@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
 import Report from "@/pages/report";
+import Studio from "@/pages/studio";
 
 const queryClient = new QueryClient();
 
@@ -14,6 +15,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/studio" component={Studio} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/report" component={Report} />
       <Route component={NotFound} />
