@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "GravelKingPro"
+version = "1.0.0"
+id = "artifacts/gravelkingpro"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19390
+
+[services.development]
+run = "pnpm --filter @workspace/gravelkingpro run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gravelkingpro", "run", "build" ]
+publicDir = "artifacts/gravelkingpro/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19390"
+BASE_PATH = "/"
