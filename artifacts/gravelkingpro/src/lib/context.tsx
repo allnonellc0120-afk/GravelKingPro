@@ -1,9 +1,16 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
-type Results = {
+export type Results = {
   throughput: string;
   stability: string;
   efficiency: string;
+  decayRate: string;
+  originalSum: number;
+  carvedSum: number;
+  parityStatus: "VALIDATED" | "KERNEL_VIOLATION";
+  multiplier: number;
+  sliceSize: number;
+  runDate: string;
 } | null;
 
 interface AppState {

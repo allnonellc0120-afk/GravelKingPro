@@ -11,6 +11,7 @@ import { Activity, AlertCircle, CheckCircle2, ChevronRight, FileText, Lock, Play
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { generateKernelReport } from "@/lib/generateReport";
 
 export default function Home() {
   const { isPro, results, setResults, hasRun, setHasRun } = useAppState();
@@ -18,7 +19,6 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [multiplier, setMultiplier] = useState([0.75]);
   const [sliceSize, setSliceSize] = useState("2");
-  const [parityStatus, setParityStatus] = useState<"VALIDATED" | "KERNEL_VIOLATION" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -27,9 +27,7 @@ export default function Home() {
     setProgress(0);
     setHasRun(false);
     setError(null);
-    setParityStatus(null);
 
-    // Animate progress while waiting for the API
     let currentProgress = 0;
     const interval = setInterval(() => {
       currentProgress = Math.min(currentProgress + 8, 90);
@@ -47,7 +45,6 @@ export default function Home() {
       });
 
       const json = await response.json();
-
       clearInterval(interval);
       setProgress(100);
 
@@ -56,15 +53,19 @@ export default function Home() {
       }
 
       const { stats } = json.data;
+      const parityStatus: "VALIDATED" | "KERNEL_VIOLATION" = json.status;
 
-      setParityStatus(json.status);
       setResults({
-        throughput: `${stats.originalSum.toLocaleString()} → ${stats.carvedSum.toFixed(2)}`,
-        stability: json.status === "VALIDATED" ? "100%" : "FAILED",
+        throughput: `${stats.originalSum} → ${stats.carvedSum.toFixed(2)}`,
+        stability: parityStatus === "VALIDATED" ? "100%" : "FAILED",
         efficiency: `${(stats.efficiency * 100).toFixed(1)}%`,
         decayRate: `${(stats.decayRate * 100).toFixed(1)}%`,
         originalSum: stats.originalSum,
         carvedSum: stats.carvedSum,
+        parityStatus,
+        multiplier: multiplier[0],
+        sliceSize: parseInt(sliceSize),
+        runDate: new Date().toLocaleString(),
       });
       setHasRun(true);
     } catch (err: any) {
@@ -75,6 +76,23 @@ export default function Home() {
     } finally {
       setIsRunning(false);
     }
+  };
+
+  const handleDownload = () => {
+    if (!results) return;
+    generateKernelReport({
+      multiplier: results.multiplier,
+      sliceSize: results.sliceSize,
+      throughput: results.throughput,
+      stability: results.stability,
+      efficiency: results.efficiency,
+      decayRate: results.decayRate,
+      originalSum: results.originalSum,
+      carvedSum: results.carvedSum,
+      parityStatus: results.parityStatus,
+      runDate: results.runDate,
+    });
+    toast({ title: "Report downloaded", description: "Your PDF is ready." });
   };
 
   const getStatusDisplay = () => {
@@ -113,16 +131,16 @@ export default function Home() {
                 Ready
               </Badge>
             )}
-            {parityStatus && hasRun && (
+            {results && hasRun && (
               <Badge
                 variant="outline"
                 className={
-                  parityStatus === "VALIDATED"
+                  results.parityStatus === "VALIDATED"
                     ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-3 py-1 text-sm font-normal"
                     : "bg-red-500/10 text-red-500 border-red-500/20 px-3 py-1 text-sm font-normal"
                 }
               >
-                {parityStatus === "VALIDATED" ? "Parity Validated" : "Parity Violation"}
+                {results.parityStatus === "VALIDATED" ? "Parity Validated" : "Parity Violation"}
               </Badge>
             )}
           </CardContent>
@@ -138,7 +156,7 @@ export default function Home() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium">Signal Strength</label>
                   <span className="text-sm text-muted-foreground font-mono">{multiplier[0].toFixed(2)}</span>
@@ -172,7 +190,7 @@ export default function Home() {
               </div>
 
               <Button
-                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold h-12 mt-4"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold h-12"
                 onClick={handleRun}
                 disabled={isRunning}
                 data-testid="button-run"
@@ -188,7 +206,7 @@ export default function Home() {
               </Button>
 
               {isRunning && (
-                <div className="space-y-2 mt-2">
+                <div className="space-y-2">
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Running gravelking_opt...</span>
                     <span>{progress}%</span>
@@ -198,7 +216,7 @@ export default function Home() {
               )}
 
               {error && (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 mt-2">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                   {error}
                 </div>
@@ -230,12 +248,14 @@ export default function Home() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-3"
                     >
-                      {[
-                        { label: "Signal Throughput", value: results.throughput },
-                        { label: "Stability", value: results.stability },
-                        { label: "Efficiency", value: results.efficiency },
-                        { label: "Decay Rate", value: results.decayRate },
-                      ].map((metric) => (
+                      {(
+                        [
+                          { label: "Signal Throughput", value: results.throughput },
+                          { label: "Stability", value: results.stability },
+                          { label: "Efficiency", value: results.efficiency },
+                          { label: "Decay Rate", value: results.decayRate },
+                        ] as { label: string; value: string }[]
+                      ).map((metric) => (
                         <div
                           key={metric.label}
                           className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border/50"
@@ -251,13 +271,11 @@ export default function Home() {
                       <Button
                         variant="secondary"
                         className="w-full mt-2"
-                        onClick={() =>
-                          toast({ title: "Report ready", description: "Your analysis report is downloading." })
-                        }
+                        onClick={handleDownload}
                         data-testid="button-download-report"
                       >
                         <FileText className="w-4 h-4 mr-2" />
-                        Download Report
+                        Download PDF Report
                       </Button>
                     </motion.div>
                   )}
@@ -267,7 +285,6 @@ export default function Home() {
           </Card>
         </div>
 
-        {/* Upgrade Banner */}
         {!isPro && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

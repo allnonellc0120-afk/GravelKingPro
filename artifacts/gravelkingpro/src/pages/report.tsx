@@ -7,16 +7,27 @@ import { Download, FileText, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { generateKernelReport } from "@/lib/generateReport";
 
 export default function Report() {
   const { isPro, hasRun, results } = useAppState();
   const { toast } = useToast();
 
   const handleDownload = () => {
-    toast({
-      title: "Downloading PDF",
-      description: "Your report is being generated and will download shortly.",
+    if (!results) return;
+    generateKernelReport({
+      multiplier: results.multiplier,
+      sliceSize: results.sliceSize,
+      throughput: results.throughput,
+      stability: results.stability,
+      efficiency: results.efficiency,
+      decayRate: results.decayRate,
+      originalSum: results.originalSum,
+      carvedSum: results.carvedSum,
+      parityStatus: results.parityStatus,
+      runDate: results.runDate,
     });
+    toast({ title: "Report downloaded", description: "Your PDF is ready." });
   };
 
   if (!hasRun || !results) {
