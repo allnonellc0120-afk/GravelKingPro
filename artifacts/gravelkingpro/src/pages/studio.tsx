@@ -34,6 +34,7 @@ export default function Studio() {
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const processedBufferRef = useRef<AudioBuffer | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const loadedFileRef = useRef<File | null>(null);
 
   const getAudioContext = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -47,6 +48,7 @@ export default function Studio() {
       toast({ title: "Invalid file", description: "Please upload an audio file (MP3, WAV, etc.)", variant: "destructive" });
       return;
     }
+    loadedFileRef.current = file;
     setFileName(file.name);
     setState("loading");
     setProgress(20);
@@ -78,7 +80,7 @@ export default function Studio() {
 
     try {
       const ctx = getAudioContext();
-      const input = fileInputRef.current?.files?.[0];
+      const input = loadedFileRef.current;
       if (!input) throw new Error("No file loaded");
 
       const ab = await input.arrayBuffer();
@@ -218,7 +220,7 @@ export default function Studio() {
                 </p>
                 <button
                   className="text-xs text-amber-500 hover:underline"
-                  onClick={(e) => { e.stopPropagation(); setState("idle"); setWaveformBefore([]); setWaveformAfter([]); setProcessedBlob(null); setStats(null); setFileName(""); }}
+                  onClick={(e) => { e.stopPropagation(); setState("idle"); setWaveformBefore([]); setWaveformAfter([]); setProcessedBlob(null); setStats(null); setFileName(""); loadedFileRef.current = null; }}
                 >
                   Load different file
                 </button>
