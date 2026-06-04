@@ -1,368 +1,236 @@
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { 
-  ArrowRight, 
-  Cpu, 
-  Layers, 
-  Settings2, 
-  SlidersHorizontal,
-  Mail,
-  Zap,
-  Lock
-} from "lucide-react";
 import { useState } from "react";
-
-const PRODUCTS = [
-  {
-    name: "GravelKing DAW",
-    tagline: "The Flagship Environment",
-    description: "A proprietary, hyper-optimized digital audio workstation built on a custom C++ audio engine. Features zero-latency routing, infinite plugin chaining, and a UI that stays out of the way.",
-    badge: "Flagship",
-    icon: <Cpu className="w-6 h-6 text-primary" />,
-    features: ["Custom Audio Engine", "VST3/AU Support", "Real-time Collaboration"]
-  },
-  {
-    name: "GravelMix Pro",
-    tagline: "Surgical Mixing Suite",
-    description: "A comprehensive mixing suite featuring analog-modeled EQs, transparent dynamic control, and AI-assisted spectral balancing.",
-    badge: "Active Users",
-    icon: <SlidersHorizontal className="w-6 h-6 text-primary" />,
-    features: ["Analog Modeling", "Spectral Balancing", "Dynamic EQ"]
-  },
-  {
-    name: "GravelBeat",
-    tagline: "Polyrhythmic Sequencing",
-    description: "An advanced drum machine and sequencer designed for complex polyrhythms and generative beat creation.",
-    badge: "In Development",
-    icon: <Settings2 className="w-6 h-6 text-primary" />,
-    features: ["Generative Sequencing", "Micro-timing", "Sample Slicing"]
-  },
-  {
-    name: "GravelMaster",
-    tagline: "Final Polish",
-    description: "An intelligent mastering suite that ensures broadcast-ready levels while preserving dynamic range and punch.",
-    badge: "Beta",
-    icon: <Layers className="w-6 h-6 text-primary" />,
-    features: ["True Peak Limiting", "Stereo Widening", "Loudness Metering"]
-  }
-];
-
-const WHY_ACQUIRE = [
-  {
-    title: "Proprietary Audio Engine",
-    description: "Our custom C++ engine outperforms industry standards in CPU efficiency and latency, representing significant intellectual property.",
-    icon: <Zap className="w-8 h-8 text-primary" />
-  },
-  {
-    title: "Established User Base",
-    description: "A dedicated community of professional producers and engineers who rely on GravelKing tools daily for commercial releases.",
-    icon: <Settings2 className="w-8 h-8 text-primary" />
-  },
-  {
-    title: "Cross-Platform Codebase",
-    description: "A meticulously maintained, modern codebase supporting macOS (Apple Silicon/Intel) and Windows natively.",
-    icon: <Cpu className="w-8 h-8 text-primary" />
-  },
-  {
-    title: "Acquisition-Ready",
-    description: "Clean cap table, fully documented architecture, and zero technical debt. Ready for immediate integration.",
-    icon: <Lock className="w-8 h-8 text-primary" />
-  }
-];
+import { Layout } from "@/components/layout";
+import { useAppState } from "@/lib/context";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Activity, CheckCircle2, ChevronRight, FileText, Lock, Play, Settings2 } from "lucide-react";
+import { Link } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
-  const [formState, setFormState] = useState<"idle" | "submitting" | "success">("idle");
+  const { isPro, results, setResults, hasRun, setHasRun } = useAppState();
+  const [isRunning, setIsRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [multiplier, setMultiplier] = useState([0.75]);
+  const [sliceSize, setSliceSize] = useState("2");
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormState("submitting");
-    setTimeout(() => {
-      setFormState("success");
-    }, 1500);
+  const handleRun = () => {
+    setIsRunning(true);
+    setProgress(0);
+    setHasRun(false);
+
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += 10;
+      setProgress(currentProgress);
+      
+      if (currentProgress >= 100) {
+        clearInterval(interval);
+        setIsRunning(false);
+        setHasRun(true);
+        setResults({
+          throughput: "233.9B ops/s",
+          stability: "100%",
+          efficiency: "75%",
+        });
+      }
+    }, 300);
   };
 
-  const scrollTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
+  const getStatusDisplay = () => {
+    if (isRunning) return { label: "Running", color: "text-blue-500", dot: "bg-blue-500 animate-pulse" };
+    if (hasRun) return { label: "Complete", color: "text-emerald-500", dot: "bg-emerald-500" };
+    return { label: "Standby", color: "text-amber-500", dot: "bg-amber-500" };
   };
+
+  const status = getStatusDisplay();
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground font-sans">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-border/40 bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="font-mono font-bold text-xl tracking-tighter">
-            GravelKing<span className="text-primary">Pro</span>
-          </div>
-          <div className="hidden md:flex items-center gap-8 text-sm font-mono tracking-tight text-muted-foreground">
-            <button onClick={() => scrollTo("portfolio")} className="hover:text-foreground transition-colors">Portfolio</button>
-            <button onClick={() => scrollTo("why-acquire")} className="hover:text-foreground transition-colors">Business Case</button>
-            <button onClick={() => scrollTo("valuation")} className="hover:text-foreground transition-colors">Terms</button>
-          </div>
-          <Button 
-            onClick={() => scrollTo("contact")}
-            className="font-mono uppercase tracking-wider text-xs rounded-none border-2 border-primary bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300"
-          >
-            Inquire
-          </Button>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <section className="relative min-h-[100dvh] flex items-center pt-20 overflow-hidden">
-        {/* Background Image & Overlay */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-background/90 z-10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent z-10" />
-          <img 
-            src="/hero-bg.png" 
-            alt="Abstract music production interface" 
-            className="w-full h-full object-cover opacity-30 mix-blend-screen"
-          />
-        </div>
-
-        <div className="container relative z-20 mx-auto px-6">
-          <div className="max-w-4xl">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <div className="inline-flex items-center gap-2 px-3 py-1 border border-primary/30 bg-primary/5 text-primary text-xs font-mono tracking-wider mb-8">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                ACQUISITION OPPORTUNITY
+    <Layout>
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-4xl mx-auto space-y-6"
+      >
+        {/* Status Card */}
+        <Card className="border-border/40 bg-card/40">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                <Activity className={`w-6 h-6 ${status.color}`} />
               </div>
-            </motion.div>
+              <div>
+                <h2 className="text-sm font-medium text-muted-foreground mb-1">System Status</h2>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${status.dot}`} />
+                  <span className="text-xl font-semibold tracking-tight">{status.label}</span>
+                </div>
+              </div>
+            </div>
+            {!isRunning && !hasRun && (
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-3 py-1 text-sm font-normal">
+                Ready
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
 
-            <motion.h1 
-              className="text-6xl md:text-8xl font-bold tracking-tighter leading-[0.9] mb-8"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            >
-              The Software <br/>
-              Portfolio.
-            </motion.h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Controls */}
+          <Card className="border-border/40 bg-card/40">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Settings2 className="w-5 h-5 text-amber-500" />
+                Parameters
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium">Signal Strength</label>
+                  <span className="text-sm text-muted-foreground font-mono">{multiplier[0].toFixed(2)}</span>
+                </div>
+                <Slider 
+                  value={multiplier} 
+                  onValueChange={setMultiplier} 
+                  max={2.0} 
+                  min={0.1} 
+                  step={0.01}
+                  disabled={isRunning}
+                  data-testid="slider-multiplier"
+                />
+              </div>
 
-            <motion.p 
-              className="text-xl md:text-2xl text-muted-foreground font-light max-w-2xl mb-12"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            >
-              Precision tools for music creators. A complete, proprietary ecosystem of professional audio software, available for strategic acquisition.
-            </motion.p>
+              <div className="space-y-4">
+                <label className="text-sm font-medium">Buffer Size</label>
+                <Select value={sliceSize} onValueChange={setSliceSize} disabled={isRunning}>
+                  <SelectTrigger data-testid="select-buffersize">
+                    <SelectValue placeholder="Select buffer size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="8">8</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            >
               <Button 
-                onClick={() => scrollTo("contact")}
-                size="lg"
-                className="h-16 px-8 rounded-none bg-primary text-primary-foreground hover:bg-primary/90 font-mono uppercase tracking-widest text-sm group"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold h-12 mt-4" 
+                onClick={handleRun}
+                disabled={isRunning}
+                data-testid="button-run"
               >
-                Schedule Acquisition Inquiry
-                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                {isRunning ? (
+                  <>Running Analysis...</>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2 fill-current" />
+                    Run Analysis
+                  </>
+                )}
               </Button>
-            </motion.div>
-          </div>
-        </div>
-      </section>
 
-      {/* Portfolio */}
-      <section id="portfolio" className="py-32 bg-secondary/30 relative">
-        <div className="container mx-auto px-6">
-          <div className="mb-16 md:mb-24">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">The Suite</h2>
-            <p className="text-muted-foreground text-lg max-w-xl font-light">
-              Four distinct, interconnected products sharing a unified codebase and design language.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {PRODUCTS.map((product, index) => (
-              <motion.div
-                key={product.name}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                className={`p-8 border border-border bg-card/50 backdrop-blur-sm relative group overflow-hidden ${index === 0 ? 'md:col-span-2 md:p-12' : ''}`}
-              >
-                <div className="absolute top-0 left-0 w-1 h-full bg-primary origin-top scale-y-0 group-hover:scale-y-100 transition-transform duration-500" />
-                
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-secondary rounded-none border border-border">
-                      {product.icon}
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold tracking-tight">{product.name}</h3>
-                      <div className="text-primary font-mono text-xs uppercase tracking-wider mt-1">{product.tagline}</div>
-                    </div>
+              {isRunning && (
+                <div className="space-y-2 mt-4">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Processing streams...</span>
+                    <span>{progress}%</span>
                   </div>
-                  <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider rounded-none border-primary/50 text-primary self-start">
-                    {product.badge}
-                  </Badge>
+                  <Progress value={progress} className="h-2" />
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                <p className={`text-muted-foreground font-light mb-8 ${index === 0 ? 'text-xl max-w-3xl' : 'text-base'}`}>
-                  {product.description}
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-border pt-8 mt-auto">
-                  {product.features.map((feature, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm text-foreground/80 font-mono">
-                      <div className="w-1 h-1 bg-primary rounded-full" />
-                      {feature}
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Why Acquire */}
-      <section id="why-acquire" className="py-32">
-        <div className="container mx-auto px-6">
-          <div className="max-w-2xl mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">The Business Case</h2>
-            <p className="text-muted-foreground text-lg font-light">
-              Why GravelKingPro represents a strategic acceleration for existing audio-tech portfolios.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {WHY_ACQUIRE.map((item, index) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="flex flex-col"
-              >
-                <div className="mb-6 opacity-80">{item.icon}</div>
-                <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {item.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Valuation & Terms */}
-      <section id="valuation" className="py-32 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">Terms of Engagement</h2>
-              <p className="text-primary-foreground/80 text-xl font-light mb-8 max-w-lg">
-                GravelKingPro is seeking a strategic exit to accelerate the distribution and evolution of our core technology.
-              </p>
-              
-              <ul className="space-y-4 font-mono text-sm uppercase tracking-wider">
-                <li className="flex items-center gap-3">
-                  <ArrowRight className="w-4 h-4" /> 100% Asset Acquisition
-                </li>
-                <li className="flex items-center gap-3">
-                  <ArrowRight className="w-4 h-4" /> IP Licensing Deals
-                </li>
-                <li className="flex items-center gap-3">
-                  <ArrowRight className="w-4 h-4" /> Team Acqui-hire Options
-                </li>
-              </ul>
-            </div>
+          {/* Results Area */}
+          <Card className="border-border/40 bg-card/40 relative overflow-hidden">
+            {!hasRun && !isRunning && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[2px]">
+                <p className="text-muted-foreground text-sm font-medium mb-4">No data to display</p>
+                <Button variant="outline" onClick={handleRun} data-testid="button-run-empty">
+                  Start Analysis
+                </Button>
+              </div>
+            )}
             
-            <div className="p-8 md:p-12 bg-background text-foreground border border-primary/20">
-              <h3 className="font-mono text-primary text-sm uppercase tracking-wider mb-4">Confidentiality</h3>
-              <p className="mb-8 text-muted-foreground">
-                Detailed metrics, MAU data, retention cohorts, and architectural deep-dives are available to qualified parties under a standard Non-Disclosure Agreement.
-              </p>
-              <Button 
-                onClick={() => scrollTo("contact")}
-                variant="outline" 
-                className="w-full rounded-none border-primary text-primary hover:bg-primary hover:text-primary-foreground font-mono uppercase tracking-widest"
-              >
-                Request NDA
-              </Button>
-            </div>
-          </div>
+            <CardHeader>
+              <CardTitle className="text-lg">Telemetry</CardTitle>
+              <CardDescription>Real-time performance metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 min-h-[180px]">
+                <AnimatePresence>
+                  {results && !isRunning && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-4"
+                    >
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border/50">
+                        <span className="text-sm font-medium text-muted-foreground">Throughput</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-emerald-400 font-semibold">{results.throughput}</span>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border/50">
+                        <span className="text-sm font-medium text-muted-foreground">Stability</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold">{results.stability}</span>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border/50">
+                        <span className="text-sm font-medium text-muted-foreground">Efficiency</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold">{results.efficiency}</span>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        </div>
+                      </div>
+
+                      <Button 
+                        variant="secondary" 
+                        className="w-full mt-4"
+                        onClick={() => toast({ title: "Report ready", description: "Your PDF is downloading." })}
+                        data-testid="button-download-report"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Download Report
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </section>
 
-      {/* Contact */}
-      <section id="contact" className="py-32 border-t border-border bg-secondary/10">
-        <div className="container mx-auto px-6 max-w-4xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Direct Inquiry</h2>
-            <p className="text-muted-foreground">For corporate development and M&A teams only.</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-mono text-muted-foreground uppercase tracking-wider">Full Name</label>
-                <Input required className="rounded-none bg-background border-border focus-visible:ring-primary h-12" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-mono text-muted-foreground uppercase tracking-wider">Corporate Email</label>
-                <Input type="email" required className="rounded-none bg-background border-border focus-visible:ring-primary h-12" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-mono text-muted-foreground uppercase tracking-wider">Company</label>
-                <Input required className="rounded-none bg-background border-border focus-visible:ring-primary h-12" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-mono text-muted-foreground uppercase tracking-wider">Title / Role</label>
-                <Input required className="rounded-none bg-background border-border focus-visible:ring-primary h-12" />
-              </div>
+        {/* Upgrade Banner */}
+        {!isPro && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between mt-8"
+          >
+            <div className="flex items-center gap-3">
+              <Lock className="w-5 h-5 text-amber-500" />
+              <p className="text-sm text-amber-500/90 font-medium">You're on the free plan — unlock full metrics and unlimited runs.</p>
             </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-mono text-muted-foreground uppercase tracking-wider">Statement of Intent</label>
-              <Textarea 
-                required 
-                className="rounded-none bg-background border-border focus-visible:ring-primary min-h-[150px] resize-none" 
-              />
-            </div>
-
-            <Button 
-              type="submit" 
-              disabled={formState !== "idle"}
-              className="w-full h-16 rounded-none bg-primary text-primary-foreground hover:bg-primary/90 font-mono uppercase tracking-widest text-sm"
-            >
-              {formState === "idle" && "Submit Acquisition Inquiry"}
-              {formState === "submitting" && "Transmitting..."}
-              {formState === "success" && "Inquiry Received"}
-            </Button>
-          </form>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-background py-12">
-        <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="font-mono font-bold text-xl tracking-tighter">
-            GravelKing<span className="text-primary">Pro</span>
-          </div>
-          <div className="text-muted-foreground text-sm font-light">
-            © {new Date().getFullYear()} GravelKing Software. All rights reserved.
-          </div>
-          <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <Lock className="w-3 h-3" /> For Acquisition Inquiries Only
-          </div>
-        </div>
-      </footer>
-    </div>
+            <Link href="/pricing" className="text-sm font-semibold text-amber-500 hover:text-amber-400 flex items-center" data-testid="link-upgrade-banner">
+              Upgrade <ChevronRight className="w-4 h-4 ml-1" />
+            </Link>
+          </motion.div>
+        )}
+      </motion.div>
+    </Layout>
   );
 }
