@@ -6,12 +6,12 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Download, Upload, Music, BarChart2, Settings2, CheckCircle2, Lock, Play, Square } from "lucide-react";
+import { Download, Upload, Music, BarChart2, Settings2, CheckCircle2, Lock, Play, Square, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { Link } from "wouter";
-import { gravelking_opt_audio, audioBufferToWav, getWaveformPoints } from "@/lib/audioKernel";
+import { getWaveformPoints } from "@/lib/audioKernel";
 
 type ProcessState = "idle" | "loading" | "ready" | "processing" | "done";
 
@@ -27,12 +27,16 @@ export default function Studio() {
   const [waveformBefore, setWaveformBefore] = useState<number[]>([]);
   const [waveformAfter, setWaveformAfter] = useState<number[]>([]);
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
-  const [stats, setStats] = useState<{ efficiency: string; decayRate: string; samples: string } | null>(null);
+  const [stats, setStats] = useState<{
+    efficiency: string;
+    decayRate: string;
+    samples: string;
+    parity: string;
+  } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const processedBufferRef = useRef<AudioBuffer | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadedFileRef = useRef<File | null>(null);
 
@@ -74,68 +78,80 @@ export default function Studio() {
   };
 
   const handleProcess = async () => {
-    if (state !== "ready") return;
+    if (state !== "ready" || !loadedFileRef.current) return;
     setState("processing");
     setProgress(0);
 
+    // Animate progress while server processes
+    let fakeProgress = 0;
+    const progressInterval = setInterval(() => {
+      fakeProgress = Math.min(fakeProgress + 3, 88);
+      setProgress(fakeProgress);
+    }, 200);
+
     try {
-      const ctx = getAudioContext();
-      const input = loadedFileRef.current;
-      if (!input) throw new Error("No file loaded");
+      const formData = new FormData();
+      formData.append("audio", loadedFileRef.current);
+      formData.append("multiplier", String(multiplier[0]));
+      formData.append("slice_size", sliceSize);
 
-      const ab = await input.arrayBuffer();
-      setProgress(25);
-      const decoded = await ctx.decodeAudioData(ab);
-      setProgress(50);
+      const response = await fetch("/api/kernel/process-audio", {
+        method: "POST",
+        body: formData,
+      });
 
-      const mul = multiplier[0];
-      const sl = parseInt(sliceSize);
-      const numChannels = decoded.numberOfChannels;
-      const outBuffer = ctx.createBuffer(numChannels, decoded.length, decoded.sampleRate);
+      clearInterval(progressInterval);
 
-      let totalStats = { originalSum: 0, carvedSum: 0, sampleCount: 0 };
-
-      for (let ch = 0; ch < numChannels; ch++) {
-        const samples = decoded.getChannelData(ch);
-        const { processed, stats: s } = gravelking_opt_audio(samples, mul, sl);
-        outBuffer.copyToChannel(processed, ch);
-        totalStats.originalSum += s.originalSum;
-        totalStats.carvedSum += s.carvedSum;
-        totalStats.sampleCount += s.sampleCount;
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Server error" }));
+        throw new Error(err.error || "Processing failed");
       }
 
-      setProgress(80);
-      processedBufferRef.current = outBuffer;
-      const wav = audioBufferToWav(outBuffer);
-      setProcessedBlob(wav);
+      setProgress(95);
 
-      const afterSamples = outBuffer.getChannelData(0);
-      setWaveformAfter(getWaveformPoints(afterSamples, 120));
+      const wavBlob = await response.blob();
+      const parity = response.headers.get("X-GK-Parity") ?? "VALIDATED";
+      const efficiency = response.headers.get("X-GK-Efficiency") ?? "0";
+      const decayRate = response.headers.get("X-GK-Decay-Rate") ?? "0";
+      const sampleCount = response.headers.get("X-GK-Sample-Count") ?? "0";
+
+      setProcessedBlob(wavBlob);
+
+      // Build waveform from processed audio
+      const ctx = getAudioContext();
+      const arrayBuf = await wavBlob.arrayBuffer();
+      const decodedOut = await ctx.decodeAudioData(arrayBuf);
+      setWaveformAfter(getWaveformPoints(decodedOut.getChannelData(0), 120));
 
       setStats({
-        efficiency: `${(mul * 100).toFixed(1)}%`,
-        decayRate: `${((1 - mul) * 100).toFixed(1)}%`,
-        samples: totalStats.sampleCount.toLocaleString(),
+        efficiency: `${(parseFloat(efficiency) * 100).toFixed(1)}%`,
+        decayRate: `${(parseFloat(decayRate) * 100).toFixed(1)}%`,
+        samples: parseInt(sampleCount).toLocaleString(),
+        parity,
       });
 
       setProgress(100);
       setState("done");
     } catch (err: any) {
+      clearInterval(progressInterval);
+      setProgress(0);
       toast({ title: "Processing failed", description: err.message, variant: "destructive" });
       setState("ready");
     }
   };
 
-  const handlePlayProcessed = () => {
-    if (!processedBufferRef.current) return;
+  const handlePlayProcessed = async () => {
+    if (!processedBlob) return;
     const ctx = getAudioContext();
     if (isPlaying) {
       sourceRef.current?.stop();
       setIsPlaying(false);
       return;
     }
+    const ab = await processedBlob.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(ab);
     const source = ctx.createBufferSource();
-    source.buffer = processedBufferRef.current;
+    source.buffer = decoded;
     source.connect(ctx.destination);
     source.start();
     source.onended = () => setIsPlaying(false);
@@ -154,6 +170,18 @@ export default function Studio() {
     toast({ title: "Downloaded", description: "Your processed audio is ready." });
   };
 
+  const resetState = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setState("idle");
+    setWaveformBefore([]);
+    setWaveformAfter([]);
+    setProcessedBlob(null);
+    setStats(null);
+    setFileName("");
+    loadedFileRef.current = null;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
     <Layout>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-6">
@@ -163,13 +191,19 @@ export default function Studio() {
             <h1 className="text-2xl font-bold tracking-tight">Audio Studio</h1>
             <p className="text-muted-foreground text-sm mt-1">Upload your audio — GravelKing processes the signal.</p>
           </div>
-          {!isPro && (
-            <Link href="/pricing">
-              <Badge variant="outline" className="border-amber-500/30 text-amber-500 cursor-pointer hover:bg-amber-500/10 px-3 py-1">
-                Free Plan — Upgrade
-              </Badge>
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2.5 py-1.5">
+              <Shield className="w-3.5 h-3.5" />
+              Server-side processing
+            </div>
+            {!isPro && (
+              <Link href="/pricing">
+                <Badge variant="outline" className="border-amber-500/30 text-amber-500 cursor-pointer hover:bg-amber-500/10 px-3 py-1">
+                  Free Plan — Upgrade
+                </Badge>
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Drop Zone */}
@@ -216,14 +250,13 @@ export default function Studio() {
                   <Badge variant="secondary" className="text-xs">{duration.toFixed(1)}s</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {state === "done" ? "Processed — ready to download" : "Loaded and ready"}
+                  {state === "done" ? "Processed — ready to download" : state === "processing" ? "Sending to GravelKing server..." : "Loaded and ready"}
                 </p>
-                <button
-                  className="text-xs text-amber-500 hover:underline"
-                  onClick={(e) => { e.stopPropagation(); setState("idle"); setWaveformBefore([]); setWaveformAfter([]); setProcessedBlob(null); setStats(null); setFileName(""); loadedFileRef.current = null; }}
-                >
-                  Load different file
-                </button>
+                {state !== "processing" && (
+                  <button className="text-xs text-amber-500 hover:underline" onClick={resetState}>
+                    Load different file
+                  </button>
+                )}
               </div>
             )}
           </CardContent>
@@ -272,16 +305,14 @@ export default function Studio() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <Button
                   className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold h-11"
                   onClick={handleProcess}
                   disabled={state === "processing" || state === "idle" || state === "loading"}
                   data-testid="button-process"
                 >
-                  {state === "processing" ? `Processing... ${progress}%` : "Process with GravelKing"}
+                  {state === "processing" ? `Processing on server... ${progress}%` : "Process with GravelKing"}
                 </Button>
-
                 {state === "processing" && <Progress value={progress} className="h-1.5" />}
               </CardContent>
             </Card>
@@ -290,18 +321,19 @@ export default function Studio() {
             <Card className="border-border/40 bg-card/40">
               <CardHeader>
                 <CardTitle className="text-base">Output</CardTitle>
-                <CardDescription>Processed audio and metrics</CardDescription>
+                <CardDescription>Processed on the GravelKing server</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {state !== "done" && (
                   <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground text-sm">
                     <BarChart2 className="w-8 h-8 mb-3 opacity-30" />
-                    Hit "Process" to run the kernel
+                    {state === "processing" ? "Server is running the kernel..." : "Hit Process to run the kernel"}
                   </div>
                 )}
                 {state === "done" && stats && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
                     {[
+                      { label: "Parity Status", value: stats.parity },
                       { label: "Efficiency", value: stats.efficiency },
                       { label: "Decay Rate", value: stats.decayRate },
                       { label: "Samples Processed", value: stats.samples },
@@ -314,7 +346,6 @@ export default function Studio() {
                         </div>
                       </div>
                     ))}
-
                     <div className="flex gap-2 pt-1">
                       <Button variant="outline" className="flex-1" onClick={handlePlayProcessed} data-testid="button-play">
                         {isPlaying ? <><Square className="w-4 h-4 mr-2" />Stop</> : <><Play className="w-4 h-4 mr-2" />Preview</>}
@@ -343,21 +374,19 @@ export default function Studio() {
 }
 
 function WaveformCard({ label, points, color, placeholder }: { label: string; points: number[]; color: string; placeholder?: boolean }) {
-  const height = 80;
-  const width = 300;
   return (
     <Card className="border-border/40 bg-card/40">
       <CardContent className="p-4">
         <p className="text-xs font-medium text-muted-foreground mb-3">{label}</p>
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height: 80 }}>
+        <svg viewBox="0 0 300 80" className="w-full" style={{ height: 80 }}>
           {placeholder ? (
-            <text x={width / 2} y={height / 2} textAnchor="middle" fill="#555" fontSize="11" dominantBaseline="middle">Run kernel to see output</text>
+            <text x={150} y={40} textAnchor="middle" fill="#555" fontSize="11" dominantBaseline="middle">Run kernel to see output</text>
           ) : (
             points.map((p, i) => {
-              const x = (i / points.length) * width;
-              const barH = Math.max(2, p * height * 0.9);
-              const y = (height - barH) / 2;
-              return <rect key={i} x={x} y={y} width={Math.max(1, width / points.length - 0.5)} height={barH} fill={color} opacity={0.7} rx={0.5} />;
+              const x = (i / points.length) * 300;
+              const barH = Math.max(2, p * 72);
+              const y = (80 - barH) / 2;
+              return <rect key={i} x={x} y={y} width={Math.max(1, 300 / points.length - 0.5)} height={barH} fill={color} opacity={0.75} rx={0.5} />;
             })
           )}
         </svg>
