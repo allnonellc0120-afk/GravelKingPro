@@ -1,22 +1,90 @@
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { useAppState } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Mail } from "lucide-react";
+import { Check, Mail, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export default function Pricing() {
   const { isPro, setIsPro } = useAppState();
   const { toast } = useToast();
+  const [location] = useLocation();
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
-  const handleUpgrade = () => {
-    setIsPro(true);
-    toast({
-      title: "Upgraded to Pro",
-      description: "You now have access to full metrics and reports.",
-    });
+  // Handle return from Stripe checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    const sessionId = params.get("session_id");
+
+    if (checkout === "success" && sessionId) {
+      fetch(`/api/stripe/subscription-status?session_id=${sessionId}`)
+        .then(r => r.json())
+        .then((data: any) => {
+          if (data.active) {
+            setIsPro(true);
+            toast({ title: "You're now Pro!", description: "All features unlocked. Welcome to GravelKing Pro." });
+          }
+        })
+        .catch(() => {});
+      window.history.replaceState({}, "", "/pricing");
+    } else if (checkout === "cancelled") {
+      toast({ title: "Checkout cancelled", description: "No charge was made.", variant: "destructive" });
+      window.history.replaceState({}, "", "/pricing");
+    }
+
+    // Also check on landing page return
+    const rootParams = new URLSearchParams(window.location.search);
+    if (rootParams.get("checkout") === "success") {
+      const sid = rootParams.get("session_id");
+      if (sid) {
+        fetch(`/api/stripe/subscription-status?session_id=${sid}`)
+          .then(r => r.json())
+          .then((data: any) => { if (data.active) setIsPro(true); })
+          .catch(() => {});
+      }
+    }
+  }, []);
+
+  const handleStripeCheckout = async (tier: "pro" | "node_auditor") => {
+    setLoadingTier(tier);
+    try {
+      // Fetch products to get the right price ID
+      const productsRes = await fetch("/api/stripe/products");
+      const { data: products } = await productsRes.json() as { data: any[] };
+
+      const tierName = tier === "pro" ? "GravelKing Pro" : "Node Auditor";
+      const product = products.find((p: any) => p.name === tierName);
+
+      if (!product || !product.prices?.length) {
+        toast({
+          title: "Products not configured yet",
+          description: "Run the seed script to create Stripe products, then try again.",
+          variant: "destructive",
+        });
+        setLoadingTier(null);
+        return;
+      }
+
+      const priceId = product.prices[0].id;
+      const checkoutRes = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId }),
+      });
+
+      const { url, error } = await checkoutRes.json() as { url?: string; error?: string };
+      if (error) throw new Error(error);
+      if (url) window.location.href = url;
+    } catch (err: any) {
+      toast({ title: "Checkout error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoadingTier(null);
+    }
   };
 
   const handleContactSales = () => {
@@ -38,11 +106,7 @@ export default function Pricing() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Starter Plan */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
                 <CardTitle className="text-xl">Starter</CardTitle>
@@ -53,15 +117,9 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-emerald-500" /> Basic analysis
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-emerald-500" /> 1 core utilization
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-emerald-500" /> Standard report
-                  </li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-emerald-500" /> Basic analysis</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-emerald-500" /> Server-side processing</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-emerald-500" /> Audio preview</li>
                 </ul>
               </CardContent>
               <CardFooter>
@@ -79,11 +137,7 @@ export default function Pricing() {
           </motion.div>
 
           {/* Pro Plan */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <Card className="flex flex-col h-full border-amber-500/30 bg-card/60 relative overflow-hidden">
               <div className="absolute top-0 right-0 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
                 POPULAR
@@ -98,18 +152,11 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> Full real-time metrics
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> Unlimited runs
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> Detailed PDF reports
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> Priority support
-                  </li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Full real-time metrics</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Unlimited runs</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> WAV download</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Detailed PDF reports</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Priority support</li>
                 </ul>
               </CardContent>
               <CardFooter>
@@ -118,12 +165,13 @@ export default function Pricing() {
                     Current Plan
                   </Badge>
                 ) : (
-                  <Button 
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold" 
-                    onClick={handleUpgrade}
+                  <Button
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+                    onClick={() => handleStripeCheckout("pro")}
+                    disabled={loadingTier !== null}
                     data-testid="button-upgrade-pro"
                   >
-                    Upgrade to Pro
+                    {loadingTier === "pro" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Upgrade to Pro"}
                   </Button>
                 )}
               </CardFooter>
@@ -131,11 +179,7 @@ export default function Pricing() {
           </motion.div>
 
           {/* Node Auditor Plan */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
                 <CardTitle className="text-xl">Node Auditor</CardTitle>
@@ -147,27 +191,21 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-blue-500" /> Enterprise benchmarking
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-blue-500" /> 1T scale testing
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-blue-500" /> Morris Law V2 access
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-blue-500" /> Dedicated support
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check className="w-4 h-4 text-blue-500" /> Custom reports
-                  </li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Everything in Pro</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Enterprise benchmarking</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Custom reports</li>
+                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Dedicated support</li>
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full" onClick={handleContactSales} data-testid="button-contact-sales">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Contact Sales
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleStripeCheckout("node_auditor")}
+                  disabled={loadingTier !== null}
+                  data-testid="button-contact-sales"
+                >
+                  {loadingTier === "node_auditor" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : <><Mail className="w-4 h-4 mr-2" />Subscribe</>}
                 </Button>
               </CardFooter>
             </Card>
