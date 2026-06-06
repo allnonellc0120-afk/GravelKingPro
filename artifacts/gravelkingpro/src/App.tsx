@@ -8,6 +8,7 @@ import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
 import Report from "@/pages/report";
 import Studio from "@/pages/studio";
+import MixStudio from "@/pages/mix-studio";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/studio" component={Studio} />
+      <Route path="/mix" component={MixStudio} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/report" component={Report} />
       <Route component={NotFound} />
