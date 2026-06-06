@@ -8,49 +8,51 @@ if (!key) {
 
 const stripe = new Stripe(key);
 
+async function ensureProduct(name: string, description: string, tier: string, unitAmount: number, interval: 'month' | 'year' = 'month') {
+  const existing = await stripe.products.search({ query: `name:'${name}' AND active:'true'` });
+  if (existing.data.length > 0) {
+    console.log(`${name} already exists: ${existing.data[0].id}`);
+    const prices = await stripe.prices.list({ product: existing.data[0].id, active: true });
+    prices.data.forEach(p => console.log(`  Price: $${(p.unit_amount ?? 0) / 100}/${(p.recurring as any)?.interval ?? 'one-time'} — ${p.id}`));
+  } else {
+    console.log(`Creating ${name}...`);
+    const product = await stripe.products.create({
+      name,
+      description,
+      metadata: { tier },
+    });
+    const price = await stripe.prices.create({
+      product: product.id,
+      unit_amount: unitAmount,
+      currency: 'usd',
+      recurring: { interval },
+    });
+    console.log(`Created ${name} — price: $${unitAmount / 100}/mo (${price.id})`);
+  }
+}
+
 async function createProducts() {
   try {
-    console.log('Checking for existing GravelKing Pro product...');
-    const existing = await stripe.products.search({ query: "name:'GravelKing Pro' AND active:'true'" });
-    if (existing.data.length > 0) {
-      console.log('GravelKing Pro already exists:', existing.data[0].id);
-      const prices = await stripe.prices.list({ product: existing.data[0].id, active: true });
-      prices.data.forEach(p => console.log(`  Price: $${(p.unit_amount ?? 0) / 100}/${(p.recurring as any)?.interval ?? 'one-time'} — ${p.id}`));
-    } else {
-      console.log('Creating GravelKing Pro...');
-      const proProduct = await stripe.products.create({
-        name: 'GravelKing Pro',
-        description: 'Full server-side audio processing, unlimited runs, PDF reports, and priority support.',
-        metadata: { tier: 'pro' },
-      });
-      const monthlyPrice = await stripe.prices.create({
-        product: proProduct.id,
-        unit_amount: 3999,
-        currency: 'usd',
-        recurring: { interval: 'month' },
-      });
-      console.log(`Created GravelKing Pro — monthly price: $39.99/mo (${monthlyPrice.id})`);
-    }
+    await ensureProduct(
+      'GravelKing Splits',
+      'Unlimited stem splitting and voice removal with downloadable WAV stems. No Studio access.',
+      'splits',
+      999,
+    );
 
-    console.log('\nChecking for Node Auditor product...');
-    const existingAuditor = await stripe.products.search({ query: "name:'Node Auditor' AND active:'true'" });
-    if (existingAuditor.data.length > 0) {
-      console.log('Node Auditor already exists:', existingAuditor.data[0].id);
-    } else {
-      console.log('Creating Node Auditor...');
-      const auditorProduct = await stripe.products.create({
-        name: 'Node Auditor',
-        description: 'Enterprise-scale benchmarking, dedicated support, custom reports.',
-        metadata: { tier: 'node_auditor' },
-      });
-      const auditorPrice = await stripe.prices.create({
-        product: auditorProduct.id,
-        unit_amount: 49900,
-        currency: 'usd',
-        recurring: { interval: 'month' },
-      });
-      console.log(`Created Node Auditor — price: $499/mo (${auditorPrice.id})`);
-    }
+    await ensureProduct(
+      'GravelKing Pro',
+      'Full server-side audio processing, unlimited runs, PDF reports, and priority support.',
+      'pro',
+      3999,
+    );
+
+    await ensureProduct(
+      'Node Auditor',
+      'Enterprise-scale benchmarking, dedicated support, custom reports.',
+      'node_auditor',
+      49900,
+    );
 
     console.log('\nDone. Webhooks will sync products to your database automatically.');
   } catch (err: any) {

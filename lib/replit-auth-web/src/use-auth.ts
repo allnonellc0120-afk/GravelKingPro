@@ -7,6 +7,7 @@ export type AuthUser = {
   lastName?: string | null;
   profileImageUrl?: string | null;
   isPro?: boolean;
+  subscriptionTier?: string | null;
 };
 
 interface AuthState {
