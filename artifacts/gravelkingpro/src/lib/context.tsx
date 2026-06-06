@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useAuth } from "@workspace/replit-auth-web";
 
 export type Results = {
   throughput: string;
@@ -25,9 +26,17 @@ interface AppState {
 const AppContext = createContext<AppState | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
   const [isPro, setIsPro] = useState(false);
   const [results, setResults] = useState<Results>(null);
   const [hasRun, setHasRun] = useState(false);
+
+  // Sync isPro from authenticated user's DB record
+  useEffect(() => {
+    if (!isLoading && user?.isPro) {
+      setIsPro(true);
+    }
+  }, [user, isLoading]);
 
   return (
     <AppContext.Provider value={{ isPro, setIsPro, results, setResults, hasRun, setHasRun }}>

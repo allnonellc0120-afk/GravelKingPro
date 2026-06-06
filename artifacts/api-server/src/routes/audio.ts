@@ -6,6 +6,7 @@ import { writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { gravelking_opt, verifyParity } from "../kernel";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
+import { db, processRunsTable } from "@workspace/db";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -182,6 +183,18 @@ audioRouter.post(
       };
       telemetryBus.emit("run", event);
 
+      if (req.isAuthenticated()) {
+        db.insert(processRunsTable).values({
+          userId: req.user.id,
+          routing: "remote",
+          parity: remote.headers["X-GK-Parity"] ?? "UNKNOWN",
+          efficiency: parseFloat(remote.headers["X-GK-Efficiency"] ?? "0") || null,
+          decayRate: parseFloat(remote.headers["X-GK-Decay-Rate"] ?? "0") || null,
+          sampleCount: parseInt(remote.headers["X-GK-Sample-Count"] ?? "0") || null,
+          fileName: req.file.originalname,
+        }).catch(() => {});
+      }
+
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
       res.setHeader("X-GK-Routing", "remote");
@@ -208,6 +221,18 @@ audioRouter.post(
         remoteUrl: getRemoteUrl(),
       };
       telemetryBus.emit("run", event);
+
+      if (req.isAuthenticated()) {
+        db.insert(processRunsTable).values({
+          userId: req.user.id,
+          routing: "local",
+          parity: parityStatus,
+          efficiency: result.stats.efficiency,
+          decayRate: result.stats.decayRate,
+          sampleCount: result.processed.length,
+          fileName: req.file.originalname,
+        }).catch(() => {});
+      }
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
