@@ -21,22 +21,25 @@ function getRemoteUrl(): string | null {
 async function tryRemoteProcessing(
   file: Express.Multer.File,
   multiplier: number,
-  sliceSize: number
+  sliceSize: number,
+  stemId = 1
 ): Promise<{ wav: Buffer; headers: Record<string, string> } | null> {
   const remoteUrl = getRemoteUrl();
   if (!remoteUrl) return null;
 
   try {
-    const form = new FormData();
-    form.append("audio", new Blob([new Uint8Array(file.buffer)], { type: file.mimetype }), file.originalname);
-    form.append("multiplier", String(multiplier));
-    form.append("slice_size", String(sliceSize));
-
     const response = await fetch(`${remoteUrl}/process-audio`, {
       method: "POST",
-      body: form,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-GravelKing-V3-Protocol": "REGENERATIVE_FLOW",
+        "X-Stem-ID": String(stemId),
+        "X-GK-Multiplier": String(multiplier),
+        "X-GK-Slice-Size": String(sliceSize),
+      },
+      body: new Uint8Array(file.buffer),
       signal: AbortSignal.timeout(30_000),
-      redirect: "error", // don't follow redirects — indicates a real API is missing
+      redirect: "error", // don't follow redirects — indicates the endpoint isn't live yet
     });
 
     if (!response.ok) return null;
@@ -52,7 +55,7 @@ async function tryRemoteProcessing(
     });
     return { wav, headers };
   } catch {
-    return null; // network error, redirect, timeout → fall back to local
+    return null; // network error, redirect, timeout → fall back to local kernel
   }
 }
 
