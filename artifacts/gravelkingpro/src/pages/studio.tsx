@@ -428,7 +428,7 @@ export default function Studio() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Audio Studio</h1>
-            <p className="text-muted-foreground text-sm mt-1">Upload your audio — GravelKing processes it on the server.</p>
+            <p className="text-muted-foreground text-sm mt-1">Upload your audio — GravelKing Productions processes it on the server.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2.5 py-1.5">

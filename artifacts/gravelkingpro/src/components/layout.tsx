@@ -20,8 +20,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="w-6 h-6 text-amber-500" />
-            <span className="font-bold text-lg tracking-tight uppercase">GravelKing</span>
-            <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20 ml-2">PRO</Badge>
+            <span className="font-bold text-lg tracking-tight uppercase">GravelKing Productions</span>
           </div>
           <nav className="flex items-center gap-5">
             {links.map((link) => (
