@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { useAppState } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,10 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertCircle, CheckCircle2, ChevronRight, FileText, Lock, Play, Settings2, Radio, Server, Wifi, WifiOff } from "lucide-react";
+import {
+  Activity, AlertCircle, CheckCircle2, ChevronRight, FileText,
+  Lock, Play, Settings2, Radio, Server, Wifi, WifiOff, Zap,
+} from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +21,17 @@ type RoutingConfig = {
   remoteUrl: string | null;
   remoteStatus: "online" | "offline" | "not_configured";
   localKernel: "active";
+  authConfigured: boolean;
+};
+
+type LiveEvent = {
+  routing: "remote" | "local";
+  parity: string;
+  efficiency: string;
+  decayRate: string;
+  sampleCount: string;
+  timestamp: string;
+  remoteUrl: string | null;
 };
 
 export default function Home() {
@@ -28,14 +42,37 @@ export default function Home() {
   const [sliceSize, setSliceSize] = useState("2");
   const [error, setError] = useState<string | null>(null);
   const [routing, setRouting] = useState<RoutingConfig | null>(null);
-  const [lastRoutingPath, setLastRoutingPath] = useState<"remote" | "local" | null>(null);
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
+  const [sseConnected, setSseConnected] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const { toast } = useToast();
 
+  // Fetch routing config
   useEffect(() => {
     fetch("/api/kernel/routing")
       .then((r) => r.json())
       .then(setRouting)
       .catch(() => {});
+  }, []);
+
+  // Connect to SSE telemetry stream
+  useEffect(() => {
+    const es = new EventSource("/api/kernel/telemetry");
+    eventSourceRef.current = es;
+
+    es.onopen = () => setSseConnected(true);
+    es.onerror = () => setSseConnected(false);
+    es.onmessage = (e) => {
+      try {
+        const event: LiveEvent = JSON.parse(e.data);
+        setLiveEvents((prev) => [event, ...prev].slice(0, 10));
+      } catch { /* ignore malformed */ }
+    };
+
+    return () => {
+      es.close();
+      setSseConnected(false);
+    };
   }, []);
 
   const handleRun = async () => {
@@ -119,18 +156,23 @@ export default function Home() {
     <Layout>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-6">
 
-        {/* Routing Telemetry Banner */}
+        {/* Routing / Telemetry Banner */}
         {routing && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
             <Card className="border-border/40 bg-card/30">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <Radio className="w-4 h-4 text-amber-500" />
                     <span className="text-sm font-medium">Kernel Routing</span>
+                    {/* SSE connection indicator */}
+                    <div className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${sseConnected ? "bg-emerald-500/10 text-emerald-400" : "bg-secondary text-muted-foreground"}`}>
+                      <Zap className="w-3 h-3" />
+                      {sseConnected ? "Live" : "Connecting..."}
+                    </div>
                   </div>
+
                   <div className="flex items-center gap-3 flex-wrap">
-                    {/* Local kernel status */}
                     <div className="flex items-center gap-1.5 text-xs bg-secondary/60 rounded-md px-2.5 py-1.5">
                       <Server className="w-3.5 h-3.5 text-emerald-500" />
                       <span className="text-emerald-400 font-medium">Local — Active</span>
@@ -138,19 +180,19 @@ export default function Home() {
 
                     <span className="text-muted-foreground text-xs">→</span>
 
-                    {/* Remote endpoint status */}
                     {routing.mode === "remote_with_fallback" ? (
                       <div className={`flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5 border ${
                         routing.remoteStatus === "online"
                           ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                           : "bg-amber-500/10 border-amber-500/20 text-amber-400"
                       }`}>
-                        {routing.remoteStatus === "online"
-                          ? <Wifi className="w-3.5 h-3.5" />
-                          : <WifiOff className="w-3.5 h-3.5" />}
+                        {routing.remoteStatus === "online" ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
                         <span className="font-medium">
-                          Remote — {routing.remoteStatus === "online" ? "Online" : "Offline (using local fallback)"}
+                          Remote — {routing.remoteStatus === "online" ? "Online" : "Offline (local fallback)"}
                         </span>
+                        {routing.authConfigured && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 border-emerald-500/30 text-emerald-400 ml-1">Auth ✓</Badge>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 text-xs bg-secondary/40 border border-border/30 rounded-md px-2.5 py-1.5 text-muted-foreground">
@@ -158,21 +200,7 @@ export default function Home() {
                         <span>Remote — Not configured</span>
                       </div>
                     )}
-
-                    {/* Last run routing path */}
-                    {lastRoutingPath && (
-                      <Badge variant="outline" className={`text-xs ${lastRoutingPath === "remote" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}`}>
-                        Last run: {lastRoutingPath === "remote" ? "Remote" : "Local fallback"}
-                      </Badge>
-                    )}
                   </div>
-
-                  {/* Configure link */}
-                  {routing.mode === "local" && (
-                    <p className="text-xs text-muted-foreground">
-                      Set <code className="bg-secondary px-1 rounded text-amber-400">REMOTE_KERNEL_URL</code> to enable remote routing
-                    </p>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -195,9 +223,7 @@ export default function Home() {
               </div>
             </div>
             {!isRunning && !hasRun && !error && (
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-3 py-1 text-sm font-normal">
-                Ready
-              </Badge>
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-3 py-1 text-sm font-normal">Ready</Badge>
             )}
             {results && hasRun && (
               <Badge variant="outline" className={results.parityStatus === "VALIDATED"
@@ -265,7 +291,7 @@ export default function Home() {
 
           {/* Telemetry */}
           <Card className="border-border/40 bg-card/40 relative overflow-hidden">
-            {!hasRun && !isRunning && (
+            {!hasRun && !isRunning && liveEvents.length === 0 && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[2px]">
                 <p className="text-muted-foreground text-sm font-medium mb-4">No data to display</p>
                 <Button variant="outline" onClick={handleRun} data-testid="button-run-empty">Start Analysis</Button>
@@ -304,6 +330,51 @@ export default function Home() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Live Event Stream */}
+        {liveEvents.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <Card className="border-border/40 bg-card/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  Live Event Stream
+                  <Badge variant="outline" className="text-xs ml-auto border-emerald-500/30 text-emerald-400">
+                    {liveEvents.length} event{liveEvents.length !== 1 ? "s" : ""}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <AnimatePresence initial={false}>
+                    {liveEvents.map((event, i) => (
+                      <motion.div
+                        key={event.timestamp + i}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/40 border border-border/40 font-mono text-xs"
+                      >
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                          event.routing === "remote"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "bg-amber-500/20 text-amber-400"
+                        }`}>
+                          {event.routing.toUpperCase()}
+                        </span>
+                        <span className="text-muted-foreground shrink-0">
+                          {new Date(event.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span className="text-foreground/70 truncate">
+                          eff={event.efficiency} · decay={event.decayRate} · samples={event.sampleCount} · parity={event.parity}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {!isPro && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}

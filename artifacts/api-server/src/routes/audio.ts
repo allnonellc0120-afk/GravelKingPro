@@ -5,17 +5,19 @@ import { promisify } from "util";
 import { writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { gravelking_opt, verifyParity } from "../kernel";
+import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 const audioRouter = Router();
 
 // ── Remote routing ────────────────────────────────────────────────────────────
-// Set REMOTE_KERNEL_URL to route processing to an external endpoint.
-// Falls back to local kernel automatically on any error.
 function getRemoteUrl(): string | null {
-  const url = process.env.REMOTE_KERNEL_URL?.trim();
-  return url || null;
+  return process.env.REMOTE_KERNEL_URL?.trim() || null;
+}
+
+function getRemoteApiKey(): string | null {
+  return process.env.REMOTE_KERNEL_API_KEY?.trim() || null;
 }
 
 async function tryRemoteProcessing(
@@ -27,19 +29,25 @@ async function tryRemoteProcessing(
   const remoteUrl = getRemoteUrl();
   if (!remoteUrl) return null;
 
+  const requestHeaders: Record<string, string> = {
+    "Content-Type": "application/octet-stream",
+    "X-GravelKing-V3-Protocol": "REGENERATIVE_FLOW",
+    "X-Stability-Quorum": "MONITOR_100",
+    "X-Stem-ID": String(stemId),
+    "X-GK-Multiplier": String(multiplier),
+    "X-GK-Slice-Size": String(sliceSize),
+  };
+
+  const apiKey = getRemoteApiKey();
+  if (apiKey) requestHeaders["Authorization"] = `Bearer ${apiKey}`;
+
   try {
     const response = await fetch(`${remoteUrl}/process-audio`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/octet-stream",
-        "X-GravelKing-V3-Protocol": "REGENERATIVE_FLOW",
-        "X-Stem-ID": String(stemId),
-        "X-GK-Multiplier": String(multiplier),
-        "X-GK-Slice-Size": String(sliceSize),
-      },
+      headers: requestHeaders,
       body: new Uint8Array(file.buffer),
       signal: AbortSignal.timeout(30_000),
-      redirect: "error", // don't follow redirects — indicates the endpoint isn't live yet
+      redirect: "error",
     });
 
     if (!response.ok) return null;
@@ -48,14 +56,14 @@ async function tryRemoteProcessing(
     if (!contentType.includes("audio")) return null;
 
     const wav = Buffer.from(await response.arrayBuffer());
-    const headers: Record<string, string> = {};
+    const responseHeaders: Record<string, string> = {};
     ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count"].forEach((h) => {
       const v = response.headers.get(h);
-      if (v) headers[h] = v;
+      if (v) responseHeaders[h] = v;
     });
-    return { wav, headers };
+    return { wav, headers: responseHeaders };
   } catch {
-    return null; // network error, redirect, timeout → fall back to local kernel
+    return null;
   }
 }
 
@@ -97,6 +105,29 @@ async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<B
   return wavBuf;
 }
 
+// ── Telemetry SSE endpoint ────────────────────────────────────────────────────
+audioRouter.get("/kernel/telemetry", (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  // Send a heartbeat every 25s to keep the connection alive through proxies
+  const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 25_000);
+
+  const handler = (event: TelemetryEvent) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  telemetryBus.on("run", handler);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    telemetryBus.off("run", handler);
+  });
+});
+
 // ── Config / health endpoint ──────────────────────────────────────────────────
 audioRouter.get("/kernel/routing", async (_req, res) => {
   const remoteUrl = getRemoteUrl();
@@ -120,6 +151,7 @@ audioRouter.get("/kernel/routing", async (_req, res) => {
     remoteUrl: remoteUrl ?? null,
     remoteStatus,
     localKernel: "active",
+    authConfigured: !!getRemoteApiKey(),
   });
 });
 
@@ -139,6 +171,17 @@ audioRouter.post(
     // Try remote first
     const remote = await tryRemoteProcessing(req.file, multiplier, sliceSize);
     if (remote) {
+      const event: TelemetryEvent = {
+        routing: "remote",
+        parity: remote.headers["X-GK-Parity"] ?? "UNKNOWN",
+        efficiency: remote.headers["X-GK-Efficiency"] ?? "—",
+        decayRate: remote.headers["X-GK-Decay-Rate"] ?? "—",
+        sampleCount: remote.headers["X-GK-Sample-Count"] ?? "—",
+        timestamp: new Date().toISOString(),
+        remoteUrl: getRemoteUrl(),
+      };
+      telemetryBus.emit("run", event);
+
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
       res.setHeader("X-GK-Routing", "remote");
@@ -154,6 +197,17 @@ audioRouter.post(
       const result = gravelking_opt(Array.from(samples), multiplier, sliceSize);
       const parityStatus = verifyParity(result.processed);
       const wavBuffer = await encodeToWav(new Float32Array(result.processed), sampleRate);
+
+      const event: TelemetryEvent = {
+        routing: "local",
+        parity: parityStatus,
+        efficiency: result.stats.efficiency.toFixed(4),
+        decayRate: result.stats.decayRate.toFixed(4),
+        sampleCount: String(result.processed.length),
+        timestamp: new Date().toISOString(),
+        remoteUrl: getRemoteUrl(),
+      };
+      telemetryBus.emit("run", event);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
