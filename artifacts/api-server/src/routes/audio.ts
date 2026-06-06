@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 const audioRouter = Router();
 
-type ProcessMode = "standard" | "voice_remove" | "stem_split";
+type ProcessMode = "standard" | "voice_remove" | "stem_split" | "voice_change" | "denoise";
 
 // ── Remote routing ────────────────────────────────────────────────────────────
 function getRemoteUrl(): string | null {
@@ -128,6 +128,23 @@ async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<B
   await unlink(outPath).catch(() => {});
   return wavBuf;
 }
+
+/** Apply rubberband tempo/pitch shift as a post-processing step. */
+async function applyTempoAndPitch(inputBuf: Buffer, tempo: number, semitones: number): Promise<Buffer> {
+  if (Math.abs(tempo - 1.0) < 0.01 && Math.abs(semitones) < 0.1) return inputBuf;
+  const pitchRatio = Math.pow(2, semitones / 12);
+  const filter = `rubberband=tempo=${tempo.toFixed(3)}:pitch=${pitchRatio.toFixed(4)}`;
+  return processWithFilter(inputBuf, "wav", filter, 2);
+}
+
+/** Voice change presets → ffmpeg filter strings. */
+const VOICE_CHANGE_FILTERS: Record<string, string> = {
+  normal:   "aecho=0.6:0.88:20:0.1",
+  robot:    "vibrato=f=30:d=0.9,aecho=0.9:0.9:4:0.6",
+  chipmunk: "rubberband=tempo=1.25:pitch=1.5",
+  deep:     "rubberband=tempo=0.82:pitch=0.6",
+  alien:    "vibrato=f=7:d=0.95,aecho=0.85:0.85:55:0.65,rubberband=pitch=1.18",
+};
 
 /** Apply an ffmpeg audio filter directly to a file and return a WAV buffer. */
 async function processWithFilter(
@@ -244,6 +261,46 @@ audioRouter.post(
     const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
     const mode: ProcessMode = (req.body.mode as ProcessMode) ?? "standard";
     const ext = (req.file.originalname.split(".").pop() ?? "mp3").toLowerCase();
+    const tempo = Math.min(2.5, Math.max(0.25, parseFloat((req.body.tempo as string) ?? "1.0")));
+    const semitones = Math.min(12, Math.max(-12, parseFloat((req.body.semitones as string) ?? "0")));
+    const voicePreset = (req.body.voice_preset as string) ?? "normal";
+
+    // ── Denoise (free) ─────────────────────────────────────────────────────────
+    if (mode === "denoise") {
+      try {
+        let wavBuffer = await processWithFilter(req.file.buffer, ext, "afftdn=nf=-25,anlmdn=s=7");
+        wavBuffer = await applyTempoAndPitch(wavBuffer, tempo, semitones);
+        res.setHeader("Content-Type", "audio/wav");
+        res.setHeader("Content-Disposition", `attachment; filename="gravelking_denoised.wav"`);
+        res.setHeader("X-GK-Mode", "denoise");
+        res.setHeader("X-GK-Routing", "local");
+        res.setHeader("X-GK-Parity", "VALIDATED");
+        res.send(wavBuffer);
+        return;
+      } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+        return;
+      }
+    }
+
+    // ── Voice change (free) ────────────────────────────────────────────────────
+    if (mode === "voice_change") {
+      try {
+        const filter = VOICE_CHANGE_FILTERS[voicePreset] ?? VOICE_CHANGE_FILTERS["normal"];
+        let wavBuffer = await processWithFilter(req.file.buffer, ext, filter);
+        wavBuffer = await applyTempoAndPitch(wavBuffer, tempo, semitones);
+        res.setHeader("Content-Type", "audio/wav");
+        res.setHeader("Content-Disposition", `attachment; filename="gravelking_voice.wav"`);
+        res.setHeader("X-GK-Mode", "voice_change");
+        res.setHeader("X-GK-Routing", "local");
+        res.setHeader("X-GK-Parity", "VALIDATED");
+        res.send(wavBuffer);
+        return;
+      } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+        return;
+      }
+    }
 
     // ── Free-tier gate for split modes ─────────────────────────────────────────
     let isFreeUse = false;
@@ -278,7 +335,7 @@ audioRouter.post(
           return;
         }
 
-        const wavBuffer = await processWithFilter(
+        let wavBuffer = await processWithFilter(
           req.file.buffer,
           ext,
           "pan=stereo|c0=c0-c1|c1=c1-c0",
@@ -311,6 +368,7 @@ audioRouter.post(
         if (isFreeUse && req.isAuthenticated()) {
           db.update(usersTable).set({ usedFreeSplit: true }).where(eq(usersTable.id, req.user.id)).catch(() => {});
         }
+        wavBuffer = await applyTempoAndPitch(wavBuffer, tempo, semitones);
         res.setHeader("Content-Type", "audio/wav");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.wav"`);
         res.setHeader("X-GK-Mode", "voice_remove");
