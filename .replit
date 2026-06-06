@@ -34,3 +34,8 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VITE_STRIPE_PUBLISHABLE_KEY = "pk_test_51Tf1ojANk3kJTOQRKfpUlYyaxT2uN9H2pw3Zb9lYCGbaUN07fQDCLMopYzUvkDRdtUYugTUai4fsa6OT6GjkQjR300QdR3PM8R"
