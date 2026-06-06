@@ -3,7 +3,6 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { WebhookHandlers } from "./webhookHandlers";
 
 const app: Express = express();
 
@@ -32,12 +31,20 @@ app.post(
       return;
     }
     try {
-      const sig = Array.isArray(signature) ? signature[0] : signature;
-      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        stripe.webhooks.constructEvent(
+          req.body as Buffer,
+          Array.isArray(signature) ? signature[0] : signature,
+          webhookSecret
+        );
+      }
       res.status(200).json({ received: true });
     } catch (err: any) {
       logger.error({ err }, "Stripe webhook error");
-      res.status(400).json({ error: "Webhook processing error" });
+      res.status(400).json({ error: "Webhook error" });
     }
   }
 );
