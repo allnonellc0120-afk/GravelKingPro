@@ -308,7 +308,7 @@ export default function Studio() {
                 <Button
                   className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold h-11"
                   onClick={handleProcess}
-                  disabled={state === "processing" || state === "idle" || state === "loading"}
+                  disabled={state === "processing" || state === "loading"}
                   data-testid="button-process"
                 >
                   {state === "processing" ? `Processing on server... ${progress}%` : "Process with GravelKing"}
