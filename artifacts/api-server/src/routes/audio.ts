@@ -10,45 +10,75 @@ const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 const audioRouter = Router();
 
-async function decodeToFloat32(inputBuf: Buffer, ext: string): Promise<{ samples: Float32Array; sampleRate: number; channels: number }> {
+// ── Remote routing ────────────────────────────────────────────────────────────
+// Set REMOTE_KERNEL_URL to route processing to an external endpoint.
+// Falls back to local kernel automatically on any error.
+function getRemoteUrl(): string | null {
+  const url = process.env.REMOTE_KERNEL_URL?.trim();
+  return url || null;
+}
+
+async function tryRemoteProcessing(
+  file: Express.Multer.File,
+  multiplier: number,
+  sliceSize: number
+): Promise<{ wav: Buffer; headers: Record<string, string> } | null> {
+  const remoteUrl = getRemoteUrl();
+  if (!remoteUrl) return null;
+
+  try {
+    const form = new FormData();
+    form.append("audio", new Blob([new Uint8Array(file.buffer)], { type: file.mimetype }), file.originalname);
+    form.append("multiplier", String(multiplier));
+    form.append("slice_size", String(sliceSize));
+
+    const response = await fetch(`${remoteUrl}/process-audio`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+      redirect: "error", // don't follow redirects — indicates a real API is missing
+    });
+
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("audio")) return null;
+
+    const wav = Buffer.from(await response.arrayBuffer());
+    const headers: Record<string, string> = {};
+    ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count"].forEach((h) => {
+      const v = response.headers.get(h);
+      if (v) headers[h] = v;
+    });
+    return { wav, headers };
+  } catch {
+    return null; // network error, redirect, timeout → fall back to local
+  }
+}
+
+// ── Local processing ──────────────────────────────────────────────────────────
+async function decodeToFloat32(inputBuf: Buffer, ext: string): Promise<{ samples: Float32Array; sampleRate: number }> {
   const id = randomUUID();
   const inPath = `/tmp/gk_in_${id}.${ext}`;
   const outPath = `/tmp/gk_pcm_${id}.raw`;
 
   await writeFile(inPath, inputBuf);
 
-  // Probe sample rate and channels
   let sampleRate = 44100;
-  let channels = 1;
   try {
-    const { stdout } = await execFileAsync("ffprobe", [
-      "-v", "quiet", "-print_format", "json", "-show_streams", inPath,
-    ]);
+    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", inPath]);
     const info = JSON.parse(stdout);
     const stream = info.streams?.find((s: any) => s.codec_type === "audio");
-    if (stream) {
-      sampleRate = parseInt(stream.sample_rate) || 44100;
-      channels = parseInt(stream.channels) || 1;
-    }
+    if (stream) sampleRate = parseInt(stream.sample_rate) || 44100;
   } catch { /* use defaults */ }
 
-  // Decode to raw float32 little-endian PCM, mix down to mono for kernel
-  await execFileAsync("ffmpeg", [
-    "-y", "-i", inPath,
-    "-f", "f32le",
-    "-ac", "1",
-    "-ar", String(sampleRate),
-    "-acodec", "pcm_f32le",
-    outPath,
-  ]);
-
+  await execFileAsync("ffmpeg", ["-y", "-i", inPath, "-f", "f32le", "-ac", "1", "-ar", String(sampleRate), "-acodec", "pcm_f32le", outPath]);
   const rawBuf = await readFile(outPath);
   const samples = new Float32Array(rawBuf.buffer, rawBuf.byteOffset, rawBuf.byteLength / 4);
 
   await unlink(inPath).catch(() => {});
   await unlink(outPath).catch(() => {});
-
-  return { samples: new Float32Array(samples), sampleRate, channels };
+  return { samples: new Float32Array(samples), sampleRate };
 }
 
 async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<Buffer> {
@@ -56,25 +86,41 @@ async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<B
   const inPath = `/tmp/gk_processed_${id}.raw`;
   const outPath = `/tmp/gk_out_${id}.wav`;
 
-  const rawBuf = Buffer.from(samples.buffer);
-  await writeFile(inPath, rawBuf);
-
-  await execFileAsync("ffmpeg", [
-    "-y",
-    "-f", "f32le",
-    "-ar", String(sampleRate),
-    "-ac", "1",
-    "-i", inPath,
-    "-acodec", "pcm_s16le",
-    outPath,
-  ]);
-
+  await writeFile(inPath, Buffer.from(samples.buffer));
+  await execFileAsync("ffmpeg", ["-y", "-f", "f32le", "-ar", String(sampleRate), "-ac", "1", "-i", inPath, "-acodec", "pcm_s16le", outPath]);
   const wavBuf = await readFile(outPath);
   await unlink(inPath).catch(() => {});
   await unlink(outPath).catch(() => {});
   return wavBuf;
 }
 
+// ── Config / health endpoint ──────────────────────────────────────────────────
+audioRouter.get("/kernel/routing", async (_req, res) => {
+  const remoteUrl = getRemoteUrl();
+  let remoteStatus: "online" | "offline" | "not_configured" = "not_configured";
+
+  if (remoteUrl) {
+    try {
+      const r = await fetch(`${remoteUrl}/process-audio`, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(5_000),
+        redirect: "error",
+      });
+      remoteStatus = r.ok ? "online" : "offline";
+    } catch {
+      remoteStatus = "offline";
+    }
+  }
+
+  res.json({
+    mode: remoteUrl ? "remote_with_fallback" : "local",
+    remoteUrl: remoteUrl ?? null,
+    remoteStatus,
+    localKernel: "active",
+  });
+});
+
+// ── Main processing endpoint ──────────────────────────────────────────────────
 audioRouter.post(
   "/kernel/process-audio",
   upload.single("audio"),
@@ -84,23 +130,31 @@ audioRouter.post(
       return;
     }
 
+    const multiplier = parseFloat((req.body.multiplier as string) ?? "0.75");
+    const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
+
+    // Try remote first
+    const remote = await tryRemoteProcessing(req.file, multiplier, sliceSize);
+    if (remote) {
+      res.setHeader("Content-Type", "audio/wav");
+      res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
+      res.setHeader("X-GK-Routing", "remote");
+      Object.entries(remote.headers).forEach(([k, v]) => res.setHeader(k, v));
+      res.send(remote.wav);
+      return;
+    }
+
+    // Local kernel fallback
     try {
-      const multiplier = parseFloat((req.body.multiplier as string) ?? "0.75");
-      const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
       const ext = (req.file.originalname.split(".").pop() ?? "mp3").toLowerCase();
-
-      // Decode audio to float32 PCM on the server
       const { samples, sampleRate } = await decodeToFloat32(req.file.buffer, ext);
-
-      // Run the GravelKing kernel server-side — algorithm stays private
       const result = gravelking_opt(Array.from(samples), multiplier, sliceSize);
       const parityStatus = verifyParity(result.processed);
-
-      // Encode processed samples back to WAV
       const wavBuffer = await encodeToWav(new Float32Array(result.processed), sampleRate);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
+      res.setHeader("X-GK-Routing", "local");
       res.setHeader("X-GK-Parity", parityStatus);
       res.setHeader("X-GK-Efficiency", result.stats.efficiency.toFixed(4));
       res.setHeader("X-GK-Decay-Rate", result.stats.decayRate.toFixed(4));
