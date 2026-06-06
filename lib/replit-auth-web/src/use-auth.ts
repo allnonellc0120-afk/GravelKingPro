@@ -8,6 +8,7 @@ export type AuthUser = {
   profileImageUrl?: string | null;
   isPro?: boolean;
   subscriptionTier?: string | null;
+  usedFreeSplit?: boolean;
 };
 
 interface AuthState {

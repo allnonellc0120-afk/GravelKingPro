@@ -21,6 +21,7 @@ export const usersTable = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   isPro: boolean("is_pro").notNull().default(false),
   subscriptionTier: varchar("subscription_tier"),
+  usedFreeSplit: boolean("used_free_split").notNull().default(false),
   stripeCustomerId: varchar("stripe_customer_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
