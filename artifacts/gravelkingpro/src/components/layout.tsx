@@ -9,6 +9,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const links = [
     { href: "/", label: "Dashboard" },
     { href: "/studio", label: "Studio" },
+    { href: "/mix", label: "Mix Studio" },
     { href: "/pricing", label: "Pricing" },
     { href: "/report", label: "Report" },
   ];
@@ -22,15 +23,15 @@ export function Layout({ children }: { children: ReactNode }) {
             <span className="font-bold text-lg tracking-tight uppercase">GravelKing</span>
             <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20 ml-2">PRO</Badge>
           </div>
-          <nav className="flex items-center gap-6">
+          <nav className="flex items-center gap-5">
             {links.map((link) => (
-              <Link 
-                key={link.href} 
+              <Link
+                key={link.href}
                 href={link.href}
                 className={`text-sm font-medium transition-colors hover:text-amber-500 ${
                   location === link.href ? "text-amber-500" : "text-muted-foreground"
                 }`}
-                data-testid={`link-${link.label.toLowerCase()}`}
+                data-testid={`link-${link.label.toLowerCase().replace(" ", "-")}`}
               >
                 {link.label}
               </Link>
