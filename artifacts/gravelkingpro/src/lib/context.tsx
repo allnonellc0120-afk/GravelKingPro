@@ -26,6 +26,9 @@ interface AppState {
   setTier: (tier: SubscriptionTier) => void;
   /** Legacy setter — still used by old Stripe success handler; maps to tier */
   setIsPro: (value: boolean) => void;
+  /** Free-tier one-time voice/stem split trial */
+  usedFreeSplit: boolean;
+  setUsedFreeSplit: (v: boolean) => void;
   results: Results;
   setResults: (results: Results) => void;
   hasRun: boolean;
@@ -44,14 +47,17 @@ function tierFromUser(subscriptionTier?: string | null, isPro?: boolean): Subscr
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const [tier, setTierState] = useState<SubscriptionTier>(null);
+  const [usedFreeSplit, setUsedFreeSplit] = useState(false);
   const [results, setResults] = useState<Results>(null);
   const [hasRun, setHasRun] = useState(false);
 
   useEffect(() => {
     if (!isLoading && user) {
       setTierState(tierFromUser(user.subscriptionTier, user.isPro));
+      setUsedFreeSplit(user.usedFreeSplit ?? false);
     } else if (!isLoading && !user) {
       setTierState(null);
+      setUsedFreeSplit(false);
     }
   }, [user, isLoading]);
 
@@ -62,7 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setIsPro = (value: boolean) => setTierState(value ? "pro" : null);
 
   return (
-    <AppContext.Provider value={{ tier, hasSplits, isPro, setTier, setIsPro, results, setResults, hasRun, setHasRun }}>
+    <AppContext.Provider value={{ tier, hasSplits, isPro, setTier, setIsPro, usedFreeSplit, setUsedFreeSplit, results, setResults, hasRun, setHasRun }}>
       {children}
     </AppContext.Provider>
   );

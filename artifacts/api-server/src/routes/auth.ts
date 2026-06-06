@@ -100,6 +100,7 @@ router.get("/auth/user", async (req: Request, res: Response) => {
         profileImageUrl: dbUser.profileImageUrl,
         isPro: dbUser.isPro,
         subscriptionTier: dbUser.subscriptionTier ?? null,
+        usedFreeSplit: dbUser.usedFreeSplit,
       } : null,
     }),
   );

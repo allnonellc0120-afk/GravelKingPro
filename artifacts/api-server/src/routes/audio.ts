@@ -7,7 +7,8 @@ import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
 import { gravelking_opt, verifyParity } from "../kernel";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
-import { db, processRunsTable } from "@workspace/db";
+import { db, processRunsTable, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -244,6 +245,26 @@ audioRouter.post(
     const mode: ProcessMode = (req.body.mode as ProcessMode) ?? "standard";
     const ext = (req.file.originalname.split(".").pop() ?? "mp3").toLowerCase();
 
+    // ── Free-tier gate for split modes ─────────────────────────────────────────
+    let isFreeUse = false;
+    if (mode === "voice_remove" || mode === "stem_split") {
+      if (!req.isAuthenticated()) {
+        res.status(401).json({ success: false, error: "Please sign in to use voice removal and stem splitting." });
+        return;
+      }
+      const [gateUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
+      const hasPaidTier = !!gateUser?.subscriptionTier;
+      if (!hasPaidTier && gateUser?.usedFreeSplit) {
+        res.status(403).json({
+          success: false,
+          error: "You've used your free voice/stem split. Upgrade to GravelKing Splits for unlimited access.",
+          code: "FREE_TRIAL_EXHAUSTED",
+        });
+        return;
+      }
+      isFreeUse = !hasPaidTier;
+    }
+
     // ── Voice removal ──────────────────────────────────────────────────────────
     if (mode === "voice_remove") {
       try {
@@ -287,6 +308,9 @@ audioRouter.post(
           }).catch(() => {});
         }
 
+        if (isFreeUse && req.isAuthenticated()) {
+          db.update(usersTable).set({ usedFreeSplit: true }).where(eq(usersTable.id, req.user.id)).catch(() => {});
+        }
         res.setHeader("Content-Type", "audio/wav");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.wav"`);
         res.setHeader("X-GK-Mode", "voice_remove");
@@ -332,6 +356,9 @@ audioRouter.post(
           }).catch(() => {});
         }
 
+        if (isFreeUse && req.isAuthenticated()) {
+          db.update(usersTable).set({ usedFreeSplit: true }).where(eq(usersTable.id, req.user.id)).catch(() => {});
+        }
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_stems.zip"`);
         res.setHeader("X-GK-Mode", "stem_split");

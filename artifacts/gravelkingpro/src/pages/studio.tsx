@@ -8,16 +8,27 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Download, Upload, Music, BarChart2, Settings2, CheckCircle2,
-  Lock, Play, Square, Shield, Scissors, Mic2, Layers, AlertCircle, ChevronRight,
+  Lock, Play, Square, Shield, Scissors, Mic2, Layers, AlertCircle, ChevronRight, Wand2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
+import { useAuth } from "@workspace/replit-auth-web";
 import { Link } from "wouter";
 import { getWaveformPoints } from "@/lib/audioKernel";
 
 type ProcessState = "idle" | "loading" | "ready" | "processing" | "done";
-type ProcessMode = "standard" | "voice_remove" | "stem_split";
+type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master";
+
+const MASTER_PRESETS_UI = [
+  { id: "normal",    label: "Normal",    description: "Balanced loudness. Good for any content.", free: true },
+  { id: "broadcast", label: "Broadcast", description: "EBU R128 broadcast standard for streaming.", free: false },
+  { id: "vinyl",     label: "Vinyl",     description: "Warm analog character with boosted lows.", free: false },
+  { id: "podcast",   label: "Podcast",   description: "Voice clarity with dynamic compression.", free: false },
+  { id: "club",      label: "Club",      description: "Heavy bass and punchy transients.", free: false },
+  { id: "film",      label: "Film",      description: "Wide cinematic dynamics with presence.", free: false },
+] as const;
+type MasterPresetId = (typeof MASTER_PRESETS_UI)[number]["id"];
 
 const MODES: Array<{
   value: ProcessMode;
@@ -26,6 +37,13 @@ const MODES: Array<{
   icon: React.ReactNode;
   requiresStudio: boolean;
 }> = [
+  {
+    value: "master",
+    label: "Mastering",
+    description: "Apply a professional mastering preset — Normal is free, 5 more presets for paid plans",
+    icon: <Wand2 className="w-4 h-4 text-sky-400" />,
+    requiresStudio: false,
+  },
   {
     value: "stem_split",
     label: "Stem Splitting",
@@ -57,13 +75,15 @@ const STEM_LABELS: Record<string, { label: string; color: string; description: s
 };
 
 export default function Studio() {
-  const { isPro, hasSplits } = useAppState();
+  const { isPro, hasSplits, usedFreeSplit, setUsedFreeSplit } = useAppState();
+  const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [state, setState] = useState<ProcessState>("idle");
   const [progress, setProgress] = useState(0);
   const [multiplier, setMultiplier] = useState([0.75]);
   const [sliceSize, setSliceSize] = useState("2");
-  const [mode, setMode] = useState<ProcessMode>("stem_split");
+  const [mode, setMode] = useState<ProcessMode>("master");
+  const [masterPreset, setMasterPreset] = useState<MasterPresetId>("normal");
   const [fileName, setFileName] = useState("");
   const [duration, setDuration] = useState(0);
   const [waveformBefore, setWaveformBefore] = useState<number[]>([]);
@@ -128,10 +148,65 @@ export default function Studio() {
       toast({ title: "Pro required", description: "GravelKing Kernel processing requires a Pro subscription.", variant: "destructive" });
       return;
     }
-    // Block if mode requires splits and user has no paid tier
-    if (!hasSplits && (mode === "voice_remove" || mode === "stem_split")) {
-      toast({ title: "Paid plan required", description: "Voice removal and stem splitting require a GravelKing Splits or Pro subscription.", variant: "destructive" });
+
+    // Master mode shortcut — call /api/kernel/master
+    if (mode === "master") {
+      setState("processing");
+      setProgress(0);
+      setProcessedBlob(null);
+      setStemBlobs([]);
+      setWaveformAfter([]);
+      setStats(null);
+      let fakeProgress = 0;
+      const progressInterval = setInterval(() => {
+        fakeProgress = Math.min(fakeProgress + 4, 88);
+        setProgress(fakeProgress);
+      }, 180);
+      try {
+        const formData = new FormData();
+        formData.append("audio", loadedFileRef.current);
+        formData.append("preset", masterPreset);
+        const response = await fetch("/api/kernel/master", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        clearInterval(progressInterval);
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: "Mastering failed." }));
+          throw new Error(err.error ?? "Mastering failed.");
+        }
+        setProgress(95);
+        const wavBlob = await response.blob();
+        setProcessedBlob(wavBlob);
+        const ctx = getAudioContext();
+        try {
+          const ab = await wavBlob.arrayBuffer();
+          const decodedOut = await ctx.decodeAudioData(ab);
+          setWaveformAfter(getWaveformPoints(decodedOut.getChannelData(0), 120));
+        } catch { /* waveform optional */ }
+        setStats({ efficiency: "—", decayRate: "—", samples: "—", parity: "VALIDATED" });
+        setProgress(100);
+        setState("done");
+      } catch (err: any) {
+        clearInterval(progressInterval);
+        setProgress(0);
+        toast({ title: "Mastering failed", description: err.message, variant: "destructive" });
+        setState("ready");
+      }
       return;
+    }
+
+    // Block if mode requires splits and user has no paid tier + no free trial left
+    if (mode === "voice_remove" || mode === "stem_split") {
+      if (!isAuthenticated) {
+        toast({ title: "Sign in required", description: "Please sign in to use voice removal and stem splitting.", variant: "destructive" });
+        return;
+      }
+      if (!hasSplits && usedFreeSplit) {
+        toast({ title: "Free trial used", description: "Upgrade to GravelKing Splits for unlimited voice removal and stem splitting.", variant: "destructive" });
+        return;
+      }
     }
 
     setState("processing");
@@ -190,6 +265,8 @@ export default function Studio() {
 
         setProgress(100);
         setState("done");
+        // Mark free trial as used for free-tier users
+        if (!hasSplits && !usedFreeSplit) setUsedFreeSplit(true);
         return;
       }
 
@@ -218,6 +295,8 @@ export default function Studio() {
 
       setProgress(100);
       setState("done");
+      // Mark free trial as used on voice_remove for free-tier users
+      if (mode === "voice_remove" && !hasSplits && !usedFreeSplit) setUsedFreeSplit(true);
     } catch (err: any) {
       clearInterval(progressInterval);
       setProgress(0);
@@ -292,7 +371,12 @@ export default function Studio() {
   };
 
   const selectedMode = MODES.find(m => m.value === mode)!;
-  const canProcess = mode === "standard" ? isPro : hasSplits;
+  const selectedPresetInfo = MASTER_PRESETS_UI.find(p => p.id === masterPreset)!;
+  const canUseSplit = hasSplits || (!usedFreeSplit && isAuthenticated);
+  const canProcess =
+    mode === "standard" ? isPro :
+    mode === "master" ? true :
+    canUseSplit;
 
   return (
     <Layout>
@@ -444,6 +528,9 @@ export default function Studio() {
                           <div className="flex items-center gap-2">
                             {m.icon}
                             <span>{m.label}</span>
+                            {m.value === "master" && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-sky-500/30 text-sky-400">Free</Badge>
+                            )}
                             {m.requiresStudio && !isPro && (
                               <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-amber-500/30 text-amber-500">Pro</Badge>
                             )}
@@ -454,6 +541,12 @@ export default function Studio() {
                   </Select>
                   <p className="text-xs text-muted-foreground">{selectedMode.description}</p>
 
+                  {mode === "master" && (
+                    <div className="flex items-start gap-1.5 text-xs text-sky-400/80 bg-sky-500/10 border border-sky-500/20 rounded-md p-2.5">
+                      <Wand2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      Normal is free for everyone. Upgrade to unlock 5 additional professional presets.
+                    </div>
+                  )}
                   {mode === "voice_remove" && (
                     <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-secondary/40 rounded-md p-2.5">
                       <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
@@ -466,6 +559,19 @@ export default function Studio() {
                       Returns bass, midrange, and highs. Instrumental stem added for stereo files.
                     </div>
                   )}
+                  {(mode === "voice_remove" || mode === "stem_split") && !hasSplits && !usedFreeSplit && isAuthenticated && (
+                    <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      You have <strong className="mx-0.5">1 free use</strong> of the voice splitter remaining.
+                    </div>
+                  )}
+                  {(mode === "voice_remove" || mode === "stem_split") && !hasSplits && usedFreeSplit && (
+                    <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
+                      <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      Free trial used.{" "}
+                      <Link href="/pricing" className="underline font-medium ml-0.5">Upgrade to Splits</Link> for unlimited use.
+                    </div>
+                  )}
                   {mode === "standard" && !isPro && (
                     <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
                       <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -474,6 +580,48 @@ export default function Studio() {
                     </div>
                   )}
                 </div>
+
+                {/* Mastering presets grid */}
+                {mode === "master" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Preset</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {MASTER_PRESETS_UI.map((p) => {
+                        const locked = !p.free && !hasSplits;
+                        const selected = masterPreset === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => !locked && setMasterPreset(p.id as MasterPresetId)}
+                            disabled={locked}
+                            className={`relative text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                              selected
+                                ? "border-amber-500 bg-amber-500/10"
+                                : locked
+                                ? "border-border/20 bg-secondary/10 opacity-40 cursor-not-allowed"
+                                : "border-border/40 bg-secondary/20 hover:border-amber-500/50 cursor-pointer"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-xs font-semibold">{p.label}</span>
+                              {p.free ? (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-500/30 text-sky-400">Free</Badge>
+                              ) : locked ? (
+                                <Lock className="w-3 h-3 text-muted-foreground/40" />
+                              ) : null}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground leading-snug">{p.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!hasSplits && (
+                      <p className="text-xs text-muted-foreground/60 pt-0.5">
+                        <Link href="/pricing" className="text-amber-500 underline">Upgrade to Splits</Link> to unlock all 6 mastering presets.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Standard-only params */}
                 {mode === "standard" && (
@@ -511,6 +659,7 @@ export default function Studio() {
                     ? `Processing... ${progress}%`
                     : !canProcess
                     ? <><Lock className="w-4 h-4 mr-2" />{mode === "standard" ? "Pro Required" : "Upgrade Required"}</>
+                    : mode === "master"   ? <><Wand2 className="w-4 h-4 mr-2" />Apply {selectedPresetInfo?.label} Master</>
                     : mode === "voice_remove" ? "Remove Vocals"
                     : mode === "stem_split" ? "Split into Stems"
                     : "Process with GravelKing"}
@@ -529,6 +678,7 @@ export default function Studio() {
                   {mode === "standard" && "Processed on the GravelKing server"}
                   {mode === "voice_remove" && "Center-channel cancelled instrumental"}
                   {mode === "stem_split" && "Frequency-separated stems"}
+                  {mode === "master" && `Mastered with the ${selectedPresetInfo?.label} preset`}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -615,7 +765,7 @@ export default function Studio() {
                       <Button variant="outline" className="flex-1" onClick={handlePlayProcessed} data-testid="button-play">
                         {isPlaying ? <><Square className="w-4 h-4 mr-2" />Stop</> : <><Play className="w-4 h-4 mr-2" />Preview</>}
                       </Button>
-                      {(mode === "voice_remove" ? hasSplits : isPro) ? (
+                      {(mode === "master" || mode === "voice_remove" ? (hasSplits || (mode === "master")) : isPro) ? (
                         <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={handleDownload} data-testid="button-download">
                           <Download className="w-4 h-4 mr-2" /> Download WAV
                         </Button>
