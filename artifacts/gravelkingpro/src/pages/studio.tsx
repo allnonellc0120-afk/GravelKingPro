@@ -128,6 +128,7 @@ export default function Studio() {
     mode?: string;
   } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isSampleResult, setIsSampleResult] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -206,6 +207,7 @@ export default function Studio() {
 
     setState("processing");
     setProgress(0);
+    setIsSampleResult(false);
     setProcessedBlob(null);
     if (processedUrl) { URL.revokeObjectURL(processedUrl); setProcessedUrl(null); }
     setStemBlobs([]);
@@ -234,6 +236,8 @@ export default function Studio() {
           throw new Error(err.error ?? "Mastering failed.");
         }
         setProgress(95);
+        const isSample = response.headers.get("X-GK-Sample") === "true";
+        setIsSampleResult(isSample);
         const wavBlob = await response.blob();
         const url = URL.createObjectURL(wavBlob);
         setProcessedBlob(wavBlob);
@@ -418,8 +422,7 @@ export default function Studio() {
     (mode === "voice_remove" || mode === "stem_split") ? canUseSplit :
     true; // master, voice_change, denoise are always available
 
-  const isFreeMode = mode === "voice_change" || mode === "denoise" ||
-    (mode === "master" && masterPreset === "normal");
+  const isFreeMode = mode === "voice_change" || mode === "denoise" || mode === "master";
 
   return (
     <Layout>
@@ -459,7 +462,7 @@ export default function Studio() {
             {[
               { icon: <Waves className="w-4 h-4 text-teal-400" />, label: "Denoise", tag: "Free" },
               { icon: <Volume2 className="w-4 h-4 text-pink-400" />, label: "Voice Changer", tag: "Free" },
-              { icon: <Wand2 className="w-4 h-4 text-sky-400" />, label: "Mastering", tag: "Normal Free" },
+              { icon: <Wand2 className="w-4 h-4 text-sky-400" />, label: "Mastering", tag: "Sample Free" },
               { icon: <Scissors className="w-4 h-4 text-emerald-400" />, label: "Stem Split", tag: "1 Free" },
             ].map((f) => (
               <div key={f.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/30 border border-border/30">
@@ -599,10 +602,16 @@ export default function Studio() {
                   <p className="text-xs text-muted-foreground">{selectedMode.description}</p>
 
                   {/* Mode notices */}
-                  {mode === "master" && (
+                  {mode === "master" && !isPro && (
                     <div className="flex items-start gap-1.5 text-xs text-sky-400/80 bg-sky-500/10 border border-sky-500/20 rounded-md p-2.5">
                       <Wand2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      Normal is free for everyone. Upgrade to Splits to unlock 5 additional presets.
+                      Try any preset free — you'll hear a 30-second sample. <Link href="/pricing" className="text-amber-500 underline font-medium ml-0.5">Upgrade to Pro</Link> to download the full master.
+                    </div>
+                  )}
+                  {mode === "master" && isPro && (
+                    <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      Pro — all presets unlocked with full-length download.
                     </div>
                   )}
                   {mode === "voice_remove" && (
@@ -651,37 +660,27 @@ export default function Studio() {
                     <label className="text-sm font-medium">Preset</label>
                     <div className="grid grid-cols-2 gap-2">
                       {MASTER_PRESETS_UI.map((p) => {
-                        const locked = !p.free && !hasSplits;
                         const selected = masterPreset === p.id;
                         return (
                           <button
                             key={p.id}
-                            onClick={() => !locked && setMasterPreset(p.id as MasterPresetId)}
-                            disabled={locked}
+                            onClick={() => setMasterPreset(p.id as MasterPresetId)}
                             className={`relative text-left px-3 py-2.5 rounded-lg border transition-colors ${
                               selected ? "border-amber-500 bg-amber-500/10"
-                              : locked ? "border-border/20 bg-secondary/10 opacity-40 cursor-not-allowed"
                               : "border-border/40 bg-secondary/20 hover:border-amber-500/50 cursor-pointer"
                             }`}
                           >
                             <div className="flex items-center justify-between mb-0.5">
                               <span className="text-xs font-semibold">{p.label}</span>
-                              {p.free ? (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-500/30 text-sky-400">Free</Badge>
-                              ) : locked ? (
-                                <Lock className="w-3 h-3 text-muted-foreground/40" />
-                              ) : null}
+                              {!isPro && (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-500/30 text-sky-400">Sample</Badge>
+                              )}
                             </div>
                             <p className="text-[10px] text-muted-foreground leading-snug">{p.description}</p>
                           </button>
                         );
                       })}
                     </div>
-                    {!hasSplits && (
-                      <p className="text-xs text-muted-foreground/60 pt-0.5">
-                        <Link href="/pricing" className="text-amber-500 underline">Upgrade to Splits</Link> to unlock all 6 mastering presets.
-                      </p>
-                    )}
                   </div>
                 )}
 
@@ -880,7 +879,14 @@ export default function Studio() {
                     {/* Before / After comparison */}
                     {originalUrl && processedUrl && (
                       <div className="space-y-2 p-3 rounded-lg bg-secondary/30 border border-border/30">
-                        <p className="text-xs font-medium text-muted-foreground mb-2">Before / After</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium text-muted-foreground">Before / After</p>
+                          {isSampleResult && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-sky-500/30 text-sky-400">
+                              30s Sample Preview
+                            </Badge>
+                          )}
+                        </div>
                         <div className="space-y-2">
                           <div>
                             <p className="text-[10px] text-amber-400 font-medium mb-1">▶ Original</p>
@@ -919,14 +925,14 @@ export default function Studio() {
                       <Button variant="outline" className="flex-1" onClick={handlePlayProcessed} data-testid="button-play">
                         {isPlaying ? <><Square className="w-4 h-4 mr-2" />Stop</> : <><Play className="w-4 h-4 mr-2" />Preview</>}
                       </Button>
-                      {(mode === "master" || mode === "voice_change" || mode === "denoise" || (mode === "voice_remove" && hasSplits) || (mode === "standard" && isPro)) ? (
+                      {(mode === "voice_change" || mode === "denoise" || (mode === "master" && !isSampleResult) || (mode === "voice_remove" && hasSplits) || (mode === "standard" && isPro)) ? (
                         <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={handleDownload} data-testid="button-download">
                           <Download className="w-4 h-4 mr-2" /> Download WAV
                         </Button>
                       ) : (
                         <Link href="/pricing" className="flex-1">
                           <Button variant="outline" className="w-full border-amber-500/30 text-amber-500" data-testid="button-upgrade-download">
-                            <Lock className="w-4 h-4 mr-2" /> Upgrade to Download
+                            <Lock className="w-4 h-4 mr-2" /> {mode === "master" ? "Upgrade to Pro to Download" : "Upgrade to Download"}
                           </Button>
                         </Link>
                       )}
