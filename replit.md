@@ -1,6 +1,6 @@
-# [Project name]
+# GravelKing Productions
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Professional audio tools (voice removal, stem splitting, mastering, voice changer, denoise, Mix Studio) processed server-side — built by All N One LLC.
 
 ## Run & Operate
 

@@ -233,7 +233,7 @@ export default function Home() {
             <span className="text-amber-500">no plugin required.</span>
           </h1>
           <p className="text-muted-foreground text-base max-w-xl mx-auto">
-            GravelKingPro handles voice removal, stem splitting, mastering, and multi-track mixing entirely on the server. Upload a file — done in seconds.
+            GravelKing Productions handles voice removal, stem splitting, mastering, and multi-track mixing entirely on the server. Upload a file — done in seconds.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link href="/studio">

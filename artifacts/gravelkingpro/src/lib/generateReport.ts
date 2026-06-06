@@ -168,8 +168,8 @@ export function generateKernelReport(data: ReportData): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(90, 90, 100);
-  doc.text("GravelKing Enterprises  //  All N One LLC  //  Confidential", col, 289);
+  doc.text("GravelKing Productions  //  All N One LLC  //  Confidential", col, 289);
   doc.text(`Hash: GK-MLK-LL-V2`, W - margin, 289, { align: "right" });
 
-  doc.save(`GravelKing_Report_${Date.now()}.pdf`);
+  doc.save(`GravelKingProductions_Report_${Date.now()}.pdf`);
 }
