@@ -7,6 +7,7 @@ export const AuthUserSchema = z.object({
   lastName: z.string().nullable().optional(),
   profileImageUrl: z.string().nullable().optional(),
   isPro: z.boolean().optional(),
+  subscriptionTier: z.string().nullable().optional(),
 });
 
 export type AuthUser = z.infer<typeof AuthUserSchema>;

@@ -1,33 +1,49 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
-import { useAppState } from "@/lib/context";
+import { useAppState, type SubscriptionTier } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Mail, Loader2 } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+
+type PlanId = "splits" | "pro" | "node_auditor";
+
+const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
+  splits: "GravelKing Splits",
+  pro: "GravelKing Pro",
+  node_auditor: "Node Auditor",
+};
 
 export default function Pricing() {
-  const { isPro, setIsPro } = useAppState();
+  const { tier, setTier } = useAppState();
   const { toast } = useToast();
-  const [location] = useLocation();
-  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
 
-  // Handle return from Stripe checkout
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get("checkout");
     const sessionId = params.get("session_id");
 
     if (checkout === "success" && sessionId) {
-      fetch(`/api/stripe/subscription-status?session_id=${sessionId}`)
+      fetch(`/api/stripe/subscription-status?session_id=${sessionId}`, { credentials: "include" })
         .then(r => r.json())
         .then((data: any) => {
           if (data.active) {
-            setIsPro(true);
-            toast({ title: "You're now Pro!", description: "All features unlocked. Welcome to GravelKing Pro." });
+            const newTier = (data.tier as SubscriptionTier) ?? "pro";
+            setTier(newTier);
+            const labels: Record<string, string> = {
+              splits: "GravelKing Splits",
+              pro: "GravelKing Pro",
+              node_auditor: "Node Auditor",
+            };
+            toast({
+              title: `You're now on ${labels[newTier] ?? "a paid plan"}!`,
+              description: newTier === "splits"
+                ? "Voice removal and stem splitting are now unlocked."
+                : "All features unlocked. Welcome aboard.",
+            });
           }
         })
         .catch(() => {});
@@ -36,34 +52,21 @@ export default function Pricing() {
       toast({ title: "Checkout cancelled", description: "No charge was made.", variant: "destructive" });
       window.history.replaceState({}, "", "/pricing");
     }
-
-    // Also check on landing page return
-    const rootParams = new URLSearchParams(window.location.search);
-    if (rootParams.get("checkout") === "success") {
-      const sid = rootParams.get("session_id");
-      if (sid) {
-        fetch(`/api/stripe/subscription-status?session_id=${sid}`)
-          .then(r => r.json())
-          .then((data: any) => { if (data.active) setIsPro(true); })
-          .catch(() => {});
-      }
-    }
   }, []);
 
-  const handleStripeCheckout = async (tier: "pro" | "node_auditor") => {
-    setLoadingTier(tier);
+  const handleCheckout = async (planId: PlanId) => {
+    setLoadingTier(planId);
     try {
-      // Fetch products to get the right price ID
       const productsRes = await fetch("/api/stripe/products");
       const { data: products } = await productsRes.json() as { data: any[] };
 
-      const tierName = tier === "pro" ? "GravelKing Pro" : "Node Auditor";
-      const product = products.find((p: any) => p.name === tierName);
+      const productName = PLAN_PRODUCT_NAMES[planId];
+      const product = products.find((p: any) => p.name === productName);
 
-      if (!product || !product.prices?.length) {
+      if (!product?.prices?.length) {
         toast({
           title: "Products not configured yet",
-          description: "Run the seed script to create Stripe products, then try again.",
+          description: "Run `pnpm --filter @workspace/scripts run seed-products` to create Stripe products, then try again.",
           variant: "destructive",
         });
         setLoadingTier(null);
@@ -74,6 +77,7 @@ export default function Pricing() {
       const checkoutRes = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ priceId }),
       });
 
@@ -87,131 +91,201 @@ export default function Pricing() {
     }
   };
 
-  const handleContactSales = () => {
-    toast({
-      title: "Sales team contacted",
-      description: "A representative will reach out to you shortly.",
-    });
+  const isCurrent = (planId: PlanId) => tier === planId;
+  const isUpgrade = (planId: PlanId) => {
+    const order: Array<SubscriptionTier> = [null, "splits", "pro", "node_auditor"];
+    return order.indexOf(tier) < order.indexOf(planId);
   };
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto py-12">
+      <div className="max-w-6xl mx-auto py-12 px-4">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold tracking-tight mb-4">Pricing Plans</h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Choose the right level of analysis power for your needs. Simple, transparent pricing.
+            Start free. Unlock stem splitting with Splits, or get the full studio experience with Pro.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Starter Plan */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+
+          {/* Free / Starter */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
-                <CardTitle className="text-xl">Starter</CardTitle>
-                <CardDescription>Perfect for basic testing</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold">Free</span>
+                <CardTitle className="text-lg">Starter</CardTitle>
+                <CardDescription>Basic access, no account needed</CardDescription>
+                <div className="mt-3">
+                  <span className="text-3xl font-bold">Free</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-emerald-500" /> Basic analysis</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-emerald-500" /> Server-side processing</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-emerald-500" /> Audio preview</li>
+                <ul className="space-y-2.5 text-sm text-muted-foreground">
+                  <FeatureRow yes>Basic kernel analysis</FeatureRow>
+                  <FeatureRow yes>Server-side processing</FeatureRow>
+                  <FeatureRow yes>Audio preview</FeatureRow>
+                  <FeatureRow yes={false}>Stem splitting / voice removal</FeatureRow>
+                  <FeatureRow yes={false}>Download processed audio</FeatureRow>
+                  <FeatureRow yes={false}>Full Audio Studio</FeatureRow>
                 </ul>
               </CardContent>
               <CardFooter>
-                {!isPro ? (
-                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-secondary/50" data-testid="badge-current-plan">
+                {tier === null ? (
+                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm" data-testid="badge-current-plan">
                     Current Plan
                   </Badge>
                 ) : (
-                  <Button variant="outline" className="w-full" disabled data-testid="button-starter-downgrade">
-                    Downgrade
-                  </Button>
+                  <Button variant="outline" className="w-full" disabled>On paid plan</Button>
                 )}
               </CardFooter>
             </Card>
           </motion.div>
 
-          {/* Pro Plan */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          {/* GravelKing Splits */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="flex flex-col h-full border-emerald-500/30 bg-card/40 relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-emerald-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
+                NEW
+              </div>
+              <CardHeader>
+                <CardTitle className="text-lg text-emerald-400">GravelKing Splits</CardTitle>
+                <CardDescription>Voice removal + stem splitting</CardDescription>
+                <div className="mt-3">
+                  <span className="text-3xl font-bold">$9.99</span>
+                  <span className="text-muted-foreground text-sm">/mo</span>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <ul className="space-y-2.5 text-sm text-muted-foreground">
+                  <FeatureRow yes>Everything in Starter</FeatureRow>
+                  <FeatureRow yes>Unlimited voice removal</FeatureRow>
+                  <FeatureRow yes>Unlimited stem splitting</FeatureRow>
+                  <FeatureRow yes>Download all stems as WAV</FeatureRow>
+                  <FeatureRow yes>Processing history</FeatureRow>
+                  <FeatureRow yes={false}>Full Audio Studio (kernel)</FeatureRow>
+                </ul>
+              </CardContent>
+              <CardFooter>
+                {isCurrent("splits") ? (
+                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-emerald-500/10 text-emerald-400 border-emerald-500/20" data-testid="badge-splits-current">
+                    Current Plan
+                  </Badge>
+                ) : isUpgrade("splits") ? (
+                  <Button
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-semibold"
+                    onClick={() => handleCheckout("splits")}
+                    disabled={loadingTier !== null}
+                    data-testid="button-upgrade-splits"
+                  >
+                    {loadingTier === "splits" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Get Splits"}
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>Lower tier</Button>
+                )}
+              </CardFooter>
+            </Card>
+          </motion.div>
+
+          {/* Pro */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="flex flex-col h-full border-amber-500/30 bg-card/60 relative overflow-hidden">
               <div className="absolute top-0 right-0 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
                 POPULAR
               </div>
               <CardHeader>
-                <CardTitle className="text-xl text-amber-500">Pro</CardTitle>
-                <CardDescription>For serious audio professionals</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold">$39.99</span>
-                  <span className="text-muted-foreground">/mo</span>
+                <CardTitle className="text-lg text-amber-500">GravelKing Pro</CardTitle>
+                <CardDescription>Full studio for audio professionals</CardDescription>
+                <div className="mt-3">
+                  <span className="text-3xl font-bold">$39.99</span>
+                  <span className="text-muted-foreground text-sm">/mo</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Full real-time metrics</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Unlimited runs</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> WAV download</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Detailed PDF reports</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-amber-500" /> Priority support</li>
+                <ul className="space-y-2.5 text-sm text-muted-foreground">
+                  <FeatureRow yes>Everything in Splits</FeatureRow>
+                  <FeatureRow yes>Full Audio Studio</FeatureRow>
+                  <FeatureRow yes>Waveform visualization</FeatureRow>
+                  <FeatureRow yes>Kernel metrics &amp; PDF reports</FeatureRow>
+                  <FeatureRow yes>Unlimited WAV downloads</FeatureRow>
+                  <FeatureRow yes>Priority support</FeatureRow>
                 </ul>
               </CardContent>
               <CardFooter>
-                {isPro ? (
+                {isCurrent("pro") ? (
                   <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-amber-500/10 text-amber-500 border-amber-500/20" data-testid="badge-pro-current">
                     Current Plan
                   </Badge>
-                ) : (
+                ) : isUpgrade("pro") ? (
                   <Button
                     className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold"
-                    onClick={() => handleStripeCheckout("pro")}
+                    onClick={() => handleCheckout("pro")}
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-pro"
                   >
                     {loadingTier === "pro" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Upgrade to Pro"}
                   </Button>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>Lower tier</Button>
                 )}
               </CardFooter>
             </Card>
           </motion.div>
 
-          {/* Node Auditor Plan */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          {/* Node Auditor */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
-                <CardTitle className="text-xl">Node Auditor</CardTitle>
+                <CardTitle className="text-lg">Node Auditor</CardTitle>
                 <CardDescription>Enterprise scale benchmarking</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold">$499</span>
-                  <span className="text-muted-foreground">/mo</span>
+                <div className="mt-3">
+                  <span className="text-3xl font-bold">$499</span>
+                  <span className="text-muted-foreground text-sm">/mo</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Everything in Pro</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Enterprise benchmarking</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Custom reports</li>
-                  <li className="flex items-center gap-3"><Check className="w-4 h-4 text-blue-500" /> Dedicated support</li>
+                <ul className="space-y-2.5 text-sm text-muted-foreground">
+                  <FeatureRow yes>Everything in Pro</FeatureRow>
+                  <FeatureRow yes>Enterprise benchmarking</FeatureRow>
+                  <FeatureRow yes>Custom reports</FeatureRow>
+                  <FeatureRow yes>Dedicated support</FeatureRow>
+                  <FeatureRow yes>SLA guarantee</FeatureRow>
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => handleStripeCheckout("node_auditor")}
-                  disabled={loadingTier !== null}
-                  data-testid="button-contact-sales"
-                >
-                  {loadingTier === "node_auditor" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : <><Mail className="w-4 h-4 mr-2" />Subscribe</>}
-                </Button>
+                {isCurrent("node_auditor") ? (
+                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm" data-testid="badge-auditor-current">
+                    Current Plan
+                  </Badge>
+                ) : isUpgrade("node_auditor") ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleCheckout("node_auditor")}
+                    disabled={loadingTier !== null}
+                    data-testid="button-upgrade-auditor"
+                  >
+                    {loadingTier === "node_auditor" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Subscribe"}
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>Lower tier</Button>
+                )}
               </CardFooter>
             </Card>
           </motion.div>
         </div>
       </div>
     </Layout>
+  );
+}
+
+function FeatureRow({ yes = true, children }: { yes?: boolean; children: React.ReactNode }) {
+  return (
+    <li className="flex items-center gap-2.5">
+      {yes
+        ? <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+        : <X className="w-4 h-4 text-border shrink-0" />
+      }
+      <span className={yes ? "" : "opacity-40"}>{children}</span>
+    </li>
   );
 }

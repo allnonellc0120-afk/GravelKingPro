@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Download, Upload, Music, BarChart2, Settings2, CheckCircle2,
-  Lock, Play, Square, Shield, Scissors, Mic2, Layers, AlertCircle,
+  Lock, Play, Square, Shield, Scissors, Mic2, Layers, AlertCircle, ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -24,46 +24,46 @@ const MODES: Array<{
   label: string;
   description: string;
   icon: React.ReactNode;
-  outputType: "wav" | "zip";
+  requiresStudio: boolean;
 }> = [
   {
-    value: "standard",
-    label: "GravelKing Processing",
-    description: "Full kernel signal carving — amplitude, parity, efficiency",
-    icon: <Layers className="w-4 h-4 text-amber-500" />,
-    outputType: "wav",
+    value: "stem_split",
+    label: "Stem Splitting",
+    description: "Splits into bass, midrange, highs (+ instrumental for stereo files)",
+    icon: <Scissors className="w-4 h-4 text-emerald-400" />,
+    requiresStudio: false,
   },
   {
     value: "voice_remove",
     label: "Voice Removal",
-    description: "Center-channel cancellation — extracts the instrumental track",
+    description: "Center-channel cancellation — extracts the instrumental track (stereo only)",
     icon: <Mic2 className="w-4 h-4 text-purple-400" />,
-    outputType: "wav",
+    requiresStudio: false,
   },
   {
-    value: "stem_split",
-    label: "Stem Splitting",
-    description: "Splits into bass, midrange, highs (+ instrumental for stereo)",
-    icon: <Scissors className="w-4 h-4 text-emerald-400" />,
-    outputType: "zip",
+    value: "standard",
+    label: "GravelKing Kernel",
+    description: "Full kernel signal carving — amplitude, parity, efficiency (Pro only)",
+    icon: <Layers className="w-4 h-4 text-amber-500" />,
+    requiresStudio: true,
   },
 ];
 
 const STEM_LABELS: Record<string, { label: string; color: string; description: string }> = {
-  "bass.wav":         { label: "Bass",         color: "text-orange-400",  description: "Sub-bass & bass frequencies (< 250 Hz)" },
-  "midrange.wav":     { label: "Midrange",      color: "text-amber-400",   description: "Instruments & melody (250 Hz – 4 kHz)" },
-  "highs.wav":        { label: "Highs",         color: "text-sky-400",     description: "Presence & air (> 4 kHz)" },
-  "instrumental.wav": { label: "Instrumental",  color: "text-purple-400",  description: "Vocals removed (stereo center cancel)" },
+  "bass.wav":         { label: "Bass",        color: "text-orange-400",  description: "Sub-bass & bass (< 250 Hz)" },
+  "midrange.wav":     { label: "Midrange",    color: "text-amber-400",   description: "Instruments & melody (250 Hz – 4 kHz)" },
+  "highs.wav":        { label: "Highs",       color: "text-sky-400",     description: "Presence & air (> 4 kHz)" },
+  "instrumental.wav": { label: "Instrumental",color: "text-purple-400",  description: "Vocals removed (stereo only)" },
 };
 
 export default function Studio() {
-  const { isPro } = useAppState();
+  const { isPro, hasSplits } = useAppState();
   const { toast } = useToast();
   const [state, setState] = useState<ProcessState>("idle");
   const [progress, setProgress] = useState(0);
   const [multiplier, setMultiplier] = useState([0.75]);
   const [sliceSize, setSliceSize] = useState("2");
-  const [mode, setMode] = useState<ProcessMode>("standard");
+  const [mode, setMode] = useState<ProcessMode>("stem_split");
   const [fileName, setFileName] = useState("");
   const [duration, setDuration] = useState(0);
   const [waveformBefore, setWaveformBefore] = useState<number[]>([]);
@@ -122,6 +122,18 @@ export default function Studio() {
 
   const handleProcess = async () => {
     if (state !== "ready" || !loadedFileRef.current) return;
+
+    // Block if mode requires studio but user lacks Pro
+    if (mode === "standard" && !isPro) {
+      toast({ title: "Pro required", description: "GravelKing Kernel processing requires a Pro subscription.", variant: "destructive" });
+      return;
+    }
+    // Block if mode requires splits and user has no paid tier
+    if (!hasSplits && (mode === "voice_remove" || mode === "stem_split")) {
+      toast({ title: "Paid plan required", description: "Voice removal and stem splitting require a GravelKing Splits or Pro subscription.", variant: "destructive" });
+      return;
+    }
+
     setState("processing");
     setProgress(0);
     setProcessedBlob(null);
@@ -144,6 +156,7 @@ export default function Studio() {
 
       const response = await fetch("/api/kernel/process-audio", {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 
@@ -157,7 +170,7 @@ export default function Studio() {
       setProgress(95);
       const contentType = response.headers.get("content-type") ?? "";
 
-      // ── Stem split → ZIP ────────────────────────────────────────────────────
+      // Stem split → ZIP
       if (mode === "stem_split" && contentType.includes("zip")) {
         const zipBlob = await response.blob();
         const { unzip } = await import("fflate");
@@ -180,7 +193,7 @@ export default function Studio() {
         return;
       }
 
-      // ── WAV response (standard or voice_remove) ─────────────────────────────
+      // WAV response (standard or voice_remove)
       const wavBlob = await response.blob();
       const parity = response.headers.get("X-GK-Parity") ?? "VALIDATED";
       const efficiency = response.headers.get("X-GK-Efficiency") ?? "0";
@@ -261,7 +274,7 @@ export default function Studio() {
       a.click();
       URL.revokeObjectURL(url);
     });
-    toast({ title: "All stems downloaded", description: `${stemBlobs.length} files` });
+    toast({ title: "All stems downloading", description: `${stemBlobs.length} files` });
   };
 
   const resetState = (e?: React.MouseEvent) => {
@@ -279,30 +292,57 @@ export default function Studio() {
   };
 
   const selectedMode = MODES.find(m => m.value === mode)!;
+  const canProcess = mode === "standard" ? isPro : hasSplits;
 
   return (
     <Layout>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-6">
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Audio Studio</h1>
             <p className="text-muted-foreground text-sm mt-1">Upload your audio — GravelKing processes it on the server.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2.5 py-1.5">
               <Shield className="w-3.5 h-3.5" />
               Server-side processing
             </div>
-            {!isPro && (
+            {!hasSplits && (
               <Link href="/pricing">
                 <Badge variant="outline" className="border-amber-500/30 text-amber-500 cursor-pointer hover:bg-amber-500/10 px-3 py-1">
                   Free Plan — Upgrade
                 </Badge>
               </Link>
             )}
+            {hasSplits && !isPro && (
+              <Link href="/pricing">
+                <Badge variant="outline" className="border-amber-500/30 text-amber-500 cursor-pointer hover:bg-amber-500/10 px-3 py-1">
+                  Splits Plan — Upgrade to Pro
+                </Badge>
+              </Link>
+            )}
           </div>
         </div>
+
+        {/* Splits-only upsell banner */}
+        {hasSplits && !isPro && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-amber-500/20 bg-amber-500/5"
+          >
+            <div className="flex items-center gap-2.5 text-sm">
+              <Lock className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="text-amber-400/90">You're on <strong>GravelKing Splits</strong> — voice removal and stem splitting are unlocked. Upgrade to Pro to unlock the full Audio Studio.</span>
+            </div>
+            <Link href="/pricing">
+              <Button size="sm" variant="outline" className="shrink-0 border-amber-500/30 text-amber-500 h-8 text-xs">
+                Upgrade <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </Link>
+          </motion.div>
+        )}
 
         {/* Drop Zone */}
         <Card
@@ -363,7 +403,7 @@ export default function Studio() {
           </CardContent>
         </Card>
 
-        {/* Waveforms — not shown for stem split */}
+        {/* Waveforms — only for standard/voice modes */}
         <AnimatePresence>
           {waveformBefore.length > 0 && mode !== "stem_split" && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -396,16 +436,24 @@ export default function Studio() {
                     </SelectTrigger>
                     <SelectContent>
                       {MODES.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
+                        <SelectItem
+                          key={m.value}
+                          value={m.value}
+                          disabled={m.requiresStudio && !isPro}
+                        >
                           <div className="flex items-center gap-2">
                             {m.icon}
                             <span>{m.label}</span>
+                            {m.requiresStudio && !isPro && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-amber-500/30 text-amber-500">Pro</Badge>
+                            )}
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">{selectedMode.description}</p>
+
                   {mode === "voice_remove" && (
                     <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-secondary/40 rounded-md p-2.5">
                       <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
@@ -415,12 +463,19 @@ export default function Studio() {
                   {mode === "stem_split" && (
                     <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-secondary/40 rounded-md p-2.5">
                       <Scissors className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-400" />
-                      Returns bass, midrange, and highs stems. Instrumental stem added for stereo files.
+                      Returns bass, midrange, and highs. Instrumental stem added for stereo files.
+                    </div>
+                  )}
+                  {mode === "standard" && !isPro && (
+                    <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
+                      <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      GravelKing Kernel requires a Pro subscription.{" "}
+                      <Link href="/pricing" className="underline font-medium">Upgrade</Link>
                     </div>
                   )}
                 </div>
 
-                {/* Standard-only parameters */}
+                {/* Standard-only params */}
                 {mode === "standard" && (
                   <>
                     <div className="space-y-3">
@@ -428,12 +483,12 @@ export default function Studio() {
                         <label className="text-sm font-medium">Signal Strength</label>
                         <span className="text-sm font-mono text-muted-foreground">{multiplier[0].toFixed(2)}</span>
                       </div>
-                      <Slider value={multiplier} onValueChange={setMultiplier} min={0.1} max={2.0} step={0.01} disabled={state === "processing"} data-testid="slider-studio-multiplier" />
+                      <Slider value={multiplier} onValueChange={setMultiplier} min={0.1} max={2.0} step={0.01} disabled={state === "processing" || !isPro} data-testid="slider-studio-multiplier" />
                       <p className="text-xs text-muted-foreground">Below 1.0 reduces amplitude. Above 1.0 boosts it.</p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Buffer Size</label>
-                      <Select value={sliceSize} onValueChange={setSliceSize} disabled={state === "processing"}>
+                      <Select value={sliceSize} onValueChange={setSliceSize} disabled={state === "processing" || !isPro}>
                         <SelectTrigger data-testid="select-studio-buffersize"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="1">1 — sample-by-sample</SelectItem>
@@ -447,13 +502,15 @@ export default function Studio() {
                 )}
 
                 <Button
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold h-11"
+                  className={`w-full font-semibold h-11 ${canProcess ? "bg-amber-500 hover:bg-amber-600 text-black" : "opacity-60 cursor-not-allowed"}`}
                   onClick={handleProcess}
-                  disabled={state === "processing" || state === "loading"}
+                  disabled={state === "processing" || state === "loading" || !canProcess}
                   data-testid="button-process"
                 >
                   {state === "processing"
                     ? `Processing... ${progress}%`
+                    : !canProcess
+                    ? <><Lock className="w-4 h-4 mr-2" />{mode === "standard" ? "Pro Required" : "Upgrade Required"}</>
                     : mode === "voice_remove" ? "Remove Vocals"
                     : mode === "stem_split" ? "Split into Stems"
                     : "Process with GravelKing"}
@@ -501,7 +558,7 @@ export default function Studio() {
                               <span className={`text-sm font-semibold ${meta.color}`}>{meta.label}</span>
                               <p className="text-[11px] text-muted-foreground mt-0.5">{meta.description}</p>
                             </div>
-                            {isPro ? (
+                            {hasSplits ? (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -513,14 +570,14 @@ export default function Studio() {
                             ) : (
                               <Link href="/pricing" className="shrink-0">
                                 <Button size="sm" variant="outline" className="h-8 text-xs border-amber-500/30 text-amber-500">
-                                  <Lock className="w-3.5 h-3.5 mr-1.5" />Pro
+                                  <Lock className="w-3.5 h-3.5 mr-1.5" />Splits
                                 </Button>
                               </Link>
                             )}
                           </div>
                         );
                       })}
-                    {isPro && (
+                    {hasSplits && (
                       <Button
                         className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold"
                         onClick={handleDownloadAllStems}
@@ -558,7 +615,7 @@ export default function Studio() {
                       <Button variant="outline" className="flex-1" onClick={handlePlayProcessed} data-testid="button-play">
                         {isPlaying ? <><Square className="w-4 h-4 mr-2" />Stop</> : <><Play className="w-4 h-4 mr-2" />Preview</>}
                       </Button>
-                      {isPro ? (
+                      {(mode === "voice_remove" ? hasSplits : isPro) ? (
                         <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={handleDownload} data-testid="button-download">
                           <Download className="w-4 h-4 mr-2" /> Download WAV
                         </Button>
