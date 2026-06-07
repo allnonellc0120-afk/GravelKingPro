@@ -1,8 +1,19 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "22f-ouYn0_yzpdegv7Sd3"
 uri = "file://artifacts/gravelkingpro/public/hero-bg.png"
 type = "image"
 title = "Abstract music production software interface"
+
+[[generated]]
+id = "otszyGWTr6Fu91PK4E9pZ"
+uri = "file://attached_assets/generated_images/gravelking_productions_mobile_app_7cd0.png"
+type = "image"
+title = "generated_image"
+
+[[outputs]]
+id = "whvKht8bnIVNiskggSZrV"
+uri = "file://GravelKingPro_Product_Overview.md"
+type = "text"
+title = "GravelKing Productions — Product Overview"

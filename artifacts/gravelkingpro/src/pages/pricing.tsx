@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { useAppState, type SubscriptionTier } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { Check, Loader2, X, Gift, CheckCircle2, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 type PlanId = "splits" | "pro" | "node_auditor";
@@ -17,9 +17,12 @@ const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
 };
 
 export default function Pricing() {
-  const { tier, setTier } = useAppState();
+  const { tier, setTier, activePromo, redeemPromo, revokePromo } = useAppState();
   const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promoError, setPromoError] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -106,6 +109,32 @@ export default function Pricing() {
             Start free. Unlock stem splitting with Splits, or get the full studio experience with Pro.
           </p>
         </div>
+
+        {/* Promo Code — active banner */}
+        <AnimatePresence>
+          {activePromo && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mb-8 flex items-center justify-between gap-4 border border-amber-500/40 bg-amber-500/5 px-5 py-4"
+            >
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-5 h-5 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-400">Promo active — Node Auditor unlocked</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">All features are enabled for free via your promo code.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { revokePromo(); toast({ title: "Promo removed", description: "Access reverted to your base plan." }); }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              >
+                Remove
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
 
@@ -273,6 +302,66 @@ export default function Pricing() {
             </Card>
           </motion.div>
         </div>
+
+        {/* Promo Code Entry */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-12 max-w-md mx-auto"
+        >
+          <div className="border border-border/40 bg-card/20 p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Gift className="w-4 h-4 text-amber-500" />
+              <span className="text-sm font-semibold">Have a promo code?</span>
+            </div>
+            {activePromo ? (
+              <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 px-4 py-3">
+                <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-400">Code applied — all tools unlocked</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Enjoy full Node Auditor access, on the house.</p>
+                </div>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setPromoError(false);
+                  const ok = redeemPromo(promoInput);
+                  if (ok) {
+                    setPromoInput("");
+                    toast({
+                      title: "Promo code accepted!",
+                      description: "Node Auditor access is now unlocked — all tools are yours.",
+                    });
+                  } else {
+                    setPromoError(true);
+                    inputRef.current?.select();
+                  }
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  ref={inputRef}
+                  value={promoInput}
+                  onChange={(e) => { setPromoInput(e.target.value); setPromoError(false); }}
+                  placeholder="Enter promo code"
+                  className={`flex-1 bg-secondary/40 border px-3 py-2 text-sm focus:outline-none focus:border-amber-500/60 transition-colors ${
+                    promoError ? "border-destructive/60 text-destructive" : "border-border/40"
+                  }`}
+                />
+                <Button type="submit" disabled={!promoInput.trim()} className="bg-amber-500 hover:bg-amber-400 text-black font-semibold px-4">
+                  Apply
+                </Button>
+              </form>
+            )}
+            {promoError && (
+              <p className="text-xs text-destructive">Invalid promo code — check the code and try again.</p>
+            )}
+          </div>
+        </motion.div>
+
       </div>
     </Layout>
   );
