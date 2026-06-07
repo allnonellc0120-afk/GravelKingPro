@@ -9,6 +9,11 @@ import Pricing from "@/pages/pricing";
 import Report from "@/pages/report";
 import Studio from "@/pages/studio";
 import MixStudio from "@/pages/mix-studio";
+import KernelDashboard from "@/pages/kernel";
+import Contact from "@/pages/contact";
+import SongBot from "@/pages/songbot";
+import BeatMaker from "@/pages/beatmaker";
+import DownloadPage from "@/pages/download";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +25,11 @@ function Router() {
       <Route path="/mix" component={MixStudio} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/report" component={Report} />
+      <Route path="/kernel" component={KernelDashboard} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/songbot" component={SongBot} />
+      <Route path="/beatmaker" component={BeatMaker} />
+      <Route path="/download" component={DownloadPage} />
       <Route component={NotFound} />
     </Switch>
   );
