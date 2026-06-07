@@ -11,7 +11,11 @@ import {
   Scissors,
   Zap,
   Calendar,
+  BookOpen,
+  X,
+  Clock,
 } from "lucide-react";
+import { searchLyrics, parseLrc, formatTime, type LrclibTrack } from "@/lib/lrclib";
 
 interface Beat {
   id: number;
@@ -39,6 +43,11 @@ function BeatPlayer({ beat }: { beat: Beat }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [, navigate] = useLocation();
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [lyricsQuery, setLyricsQuery] = useState("");
+  const [lyricsResults, setLyricsResults] = useState<LrclibTrack[]>([]);
+  const [lyricsSelected, setLyricsSelected] = useState<LrclibTrack | null>(null);
+  const [lyricsLoading, setLyricsLoading] = useState(false);
 
   const toggle = () => {
     const el = audioRef.current;
@@ -53,6 +62,21 @@ function BeatPlayer({ beat }: { beat: Beat }) {
     a.download = beat.fileName ?? `${beat.title}.mp3`;
     a.click();
   };
+
+  const handleLyricsSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lyricsQuery.trim()) return;
+    setLyricsLoading(true);
+    setLyricsSelected(null);
+    try {
+      const tracks = await searchLyrics(lyricsQuery.trim());
+      setLyricsResults(tracks.slice(0, 6));
+    } catch { setLyricsResults([]); }
+    finally { setLyricsLoading(false); }
+  };
+
+  const lrcLines = lyricsSelected?.syncedLyrics ? parseLrc(lyricsSelected.syncedLyrics) : [];
+  const plainLines = (lyricsSelected?.plainLyrics ?? "").split("\n");
 
   return (
     <div className="bg-card border border-border/50 rounded-xl p-5 flex flex-col gap-4 hover:border-amber-500/40 transition-colors group">
@@ -122,18 +146,84 @@ function BeatPlayer({ beat }: { beat: Beat }) {
         <button
           onClick={() => navigate("/studio?tool=stem_split")}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-500 px-3 py-1.5 rounded-lg hover:bg-secondary/40 transition-colors"
-          title="Open Stem Splitter"
         >
           <Scissors className="w-3 h-3" /> Stem Split
         </button>
         <button
           onClick={() => navigate("/studio?tool=voice_remove")}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-500 px-3 py-1.5 rounded-lg hover:bg-secondary/40 transition-colors"
-          title="Open Voice Remover"
         >
           <Mic className="w-3 h-3" /> Voice Remove
         </button>
+        <button
+          onClick={() => setShowLyrics(s => !s)}
+          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${showLyrics ? "text-amber-400 bg-amber-500/10 border border-amber-500/30" : "text-muted-foreground hover:text-amber-500 hover:bg-secondary/40"}`}
+        >
+          <BookOpen className="w-3 h-3" /> Lyrics
+        </button>
       </div>
+
+      {/* Inline lyrics lookup */}
+      {showLyrics && (
+        <div className="border-t border-border/30 pt-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-500 flex items-center gap-1">
+              <BookOpen className="w-2.5 h-2.5" /> Lyrics Reference · lrclib.net
+            </span>
+            <button onClick={() => { setShowLyrics(false); setLyricsResults([]); setLyricsSelected(null); }} className="text-muted-foreground hover:text-foreground transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+          <form onSubmit={handleLyricsSearch} className="flex gap-1.5">
+            <input
+              value={lyricsQuery}
+              onChange={e => setLyricsQuery(e.target.value)}
+              placeholder={`"${beat.title}" or any song...`}
+              className="flex-1 bg-secondary/40 border border-border/40 rounded px-2 py-1 text-xs focus:outline-none focus:border-amber-500/50 transition-colors"
+            />
+            <button type="submit" disabled={lyricsLoading || !lyricsQuery.trim()}
+              className="px-2 py-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black rounded text-xs font-semibold transition-colors">
+              {lyricsLoading ? <span className="w-3 h-3 border border-black/30 border-t-black rounded-full animate-spin block" /> : "Go"}
+            </button>
+          </form>
+
+          {!lyricsSelected && lyricsResults.length > 0 && (
+            <div className="space-y-0.5 max-h-32 overflow-y-auto">
+              {lyricsResults.map(t => (
+                <button key={t.id} onClick={() => setLyricsSelected(t)}
+                  className="w-full text-left px-2 py-1 rounded hover:bg-secondary/60 text-xs flex items-center justify-between gap-2 transition-colors">
+                  <span className="truncate font-medium">{t.trackName} <span className="text-muted-foreground font-normal">· {t.artistName}</span></span>
+                  {t.syncedLyrics && <span className="shrink-0 text-[9px] text-amber-400 bg-amber-500/10 px-1 rounded">LRC</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {lyricsSelected && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-medium truncate">{lyricsSelected.trackName}
+                  {lyricsSelected.syncedLyrics && <span className="ml-1 text-amber-400 inline-flex items-center gap-0.5"><Clock className="w-2 h-2" /> LRC</span>}
+                </p>
+                <button onClick={() => setLyricsSelected(null)} className="text-[10px] text-muted-foreground hover:text-foreground ml-2 shrink-0 transition-colors">← Back</button>
+              </div>
+              <div className="bg-secondary/20 rounded p-2 max-h-40 overflow-y-auto space-y-0.5">
+                {lrcLines.length > 0
+                  ? lrcLines.map((l, i) => (
+                      <div key={i} className="flex gap-2 text-xs">
+                        <span className="text-[9px] font-mono text-amber-500/50 w-8 shrink-0 text-right">{formatTime(l.timeMs)}</span>
+                        <span className="text-foreground/80">{l.text || "♪"}</span>
+                      </div>
+                    ))
+                  : plainLines.map((l, i) => (
+                      <p key={i} className={`text-xs ${l ? "text-foreground/80" : "h-2"}`}>{l}</p>
+                    ))
+                }
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="text-[10px] text-muted-foreground/50 text-right">
         {beat.downloadCount.toLocaleString()} downloads

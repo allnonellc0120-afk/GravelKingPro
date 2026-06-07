@@ -16,6 +16,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/beatmaker", label: "Beat Maker" },
     { href: "/songbot", label: "Songwriter" },
     { href: "/beats", label: "Beats" },
+    { href: "/lyrics", label: "Lyrics" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
   ];
