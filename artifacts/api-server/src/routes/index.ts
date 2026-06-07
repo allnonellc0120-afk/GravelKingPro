@@ -9,6 +9,7 @@ import authRouter from "./auth";
 import historyRouter from "./history";
 import beatRouter from "./beatmaker";
 import downloadRouter from "./download";
+import beatsRouter from "./beats";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(stripeRouter);
 router.use(historyRouter);
 router.use(beatRouter);
 router.use(downloadRouter);
+router.use(beatsRouter);
 
 export default router;
