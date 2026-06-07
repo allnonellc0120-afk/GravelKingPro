@@ -12,9 +12,9 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useColors } from "@/hooks/useColors";
 
 type LrcLine = { timeMs: number; text: string };
@@ -81,13 +81,20 @@ export default function LyricsScreen() {
     }
   }
 
-  const lrcLines = selected?.syncedLyrics ? parseLrc(selected.syncedLyrics) : [];
-  const plainLines = selected?.plainLyrics?.split("\n") ?? [];
+  function selectTrack(track: Track) {
+    setSelected(track);
+    Haptics.selectionAsync();
+  }
 
+  // ── Lyrics detail view ──────────────────────────────────────────────────────
   if (selected) {
+    const lrcLines = selected.syncedLyrics ? parseLrc(selected.syncedLyrics) : [];
+    const plainLines = selected.plainLyrics?.split("\n") ?? [];
+    const hasLyrics = lrcLines.length > 0 || plainLines.some(l => l.trim());
+
     return (
       <ScrollView
-        style={[{ backgroundColor: colors.background }]}
+        style={{ flex: 1, backgroundColor: colors.background }}
         contentContainerStyle={[
           s.content,
           { paddingTop: isWeb ? 67 + insets.top : insets.top + 16 },
@@ -114,23 +121,32 @@ export default function LyricsScreen() {
           </Text>
         </View>
 
-        <View style={[s.lyricsBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {lrcLines.length > 0
-            ? lrcLines.map((l, i) => (
-                <View key={i} style={s.lrcLine}>
-                  <Text style={[s.lrcTime, { color: colors.primary }]}>{fmtTime(l.timeMs)}</Text>
-                  <Text style={[s.lrcText, { color: l.text ? colors.foreground : colors.mutedForeground }]}>
-                    {l.text || "♪"}
+        {hasLyrics ? (
+          <View style={[s.lyricsBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {lrcLines.length > 0
+              ? lrcLines.map((l, i) => (
+                  <View key={i} style={s.lrcLine}>
+                    <Text style={[s.lrcTime, { color: colors.primary }]}>{fmtTime(l.timeMs)}</Text>
+                    <Text style={[s.lrcText, { color: l.text ? colors.foreground : colors.mutedForeground }]}>
+                      {l.text || "♪"}
+                    </Text>
+                  </View>
+                ))
+              : plainLines.map((l, i) => (
+                  <Text key={i} style={[s.plainLine, { color: l.trim() ? colors.foreground : "transparent" }]}>
+                    {l || " "}
                   </Text>
-                </View>
-              ))
-            : plainLines.map((l, i) => (
-                <Text key={i} style={[s.plainLine, { color: l ? colors.foreground : "transparent" }]}>
-                  {l || " "}
-                </Text>
-              ))
-          }
-        </View>
+                ))
+            }
+          </View>
+        ) : (
+          <View style={[s.lyricsBox, s.noLyricsBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="music" size={24} color={colors.mutedForeground} />
+            <Text style={[s.noLyricsText, { color: colors.mutedForeground }]}>
+              No lyrics available for this track
+            </Text>
+          </View>
+        )}
 
         <Text style={[s.attribution, { color: colors.mutedForeground }]}>
           Lyrics via lrclib.net · GravelKing Protocol
@@ -139,122 +155,134 @@ export default function LyricsScreen() {
     );
   }
 
-  return (
-    <KeyboardAwareScrollView
-      style={{ backgroundColor: colors.background }}
-      contentContainerStyle={[
-        s.content,
-        { paddingTop: isWeb ? 67 + insets.top : insets.top + 16 },
-      ]}
-      keyboardShouldPersistTaps="handled"
-      bottomOffset={20}
-    >
-      <Text style={[s.heading, { color: colors.foreground }]}>Lyrics Hub</Text>
-      <Text style={[s.sub, { color: colors.mutedForeground }]}>Synced LRC lyrics · lrclib.net</Text>
+  // ── Search view ─────────────────────────────────────────────────────────────
+  const topPad = isWeb ? 67 + insets.top : insets.top + 16;
 
-      {/* Search bar */}
-      <View style={[s.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
-          style={[s.searchInput, { color: colors.foreground }]}
-          placeholder="Song title or artist…"
-          placeholderTextColor={colors.mutedForeground}
-          value={query}
-          onChangeText={setQuery}
-          onSubmitEditing={search}
-          returnKeyType="search"
-          autoCorrect={false}
-        />
-        {query.length > 0 && (
-          <Pressable onPress={() => { setQuery(""); setResults([]); setSearched(false); }}>
-            <Feather name="x" size={16} color={colors.mutedForeground} />
-          </Pressable>
-        )}
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Fixed header + search controls */}
+      <View style={[s.header, { paddingTop: topPad }]}>
+        <Text style={[s.heading, { color: colors.foreground }]}>Lyrics Hub</Text>
+        <Text style={[s.sub, { color: colors.mutedForeground }]}>Synced LRC lyrics · lrclib.net</Text>
+
+        <View style={[s.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather name="search" size={16} color={colors.mutedForeground} />
+          <TextInput
+            style={[s.searchInput, { color: colors.foreground }]}
+            placeholder="Song title or artist…"
+            placeholderTextColor={colors.mutedForeground}
+            value={query}
+            onChangeText={setQuery}
+            onSubmitEditing={search}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {query.length > 0 && (
+            <Pressable onPress={() => { setQuery(""); setResults([]); setSearched(false); }}>
+              <Feather name="x" size={16} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        </View>
+
+        <Pressable
+          onPress={search}
+          disabled={!query.trim() || loading}
+          style={({ pressed }) => [
+            s.searchBtn,
+            { backgroundColor: colors.primary, opacity: pressed || !query.trim() ? 0.6 : 1 },
+          ]}
+        >
+          {loading
+            ? <ActivityIndicator size="small" color={colors.primaryForeground} />
+            : <Text style={[s.searchBtnText, { color: colors.primaryForeground }]}>Search</Text>
+          }
+        </Pressable>
       </View>
 
-      <Pressable
-        onPress={search}
-        disabled={!query.trim() || loading}
-        style={({ pressed }) => [
-          s.searchBtn,
-          { backgroundColor: colors.primary, opacity: pressed || !query.trim() ? 0.6 : 1 },
-        ]}
-      >
-        {loading
-          ? <ActivityIndicator size="small" color={colors.primaryForeground} />
-          : <Text style={[s.searchBtnText, { color: colors.primaryForeground }]}>Search</Text>
-        }
-      </Pressable>
-
-      {/* Results */}
-      {loading && (
+      {/* Results list — FlatList for reliable touch hit-testing */}
+      {loading ? (
         <View style={s.centerPad}>
           <ActivityIndicator color={colors.primary} />
         </View>
-      )}
-
-      {!loading && searched && results.length === 0 && (
-        <View style={s.centerPad}>
-          <Feather name="music" size={28} color={colors.mutedForeground} />
-          <Text style={[s.emptyText, { color: colors.mutedForeground }]}>No results for "{query}"</Text>
-        </View>
-      )}
-
-      {!loading && !searched && (
+      ) : !searched ? (
         <View style={s.centerPad}>
           <Feather name="book-open" size={28} color={colors.mutedForeground} />
           <Text style={[s.emptyText, { color: colors.mutedForeground }]}>Search any song for synced lyrics</Text>
         </View>
-      )}
-
-      {results.map((track) => (
-        <Pressable
-          key={track.id}
-          onPress={() => { setSelected(track); Haptics.selectionAsync(); }}
-          style={({ pressed }) => [
-            s.resultRow,
-            { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.75 : 1 },
-          ]}
-        >
-          <View style={s.resultInfo}>
-            <Text style={[s.resultTitle, { color: colors.foreground }]} numberOfLines={1}>{track.trackName}</Text>
-            <Text style={[s.resultArtist, { color: colors.mutedForeground }]} numberOfLines={1}>{track.artistName}</Text>
-          </View>
-          <View style={s.resultRight}>
-            {track.syncedLyrics && (
-              <View style={[s.lrcPill, { backgroundColor: colors.primary }]}>
-                <Text style={[s.lrcPillText, { color: colors.primaryForeground }]}>LRC</Text>
+      ) : results.length === 0 ? (
+        <View style={s.centerPad}>
+          <Feather name="music" size={28} color={colors.mutedForeground} />
+          <Text style={[s.emptyText, { color: colors.mutedForeground }]}>No results for "{query}"</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={results}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={s.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          renderItem={({ item: track }) => (
+            <Pressable
+              onPress={() => selectTrack(track)}
+              style={({ pressed }) => [
+                s.resultRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <View style={s.resultInfo}>
+                <Text style={[s.resultTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  {track.trackName}
+                </Text>
+                <Text style={[s.resultArtist, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {track.artistName}
+                </Text>
               </View>
-            )}
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-          </View>
-        </Pressable>
-      ))}
-    </KeyboardAwareScrollView>
+              <View style={s.resultRight}>
+                {track.syncedLyrics && (
+                  <View style={[s.lrcPill, { backgroundColor: colors.primary }]}>
+                    <Text style={[s.lrcPillText, { color: colors.primaryForeground }]}>LRC</Text>
+                  </View>
+                )}
+                <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              </View>
+            </Pressable>
+          )}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
+    header: { paddingHorizontal: 20, paddingBottom: 8 },
     content: { paddingHorizontal: 20, paddingBottom: 120 },
+    listContent: { paddingHorizontal: 20, paddingBottom: 120 },
     heading: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
-    sub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2, marginBottom: 20 },
+    sub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2, marginBottom: 16 },
     searchRow: {
       flexDirection: "row", alignItems: "center", gap: 10,
       borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 10,
     },
     searchInput: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
     searchBtn: {
-      paddingVertical: 13, alignItems: "center", justifyContent: "center", marginBottom: 24,
+      paddingVertical: 13, alignItems: "center", justifyContent: "center", marginBottom: 8,
     },
     searchBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-    centerPad: { alignItems: "center", gap: 10, paddingTop: 32 },
+    centerPad: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 32 },
     emptyText: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
     resultRow: {
       flexDirection: "row", alignItems: "center", gap: 12,
-      borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8,
+      borderWidth: 1, paddingHorizontal: 14, paddingVertical: 14,
     },
-    resultInfo: { flex: 1, gap: 3 },
+    resultInfo: { flex: 1, gap: 4 },
     resultTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
     resultArtist: { fontSize: 12, fontFamily: "Inter_400Regular" },
     resultRight: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -269,6 +297,8 @@ const styles = (colors: ReturnType<typeof useColors>) =>
     lrcBadgeText: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1.5 },
     metaDuration: { fontSize: 12, fontFamily: "Inter_400Regular" },
     lyricsBox: { borderWidth: 1, padding: 16, gap: 6, marginBottom: 16 },
+    noLyricsBox: { alignItems: "center", justifyContent: "center", paddingVertical: 40, gap: 12 },
+    noLyricsText: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
     lrcLine: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
     lrcTime: { fontSize: 10, fontFamily: "Inter_500Medium", width: 38, paddingTop: 2 },
     lrcText: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
