@@ -7,6 +7,8 @@ import masterRouter from "./master";
 import stripeRouter from "./stripe";
 import authRouter from "./auth";
 import historyRouter from "./history";
+import beatRouter from "./beatmaker";
+import downloadRouter from "./download";
 
 const router: IRouter = Router();
 
@@ -18,5 +20,7 @@ router.use(studioRouter);
 router.use(masterRouter);
 router.use(stripeRouter);
 router.use(historyRouter);
+router.use(beatRouter);
+router.use(downloadRouter);
 
 export default router;

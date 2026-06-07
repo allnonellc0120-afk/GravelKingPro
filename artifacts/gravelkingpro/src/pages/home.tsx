@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -6,47 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Scissors, Mic2, Wand2, Layers, ChevronRight, Play,
-  CheckCircle2, Lock, LogIn, Zap, History, Clock, Radio,
-  Server, Wifi, WifiOff, User, LogOut, FileText, Activity,
-  Settings2, AlertCircle,
+  Mic2, Scissors, Wand2, Layers, Pen, Music2,
+  Play, ChevronRight, CheckCircle2, Zap, Download,
+  Mail, Lock,
 } from "lucide-react";
-import { Link } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
-import { useToast } from "@/hooks/use-toast";
-import { generateKernelReport } from "@/lib/generateReport";
-import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-
-type RoutingConfig = {
-  mode: "local" | "remote_with_fallback";
-  remoteUrl: string | null;
-  remoteStatus: "online" | "offline" | "not_configured";
-  localKernel: "active";
-  authConfigured: boolean;
-};
-
-type LiveEvent = {
-  routing: "remote" | "local";
-  parity: string;
-  efficiency: string;
-  decayRate: string;
-  sampleCount: string;
-  timestamp: string;
-  remoteUrl: string | null;
-};
-
-type HistoryRun = {
-  id: number;
-  routing: string;
-  parity: string;
-  efficiency: number | null;
-  decayRate: number | null;
-  sampleCount: number | null;
-  fileName: string | null;
-  createdAt: string;
-};
+import { motion } from "framer-motion";
 
 const FEATURES = [
   {
@@ -70,8 +34,8 @@ const FEATURES = [
   {
     icon: <Wand2 className="w-6 h-6 text-sky-400" />,
     title: "Audio Mastering",
-    description: "6 professional presets: Normal (free), Broadcast, Vinyl, Podcast, Club, and Film. One click to a polished master.",
-    badge: "Normal Free",
+    description: "6 professional presets: Normal, Broadcast, Vinyl, Podcast, Club, and Film. One click to a polished master.",
+    badge: "30s Preview Free",
     badgeColor: "border-emerald-500/40 text-emerald-400",
     href: "/studio",
     cta: "Master now",
@@ -85,6 +49,24 @@ const FEATURES = [
     href: "/mix",
     cta: "Open Studio",
   },
+  {
+    icon: <Music2 className="w-6 h-6 text-pink-400" />,
+    title: "Beat Maker",
+    description: "Generate original instrumentals in 7 genres using the GravelKing MLK v3 kernel. 30s free, full-length on Pro.",
+    badge: "MLK v3",
+    badgeColor: "border-pink-500/40 text-pink-400",
+    href: "/beatmaker",
+    cta: "Make a beat",
+  },
+  {
+    icon: <Pen className="w-6 h-6 text-violet-400" />,
+    title: "Songwriter",
+    description: "Generate full song structures — verse, chorus, bridge — in 8 genres with custom mood, BPM, and rhyme scheme.",
+    badge: "Free",
+    badgeColor: "border-violet-500/40 text-violet-400",
+    href: "/songbot",
+    cta: "Write a song",
+  },
 ];
 
 const PLANS = [
@@ -92,7 +74,7 @@ const PLANS = [
     name: "Starter",
     price: "Free",
     color: "border-border/30",
-    features: ["Basic kernel analysis", "1 free voice/stem split", "Normal mastering preset", "Audio preview"],
+    features: ["1 free voice/stem split", "30s mastering preview", "30s Beat Maker clips", "Full Songwriter access", "Audio preview"],
   },
   {
     name: "GravelKing Splits",
@@ -111,113 +93,13 @@ const PLANS = [
     color: "border-amber-500/40 bg-amber-500/5",
     badge: "Full Studio",
     badgeColor: "bg-amber-500 text-black",
-    features: ["Everything in Splits", "Full Mix Studio access", "Waveform visualization", "Kernel metrics & PDF reports", "Priority support"],
+    features: ["Everything in Splits", "Full Mix Studio access", "Beat Maker — up to 120s", "Kernel Dashboard + PDF", "Priority support"],
   },
 ];
 
 export default function Home() {
-  const { isPro, results, setResults, hasRun, setHasRun } = useAppState();
-  const { user, isAuthenticated, login, logout } = useAuth();
-  const [isRunning, setIsRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [multiplier, setMultiplier] = useState([0.75]);
-  const [sliceSize, setSliceSize] = useState("2");
-  const [error, setError] = useState<string | null>(null);
-  const [routing, setRouting] = useState<RoutingConfig | null>(null);
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
-  const [sseConnected, setSseConnected] = useState(false);
-  const [history, setHistory] = useState<HistoryRun[]>([]);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    fetch("/api/kernel/routing").then((r) => r.json()).then(setRouting).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetch("/api/kernel/history", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => setHistory(d.runs ?? []))
-        .catch(() => {});
-    }
-  }, [isAuthenticated, hasRun]);
-
-  useEffect(() => {
-    const es = new EventSource("/api/kernel/telemetry");
-    eventSourceRef.current = es;
-    es.onopen = () => setSseConnected(true);
-    es.onerror = () => setSseConnected(false);
-    es.onmessage = (e) => {
-      try {
-        const event: LiveEvent = JSON.parse(e.data);
-        setLiveEvents((prev) => [event, ...prev].slice(0, 10));
-      } catch { /* ignore */ }
-    };
-    return () => { es.close(); setSseConnected(false); };
-  }, []);
-
-  const handleRun = async () => {
-    setIsRunning(true);
-    setProgress(0);
-    setHasRun(false);
-    setError(null);
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress = Math.min(currentProgress + 8, 90);
-      setProgress(currentProgress);
-    }, 150);
-    try {
-      const response = await fetch("/api/kernel/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ multiplier: multiplier[0], slice_size: parseInt(sliceSize) }),
-      });
-      const json = await response.json();
-      clearInterval(interval);
-      setProgress(100);
-      if (!response.ok || !json.success) throw new Error(json.error || "Kernel returned an error.");
-      const { stats } = json.data;
-      const parityStatus: "VALIDATED" | "KERNEL_VIOLATION" = json.status;
-      setResults({
-        throughput: `${stats.originalSum} → ${stats.carvedSum.toFixed(2)}`,
-        stability: parityStatus === "VALIDATED" ? "100%" : "FAILED",
-        efficiency: `${(stats.efficiency * 100).toFixed(1)}%`,
-        decayRate: `${(stats.decayRate * 100).toFixed(1)}%`,
-        originalSum: stats.originalSum,
-        carvedSum: stats.carvedSum,
-        parityStatus,
-        multiplier: multiplier[0],
-        sliceSize: parseInt(sliceSize),
-        runDate: new Date().toLocaleString(),
-      });
-      setHasRun(true);
-    } catch (err: any) {
-      clearInterval(interval);
-      setProgress(0);
-      setError(err.message || "Could not reach the GravelKing kernel.");
-      toast({ title: "Kernel error", description: err.message, variant: "destructive" });
-    } finally {
-      setIsRunning(false);
-    }
-  };
-
-  const handleDownload = () => {
-    if (!results) return;
-    generateKernelReport({
-      multiplier: results.multiplier,
-      sliceSize: results.sliceSize,
-      throughput: results.throughput,
-      stability: results.stability,
-      efficiency: results.efficiency,
-      decayRate: results.decayRate,
-      originalSum: results.originalSum,
-      carvedSum: results.carvedSum,
-      parityStatus: results.parityStatus,
-      runDate: results.runDate,
-    });
-    toast({ title: "Report downloaded", description: "Your PDF is ready." });
-  };
+  const { isPro } = useAppState();
+  const { isAuthenticated, login } = useAuth();
 
   return (
     <Layout>
@@ -233,7 +115,7 @@ export default function Home() {
             <span className="text-amber-500">no plugin required.</span>
           </h1>
           <p className="text-muted-foreground text-base max-w-xl mx-auto">
-            GravelKing Productions handles voice removal, stem splitting, mastering, and multi-track mixing entirely on the server. Upload a file — done in seconds.
+            GravelKing Productions handles voice removal, stem splitting, mastering, beat-making, and songwriting — entirely on the server. Upload a file or pick a tool and go.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link href="/studio">
@@ -338,175 +220,64 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── Divider ── */}
-        <div className="border-t border-border/20 pt-6">
-          <p className="text-xs text-muted-foreground text-center mb-6 uppercase tracking-wider font-medium">Kernel Dashboard</p>
-
-          {/* Auth row */}
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <p className="text-sm text-muted-foreground">Run a kernel analysis or view your processing history below.</p>
-            <div className="flex items-center gap-2">
-              {isAuthenticated ? (
-                <>
-                  {user?.profileImageUrl
-                    ? <img src={user.profileImageUrl} className="w-7 h-7 rounded-full" alt="avatar" />
-                    : <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center"><User className="w-4 h-4 text-muted-foreground" /></div>
-                  }
-                  <span className="text-sm text-muted-foreground hidden sm:block">{user?.firstName ?? user?.email ?? "Account"}</span>
-                  <Button variant="ghost" size="sm" onClick={logout} className="text-xs text-muted-foreground h-8 px-2">
-                    <LogOut className="w-3.5 h-3.5 mr-1" />Log out
-                  </Button>
-                </>
-              ) : (
-                <Button variant="outline" size="sm" onClick={login} className="h-8 text-xs">
-                  <LogIn className="w-3.5 h-3.5 mr-1.5" />Log in to save history
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Routing banner */}
-          {routing && (
-            <Card className="border-border/40 bg-card/30 mb-4">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-2">
-                    <Radio className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium">Kernel Routing</span>
-                    <div className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${sseConnected ? "bg-emerald-500/10 text-emerald-400" : "bg-secondary text-muted-foreground"}`}>
-                      <Zap className="w-3 h-3" />{sseConnected ? "Live" : "Connecting..."}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-xs bg-secondary/60 rounded-md px-2.5 py-1.5">
-                      <Server className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="text-emerald-400 font-medium">Local — Active</span>
-                    </div>
-                    <span className="text-muted-foreground text-xs">→</span>
-                    {routing.mode === "remote_with_fallback" ? (
-                      <div className={`flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5 border ${routing.remoteStatus === "online" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400"}`}>
-                        {routing.remoteStatus === "online" ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-                        <span className="font-medium">Remote — {routing.remoteStatus === "online" ? "Online" : "Offline (local fallback)"}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-xs bg-secondary/40 border border-border/30 rounded-md px-2.5 py-1.5 text-muted-foreground">
-                        <WifiOff className="w-3.5 h-3.5" /><span>Remote — Not configured</span>
-                      </div>
-                    )}
-                  </div>
+        {/* ── Bottom CTAs ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-4">
+          <Link href="/download">
+            <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
+              <CardContent className="p-5 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-secondary/60 flex items-center justify-center shrink-0">
+                  <Download className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Download Free</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Run GravelKing locally. Free features work on your machine — upgrade online.</p>
                 </div>
               </CardContent>
             </Card>
-          )}
+          </Link>
 
-          {/* Kernel controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="border-border/40 bg-card/40">
-              <CardContent className="p-5 space-y-5">
-                <div className="flex items-center gap-2 mb-1">
-                  <Settings2 className="w-4 h-4 text-amber-500" />
-                  <span className="font-medium text-sm">Parameters</span>
+          <Link href="/contact">
+            <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
+              <CardContent className="p-5 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-secondary/60 flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5 text-sky-400" />
                 </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm">Signal Strength</label>
-                    <span className="text-sm text-muted-foreground font-mono">{multiplier[0].toFixed(2)}</span>
-                  </div>
-                  <Slider value={multiplier} onValueChange={setMultiplier} max={2.0} min={0.1} step={0.01} disabled={isRunning} data-testid="slider-multiplier" />
-                  <p className="text-xs text-muted-foreground">Controls amplitude carving on the kernel output</p>
+                <div>
+                  <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Contact Us</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Licensing, enterprise, Node Auditor access, or custom integrations.</p>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm">Buffer Size</label>
-                  <Select value={sliceSize} onValueChange={setSliceSize} disabled={isRunning}>
-                    <SelectTrigger data-testid="select-buffersize"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 — minimal segments</SelectItem>
-                      <SelectItem value="2">2 — standard (default)</SelectItem>
-                      <SelectItem value="4">4 — extended</SelectItem>
-                      <SelectItem value="8">8 — deep buffer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold h-11" onClick={handleRun} disabled={isRunning} data-testid="button-run">
-                  {isRunning ? "Processing kernel..." : <><Play className="w-4 h-4 mr-2 fill-current" />Run Analysis</>}
-                </Button>
-                {isRunning && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Running gravelking_opt...</span><span>{progress}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
-                )}
-                {error && (
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
-                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{error}
-                  </div>
-                )}
               </CardContent>
             </Card>
+          </Link>
 
-            <Card className="border-border/40 bg-card/40 relative overflow-hidden">
-              {!hasRun && !isRunning && liveEvents.length === 0 && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[2px]">
-                  <Activity className="w-8 h-8 text-muted-foreground/40 mb-3" />
-                  <p className="text-muted-foreground text-sm font-medium mb-4">No data yet</p>
-                  <Button variant="outline" onClick={handleRun} data-testid="button-run-empty">Start Analysis</Button>
-                </div>
-              )}
-              <CardContent className="p-5 space-y-3 min-h-[280px]">
-                <span className="font-medium text-sm">Telemetry</span>
-                <AnimatePresence>
-                  {results && !isRunning && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 pt-2">
-                      {([
-                        { label: "Signal Throughput", value: results.throughput },
-                        { label: "Stability", value: results.stability },
-                        { label: "Efficiency", value: results.efficiency },
-                        { label: "Decay Rate", value: results.decayRate },
-                      ] as { label: string; value: string }[]).map((metric) => (
-                        <div key={metric.label} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border/50">
-                          <span className="text-sm text-muted-foreground">{metric.label}</span>
-                          <span className="font-mono text-sm font-semibold text-emerald-400">{metric.value}</span>
-                        </div>
-                      ))}
-                      <Button variant="secondary" className="w-full mt-2" onClick={handleDownload} data-testid="button-download-report">
-                        <FileText className="w-4 h-4 mr-2" />Download PDF Report
-                      </Button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Processing history */}
-          {isAuthenticated && history.length > 0 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6">
-              <Card className="border-border/40 bg-card/30">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <History className="w-4 h-4 text-amber-500" />
-                    <span className="font-medium text-sm">Processing History</span>
-                    <Badge variant="outline" className="text-xs ml-auto">{history.length} runs</Badge>
+          {isPro ? (
+            <Link href="/kernel">
+              <Card className="border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all cursor-pointer group h-full">
+                <CardContent className="p-5 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                    <Zap className="w-5 h-5 text-amber-500" />
                   </div>
-                  <div className="space-y-2 max-h-56 overflow-y-auto">
-                    {history.map((run) => (
-                      <div key={run.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/40 border border-border/40 text-xs">
-                        <span className={`shrink-0 px-1.5 py-0.5 rounded font-semibold ${run.routing === "remote" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
-                          {run.routing.toUpperCase()}
-                        </span>
-                        <span className={`shrink-0 font-medium ${run.parity === "VALIDATED" ? "text-emerald-400" : "text-red-400"}`}>{run.parity}</span>
-                        <span className="text-muted-foreground truncate flex-1">{run.fileName ?? "kernel analysis"}</span>
-                        <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-                          <Clock className="w-3 h-3" />{new Date(run.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    ))}
+                  <div>
+                    <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Kernel Dashboard</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Live telemetry, MLK v3 analysis, routing config, and PDF reports.</p>
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </Link>
+          ) : (
+            <Link href="/pricing">
+              <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
+                <CardContent className="p-5 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-secondary/60 flex items-center justify-center shrink-0">
+                    <Lock className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Kernel Dashboard</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Live kernel metrics, routing, and PDF reports — Pro & Node Auditor.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           )}
         </div>
 
