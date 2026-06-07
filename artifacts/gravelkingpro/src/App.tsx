@@ -14,6 +14,7 @@ import Contact from "@/pages/contact";
 import SongBot from "@/pages/songbot";
 import BeatMaker from "@/pages/beatmaker";
 import DownloadPage from "@/pages/download";
+import BeatsPage from "@/pages/beats";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/songbot" component={SongBot} />
       <Route path="/beatmaker" component={BeatMaker} />
       <Route path="/download" component={DownloadPage} />
+      <Route path="/beats" component={BeatsPage} />
       <Route component={NotFound} />
     </Switch>
   );
