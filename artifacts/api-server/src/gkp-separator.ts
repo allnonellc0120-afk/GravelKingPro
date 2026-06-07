@@ -10,11 +10,17 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, readdir, unlink, rm, mkdir } from "fs/promises";
 import { randomUUID } from "crypto";
-import { join, basename, extname } from "path";
+import { join, basename, extname, resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { zipSync } from "fflate";
 import { mlk_v3, bufferToFloat32, float32ToBuffer } from "./kernel-v3";
 
 const execFileAsync = promisify(execFile);
+
+// Wrapper script that patches torchaudio.load/save to use ffmpeg (bypasses missing torchcodec).
+// Resolves relative to the compiled bundle: dist/ -> .. -> artifacts/api-server/
+const _here = dirname(fileURLToPath(import.meta.url));
+const DEMUCS_RUNNER = resolve(_here, "..", "gkp_demucs_runner.py");
 
 export const GNS_PROTOCOL  = "GravelKing_Neural_Separator_v1";
 export const GNS_MODEL     = "htdemucs";
@@ -85,7 +91,7 @@ export async function gnsStemSplit(
   try {
     // ── Stage 1: GNS Neural Separation ──────────────────────────────────────
     await execFileAsync("python3", [
-      "-m", "demucs",
+      DEMUCS_RUNNER,
       "-n",     GNS_MODEL,
       "--out",  outputDir,
       "--jobs", "1",
@@ -155,7 +161,7 @@ export async function gnsVocalRemoval(
   try {
     // ── Stage 1: GNS Two-Stem Separation ────────────────────────────────────
     await execFileAsync("python3", [
-      "-m", "demucs",
+      DEMUCS_RUNNER,
       "-n",           GNS_MODEL,
       "--two-stems",  "vocals",
       "--out",        outputDir,
