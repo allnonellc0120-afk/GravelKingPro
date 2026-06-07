@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Pen, Music, Download, RefreshCw, Zap, Copy, CheckCircle2 } from "lucide-react";
+import { Pen, Music, Download, RefreshCw, Zap, Copy, CheckCircle2, Search, BookOpen, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { searchLyrics, parseLrc, formatTime, type LrclibTrack } from "@/lib/lrclib";
 
 type Genre = "hiphop" | "rnb" | "pop" | "trap" | "lofi" | "gospel" | "soul" | "country";
 type Mood = "uplifting" | "dark" | "romantic" | "aggressive" | "chill" | "melancholic" | "triumphant" | "introspective";
@@ -189,6 +190,104 @@ function generateLyrics(
   return lines.join("\n");
 }
 
+function LyricsRef() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<LrclibTrack[]>([]);
+  const [selected, setSelected] = useState<LrclibTrack | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setLoading(true);
+    setSelected(null);
+    setExpanded(false);
+    try {
+      const tracks = await searchLyrics(query.trim());
+      setResults(tracks.slice(0, 8));
+    } catch { setResults([]); }
+    finally { setLoading(false); }
+  };
+
+  const lrcLines = selected?.syncedLyrics ? parseLrc(selected.syncedLyrics) : [];
+  const plainLines = (selected?.plainLyrics ?? "").split("\n");
+  const displayLines = lrcLines.length > 0 ? lrcLines : plainLines;
+  const PREVIEW = 10;
+  const visible = expanded ? displayLines : displayLines.slice(0, PREVIEW);
+
+  return (
+    <Card className="border-border/40 bg-card/40">
+      <CardContent className="p-5 space-y-3">
+        <span className="font-medium text-sm flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-amber-500" /> Real Lyrics Reference
+          <span className="text-[10px] text-muted-foreground font-normal ml-1">via lrclib.net</span>
+        </span>
+
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search song or artist..."
+            className="flex-1 bg-secondary/40 border border-border/40 rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500/60 transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black rounded-md text-xs font-semibold flex items-center gap-1 transition-colors"
+          >
+            {loading
+              ? <span className="w-3 h-3 border border-black/30 border-t-black rounded-full animate-spin" />
+              : <Search className="w-3 h-3" />}
+          </button>
+        </form>
+
+        {results.length > 0 && !selected && (
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            {results.map(t => (
+              <button key={t.id} onClick={() => setSelected(t)}
+                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-secondary/60 text-xs flex items-center justify-between gap-2 transition-colors">
+                <span className="truncate"><span className="font-medium">{t.trackName}</span> <span className="text-muted-foreground">· {t.artistName}</span></span>
+                {t.syncedLyrics && <span className="shrink-0 text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">LRC</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selected && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium truncate">{selected.trackName} <span className="text-muted-foreground font-normal">· {selected.artistName}</span></p>
+              <button onClick={() => { setSelected(null); }} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0 ml-2">← Back</button>
+            </div>
+            {lrcLines.length > 0 && (
+              <p className="text-[10px] text-amber-400 flex items-center gap-1"><Clock className="w-2.5 h-2.5" /> Synced LRC</p>
+            )}
+            <div className="bg-secondary/20 rounded-md p-3 space-y-0.5 max-h-52 overflow-y-auto">
+              {lrcLines.length > 0
+                ? (visible as typeof lrcLines).map((l, i) => (
+                    <div key={i} className="flex gap-2 text-xs">
+                      <span className="text-amber-500/50 font-mono text-[10px] w-8 shrink-0">{formatTime(l.timeMs)}</span>
+                      <span className="text-foreground/80">{l.text || "♪"}</span>
+                    </div>
+                  ))
+                : (visible as string[]).map((l, i) => (
+                    <p key={i} className={`text-xs ${l ? "text-foreground/80" : "h-2"}`}>{l}</p>
+                  ))
+              }
+            </div>
+            {displayLines.length > PREVIEW && (
+              <button onClick={() => setExpanded(e => !e)} className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors">
+                {expanded ? "Show less" : `Show all ${displayLines.length} lines`}
+              </button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SongBot() {
   const [genre, setGenre] = useState<Genre>("hiphop");
   const [mood, setMood] = useState<Mood>("uplifting");
@@ -304,6 +403,8 @@ export default function SongBot() {
                 </div>
               </CardContent>
             </Card>
+
+            <LyricsRef />
 
             <Card className="border-border/40 bg-card/40">
               <CardContent className="p-5 space-y-4">
