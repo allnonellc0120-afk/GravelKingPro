@@ -9,6 +9,13 @@ import { gravelking_opt, verifyParity } from "../kernel";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 import { db, processRunsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import {
+  gnsStemSplit,
+  gnsVocalRemoval,
+  GNS_PROTOCOL,
+  GNS_MODEL,
+  GNS_STACK,
+} from "../gkp-separator";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -322,29 +329,16 @@ audioRouter.post(
       isFreeUse = !hasPaidTier;
     }
 
-    // ── Voice removal ──────────────────────────────────────────────────────────
+    // ── Voice removal — GNS (GravelKing Neural Separator) v1 ─────────────────
     if (mode === "voice_remove") {
       try {
-        const { channels } = await getAudioInfo(req.file.buffer, ext);
-
-        if (channels < 2) {
-          res.status(422).json({
-            success: false,
-            error: "Voice removal requires a stereo audio file. Your file appears to be mono.",
-          });
-          return;
-        }
-
-        let wavBuffer = await processWithFilter(
-          req.file.buffer,
-          ext,
-          "pan=stereo|c0=c0-c1|c1=c1-c0",
-          2
-        );
+        // GNS neural separation → MLK v3 post-processing (GravelKing Protocol)
+        const gnsResult = await gnsVocalRemoval(req.file.buffer, ext, multiplier);
+        let wavBuffer = await applyTempoAndPitch(gnsResult.instrumental, tempo, semitones);
 
         const event: TelemetryEvent = {
           routing: "local",
-          parity: "VALIDATED",
+          parity: gnsResult.kernelParity,
           efficiency: "1.0000",
           decayRate: "0.0000",
           sampleCount: String(wavBuffer.length / 2),
@@ -357,7 +351,7 @@ audioRouter.post(
           db.insert(processRunsTable).values({
             userId: req.user.id,
             routing: "local",
-            parity: "VALIDATED",
+            parity: gnsResult.kernelParity,
             efficiency: 1,
             decayRate: 0,
             sampleCount: wavBuffer.length / 2,
@@ -368,15 +362,19 @@ audioRouter.post(
         if (isFreeUse && req.isAuthenticated()) {
           db.update(usersTable).set({ usedFreeSplit: true }).where(eq(usersTable.id, req.user.id)).catch(() => {});
         }
-        wavBuffer = await applyTempoAndPitch(wavBuffer, tempo, semitones);
+
         res.setHeader("Content-Type", "audio/wav");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.wav"`);
         res.setHeader("X-GK-Mode", "voice_remove");
         res.setHeader("X-GK-Routing", "local");
-        res.setHeader("X-GK-Parity", "VALIDATED");
+        res.setHeader("X-GK-Parity", gnsResult.kernelParity);
         res.setHeader("X-GK-Efficiency", "1.0000");
         res.setHeader("X-GK-Decay-Rate", "0.0000");
         res.setHeader("X-GK-Sample-Count", String(wavBuffer.length / 2));
+        res.setHeader("X-GK-Separator", "GNS_v1");
+        res.setHeader("X-GK-Model", GNS_MODEL);
+        res.setHeader("X-GK-Protocol", GNS_PROTOCOL);
+        res.setHeader("X-GK-Stack", GNS_STACK);
         res.send(wavBuffer);
         return;
       } catch (err: any) {
@@ -385,18 +383,18 @@ audioRouter.post(
       }
     }
 
-    // ── Stem splitting ─────────────────────────────────────────────────────────
+    // ── Stem splitting — GNS (GravelKing Neural Separator) v1 ────────────────
     if (mode === "stem_split") {
       try {
-        const { channels } = await getAudioInfo(req.file.buffer, ext);
-        const zipBuffer = await buildStemsZip(req.file.buffer, ext, channels);
+        // GNS 4-stem neural separation → MLK v3 post-processing (GravelKing Protocol)
+        const gnsResult = await gnsStemSplit(req.file.buffer, ext, multiplier);
 
         const event: TelemetryEvent = {
           routing: "local",
-          parity: "VALIDATED",
+          parity: gnsResult.kernelParity,
           efficiency: "1.0000",
           decayRate: "0.0000",
-          sampleCount: String(zipBuffer.length),
+          sampleCount: String(gnsResult.zipBuffer.length),
           timestamp: new Date().toISOString(),
           remoteUrl: getRemoteUrl(),
         };
@@ -406,10 +404,10 @@ audioRouter.post(
           db.insert(processRunsTable).values({
             userId: req.user.id,
             routing: "local",
-            parity: "VALIDATED",
+            parity: gnsResult.kernelParity,
             efficiency: 1,
             decayRate: 0,
-            sampleCount: zipBuffer.length,
+            sampleCount: gnsResult.zipBuffer.length,
             fileName: req.file.originalname,
           }).catch(() => {});
         }
@@ -417,12 +415,18 @@ audioRouter.post(
         if (isFreeUse && req.isAuthenticated()) {
           db.update(usersTable).set({ usedFreeSplit: true }).where(eq(usersTable.id, req.user.id)).catch(() => {});
         }
+
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_stems.zip"`);
         res.setHeader("X-GK-Mode", "stem_split");
         res.setHeader("X-GK-Routing", "local");
-        res.setHeader("X-GK-Channels", String(channels));
-        res.send(zipBuffer);
+        res.setHeader("X-GK-Parity", gnsResult.kernelParity);
+        res.setHeader("X-GK-Stems", gnsResult.stems.join(","));
+        res.setHeader("X-GK-Separator", "GNS_v1");
+        res.setHeader("X-GK-Model", GNS_MODEL);
+        res.setHeader("X-GK-Protocol", GNS_PROTOCOL);
+        res.setHeader("X-GK-Stack", GNS_STACK);
+        res.send(gnsResult.zipBuffer);
         return;
       } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
