@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/mobile/"
+title = "GravelKingPro Mobile"
+version = "1.0.0"
+id = "artifacts/gravelkingpro-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/mobile/" ]
+localPort = 24065
+
+[services.development]
+run = "pnpm --filter @workspace/gravelkingpro-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gravelkingpro-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/gravelkingpro-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "24065"
+BASE_PATH = "/mobile/"
