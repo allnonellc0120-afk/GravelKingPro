@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 
 type PlanId = "splits" | "pro" | "node_auditor";
