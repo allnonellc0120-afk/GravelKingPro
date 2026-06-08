@@ -52,7 +52,7 @@ export const PLUGIN_DEFAULTS: Record<PluginType, Record<string, number>> = {
   reverb:     { size: 50, damp: 50, wet: 30 },
   delay:      { time: 250, feedback: 40, wet: 30 },
   distortion: { drive: 30, tone: 60 },
-  gate:       { threshold: -50, hold: 100, release: 200 },
+  gate:       { threshold: -50, release: 200 },
   gain:       { gain: 0 },
   pan:        { pan: 0 },
 };
@@ -94,7 +94,6 @@ export const PLUGIN_PARAM_META: Record<PluginType, Array<{key: string; label: st
   ],
   gate: [
     { key: 'threshold', label: 'Threshold', min: -80, max: 0,    step: 1,   unit: 'dB' },
-    { key: 'hold',      label: 'Hold',      min: 0,   max: 2000, step: 10,  unit: 'ms' },
     { key: 'release',   label: 'Release',   min: 0,   max: 2000, step: 10,  unit: 'ms' },
   ],
   gain: [

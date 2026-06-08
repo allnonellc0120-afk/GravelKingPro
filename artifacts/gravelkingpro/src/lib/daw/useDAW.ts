@@ -13,7 +13,14 @@ function toAudioParamValue(key: string, raw: number): number {
   return raw;
 }
 
+// IR cache keyed by `${sampleRate}:${sizePct}:${dampPct}` — AudioBuffer is
+// safe to share across BaseAudioContext instances with the same sample rate.
+const _irCache = new Map<string, AudioBuffer>();
+
 function makeIR(ctx: AudioContext, sizePct: number, dampPct: number): AudioBuffer {
+  const key = `${ctx.sampleRate}:${sizePct}:${dampPct}`;
+  const hit = _irCache.get(key);
+  if (hit) return hit;
   const sr = ctx.sampleRate;
   const dur = 0.4 + (sizePct / 100) * 3.5;
   const len = Math.ceil(sr * dur);
@@ -23,6 +30,7 @@ function makeIR(ctx: AudioContext, sizePct: number, dampPct: number): AudioBuffe
     const d = buf.getChannelData(ch);
     for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, damp);
   }
+  _irCache.set(key, buf);
   return buf;
 }
 
@@ -41,11 +49,13 @@ interface PluginNodeResult {
   input: AudioNode;
   output: AudioNode;
   audioParams: Map<string, AudioParam>;
+  specialParams: Map<string, (value: number) => void>;
 }
 
 function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResult {
   const p = plugin.params;
   const ap = new Map<string, AudioParam>();
+  const sp = new Map<string, (value: number) => void>();
 
   switch (plugin.type) {
     case "eq": {
@@ -58,7 +68,7 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       ap.set("b2f", b2.frequency); ap.set("b2g", b2.gain); ap.set("b2q", b2.Q);
       ap.set("b3f", b3.frequency); ap.set("b3g", b3.gain); ap.set("b3q", b3.Q);
       ap.set("b4f", b4.frequency); ap.set("b4g", b4.gain);
-      return { input: b1, output: b4, audioParams: ap };
+      return { input: b1, output: b4, audioParams: ap, specialParams: sp };
     }
     case "compressor": {
       const comp = ctx.createDynamicsCompressor();
@@ -70,7 +80,7 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       ap.set("threshold", comp.threshold); ap.set("ratio", comp.ratio);
       ap.set("attack", comp.attack); ap.set("release", comp.release);
       ap.set("knee", comp.knee); ap.set("makeup", mg.gain);
-      return { input: comp, output: mg, audioParams: ap };
+      return { input: comp, output: mg, audioParams: ap, specialParams: sp };
     }
     case "reverb": {
       const conv = ctx.createConvolver(); conv.buffer = makeIR(ctx, p.size, p.damp);
@@ -80,7 +90,10 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       inp.connect(dry); inp.connect(conv); conv.connect(wet);
       dry.connect(out); wet.connect(out);
       ap.set("wet", wet.gain);
-      return { input: inp, output: out, audioParams: ap };
+      const liveRev = { size: p.size, damp: p.damp };
+      sp.set("size", v => { liveRev.size = v; conv.buffer = makeIR(ctx, liveRev.size, liveRev.damp); });
+      sp.set("damp", v => { liveRev.damp = v; conv.buffer = makeIR(ctx, liveRev.size, liveRev.damp); });
+      return { input: inp, output: out, audioParams: ap, specialParams: sp };
     }
     case "delay": {
       const del = ctx.createDelay(3.0); del.delayTime.value = p.time / 1000;
@@ -92,7 +105,7 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       inp.connect(dry); inp.connect(del); del.connect(wet);
       dry.connect(out); wet.connect(out);
       ap.set("time", del.delayTime); ap.set("feedback", fb.gain); ap.set("wet", wet.gain);
-      return { input: inp, output: out, audioParams: ap };
+      return { input: inp, output: out, audioParams: ap, specialParams: sp };
     }
     case "distortion": {
       const ws = ctx.createWaveShaper();
@@ -100,7 +113,9 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       const tone = ctx.createBiquadFilter(); tone.type = "lowpass";
       tone.frequency.value = 1000 + (p.tone / 100) * 18000;
       ws.connect(tone);
-      return { input: ws, output: tone, audioParams: ap };
+      sp.set("drive", v => { ws.curve = makeDistortionCurve(v / 100); });
+      sp.set("tone", v => { tone.frequency.setTargetAtTime(1000 + (v / 100) * 18000, ctx.currentTime, 0.01); });
+      return { input: ws, output: tone, audioParams: ap, specialParams: sp };
     }
     case "gate": {
       const gate = ctx.createDynamicsCompressor();
@@ -108,19 +123,19 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       gate.ratio.value = 20; gate.attack.value = 0.001;
       gate.release.value = p.release / 1000;
       ap.set("threshold", gate.threshold); ap.set("release", gate.release);
-      return { input: gate, output: gate, audioParams: ap };
+      return { input: gate, output: gate, audioParams: ap, specialParams: sp };
     }
     case "gain": {
       const g = ctx.createGain(); g.gain.value = Math.pow(10, p.gain / 20);
       ap.set("gain", g.gain);
-      return { input: g, output: g, audioParams: ap };
+      return { input: g, output: g, audioParams: ap, specialParams: sp };
     }
     case "pan": {
       const pn = ctx.createStereoPanner(); pn.pan.value = p.pan / 100;
       ap.set("pan", pn.pan);
-      return { input: pn, output: pn, audioParams: ap };
+      return { input: pn, output: pn, audioParams: ap, specialParams: sp };
     }
-    default: { const g = ctx.createGain(); return { input: g, output: g, audioParams: ap }; }
+    default: { const g = ctx.createGain(); return { input: g, output: g, audioParams: ap, specialParams: sp }; }
   }
 }
 
@@ -435,15 +450,16 @@ export function useDAW() {
         ...pl, params: { ...pl.params, [paramKey]: value }
       })
     }));
-    // Live AudioParam update
+    // Live update: AudioParam first, then specialParams fallback
     const at = activeTracksRef.current.get(trackId);
     if (at) {
       const plugNode = at.plugins.get(pluginId);
       if (plugNode) {
         const audioParam = plugNode.audioParams.get(paramKey);
         if (audioParam) {
-          const converted = toAudioParamValue(paramKey, value);
-          audioParam.setTargetAtTime(converted, ctxRef.current!.currentTime, 0.01);
+          audioParam.setTargetAtTime(toAudioParamValue(paramKey, value), ctxRef.current!.currentTime, 0.01);
+        } else {
+          plugNode.specialParams.get(paramKey)?.(value);
         }
       }
     }
@@ -458,6 +474,8 @@ export function useDAW() {
       const audioParam = plugNode.audioParams.get(paramKey);
       if (audioParam) {
         audioParam.setTargetAtTime(toAudioParamValue(paramKey, value), ctxRef.current!.currentTime, 0.01);
+      } else {
+        plugNode.specialParams.get(paramKey)?.(value);
       }
     }
   }, []);
@@ -526,6 +544,10 @@ export function useDAW() {
     if (maxDur <= 0) return;
     const ctx = getCtx();
     const sr = ctx.sampleRate;
+
+    toast({ title: "Exporting…", description: "Rendering mix offline — this may take a moment." });
+
+    // Step 1: render full mix (all plugin chains + master bus) via OfflineAudioContext
     const offCtx = new OfflineAudioContext(2, Math.ceil(sr * maxDur), sr);
     const offMG = offCtx.createGain(); offMG.gain.value = masterVolRef.current;
     let offLast: AudioNode = offMG;
@@ -553,10 +575,30 @@ export function useDAW() {
       prev.connect(g); g.connect(pn); pn.connect(offMG);
       src.start(0);
     }
-    toast({ title: "Exporting…", description: "Rendering mix offline, this may take a moment." });
     const rendered = await offCtx.startRendering();
-    const blob = audioBufferToWav(rendered);
-    const url = URL.createObjectURL(blob);
+    const wavBlob = audioBufferToWav(rendered);
+
+    // Step 2: POST rendered WAV to server merge endpoint for final processing
+    const form = new FormData();
+    form.append("tracks", wavBlob, "rendered_mix.wav");
+    form.append("arrangement", "layer");
+    form.append("speed", "1");
+    form.append("semitones", "0");
+    form.append("noiseReduce", "off");
+    form.append("voicePreset", "normal");
+
+    const res = await fetch("/api/kernel/studio-mix", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Server export failed" }));
+      toast({ title: "Export failed", description: String(err.error ?? "Server error"), variant: "destructive" });
+      return;
+    }
+    const finalBlob = await res.blob();
+    const url = URL.createObjectURL(finalBlob);
     const a = document.createElement("a"); a.href = url; a.download = "gravelking_mix.wav"; a.click();
     URL.revokeObjectURL(url);
     toast({ title: "Export complete", description: "Mix downloaded as WAV." });
