@@ -259,7 +259,7 @@ export function ChannelStrip({
           <Waveform
             peaks={track.peaks}
             duration={track.duration}
-            position={position > track.duration ? track.duration : position}
+            position={Math.max(0, Math.min(track.duration, position - track.startOffset))}
             region={track.region}
             color={track.color}
             height={68}
