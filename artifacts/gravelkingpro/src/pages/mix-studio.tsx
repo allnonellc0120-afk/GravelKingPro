@@ -182,6 +182,7 @@ export default function MixStudio() {
                   onApplyTrim={daw.applyTrim}
                   onApplyDelete={daw.applyDelete}
                   onResetEdit={daw.resetEdit}
+                  onSetStartOffset={daw.setTrackStartOffset}
                 />
               ))}
               {daw.tracks.length < 8 && (

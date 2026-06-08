@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ChevronDown, ChevronUp, RotateCcw, Scissors, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { TrackState, PluginType, PluginDef, Region } from "@/lib/daw/types";
@@ -24,17 +24,56 @@ interface ChannelStripProps {
   onApplyTrim: (trackId: string) => void;
   onApplyDelete: (trackId: string) => void;
   onResetEdit: (trackId: string) => void;
+  onSetStartOffset: (trackId: string, secs: number) => void;
 }
 
 export function ChannelStrip({
   track, position, bpm, onSeek, onRemove,
   onVolumeChange, onPanChange, onToggleMute, onToggleSolo,
   onAddPlugin, onRemovePlugin, onTogglePlugin, onUpdatePlugin, onReorderPlugin,
-  onSetRegion, onApplyTrim, onApplyDelete, onResetEdit,
+  onSetRegion, onApplyTrim, onApplyDelete, onResetEdit, onSetStartOffset,
 }: ChannelStripProps) {
   const [showPlugins, setShowPlugins] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [scrollOffset, setScrollOffset] = useState(0);
+  const offsetDragRef = useRef<{ startX: number; startOffset: number } | null>(null);
+
+  const fmtOffset = (secs: number) => {
+    if (bpm && bpm > 0) {
+      const totalBeats = (secs * bpm) / 60;
+      const bar  = Math.floor(totalBeats / 4) + 1;
+      const beat = Math.floor(totalBeats % 4) + 1;
+      return `${bar}:${beat}`;
+    }
+    return `${secs.toFixed(2)}s`;
+  };
+
+  const snapToBeat = (secs: number) => {
+    if (!bpm || bpm <= 0) return secs;
+    const beatDur = 60 / bpm;
+    return Math.round(secs / beatDur) * beatDur;
+  };
+
+  const handleOffsetMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    offsetDragRef.current = { startX: e.clientX, startOffset: track.startOffset };
+    const SCALE = 0.03;
+    const onMove = (me: MouseEvent) => {
+      if (!offsetDragRef.current) return;
+      const dx = me.clientX - offsetDragRef.current.startX;
+      let next = Math.max(0, offsetDragRef.current.startOffset + dx * SCALE);
+      if (me.shiftKey) next = snapToBeat(next);
+      onSetStartOffset(track.id, next);
+    };
+    const onUp = () => {
+      offsetDragRef.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
 
   const handleZoomIn = () => {
     setZoom(z => {
@@ -141,6 +180,48 @@ export function ChannelStrip({
 
         {/* Right: waveform + region context menu */}
         <div className="flex-1 min-w-0 px-2 py-3 space-y-1">
+
+          {/* Clip start offset — drag handle or nudge buttons */}
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-[10px] text-muted-foreground shrink-0">Start</span>
+            <span
+              className="text-[10px] font-mono text-white/70 px-1.5 py-0.5 rounded bg-white/5 border border-border/15 cursor-ew-resize hover:border-amber-500/30 transition-colors select-none"
+              title="Drag to reposition clip · Shift+drag: snap to beat"
+              onMouseDown={handleOffsetMouseDown}
+            >
+              {fmtOffset(track.startOffset)}
+            </span>
+            <div className="flex items-center gap-0.5 ml-auto">
+              <button
+                onClick={e => {
+                  const beatDur = bpm ? 60 / bpm : 0.25;
+                  let next = Math.max(0, track.startOffset - beatDur);
+                  if (e.shiftKey) next = snapToBeat(next);
+                  onSetStartOffset(track.id, next);
+                }}
+                title="Move clip earlier · Shift: snap to beat"
+                className="w-5 h-5 flex items-center justify-center text-[10px] text-muted-foreground hover:text-white transition-colors"
+              >◀</button>
+              <button
+                onClick={e => {
+                  const beatDur = bpm ? 60 / bpm : 0.25;
+                  let next = track.startOffset + beatDur;
+                  if (e.shiftKey) next = snapToBeat(next);
+                  onSetStartOffset(track.id, next);
+                }}
+                title="Move clip later · Shift: snap to beat"
+                className="w-5 h-5 flex items-center justify-center text-[10px] text-muted-foreground hover:text-white transition-colors"
+              >▶</button>
+              {track.startOffset > 0.001 && (
+                <button
+                  onClick={() => onSetStartOffset(track.id, 0)}
+                  title="Reset clip to start"
+                  className="w-5 h-5 flex items-center justify-center text-[10px] text-muted-foreground hover:text-red-400 transition-colors"
+                >×</button>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] text-muted-foreground font-mono">
               {track.duration > 0 ? `${track.duration.toFixed(1)}s` : "—"}
