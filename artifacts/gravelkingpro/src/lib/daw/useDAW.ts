@@ -238,6 +238,9 @@ export function useDAW() {
       const buf = track.editedBuffer ?? track.buffer;
       const audible = hasSolo ? track.solo : !track.muted;
 
+      // Skip tracks whose content has already ended at this seek offset
+      if (offset >= buf.duration) continue;
+
       const source = ctx.createBufferSource();
       source.buffer = buf;
 

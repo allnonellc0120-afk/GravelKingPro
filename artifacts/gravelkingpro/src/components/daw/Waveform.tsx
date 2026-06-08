@@ -43,8 +43,9 @@ export function Waveform({
     const ctx = canvas.getContext("2d")!;
     const { peaks, duration, position, region, color } = propsRef.current;
     const { startFrac, endFrac, startTime, endTime } = getViewWindow();
-    const W = canvas.width;
-    const H = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.width / dpr;   // CSS pixels (ctx is already scaled by DPR)
+    const H = canvas.height / dpr;
 
     ctx.clearRect(0, 0, W, H);
 
