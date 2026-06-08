@@ -4,10 +4,16 @@ import { writeFile, readFile, unlink } from "fs/promises";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID } from "crypto";
+import { rateLimit } from "../lib/rateLimiter";
+import { concurrencyLimit } from "../lib/concurrencyLimit";
+import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 const masterRouter = Router();
+
+const masterRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
+const masterConcurrency = concurrencyLimit(3);
 
 export type MasterPreset =
   | "normal"
@@ -78,6 +84,8 @@ const VALID_PRESETS = new Set(Object.keys(MASTER_PRESETS));
 
 masterRouter.post(
   "/kernel/master",
+  masterRateLimit,
+  masterConcurrency,
   upload.single("audio"),
   async (req: Request, res: Response) => {
     if (!req.file) {
@@ -99,12 +107,22 @@ masterRouter.post(
     const isSample = !isPro;
 
     const id = randomUUID();
-    const ext = (req.file.originalname.split(".").pop() ?? "mp3").toLowerCase();
+    const ext = sanitizeExt(req.file.originalname);
     const inPath = `/tmp/gk_master_in_${id}.${ext}`;
     const outPath = `/tmp/gk_master_out_${id}.wav`;
 
     try {
       await writeFile(inPath, req.file.buffer);
+
+      // Duration guard (probe from the already-written file to avoid a second write)
+      const duration = await probeFileDuration(inPath);
+      if (duration > MAX_AUDIO_DURATION_S) {
+        res.status(422).json({
+          success: false,
+          error: `Audio exceeds the maximum allowed duration of ${Math.floor(MAX_AUDIO_DURATION_S / 60)} minutes.`,
+        });
+        return;
+      }
 
       const ffmpegArgs = [
         "-y",
@@ -116,7 +134,7 @@ masterRouter.post(
         outPath,
       ];
 
-      await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 100 * 1024 * 1024 });
+      await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 120_000 });
 
       const wavBuffer = await readFile(outPath);
 
