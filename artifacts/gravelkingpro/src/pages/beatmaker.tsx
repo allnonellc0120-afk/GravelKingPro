@@ -16,14 +16,14 @@ type Genre = "hiphop" | "rnb" | "electronic" | "lofi" | "trap" | "pop" | "soul";
 type MusicKey = "C" | "D" | "E" | "F" | "G" | "A" | "B";
 type Mood = "chill" | "dark" | "uplifting" | "aggressive" | "romantic";
 
-const GENRES: { id: Genre; label: string; emoji: string; desc: string }[] = [
-  { id: "hiphop",     label: "Hip Hop",    emoji: "🎤", desc: "Heavy 808 bass, punchy" },
-  { id: "rnb",        label: "R&B",        emoji: "🎵", desc: "Smooth, warm, soulful" },
-  { id: "electronic", label: "Electronic", emoji: "⚡", desc: "Bright synth, crisp" },
-  { id: "lofi",       label: "Lo-fi",      emoji: "☕", desc: "Warm, filtered, chill" },
-  { id: "trap",       label: "Trap",       emoji: "🔥", desc: "Sub-bass, hard-hitting" },
-  { id: "pop",        label: "Pop",        emoji: "🌟", desc: "Balanced, radio-ready" },
-  { id: "soul",       label: "Soul",       emoji: "💿", desc: "Warm bass, vintage feel" },
+const GENRES: { id: Genre; label: string; emoji: string; desc: string; img: string }[] = [
+  { id: "hiphop",     label: "Hip Hop",    emoji: "🎤", desc: "Heavy 808 bass, punchy",    img: "https://media.istockphoto.com/id/2111019920/photo/aspiring-rapper-recording-a-new-track-in-a-soundproof-studio-at-night.jpg?s=612x612&w=0&k=20&c=xtqwolfuS5JS9dLc9KXR4Ib05p7M3FuUHrrOPSovpMs=" },
+  { id: "rnb",        label: "R&B",        emoji: "🎵", desc: "Smooth, warm, soulful",     img: "https://i.pinimg.com/originals/a4/5d/49/a45d49891278b235f60abe4232b0cd47.jpg" },
+  { id: "electronic", label: "Electronic", emoji: "⚡", desc: "Bright synth, crisp",       img: "https://images.unsplash.com/photo-1571266028253-6c7f4e8e8a0e?w=400&q=80" },
+  { id: "lofi",       label: "Lo-fi",      emoji: "☕", desc: "Warm, filtered, chill",     img: "https://images.alphacoders.com/135/thumb-1920-1357322.jpeg" },
+  { id: "trap",       label: "Trap",       emoji: "🔥", desc: "Sub-bass, hard-hitting",    img: "https://media.istockphoto.com/id/147301554/photo/hip-hop-dancer-balancing-on-one-leg.jpg?s=612x612&w=0&k=20&c=nKPD0szexyhiOZjN0ezgpLc6-67ACnoXL36RcbOJtAQ=" },
+  { id: "pop",        label: "Pop",        emoji: "🌟", desc: "Balanced, radio-ready",     img: "https://static.vecteezy.com/system/resources/thumbnails/068/599/062/small/stage-with-bright-concert-lighting-spotlights-prepared-for-live-music-performance-photo.jpg" },
+  { id: "soul",       label: "Soul",       emoji: "💿", desc: "Warm bass, vintage feel",   img: "https://media.gettyimages.com/id/1327551471/photo/cheerful-young-man-playing-guitar-and-singing-to-his-girlfriend-on-the-field-during-a-sunset.jpg?s=612x612&w=0&k=20&c=RkDWCEFWziH9gmUls5_Jz2JLHU3WQZcPseTru5IEdt8=" },
 ];
 
 const MOODS: { id: Mood; label: string }[] = [
@@ -160,15 +160,15 @@ export default function BeatMaker() {
                     <button
                       key={g.id}
                       onClick={() => setGenre(g.id)}
-                      className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                        genre === g.id ? "border-amber-500 bg-amber-500/10" : "border-border/40 bg-secondary/20 hover:border-amber-500/40"
-                      }`}
+                      className={`relative overflow-hidden rounded-xl border-2 h-24 transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] ${genre === g.id ? "border-amber-500 shadow-lg shadow-amber-500/20" : "border-white/10 hover:border-amber-500/50"}`}
                     >
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-base">{g.emoji}</span>
-                        <span className="text-xs font-semibold">{g.label}</span>
+                      <img src={g.img} alt={g.label} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      <div className={`absolute inset-0 transition-all duration-200 ${genre === g.id ? "bg-amber-500/25" : "bg-black/60 hover:bg-black/45"}`} />
+                      {genre === g.id && <div className="absolute inset-0 ring-1 ring-inset ring-amber-400/30 rounded-xl" />}
+                      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-1">
+                        <span className="text-lg leading-none drop-shadow-lg">{g.emoji}</span>
+                        <span className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">{g.label}</span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">{g.desc}</p>
                     </button>
                   ))}
                 </div>

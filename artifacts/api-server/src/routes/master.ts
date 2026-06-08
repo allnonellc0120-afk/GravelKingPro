@@ -15,7 +15,10 @@ export type MasterPreset =
   | "vinyl"
   | "podcast"
   | "club"
-  | "film";
+  | "film"
+  | "youtube"
+  | "soundcloud"
+  | "apple";
 
 export const MASTER_PRESETS: Record<
   MasterPreset,
@@ -53,6 +56,21 @@ export const MASTER_PRESETS: Record<
     description: "Wide cinematic dynamics. Dialogue clarity with presence.",
     filter:
       "highpass=f=40,compand=attacks=0.05:decays=0.5:points=-70/-70|-40/-35|-20/-15|0/-5|20/-5,loudnorm=I=-24:TP=-2:LRA=15",
+  },
+  youtube: {
+    label: "YouTube",
+    description: "Optimized for YouTube's -14 LUFS loudness normalization.",
+    filter: "loudnorm=I=-14:TP=-1:LRA=11",
+  },
+  soundcloud: {
+    label: "SoundCloud",
+    description: "Loud and punchy at -11 LUFS for SoundCloud uploads.",
+    filter: "loudnorm=I=-11:TP=-0.5:LRA=9",
+  },
+  apple: {
+    label: "Apple Music",
+    description: "Apple Sound Check standard at -16 LUFS.",
+    filter: "loudnorm=I=-16:TP=-1:LRA=11",
   },
 };
 
