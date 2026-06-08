@@ -9,6 +9,7 @@ interface ChannelStripProps {
   track: TrackState;
   position: number;
   bpm?: number;
+  totalDuration?: number;
   onSeek: (secs: number) => void;
   onRemove: (id: string) => void;
   onVolumeChange: (id: string, v: number) => void;
@@ -28,7 +29,7 @@ interface ChannelStripProps {
 }
 
 export function ChannelStrip({
-  track, position, bpm, onSeek, onRemove,
+  track, position, bpm, totalDuration, onSeek, onRemove,
   onVolumeChange, onPanChange, onToggleMute, onToggleSolo,
   onAddPlugin, onRemovePlugin, onTogglePlugin, onUpdatePlugin, onReorderPlugin,
   onSetRegion, onApplyTrim, onApplyDelete, onResetEdit, onSetStartOffset,
@@ -36,7 +37,6 @@ export function ChannelStrip({
   const [showPlugins, setShowPlugins] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const offsetDragRef = useRef<{ startX: number; startOffset: number } | null>(null);
 
   const fmtOffset = (secs: number) => {
     if (bpm && bpm > 0) {
@@ -52,27 +52,6 @@ export function ChannelStrip({
     if (!bpm || bpm <= 0) return secs;
     const beatDur = 60 / bpm;
     return Math.round(secs / beatDur) * beatDur;
-  };
-
-  const handleOffsetMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    offsetDragRef.current = { startX: e.clientX, startOffset: track.startOffset };
-    const SCALE = 0.03;
-    const onMove = (me: MouseEvent) => {
-      if (!offsetDragRef.current) return;
-      const dx = me.clientX - offsetDragRef.current.startX;
-      let next = Math.max(0, offsetDragRef.current.startOffset + dx * SCALE);
-      if (me.shiftKey) next = snapToBeat(next);
-      onSetStartOffset(track.id, next);
-    };
-    const onUp = () => {
-      offsetDragRef.current = null;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
   };
 
   const handleZoomIn = () => {
@@ -181,13 +160,12 @@ export function ChannelStrip({
         {/* Right: waveform + region context menu */}
         <div className="flex-1 min-w-0 px-2 py-3 space-y-1">
 
-          {/* Clip start offset — drag handle or nudge buttons */}
+          {/* Clip start offset — position badge (drag directly on waveform) + nudge buttons */}
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-[10px] text-muted-foreground shrink-0">Start</span>
             <span
-              className="text-[10px] font-mono text-white/70 px-1.5 py-0.5 rounded bg-white/5 border border-border/15 cursor-ew-resize hover:border-amber-500/30 transition-colors select-none"
-              title="Drag to reposition clip · Shift+drag: snap to beat"
-              onMouseDown={handleOffsetMouseDown}
+              className="text-[10px] font-mono text-white/50 px-1.5 py-0.5 rounded bg-white/5 border border-border/10 select-none"
+              title="Drag the waveform clip to reposition · Shift+drag: snap to beat"
             >
               {fmtOffset(track.startOffset)}
             </span>
@@ -259,14 +237,17 @@ export function ChannelStrip({
           <Waveform
             peaks={track.peaks}
             duration={track.duration}
-            position={Math.max(0, Math.min(track.duration, position - track.startOffset))}
+            position={position}
+            startOffset={track.startOffset}
+            totalDuration={totalDuration}
             region={track.region}
             color={track.color}
             height={68}
             zoom={zoom}
             scrollOffset={scrollOffset}
             bpm={bpm}
-            onSeek={local => onSeek(local + track.startOffset)}
+            onSeek={onSeek}
+            onMoveClip={offset => onSetStartOffset(track.id, offset)}
             onRegionChange={r => onSetRegion(track.id, r)}
           />
 
