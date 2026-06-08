@@ -266,7 +266,7 @@ export function ChannelStrip({
             zoom={zoom}
             scrollOffset={scrollOffset}
             bpm={bpm}
-            onSeek={onSeek}
+            onSeek={local => onSeek(local + track.startOffset)}
             onRegionChange={r => onSetRegion(track.id, r)}
           />
 
