@@ -16,23 +16,23 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 
 const GENRES = [
-  { id: "hip-hop", label: "Hip-Hop" },
-  { id: "rnb", label: "R&B" },
-  { id: "pop", label: "Pop" },
-  { id: "trap", label: "Trap" },
-  { id: "reggae", label: "Reggae" },
-  { id: "soul", label: "Soul" },
-  { id: "rock", label: "Rock" },
-  { id: "afrobeats", label: "Afrobeats" },
+  { id: "hip-hop",   label: "Hip-Hop",   emoji: "🎤", accent: "#f59e0b" },
+  { id: "rnb",       label: "R&B",       emoji: "🎵", accent: "#f43f5e" },
+  { id: "pop",       label: "Pop",       emoji: "🌟", accent: "#a855f7" },
+  { id: "trap",      label: "Trap",      emoji: "🔥", accent: "#ef4444" },
+  { id: "reggae",    label: "Reggae",    emoji: "🌿", accent: "#22c55e" },
+  { id: "soul",      label: "Soul",      emoji: "💿", accent: "#f97316" },
+  { id: "rock",      label: "Rock",      emoji: "🎸", accent: "#94a3b8" },
+  { id: "afrobeats", label: "Afrobeats", emoji: "🥁", accent: "#06b6d4" },
 ];
 
 const MOODS = [
-  { id: "hype", label: "Hype" },
-  { id: "chill", label: "Chill" },
-  { id: "emotional", label: "Emotional" },
-  { id: "dark", label: "Dark" },
-  { id: "motivational", label: "Motivational" },
-  { id: "romantic", label: "Romantic" },
+  { id: "hype",        label: "Hype",        emoji: "⚡", accent: "#ef4444" },
+  { id: "chill",       label: "Chill",       emoji: "🌊", accent: "#06b6d4" },
+  { id: "emotional",   label: "Emotional",   emoji: "💕", accent: "#f43f5e" },
+  { id: "dark",        label: "Dark",        emoji: "🌑", accent: "#a855f7" },
+  { id: "motivational",label: "Motivational",emoji: "🏆", accent: "#22c55e" },
+  { id: "romantic",    label: "Romantic",    emoji: "🌹", accent: "#f97316" },
 ];
 
 const STRUCTURES: Record<string, string[]> = {
@@ -206,47 +206,65 @@ export default function SongBotScreen() {
       {/* Genre */}
       <Text style={[s.label, { color: colors.mutedForeground }]}>GENRE</Text>
       <View style={s.optionGrid}>
-        {GENRES.map((g) => (
-          <Pressable
-            key={g.id}
-            onPress={() => { setGenre(g.id); Haptics.selectionAsync(); }}
-            style={({ pressed }) => [
-              s.optionChip,
-              {
-                backgroundColor: genre === g.id ? colors.primary : colors.card,
-                borderColor: genre === g.id ? colors.primary : colors.border,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Text style={[s.optionChipText, { color: genre === g.id ? colors.primaryForeground : colors.mutedForeground }]}>
-              {g.label}
-            </Text>
-          </Pressable>
-        ))}
+        {GENRES.map((g) => {
+          const sel = genre === g.id;
+          return (
+            <Pressable
+              key={g.id}
+              onPress={() => { setGenre(g.id); Haptics.selectionAsync(); }}
+              style={({ pressed }) => [
+                s.optionChip,
+                {
+                  backgroundColor: sel ? `${g.accent}22` : colors.card,
+                  borderColor: sel ? g.accent : `${g.accent}44`,
+                  borderWidth: sel ? 2 : 1.5,
+                  opacity: pressed ? 0.75 : 1,
+                  shadowColor: sel ? g.accent : "transparent",
+                  shadowOpacity: sel ? 0.35 : 0,
+                  shadowRadius: 8,
+                  elevation: sel ? 4 : 0,
+                },
+              ]}
+            >
+              <Text style={s.optionChipEmoji}>{g.emoji}</Text>
+              <Text style={[s.optionChipText, { color: sel ? g.accent : colors.mutedForeground, fontFamily: sel ? "Inter_700Bold" : "Inter_500Medium" }]}>
+                {g.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Mood */}
       <Text style={[s.label, { color: colors.mutedForeground }]}>MOOD</Text>
       <View style={s.optionGrid}>
-        {MOODS.map((m) => (
-          <Pressable
-            key={m.id}
-            onPress={() => { setMood(m.id); Haptics.selectionAsync(); }}
-            style={({ pressed }) => [
-              s.optionChip,
-              {
-                backgroundColor: mood === m.id ? colors.secondary : colors.card,
-                borderColor: mood === m.id ? colors.foreground : colors.border,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Text style={[s.optionChipText, { color: mood === m.id ? colors.foreground : colors.mutedForeground }]}>
-              {m.label}
-            </Text>
-          </Pressable>
-        ))}
+        {MOODS.map((m) => {
+          const sel = mood === m.id;
+          return (
+            <Pressable
+              key={m.id}
+              onPress={() => { setMood(m.id); Haptics.selectionAsync(); }}
+              style={({ pressed }) => [
+                s.optionChip,
+                {
+                  backgroundColor: sel ? `${m.accent}22` : colors.card,
+                  borderColor: sel ? m.accent : `${m.accent}44`,
+                  borderWidth: sel ? 2 : 1.5,
+                  opacity: pressed ? 0.75 : 1,
+                  shadowColor: sel ? m.accent : "transparent",
+                  shadowOpacity: sel ? 0.35 : 0,
+                  shadowRadius: 8,
+                  elevation: sel ? 4 : 0,
+                },
+              ]}
+            >
+              <Text style={s.optionChipEmoji}>{m.emoji}</Text>
+              <Text style={[s.optionChipText, { color: sel ? m.accent : colors.mutedForeground, fontFamily: sel ? "Inter_700Bold" : "Inter_500Medium" }]}>
+                {m.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <Pressable
@@ -271,7 +289,8 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       fontSize: 14, fontFamily: "Inter_400Regular", marginBottom: 20,
     },
     optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 },
-    optionChip: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+    optionChip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },
+    optionChipEmoji: { fontSize: 14, lineHeight: 18 },
     optionChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
     generateBtn: {
       flexDirection: "row", alignItems: "center", justifyContent: "center",
