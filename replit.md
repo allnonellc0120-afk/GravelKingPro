@@ -1,14 +1,14 @@
-# GravelKing Productions
+# GravelKingPro
 
-Professional audio tools (voice removal, stem splitting, mastering, voice changer, denoise, Mix Studio) processed server-side — built by All N One LLC.
+A gravel-optimisation benchmarking tool with real Stripe subscription payments.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/scripts run seed-products` — create products in Stripe (run once after connecting Stripe)
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -16,29 +16,35 @@ Professional audio tools (voice removal, stem splitting, mastering, voice change
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Payments: Stripe Checkout (subscriptions) via Replit integration + `stripe-replit-sync`
+- Session tracking: `gk_session` cookie (no auth system)
+- Build: esbuild
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- DB schema: `lib/db/src/schema/users.ts` (public.users table — only app table; Stripe tables are in stripe.* schema managed by stripe-replit-sync)
+- Stripe client: `artifacts/api-server/src/stripeClient.ts` and `scripts/src/stripeClient.ts`
+- Payment routes: `artifacts/api-server/src/routes/stripe.ts`
+- Subscription context: `artifacts/gravelkingpro/src/lib/context.tsx`
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Session-based subscriptions (no auth)**: Users are tracked via a `gk_session` cookie set on first checkout. The backend looks up the session → user → Stripe customer → subscription.
+- **Stripe data lives in stripe.* schema**: `stripe-replit-sync` auto-creates and manages all Stripe tables. Never create product/price tables manually.
+- **Webhook must precede express.json()**: Stripe webhooks require raw Buffer body. The webhook route in `app.ts` is registered before any body parsers.
+- **Seed products once**: Run `pnpm --filter @workspace/scripts run seed-products` once in dev to create GravelKing Pro ($39.99/mo) and Node Auditor ($499/mo) products in Stripe.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- **Starter (free)**: basic analysis, standard report
+- **Pro ($39.99/mo)**: full real-time metrics, unlimited runs, PDF reports, WAV downloads, priority support
+- **Node Auditor ($499/mo)**: enterprise benchmarking, 1T scale, Morris Law V2 access
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Connect Stripe via Integrations tab FIRST, then restart the API server — it logs an error on startup if Stripe isn't connected.
+- Run `seed-products` AFTER connecting Stripe — products must exist in Stripe before the pricing page can start a checkout.
+- `stripe` and `stripe-replit-sync` packages live at the workspace root (not in api-server package.json) — pnpm hoisting makes them accessible.
 
 ## Pointers
 

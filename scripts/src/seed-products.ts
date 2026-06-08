@@ -1,14 +1,7 @@
 import Stripe from 'stripe';
+import { getUncachableStripeClient } from './stripeClient';
 
-const key = process.env.STRIPE_SECRET_KEY;
-if (!key) {
-  console.error('STRIPE_SECRET_KEY is not set. Add it to your Replit Secrets.');
-  process.exit(1);
-}
-
-const stripe = new Stripe(key);
-
-async function ensureProduct(name: string, description: string, tier: string) {
+async function ensureProduct(stripe: Stripe, name: string, description: string, tier: string) {
   const existing = await stripe.products.search({ query: `name:'${name}' AND active:'true'` });
   if (existing.data.length > 0) {
     console.log(`${name} already exists: ${existing.data[0].id}`);
@@ -21,6 +14,7 @@ async function ensureProduct(name: string, description: string, tier: string) {
 }
 
 async function ensurePrice(
+  stripe: Stripe,
   product: Stripe.Product,
   unitAmount: number,
   interval: 'week' | 'month' | 'year',
@@ -45,30 +39,35 @@ async function ensurePrice(
 
 async function createProducts() {
   try {
+    const stripe = await getUncachableStripeClient();
+
     // GravelKing Splits — $9.99/month
     const splits = await ensureProduct(
+      stripe,
       'GravelKing Splits',
       'Unlimited stem splitting and voice removal with downloadable WAV stems. No Studio access.',
       'splits',
     );
-    await ensurePrice(splits, 999, 'month');
+    await ensurePrice(stripe, splits, 999, 'month');
 
     // GravelKing Pro — $9.99/week  and  $19.99/month (monthly gets 3-day trial in checkout)
     const pro = await ensureProduct(
+      stripe,
       'GravelKing Pro',
       'Full server-side audio processing, unlimited runs, plugin chain, waveform studio, and priority support.',
       'pro',
     );
-    await ensurePrice(pro, 999,  'week');
-    await ensurePrice(pro, 1999, 'month');
+    await ensurePrice(stripe, pro, 999,  'week');
+    await ensurePrice(stripe, pro, 1999, 'month');
 
     // Node Auditor — $499/month
     const auditor = await ensureProduct(
+      stripe,
       'Node Auditor',
       'Enterprise-scale benchmarking, dedicated support, custom reports.',
       'node_auditor',
     );
-    await ensurePrice(auditor, 49900, 'month');
+    await ensurePrice(stripe, auditor, 49900, 'month');
 
     console.log('\nDone. Run the app — Stripe products are ready.');
   } catch (err: any) {

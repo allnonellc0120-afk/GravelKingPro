@@ -4,13 +4,15 @@ import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Mic2, Scissors, Wand2, Layers, Pen, Music2,
   Play, ChevronRight, CheckCircle2, Zap, Download,
-  Mail, Lock,
+  Mail, Lock, Bell, X,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 
 const FEATURES = [
   {
@@ -103,6 +105,112 @@ const PLANS = [
   },
 ];
 
+function NotifyBanner() {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<"idle" | "loading" | "done">("idle");
+  const [dismissed, setDismissed] = useState(
+    () => sessionStorage.getItem("notify_dismissed") === "true"
+  );
+  const { toast } = useToast();
+
+  if (dismissed) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setState("loading");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+      setState("done");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Error", description: message, variant: "destructive" });
+      setState("idle");
+    }
+  };
+
+  const handleDismiss = () => {
+    sessionStorage.setItem("notify_dismissed", "true");
+    setDismissed(true);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="relative rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-transparent p-5 mb-6"
+    >
+      <button
+        onClick={handleDismiss}
+        className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Dismiss"
+      >
+        <X className="w-4 h-4" />
+      </button>
+
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+          <Bell className="w-5 h-5 text-amber-400" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <AnimatePresence mode="wait">
+            {state === "done" ? (
+              <motion.div
+                key="done"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 pt-1"
+              >
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <div>
+                  <p className="font-semibold text-emerald-400">You're on the list!</p>
+                  <p className="text-sm text-muted-foreground">We'll email you the moment payments go live.</p>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <p className="font-semibold text-amber-400 mb-0.5">
+                  Payments launching very soon
+                </p>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Leave your email and we'll notify you the moment Pro subscriptions open.
+                </p>
+                <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm">
+                  <Input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-background/60 border-amber-500/20 focus-visible:ring-amber-500/30 h-9 text-sm"
+                    data-testid="input-notify-email"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="bg-amber-500 hover:bg-amber-600 text-black font-semibold shrink-0"
+                    disabled={state === "loading"}
+                    data-testid="button-notify-submit"
+                  >
+                    {state === "loading" ? "…" : "Notify me"}
+                  </Button>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Home() {
   const { isPro } = useAppState();
   const { isAuthenticated, login } = useAuth();
@@ -110,6 +218,8 @@ export default function Home() {
   return (
     <Layout>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-12">
+
+        {!isPro && <NotifyBanner />}
 
         {/* ── Hero ── */}
         <div className="relative rounded-2xl overflow-hidden text-center space-y-5 pt-4 pb-10 px-4">
