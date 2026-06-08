@@ -291,7 +291,7 @@ export function useDAW() {
       if (!isPlayingRef.current) return;
       const elapsed = ctx.currentTime - playStartRef.current;
       const pos = offsetRef.current + elapsed;
-      const dur = tracksRef.current.reduce((m, t) => Math.max(m, t.duration), 0);
+      const dur = tracksRef.current.reduce((m, t) => Math.max(m, t.startOffset + t.duration), 0);
       if (dur > 0 && pos >= dur) {
         if (loopRef.current) {
           buildAndStart(0);
@@ -558,7 +558,7 @@ export function useDAW() {
   const exportMix = useCallback(async () => {
     const all = tracksRef.current;
     if (!all.length) return;
-    const maxDur = all.reduce((m, t) => Math.max(m, t.duration), 0);
+    const maxDur = all.reduce((m, t) => Math.max(m, t.startOffset + t.duration), 0);
     if (maxDur <= 0) return;
     const ctx = getCtx();
     const sr = ctx.sampleRate;
@@ -591,7 +591,7 @@ export function useDAW() {
       const g = offCtx.createGain(); g.gain.value = track.volume;
       const pn = offCtx.createStereoPanner(); pn.pan.value = track.pan;
       prev.connect(g); g.connect(pn); pn.connect(offMG);
-      src.start(0);
+      src.start(track.startOffset);
     }
     const rendered = await offCtx.startRendering();
     const wavBlob = audioBufferToWav(rendered);
