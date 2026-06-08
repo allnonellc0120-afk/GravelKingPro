@@ -19,6 +19,7 @@ import {
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
+import { hasPaidSubscription } from "../lib/entitlement";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -450,6 +451,16 @@ audioRouter.post(
         res.status(500).json({ success: false, error: err.message });
         return;
       }
+    }
+
+    // ── Pro subscription gate for standard mode ─────────────────────────────────
+    if (!await hasPaidSubscription(req)) {
+      res.status(403).json({
+        success: false,
+        error: "GravelKing Standard processing requires a Pro subscription.",
+        code: "PRO_REQUIRED",
+      });
+      return;
     }
 
     // ── Standard mode: try remote first ────────────────────────────────────────

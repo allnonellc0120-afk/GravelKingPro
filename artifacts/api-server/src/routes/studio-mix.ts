@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
+import { hasPaidSubscription } from "../lib/entitlement";
 
 const execFileAsync = promisify(execFile);
 
@@ -58,6 +59,16 @@ studioRouter.post(
   studioConcurrency,
   upload.array("tracks", 8),
   async (req: Request, res: Response) => {
+    // ── Pro subscription gate ────────────────────────────────────────────────────
+    if (!await hasPaidSubscription(req)) {
+      res.status(403).json({
+        success: false,
+        error: "Mix Studio export requires a Pro subscription.",
+        code: "PRO_REQUIRED",
+      });
+      return;
+    }
+
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) {
       res.status(400).json({ success: false, error: "No audio files uploaded." });
