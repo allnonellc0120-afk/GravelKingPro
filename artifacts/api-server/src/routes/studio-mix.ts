@@ -2,15 +2,29 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { writeFile, readFile, unlink } from "fs/promises";
+import { unlink } from "fs/promises";
 import { randomUUID } from "crypto";
+import { rateLimit } from "../lib/rateLimiter";
+import { concurrencyLimit } from "../lib/concurrencyLimit";
+import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 
 const execFileAsync = promisify(execFile);
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: "/tmp",
+    filename: (_req, file, cb) => {
+      const ext = sanitizeExt(file.originalname);
+      cb(null, `gk_mix_in_${randomUUID()}.${ext}`);
+    },
+  }),
   limits: { fileSize: 200 * 1024 * 1024, files: 8 },
 });
+
 const studioRouter = Router();
+
+const studioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 5 });
+const studioConcurrency = concurrencyLimit(2);
 
 type VoicePreset = {
   semitoneOffset: number;
@@ -40,6 +54,8 @@ function buildAtempo(speed: number): string {
 
 studioRouter.post(
   "/kernel/studio-mix",
+  studioRateLimit,
+  studioConcurrency,
   upload.array("tracks", 8),
   async (req: Request, res: Response) => {
     const files = req.files as Express.Multer.File[] | undefined;
@@ -48,38 +64,46 @@ studioRouter.post(
       return;
     }
 
-    const arrangement = (req.body.arrangement as string) === "layer" ? "layer" : "sequential";
-    const speed       = Math.min(Math.max(parseFloat(req.body.speed ?? "1") || 1, 0.25), 4.0);
-    const semitones   = Math.min(Math.max(parseInt(req.body.semitones ?? "0") || 0, -24), 24);
-    const noiseReduce = (req.body.noiseReduce as string) || "off";
-    const voicePreset = (req.body.voicePreset as string) || "normal";
-
-    const preset = VOICE_PRESETS[voicePreset] ?? VOICE_PRESETS.normal;
-    const totalSemitones = semitones + preset.semitoneOffset;
-    const pitchRatio = Math.pow(2, totalSemitones / 12);
-    const clampedPitch = Math.min(Math.max(pitchRatio, 0.1), 4.0);
-    const clampedSpeed = Math.min(Math.max(speed, 0.25), 4.0);
+    // Collect all disk paths written by multer for cleanup in finally
+    const tmpFiles: string[] = files.map((f) => f.path);
 
     const id = randomUUID();
-    const tmpFiles: string[] = [];
+    const outputPath = `/tmp/gk_mix_out_${id}.wav`;
+    tmpFiles.push(outputPath);
 
     try {
-      const inputPaths: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const ext = (file.originalname.split(".").pop() ?? "mp3").toLowerCase();
+      // Validate each track: extension + duration
+      for (const file of files) {
+        const ext = sanitizeExt(file.originalname);
         if (ext === "mid" || ext === "midi") {
           res.status(422).json({ success: false, error: "MIDI files require a soundfont synthesizer. Please convert to WAV or MP3 first." });
           return;
         }
-        const tmpPath = `/tmp/gk_mix_in_${id}_${i}.${ext}`;
-        await writeFile(tmpPath, file.buffer);
-        inputPaths.push(tmpPath);
-        tmpFiles.push(tmpPath);
+        const duration = await probeFileDuration(file.path);
+        if (duration > MAX_AUDIO_DURATION_S) {
+          res.status(422).json({
+            success: false,
+            error: `Track "${file.originalname}" exceeds the maximum allowed duration of ${Math.floor(MAX_AUDIO_DURATION_S / 60)} minutes.`,
+          });
+          return;
+        }
       }
 
-      const outputPath = `/tmp/gk_mix_out_${id}.wav`;
-      tmpFiles.push(outputPath);
+      const arrangement = (req.body.arrangement as string) === "layer" ? "layer" : "sequential";
+      const speed       = Math.min(Math.max(parseFloat(req.body.speed ?? "1") || 1, 0.25), 4.0);
+      const semitones   = Math.min(Math.max(parseInt(req.body.semitones ?? "0") || 0, -24), 24);
+      const noiseReduce = (req.body.noiseReduce as string) || "off";
+      const voicePreset = (req.body.voicePreset as string) || "normal";
+
+      const preset = VOICE_PRESETS[voicePreset] ?? VOICE_PRESETS.normal;
+      const totalSemitones = semitones + preset.semitoneOffset;
+      const pitchRatio = Math.pow(2, totalSemitones / 12);
+      const clampedPitch = Math.min(Math.max(pitchRatio, 0.1), 4.0);
+      const clampedSpeed = Math.min(Math.max(speed, 0.25), 4.0);
+
+      // Use the paths multer already wrote to disk
+      const inputPaths = files.map((f) => f.path);
+      const n = inputPaths.length;
 
       // Build ffmpeg args
       const ffmpegArgs: string[] = ["-y"];
@@ -87,7 +111,6 @@ studioRouter.post(
         ffmpegArgs.push("-i", p);
       }
 
-      const n = inputPaths.length;
       const filterParts: string[] = [];
 
       // Normalize each input to 44100 stereo
@@ -112,7 +135,6 @@ studioRouter.post(
       // Build effect chain
       const effects: string[] = [];
 
-      // Pitch via rubberband (highest quality)
       const needPitch = Math.abs(clampedPitch - 1.0) > 0.0005;
       const needSpeed = Math.abs(clampedSpeed - 1.0) > 0.0005;
 
@@ -124,12 +146,10 @@ studioRouter.post(
         effects.push(buildAtempo(clampedSpeed));
       }
 
-      // Voice preset extra filters
       for (const f of preset.extraFilters) {
         effects.push(f);
       }
 
-      // Noise reduction
       if (noiseReduce === "light") effects.push("afftdn=nf=-20");
       else if (noiseReduce === "heavy") effects.push("afftdn=nf=-35,anlmdn");
 
@@ -144,19 +164,31 @@ studioRouter.post(
         outputPath
       );
 
-      await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 200 * 1024 * 1024 });
+      await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 120_000 });
 
-      const wavBuffer = await readFile(outputPath);
+      // Stream the output file directly to avoid loading entire WAV into memory
+      const { createReadStream } = await import("fs");
+      const { stat } = await import("fs/promises");
+      const { size } = await stat(outputPath);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_mix.wav"`);
+      res.setHeader("Content-Length", String(size));
       res.setHeader("X-GK-Mode", "studio-mix");
       res.setHeader("X-GK-Routing", "local");
       res.setHeader("X-GK-Track-Count", String(n));
       res.setHeader("X-GK-Arrangement", arrangement);
-      res.send(wavBuffer);
+
+      const stream = createReadStream(outputPath);
+      stream.pipe(res);
+      await new Promise<void>((resolve, reject) => {
+        stream.on("end", resolve);
+        stream.on("error", reject);
+      });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message ?? "Studio mix failed." });
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: err.message ?? "Studio mix failed." });
+      }
     } finally {
       await Promise.all(tmpFiles.map((f) => unlink(f).catch(() => {})));
     }

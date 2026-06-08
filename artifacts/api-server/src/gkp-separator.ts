@@ -35,7 +35,7 @@ async function normalizeToS16le(inputBuf: Buffer): Promise<Buffer> {
   const inPath  = `/tmp/gkp_norm_in_${id}.wav`;
   const outPath = `/tmp/gkp_norm_out_${id}.wav`;
   await writeFile(inPath, inputBuf);
-  await execFileAsync("ffmpeg", ["-y", "-i", inPath, "-acodec", "pcm_s16le", outPath]);
+  await execFileAsync("ffmpeg", ["-y", "-i", inPath, "-acodec", "pcm_s16le", outPath], { timeout: 120_000 });
   const result = await readFile(outPath);
   await unlink(inPath).catch(() => {});
   await unlink(outPath).catch(() => {});

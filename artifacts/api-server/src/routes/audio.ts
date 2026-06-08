@@ -16,10 +16,16 @@ import {
   GNS_MODEL,
   GNS_STACK,
 } from "../gkp-separator";
+import { rateLimit } from "../lib/rateLimiter";
+import { concurrencyLimit } from "../lib/concurrencyLimit";
+import { probeAudioDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 const audioRouter = Router();
+
+const audioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
+const audioConcurrency = concurrencyLimit(3);
 
 type ProcessMode = "standard" | "voice_remove" | "stem_split" | "voice_change" | "denoise";
 
@@ -87,7 +93,7 @@ async function getAudioInfo(inputBuf: Buffer, ext: string): Promise<{ sampleRate
   let sampleRate = 44100;
   let channels = 2;
   try {
-    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", inPath]);
+    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", inPath], { timeout: 10_000 });
     const info = JSON.parse(stdout);
     const stream = info.streams?.find((s: any) => s.codec_type === "audio");
     if (stream) {
@@ -108,13 +114,13 @@ async function decodeToFloat32(inputBuf: Buffer, ext: string): Promise<{ samples
 
   let sampleRate = 44100;
   try {
-    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", inPath]);
+    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", inPath], { timeout: 10_000 });
     const info = JSON.parse(stdout);
     const stream = info.streams?.find((s: any) => s.codec_type === "audio");
     if (stream) sampleRate = parseInt(stream.sample_rate) || 44100;
   } catch { /* use defaults */ }
 
-  await execFileAsync("ffmpeg", ["-y", "-i", inPath, "-f", "f32le", "-ac", "1", "-ar", String(sampleRate), "-acodec", "pcm_f32le", outPath]);
+  await execFileAsync("ffmpeg", ["-y", "-i", inPath, "-f", "f32le", "-ac", "1", "-ar", String(sampleRate), "-acodec", "pcm_f32le", outPath], { timeout: 120_000 });
   const rawBuf = await readFile(outPath);
   const samples = new Float32Array(rawBuf.buffer, rawBuf.byteOffset, rawBuf.byteLength / 4);
 
@@ -129,7 +135,7 @@ async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<B
   const outPath = `/tmp/gk_out_${id}.wav`;
 
   await writeFile(inPath, Buffer.from(samples.buffer));
-  await execFileAsync("ffmpeg", ["-y", "-f", "f32le", "-ar", String(sampleRate), "-ac", "1", "-i", inPath, "-acodec", "pcm_s16le", outPath]);
+  await execFileAsync("ffmpeg", ["-y", "-f", "f32le", "-ar", String(sampleRate), "-ac", "1", "-i", inPath, "-acodec", "pcm_s16le", outPath], { timeout: 120_000 });
   const wavBuf = await readFile(outPath);
   await unlink(inPath).catch(() => {});
   await unlink(outPath).catch(() => {});
@@ -171,7 +177,7 @@ async function processWithFilter(
     "-ac", String(outputChannels),
     "-acodec", "pcm_s16le",
     outPath,
-  ]);
+  ], { timeout: 120_000 });
   const wavBuf = await readFile(outPath);
   await unlink(inPath).catch(() => {});
   await unlink(outPath).catch(() => {});
@@ -257,6 +263,8 @@ audioRouter.get("/kernel/routing", async (_req, res) => {
 // ── Main processing endpoint ──────────────────────────────────────────────────
 audioRouter.post(
   "/kernel/process-audio",
+  audioRateLimit,
+  audioConcurrency,
   upload.single("audio"),
   async (req: Request, res: Response) => {
     if (!req.file) {
@@ -264,13 +272,23 @@ audioRouter.post(
       return;
     }
 
+    const ext = sanitizeExt(req.file.originalname);
     const multiplier = parseFloat((req.body.multiplier as string) ?? "0.75");
     const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
     const mode: ProcessMode = (req.body.mode as ProcessMode) ?? "standard";
-    const ext = (req.file.originalname.split(".").pop() ?? "mp3").toLowerCase();
     const tempo = Math.min(2.5, Math.max(0.25, parseFloat((req.body.tempo as string) ?? "1.0")));
     const semitones = Math.min(12, Math.max(-12, parseFloat((req.body.semitones as string) ?? "0")));
     const voicePreset = (req.body.voice_preset as string) ?? "normal";
+
+    // ── Duration guard ──────────────────────────────────────────────────────────
+    const duration = await probeAudioDuration(req.file.buffer, ext);
+    if (duration > MAX_AUDIO_DURATION_S) {
+      res.status(422).json({
+        success: false,
+        error: `Audio exceeds the maximum allowed duration of ${Math.floor(MAX_AUDIO_DURATION_S / 60)} minutes.`,
+      });
+      return;
+    }
 
     // ── Denoise (free) ─────────────────────────────────────────────────────────
     if (mode === "denoise") {
