@@ -167,6 +167,7 @@ export default function MixStudio() {
                   track={track}
                   position={daw.position}
                   bpm={daw.bpm}
+                  totalDuration={daw.maxDuration}
                   onSeek={daw.seek}
                   onRemove={daw.removeTrack}
                   onVolumeChange={daw.setTrackVolume}
