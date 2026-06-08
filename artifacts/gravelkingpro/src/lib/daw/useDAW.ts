@@ -89,10 +89,13 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       const inp = ctx.createGain(); const out = ctx.createGain();
       inp.connect(dry); inp.connect(conv); conv.connect(wet);
       dry.connect(out); wet.connect(out);
-      ap.set("wet", wet.gain);
       const liveRev = { size: p.size, damp: p.damp };
       sp.set("size", v => { liveRev.size = v; conv.buffer = makeIR(ctx, liveRev.size, liveRev.damp); });
       sp.set("damp", v => { liveRev.damp = v; conv.buffer = makeIR(ctx, liveRev.size, liveRev.damp); });
+      sp.set("wet", v => {
+        wet.gain.setTargetAtTime(v / 100, ctx.currentTime, 0.01);
+        dry.gain.setTargetAtTime(1 - v / 100, ctx.currentTime, 0.01);
+      });
       return { input: inp, output: out, audioParams: ap, specialParams: sp };
     }
     case "delay": {
@@ -104,7 +107,11 @@ function createPluginNode(ctx: AudioContext, plugin: PluginDef): PluginNodeResul
       del.connect(fb); fb.connect(del);
       inp.connect(dry); inp.connect(del); del.connect(wet);
       dry.connect(out); wet.connect(out);
-      ap.set("time", del.delayTime); ap.set("feedback", fb.gain); ap.set("wet", wet.gain);
+      ap.set("time", del.delayTime); ap.set("feedback", fb.gain);
+      sp.set("wet", v => {
+        wet.gain.setTargetAtTime(v / 100, ctx.currentTime, 0.01);
+        dry.gain.setTargetAtTime(1 - v / 100, ctx.currentTime, 0.01);
+      });
       return { input: inp, output: out, audioParams: ap, specialParams: sp };
     }
     case "distortion": {
