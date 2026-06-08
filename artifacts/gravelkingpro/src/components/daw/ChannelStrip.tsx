@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mic, Volume2, VolumeX, Headphones, ChevronDown, ChevronUp, RotateCcw, Scissors, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, Scissors, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { TrackState, PluginType, PluginDef, Region } from "@/lib/daw/types";
 import { Waveform } from "./Waveform";
@@ -32,6 +32,29 @@ export function ChannelStrip({
   onSetRegion, onApplyTrim, onApplyDelete, onResetEdit,
 }: ChannelStripProps) {
   const [showPlugins, setShowPlugins] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [scrollOffset, setScrollOffset] = useState(0);
+
+  const handleZoomIn = () => {
+    setZoom(z => {
+      const next = Math.min(16, z * 2);
+      setScrollOffset(o => {
+        const viewFrac = 1 / next;
+        const maxStart = 1 - viewFrac;
+        const center = o + (1 / z) / 2;
+        return Math.max(0, Math.min(maxStart, center - viewFrac / 2));
+      });
+      return next;
+    });
+  };
+
+  const handleZoomOut = () => {
+    setZoom(z => {
+      const next = Math.max(1, z / 2);
+      if (next === 1) setScrollOffset(0);
+      return next;
+    });
+  };
 
   return (
     <div
@@ -121,15 +144,34 @@ export function ChannelStrip({
             <span className="text-[10px] text-muted-foreground font-mono">
               {track.duration > 0 ? `${track.duration.toFixed(1)}s` : "—"}
             </span>
-            {track.edited && (
+            <div className="flex items-center gap-1">
+              {track.edited && (
+                <button
+                  onClick={() => onResetEdit(track.id)}
+                  className="text-[10px] text-amber-400/70 hover:text-amber-400 flex items-center gap-1 mr-1"
+                  title="Reset to original"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" /> Reset
+                </button>
+              )}
               <button
-                onClick={() => onResetEdit(track.id)}
-                className="text-[10px] text-amber-400/70 hover:text-amber-400 flex items-center gap-1"
-                title="Reset to original"
+                onClick={handleZoomOut}
+                disabled={zoom <= 1}
+                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
+                title="Zoom out"
               >
-                <RotateCcw className="w-2.5 h-2.5" /> Reset
+                <ZoomOut className="w-3 h-3" />
               </button>
-            )}
+              <span className="text-[9px] font-mono text-muted-foreground w-6 text-center">{zoom}x</span>
+              <button
+                onClick={handleZoomIn}
+                disabled={zoom >= 16}
+                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
+                title="Zoom in"
+              >
+                <ZoomIn className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
           <Waveform
@@ -139,6 +181,8 @@ export function ChannelStrip({
             region={track.region}
             color={track.color}
             height={68}
+            zoom={zoom}
+            scrollOffset={scrollOffset}
             onSeek={onSeek}
             onRegionChange={r => onSetRegion(track.id, r)}
           />

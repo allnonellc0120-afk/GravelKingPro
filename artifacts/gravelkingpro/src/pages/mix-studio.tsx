@@ -10,6 +10,7 @@ import { useDAW } from "@/lib/daw/useDAW";
 import { Transport } from "@/components/daw/Transport";
 import { ChannelStrip } from "@/components/daw/ChannelStrip";
 import { MasterBus } from "@/components/daw/MasterBus";
+import { TimelineRuler } from "@/components/daw/TimelineRuler";
 
 function ProGate() {
   return (
@@ -128,6 +129,11 @@ export default function MixStudio() {
           className="hidden"
           onChange={e => addFiles(e.target.files)}
         />
+
+        {/* Timeline ruler */}
+        {daw.tracks.length > 0 && (
+          <TimelineRuler duration={daw.maxDuration} position={daw.position} />
+        )}
 
         {/* Track list — scrollable */}
         <div

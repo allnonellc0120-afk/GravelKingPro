@@ -12,28 +12,39 @@ interface WaveformProps {
   region: Region | null;
   color: string;
   height?: number;
+  zoom?: number;
+  scrollOffset?: number;
   onSeek?: (seconds: number) => void;
   onRegionChange?: (region: Region | null) => void;
 }
 
 export function Waveform({
   peaks, duration, position, region, color,
-  height = 64, onSeek, onRegionChange,
+  height = 64, zoom = 1, scrollOffset = 0,
+  onSeek, onRegionChange,
 }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<{ startX: number; startTime: number } | null>(null);
   const rafRef = useRef<number>(0);
-  const propsRef = useRef({ peaks, duration, position, region, color, height });
-  propsRef.current = { peaks, duration, position, region, color, height };
+  const propsRef = useRef({ peaks, duration, position, region, color, height, zoom, scrollOffset });
+  propsRef.current = { peaks, duration, position, region, color, height, zoom, scrollOffset };
+
+  const getViewWindow = () => {
+    const { duration, zoom, scrollOffset } = propsRef.current;
+    const viewFrac = 1 / Math.max(1, zoom);
+    const maxStart = 1 - viewFrac;
+    const startFrac = Math.max(0, Math.min(maxStart, scrollOffset));
+    return { startFrac, endFrac: startFrac + viewFrac, startTime: startFrac * duration, endTime: (startFrac + viewFrac) * duration };
+  };
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     const { peaks, duration, position, region, color } = propsRef.current;
+    const { startFrac, endFrac, startTime, endTime } = getViewWindow();
     const W = canvas.width;
     const H = canvas.height;
-    const dpr = window.devicePixelRatio || 1;
 
     ctx.clearRect(0, 0, W, H);
 
@@ -41,25 +52,33 @@ export function Waveform({
     ctx.fillStyle = "rgba(0,0,0,0.3)";
     ctx.fillRect(0, 0, W, H);
 
-    // Region highlight
+    // Region highlight (mapped to visible window)
     if (region && duration > 0) {
-      const rx1 = (region.start / duration) * W;
-      const rx2 = (region.end / duration) * W;
-      ctx.fillStyle = "rgba(245,158,11,0.15)";
-      ctx.fillRect(rx1, 0, rx2 - rx1, H);
-      ctx.fillStyle = "rgba(245,158,11,0.5)";
-      ctx.fillRect(rx1, 0, 1, H);
-      ctx.fillRect(rx2, 0, 1, H);
+      const mapX = (t: number) => ((t / duration - startFrac) / (endFrac - startFrac)) * W;
+      const rx1 = mapX(region.start);
+      const rx2 = mapX(region.end);
+      if (rx2 > 0 && rx1 < W) {
+        const cx1 = Math.max(0, rx1), cx2 = Math.min(W, rx2);
+        ctx.fillStyle = "rgba(245,158,11,0.15)";
+        ctx.fillRect(cx1, 0, cx2 - cx1, H);
+        ctx.fillStyle = "rgba(245,158,11,0.5)";
+        if (rx1 >= 0 && rx1 <= W) ctx.fillRect(rx1, 0, 1, H);
+        if (rx2 >= 0 && rx2 <= W) ctx.fillRect(rx2, 0, 1, H);
+      }
     }
 
-    // Waveform bars
+    // Waveform bars — render only visible slice of peaks
     if (peaks.length > 0) {
-      const barW = Math.max(1, W / peaks.length);
+      const iStart = Math.floor(startFrac * peaks.length);
+      const iEnd = Math.ceil(endFrac * peaks.length);
+      const visible = peaks.slice(iStart, iEnd);
+      const barW = Math.max(1, W / visible.length);
       const mid = H / 2;
-      for (let i = 0; i < peaks.length; i++) {
-        const x = (i / peaks.length) * W;
-        const h = Math.max(2, peaks[i] * H * 0.85);
-        const alpha = position > 0 && duration > 0 && (i / peaks.length) < (position / duration) ? 1.0 : 0.55;
+      for (let i = 0; i < visible.length; i++) {
+        const x = (i / visible.length) * W;
+        const h = Math.max(2, visible[i] * H * 0.85);
+        const tAtBar = startTime + ((i + 0.5) / visible.length) * (endTime - startTime);
+        const alpha = position > 0 && duration > 0 && tAtBar < position ? 1.0 : 0.55;
         ctx.fillStyle = color + Math.round(alpha * 255).toString(16).padStart(2, "0");
         ctx.fillRect(x, mid - h / 2, Math.max(1, barW - 0.5), h);
       }
@@ -72,9 +91,9 @@ export function Waveform({
       }
     }
 
-    // Playhead
-    if (duration > 0) {
-      const px = (position / duration) * W;
+    // Playhead (mapped to visible window)
+    if (duration > 0 && position >= startTime && position <= endTime) {
+      const px = ((position / duration - startFrac) / (endFrac - startFrac)) * W;
       ctx.strokeStyle = "#fbbf24";
       ctx.lineWidth = 1.5;
       ctx.shadowColor = "#f59e0b";
@@ -84,8 +103,6 @@ export function Waveform({
       ctx.lineTo(px, H);
       ctx.stroke();
       ctx.shadowBlur = 0;
-
-      // Playhead triangle
       ctx.fillStyle = "#fbbf24";
       ctx.beginPath();
       ctx.moveTo(px - 4, 0);
@@ -121,7 +138,8 @@ export function Waveform({
   const getTime = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    return pct * (propsRef.current.duration || 0);
+    const { startTime, endTime } = getViewWindow();
+    return startTime + pct * (endTime - startTime);
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {

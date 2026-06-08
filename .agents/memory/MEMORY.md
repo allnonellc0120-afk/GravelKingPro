@@ -1,2 +1,4 @@
 - [DAW Float32Array types](daw-float32array.md) — TypeScript 5.9 generics on typed arrays require explicit Float32Array<ArrayBuffer> casts
 - [Layout noPadding prop](layout-noPadding.md) — Layout component supports noPadding for full-height pages like the DAW
+- [DAW IR cache](daw-ir-cache.md) — makeIR() blocks main thread 5–20ms at large reverb sizes; must be memoized
+- [DAW specialParams pattern](daw-special-params.md) — PluginNodeResult has specialParams for non-AudioParam live updates
