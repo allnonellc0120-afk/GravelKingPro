@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { useAuth } from "@workspace/replit-auth-web";
 
 export type Results = {
   throughput: string;
@@ -25,10 +24,13 @@ interface AppState {
   tier: SubscriptionTier;
   hasSplits: boolean;
   isPro: boolean;
+  plan: string | null;
+  isLoadingSubscription: boolean;
   setTier: (tier: SubscriptionTier) => void;
   setIsPro: (value: boolean) => void;
   usedFreeSplit: boolean;
   setUsedFreeSplit: (v: boolean) => void;
+  refreshSubscription: () => Promise<void>;
   results: Results;
   setResults: (results: Results) => void;
   hasRun: boolean;
@@ -50,8 +52,9 @@ function tierFromUser(subscriptionTier?: string | null, isPro?: boolean): Subscr
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth();
   const [userTier, setUserTier] = useState<SubscriptionTier>(null);
+  const [plan, setPlan] = useState<string | null>(null);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
   const [activePromo, setActivePromo] = useState<string | null>(null);
   const [usedFreeSplit, setUsedFreeSplit] = useState(false);
   const [results, setResults] = useState<Results>(null);
@@ -64,18 +67,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  useEffect(() => {
-    if (!isLoading && user) {
-      setUserTier(tierFromUser(user.subscriptionTier, user.isPro));
-      setUsedFreeSplit(user.usedFreeSplit ?? false);
-    } else if (!isLoading && !user) {
-      setUserTier(null);
-      setUsedFreeSplit(false);
+  const refreshSubscription = useCallback(async () => {
+    try {
+      setIsLoadingSubscription(true);
+      const resp = await fetch("/api/subscription/status", { credentials: "include" });
+      if (resp.ok) {
+        const data = await resp.json() as { isPro: boolean; plan: string | null };
+        setPlan(data.plan);
+        // Derive tier from plan string
+        const t = data.plan === "splits" ? "splits"
+          : data.plan === "pro" ? "pro"
+          : data.plan === "node_auditor" ? "node_auditor"
+          : null;
+        setUserTier(t);
+      }
+    } catch {
+      // Network error — leave tier as-is
+    } finally {
+      setIsLoadingSubscription(false);
     }
-  }, [user, isLoading]);
+  }, []);
+
+  useEffect(() => {
+    void refreshSubscription();
+  }, [refreshSubscription]);
 
   const promoTier: SubscriptionTier = activePromo ? (PROMO_CODES[activePromo] ?? null) : null;
-
   const tierOrder: Array<SubscriptionTier> = [null, "splits", "pro", "node_auditor"];
   const effectiveTier: SubscriptionTier =
     tierOrder.indexOf(promoTier) > tierOrder.indexOf(userTier) ? promoTier : userTier;
@@ -106,10 +123,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tier: effectiveTier,
       hasSplits,
       isPro,
+      plan,
+      isLoadingSubscription,
       setTier,
       setIsPro,
       usedFreeSplit,
       setUsedFreeSplit,
+      refreshSubscription,
       results,
       setResults,
       hasRun,

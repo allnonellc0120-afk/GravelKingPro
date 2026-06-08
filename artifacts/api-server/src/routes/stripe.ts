@@ -1,20 +1,16 @@
-import { Router } from "express";
-import Stripe from "stripe";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import { storage } from '../storage';
+import { getUncachableStripeClient } from '../stripeClient';
+import type Stripe from 'stripe';
 
 const stripeRouter = Router();
 
-function getStripe() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured.");
-  return new Stripe(key);
-}
-
-// List products with prices — Pricing page uses this
-stripeRouter.get("/stripe/products", async (_req, res) => {
+// List products with prices — calls Stripe API directly for reliability
+stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
   try {
-    const stripe = getStripe();
+    const stripe = await getUncachableStripeClient();
     const products = await stripe.products.list({ active: true, limit: 20 });
     const result = await Promise.all(
       products.data.map(async (product) => {
@@ -34,124 +30,121 @@ stripeRouter.get("/stripe/products", async (_req, res) => {
       })
     );
     res.json({ data: result });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 
-// Create Stripe Checkout Session
-stripeRouter.post("/stripe/checkout", async (req: any, res) => {
-  const { priceId } = req.body;
-  if (!priceId) {
-    res.status(400).json({ error: "priceId is required" });
-    return;
-  }
+// Create Stripe Checkout Session — session-cookie based, no auth required
+stripeRouter.post('/checkout', async (req: Request, res: Response) => {
   try {
-    const stripe = getStripe();
-    const origin = req.headers.origin ||
-      `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+    const { priceId } = req.body as { priceId?: string };
 
-    // Fetch the price to determine if it's a monthly sub (gets 3-day trial)
-    const price = await stripe.prices.retrieve(priceId);
-    const isMonthly = price.recurring?.interval === "month";
-
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: "subscription",
-      success_url: `${origin}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/pricing?checkout=cancelled`,
-      ...(isMonthly && {
-        subscription_data: { trial_period_days: 3 },
-      }),
-    };
-
-    // Attach existing Stripe customer if user is already linked
-    if (req.isAuthenticated()) {
-      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
-      if (dbUser?.stripeCustomerId) {
-        sessionParams.customer = dbUser.stripeCustomerId;
-      }
-    }
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
-    res.json({ url: session.url });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Check if a checkout session resulted in a paid subscription, then persist tier to DB
-stripeRouter.get("/stripe/subscription-status", async (req: any, res) => {
-  const { session_id } = req.query as { session_id?: string };
-  if (!session_id) {
-    res.status(400).json({ error: "session_id is required" });
-    return;
-  }
-  try {
-    const stripe = getStripe();
-
-    // Expand line items so we can read the product metadata for the tier
-    const session = await stripe.checkout.sessions.retrieve(session_id, {
-      expand: ["line_items.data.price.product"],
-    });
-
-    // "no_payment_required" covers trial-period checkouts
-    const active =
-      session.payment_status === "paid" ||
-      session.payment_status === "no_payment_required" ||
-      session.status === "complete";
-
-    // Determine tier from the first line item's product metadata
-    let tier: string | null = null;
-    const lineItem = session.line_items?.data?.[0];
-    if (lineItem) {
-      const price = lineItem.price as Stripe.Price | null;
-      const product = price?.product as Stripe.Product | null;
-      tier = product?.metadata?.tier ?? null;
-    }
-
-    // Persist to DB if user is authenticated
-    if (active && req.isAuthenticated()) {
-      const customerId = typeof session.customer === "string" ? session.customer : null;
-      const isPro = tier === "pro" || tier === "node_auditor";
-      await db.update(usersTable).set({
-        subscriptionTier: tier,
-        isPro,
-        ...(customerId ? { stripeCustomerId: customerId } : {}),
-      }).where(eq(usersTable.id, req.user.id));
-    }
-
-    res.json({ active, tier, customerId: session.customer });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Open Stripe Billing Portal — lets users cancel, update card, etc.
-stripeRouter.post("/stripe/portal", async (req: any, res) => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "Not authenticated" });
-    return;
-  }
-  try {
-    const stripe = getStripe();
-    const origin = req.headers.origin ||
-      `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-
-    const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
-    if (!dbUser?.stripeCustomerId) {
-      res.status(400).json({ error: "No billing account found. Subscribe first." });
+    if (!priceId) {
+      res.status(400).json({ error: 'priceId is required' });
       return;
     }
 
-    const session = await stripe.billingPortal.sessions.create({
-      customer: dbUser.stripeCustomerId,
+    const sessionId: string = (req.cookies as Record<string, string>)?.gk_session ?? randomUUID();
+    const user = await storage.getOrCreateUser(sessionId);
+
+    let customerId = user.stripeCustomerId;
+    if (!customerId) {
+      const stripe = await getUncachableStripeClient();
+      const customer = await stripe.customers.create({
+        metadata: { userId: user.id },
+      });
+      await storage.linkStripeCustomer(user.id, customer.id);
+      customerId = customer.id;
+    }
+
+    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] ?? 'localhost:80';
+    const baseUrl = `https://${domain}`;
+
+    const stripe = await getUncachableStripeClient();
+
+    // Grant a 3-day trial on monthly subscriptions
+    const price = await stripe.prices.retrieve(priceId);
+    const isMonthly = price.recurring?.interval === 'month';
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: 'subscription',
+      success_url: `${baseUrl}/pricing?checkout=success`,
+      cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
+      ...(isMonthly && { subscription_data: { trial_period_days: 3 } }),
+    };
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
+
+    res.cookie('gk_session', user.sessionId ?? user.id, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    res.json({ url: session.url });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// Get subscription status for the current session cookie
+stripeRouter.get('/subscription/status', async (req: Request, res: Response) => {
+  try {
+    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+
+    if (!sessionId) {
+      res.json({ isPro: false, plan: null });
+      return;
+    }
+
+    const user = await storage.getUserBySession(sessionId);
+    if (!user) {
+      res.json({ isPro: false, plan: null });
+      return;
+    }
+
+    const status = await storage.getUserSubscriptionStatus(user);
+    res.json(status);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// Open Stripe Billing Portal — session-cookie based
+stripeRouter.post('/stripe/portal', async (req: Request, res: Response) => {
+  try {
+    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+    if (!sessionId) {
+      res.status(401).json({ error: 'No session — subscribe first.' });
+      return;
+    }
+
+    const user = await storage.getUserBySession(sessionId);
+    if (!user?.stripeCustomerId) {
+      res.status(400).json({ error: 'No billing account found. Subscribe first.' });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const origin = (req.headers.origin as string | undefined) ??
+      `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
       return_url: `${origin}/account`,
     });
-    res.json({ url: session.url });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json({ url: portalSession.url });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
   }
 });
 

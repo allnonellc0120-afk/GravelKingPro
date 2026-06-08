@@ -1,17 +1,6 @@
 import Stripe from 'stripe';
 import { StripeSync } from 'stripe-replit-sync';
 
-function getSecretKey(): string {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error(
-      'STRIPE_SECRET_KEY environment variable is not set. ' +
-      'Add it via the Secrets tab in Replit.'
-    );
-  }
-  return key;
-}
-
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
   // Fast path: env var secret key (set when Replit integration is not used)
   if (process.env.STRIPE_SECRET_KEY) {

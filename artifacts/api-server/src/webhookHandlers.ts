@@ -10,6 +10,7 @@ export class WebhookHandlers {
         'FIX: Ensure webhook route is registered BEFORE app.use(express.json()).'
       );
     }
+
     const sync = await getStripeSync();
     await sync.processWebhook(payload, signature);
   }

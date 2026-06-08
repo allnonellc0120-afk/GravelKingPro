@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 
 type PlanId = "splits" | "pro" | "node_auditor";
 type BillingInterval = "weekly" | "monthly";
@@ -14,59 +16,46 @@ type BillingInterval = "weekly" | "monthly";
 const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
   splits: "GravelKing Splits",
   pro: "GravelKing Pro",
-  node_auditor: "Node Auditor",
+  node_auditor: "GravelKing Node Auditor",
 };
 
 export default function Pricing() {
-  const { tier, setTier, activePromo, redeemPromo, revokePromo } = useAppState();
+  const { tier, setTier, activePromo, redeemPromo, revokePromo, isPro, isLoadingSubscription, refreshSubscription } = useAppState();
   const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
   const [proBilling, setProBilling] = useState<BillingInterval>("monthly");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [location] = useLocation();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get("checkout");
-    const sessionId = params.get("session_id");
 
-    if (checkout === "success" && sessionId) {
-      fetch(`/api/stripe/subscription-status?session_id=${sessionId}`, { credentials: "include" })
-        .then(r => r.json())
-        .then((data: any) => {
-          if (data.active) {
-            const newTier = (data.tier as SubscriptionTier) ?? "pro";
-            setTier(newTier);
-            const labels: Record<string, string> = {
-              splits: "GravelKing Splits",
-              pro: "GravelKing Pro",
-              node_auditor: "Node Auditor",
-            };
-            toast({
-              title: `You're now on ${labels[newTier] ?? "a paid plan"}!`,
-              description: newTier === "splits"
-                ? "Voice removal and stem splitting are now unlocked."
-                : "All features unlocked. Welcome aboard.",
-            });
-          }
-        })
-        .catch(() => {});
-      window.history.replaceState({}, "", "/pricing");
+    if (checkout === "success") {
+      refreshSubscription().then(() => {
+        toast({
+          title: "Subscription activated!",
+          description: "All features are now unlocked. Welcome aboard.",
+        });
+        window.history.replaceState({}, "", "/pricing");
+      }).catch(() => {});
     } else if (checkout === "cancelled") {
       toast({ title: "Checkout cancelled", description: "No charge was made.", variant: "destructive" });
       window.history.replaceState({}, "", "/pricing");
     }
-  }, []);
+  }, [location]);
 
   const handleCheckout = async (planId: PlanId, interval?: BillingInterval) => {
     setLoadingTier(planId);
     try {
-      const productsRes = await fetch("/api/stripe/products");
-      const { data: products } = await productsRes.json() as { data: any[] };
+      const productsRes = await fetch("/api/stripe/products", { credentials: "include" });
+      if (!productsRes.ok) throw new Error("Could not load products");
+      const { data: products } = await productsRes.json() as { data: Array<{ name: string; prices: Array<{ id: string; recurring?: { interval: string } }> }> };
 
       const productName = PLAN_PRODUCT_NAMES[planId];
-      const product = products.find((p: any) => p.name === productName);
+      const product = products.find((p) => p.name === productName);
 
       if (!product?.prices?.length) {
         toast({
@@ -82,24 +71,28 @@ export default function Pricing() {
       let priceId: string;
       if (planId === "pro" && interval) {
         const stripeInterval = interval === "weekly" ? "week" : "month";
-        const match = product.prices.find((p: any) => p.recurring?.interval === stripeInterval);
+        const match = product.prices.find((p) => p.recurring?.interval === stripeInterval);
         priceId = match?.id ?? product.prices[0].id;
       } else {
         priceId = product.prices[0].id;
       }
 
-      const checkoutRes = await fetch("/api/stripe/checkout", {
+      const checkoutRes = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ priceId }),
       });
 
-      const { url, error } = await checkoutRes.json() as { url?: string; error?: string };
-      if (error) throw new Error(error);
+      if (!checkoutRes.ok) {
+        const errData = await checkoutRes.json() as { error?: string };
+        throw new Error(errData.error ?? "Checkout failed");
+      }
+      const { url } = await checkoutRes.json() as { url: string };
       if (url) window.location.href = url;
-    } catch (err: any) {
-      toast({ title: "Checkout error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Checkout error", description: message, variant: "destructive" });
     } finally {
       setLoadingTier(null);
     }
@@ -170,8 +163,12 @@ export default function Pricing() {
                 </ul>
               </CardContent>
               <CardFooter>
-                {tier === null ? (
-                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm" data-testid="badge-current-plan">
+                {isLoadingSubscription ? (
+                  <div className="w-full flex justify-center py-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : tier === null ? (
+                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-secondary/50" data-testid="badge-current-plan">
                     Current Plan
                   </Badge>
                 ) : (
@@ -314,7 +311,11 @@ export default function Pricing() {
                 </ul>
               </CardContent>
               <CardFooter className="flex-col gap-2">
-                {isCurrent("pro") ? (
+                {isLoadingSubscription ? (
+                  <div className="w-full flex justify-center py-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : isCurrent("pro") ? (
                   <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-amber-500/10 text-amber-500 border-amber-500/20" data-testid="badge-pro-current">
                     Current Plan
                   </Badge>
@@ -364,7 +365,11 @@ export default function Pricing() {
                 </ul>
               </CardContent>
               <CardFooter>
-                {isCurrent("node_auditor") ? (
+                {isLoadingSubscription ? (
+                  <div className="w-full flex justify-center py-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : isCurrent("node_auditor") ? (
                   <Badge variant="secondary" className="w-full justify-center py-2 text-sm" data-testid="badge-auditor-current">
                     Current Plan
                   </Badge>
