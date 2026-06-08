@@ -90,6 +90,7 @@ export default function MixStudio() {
           onSeek={(pct) => daw.seek(pct * daw.maxDuration)}
           onVolumeChange={daw.setMasterVolume}
           onLoopToggle={() => daw.setLoop(!daw.loop)}
+          onBpmChange={daw.setBpm}
           trackCount={daw.tracks.length}
         />
 
@@ -132,7 +133,7 @@ export default function MixStudio() {
 
         {/* Timeline ruler */}
         {daw.tracks.length > 0 && (
-          <TimelineRuler duration={daw.maxDuration} position={daw.position} />
+          <TimelineRuler duration={daw.maxDuration} position={daw.position} bpm={daw.bpm} />
         )}
 
         {/* Track list — scrollable */}
@@ -165,6 +166,7 @@ export default function MixStudio() {
                   key={track.id}
                   track={track}
                   position={daw.position}
+                  bpm={daw.bpm}
                   onSeek={daw.seek}
                   onRemove={daw.removeTrack}
                   onVolumeChange={daw.setTrackVolume}

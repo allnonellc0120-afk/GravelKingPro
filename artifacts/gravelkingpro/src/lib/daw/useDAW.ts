@@ -162,7 +162,7 @@ export function useDAW() {
   const [position, setPosition] = useState(0);
   const [masterVolume, setMasterVolumeState] = useState(0.85);
   const [loop, setLoop] = useState(false);
-  const [bpm] = useState(120);
+  const [bpm, setBpm] = useState(120);
   const [masterPlugins, setMasterPlugins] = useState<PluginDef[]>([
     { id: "m-eq",  type: "eq",  enabled: false, params: { ...PLUGIN_DEFAULTS.eq } },
     { id: "m-lim", type: "compressor", enabled: true,  params: { threshold: -1, ratio: 20, attack: 0, release: 100, knee: 0, makeup: 0 } },
@@ -618,7 +618,7 @@ export function useDAW() {
   useEffect(() => () => teardown(), [teardown]);
 
   return {
-    tracks, isPlaying, position, masterVolume, loop, bpm,
+    tracks, isPlaying, position, masterVolume, loop, bpm, setBpm,
     masterPlugins, maxDuration, masterAnalRef,
     addTrack, removeTrack,
     play, pause, stop, seek,

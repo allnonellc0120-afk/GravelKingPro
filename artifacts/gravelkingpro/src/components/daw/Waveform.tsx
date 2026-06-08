@@ -14,20 +14,21 @@ interface WaveformProps {
   height?: number;
   zoom?: number;
   scrollOffset?: number;
+  bpm?: number;
   onSeek?: (seconds: number) => void;
   onRegionChange?: (region: Region | null) => void;
 }
 
 export function Waveform({
   peaks, duration, position, region, color,
-  height = 64, zoom = 1, scrollOffset = 0,
+  height = 64, zoom = 1, scrollOffset = 0, bpm,
   onSeek, onRegionChange,
 }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<{ startX: number; startTime: number } | null>(null);
   const rafRef = useRef<number>(0);
-  const propsRef = useRef({ peaks, duration, position, region, color, height, zoom, scrollOffset });
-  propsRef.current = { peaks, duration, position, region, color, height, zoom, scrollOffset };
+  const propsRef = useRef({ peaks, duration, position, region, color, height, zoom, scrollOffset, bpm });
+  propsRef.current = { peaks, duration, position, region, color, height, zoom, scrollOffset, bpm };
 
   const getViewWindow = () => {
     const { duration, zoom, scrollOffset } = propsRef.current;
@@ -41,7 +42,7 @@ export function Waveform({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    const { peaks, duration, position, region, color } = propsRef.current;
+    const { peaks, duration, position, region, color, bpm } = propsRef.current;
     const { startFrac, endFrac, startTime, endTime } = getViewWindow();
     const dpr = window.devicePixelRatio || 1;
     const W = canvas.width / dpr;   // CSS pixels (ctx is already scaled by DPR)
@@ -52,6 +53,25 @@ export function Waveform({
     // Background
     ctx.fillStyle = "rgba(0,0,0,0.3)";
     ctx.fillRect(0, 0, W, H);
+
+    // Beat grid — drawn before waveform so bars sit underneath
+    if (bpm && bpm > 0 && duration > 0) {
+      const beatDur = 60 / bpm;
+      const firstBeat = Math.floor(startTime / beatDur);
+      const lastBeat  = Math.ceil(endTime / beatDur);
+      for (let b = firstBeat; b <= lastBeat; b++) {
+        const t = b * beatDur;
+        if (t < startTime - 0.0001 || t > endTime + 0.0001) continue;
+        const x = ((t / duration - startFrac) / (endFrac - startFrac)) * W;
+        const isBar = b % 4 === 0;
+        ctx.strokeStyle = isBar ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.05)";
+        ctx.lineWidth   = isBar ? 0.8 : 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+    }
 
     // Region highlight (mapped to visible window)
     if (region && duration > 0) {
@@ -143,9 +163,17 @@ export function Waveform({
     return startTime + pct * (endTime - startTime);
   };
 
+  // Snap to nearest beat boundary when Shift is held
+  const snapTime = (t: number, shiftHeld: boolean): number => {
+    const { bpm } = propsRef.current;
+    if (!shiftHeld || !bpm || bpm <= 0) return t;
+    const beatDur = 60 / bpm;
+    return Math.round(t / beatDur) * beatDur;
+  };
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return;
-    const t = getTime(e);
+    const t = snapTime(getTime(e), e.shiftKey);
     dragRef.current = { startX: e.clientX, startTime: t };
     if (onRegionChange) onRegionChange(null);
   };
@@ -154,7 +182,7 @@ export function Waveform({
     if (!dragRef.current) return;
     const dx = Math.abs(e.clientX - dragRef.current.startX);
     if (dx < 4) return;
-    const t2 = getTime(e);
+    const t2 = snapTime(getTime(e), e.shiftKey);
     const start = Math.min(dragRef.current.startTime, t2);
     const end = Math.max(dragRef.current.startTime, t2);
     if (onRegionChange) onRegionChange({ start, end });

@@ -8,6 +8,7 @@ import { PluginRack } from "./PluginRack";
 interface ChannelStripProps {
   track: TrackState;
   position: number;
+  bpm?: number;
   onSeek: (secs: number) => void;
   onRemove: (id: string) => void;
   onVolumeChange: (id: string, v: number) => void;
@@ -26,7 +27,7 @@ interface ChannelStripProps {
 }
 
 export function ChannelStrip({
-  track, position, onSeek, onRemove,
+  track, position, bpm, onSeek, onRemove,
   onVolumeChange, onPanChange, onToggleMute, onToggleSolo,
   onAddPlugin, onRemovePlugin, onTogglePlugin, onUpdatePlugin, onReorderPlugin,
   onSetRegion, onApplyTrim, onApplyDelete, onResetEdit,
@@ -183,6 +184,7 @@ export function ChannelStrip({
             height={68}
             zoom={zoom}
             scrollOffset={scrollOffset}
+            bpm={bpm}
             onSeek={onSeek}
             onRegionChange={r => onSetRegion(track.id, r)}
           />
