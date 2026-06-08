@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Download, Upload, Music, BarChart2, Settings2, CheckCircle2,
   Lock, Play, Square, Shield, Scissors, Mic2, Layers, AlertCircle,
-  ChevronRight, Wand2, Waves, Volume2,
+  ChevronRight, Wand2, Waves, Volume2, Plug,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,8 @@ import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Link } from "wouter";
 import { getWaveformPoints } from "@/lib/audioKernel";
+import { WaveformScrubber, type WaveformScrubberHandle } from "@/components/waveform-scrubber";
+import { StudioPluginRack, DEFAULT_PLUGIN_STATE, type PluginState } from "@/components/studio-plugin-rack";
 
 type ProcessState = "idle" | "loading" | "ready" | "processing" | "done";
 type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master" | "voice_change" | "denoise";
@@ -131,11 +133,18 @@ export default function Studio() {
   const [isSampleResult, setIsSampleResult] = useState(false);
   const [playingStem, setPlayingStem] = useState<string | null>(null);
   const [abMode, setAbMode] = useState<"original" | "processed">("original");
+  const [showPlugins, setShowPlugins] = useState(false);
+  const [plugins, setPlugins] = useState<PluginState>(DEFAULT_PLUGIN_STATE);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadedFileRef = useRef<File | null>(null);
+  const decodedBufferRef = useRef<AudioBuffer | null>(null);
+  const scrubberRef = useRef<WaveformScrubberHandle | null>(null);
+  const rafRef = useRef<number>(0);
+  const playStartTimeRef = useRef<number>(0);
+  const playOffsetRef = useRef<number>(0);
 
   const getAudioContext = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -143,6 +152,66 @@ export default function Studio() {
     }
     return audioCtxRef.current;
   };
+
+  const createReverbIR = (ctx: AudioContext, sizePct: number): AudioBuffer => {
+    const sr = ctx.sampleRate;
+    const dur = 0.3 + (sizePct / 100) * 3.2;
+    const len = Math.ceil(sr * dur);
+    const ir = ctx.createBuffer(2, len, sr);
+    const decay = 3.5 - (sizePct / 100) * 2.8;
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-(i / sr) * decay);
+    }
+    return ir;
+  };
+
+  const buildPluginChain = useCallback((ctx: AudioContext, source: AudioBufferSourceNode): AudioNode => {
+    let last: AudioNode = source;
+
+    if (plugins.eq.enabled) {
+      const low = ctx.createBiquadFilter();
+      low.type = "lowshelf"; low.frequency.value = 200; low.gain.value = plugins.eq.low[0];
+      const mid = ctx.createBiquadFilter();
+      mid.type = "peaking"; mid.frequency.value = plugins.eq.midFreq[0]; mid.Q.value = 1.2; mid.gain.value = plugins.eq.mid[0];
+      const high = ctx.createBiquadFilter();
+      high.type = "highshelf"; high.frequency.value = 8000; high.gain.value = plugins.eq.high[0];
+      last.connect(low); low.connect(mid); mid.connect(high);
+      last = high;
+    }
+
+    if (plugins.comp.enabled) {
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = plugins.comp.threshold[0];
+      comp.ratio.value = plugins.comp.ratio[0];
+      comp.attack.value = plugins.comp.attack[0] / 1000;
+      comp.release.value = plugins.comp.release[0] / 1000;
+      comp.knee.value = 30;
+      last.connect(comp); last = comp;
+    }
+
+    if (plugins.reverb.enabled) {
+      const wetG = ctx.createGain();
+      const dryG = ctx.createGain();
+      const outG = ctx.createGain();
+      const conv = ctx.createConvolver();
+      conv.buffer = createReverbIR(ctx, plugins.reverb.size[0]);
+      wetG.gain.value = plugins.reverb.wet[0] / 100;
+      dryG.gain.value = 1 - plugins.reverb.wet[0] / 100;
+      last.connect(dryG); last.connect(conv); conv.connect(wetG);
+      dryG.connect(outG); wetG.connect(outG);
+      last = outG;
+    }
+
+    if (plugins.limiter.enabled) {
+      const lim = ctx.createDynamicsCompressor();
+      lim.threshold.value = plugins.limiter.ceiling[0];
+      lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.1;
+      last.connect(lim); last = lim;
+    }
+
+    return last;
+  }, [plugins]);
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith("audio/")) {
@@ -211,6 +280,8 @@ export default function Studio() {
     setProgress(0);
     setIsSampleResult(false);
     setProcessedBlob(null);
+    decodedBufferRef.current = null;
+    scrubberRef.current?.setPosition(0);
     if (processedUrl) { URL.revokeObjectURL(processedUrl); setProcessedUrl(null); }
     setStemBlobs([]);
     setWaveformAfter([]);
@@ -346,26 +417,58 @@ export default function Studio() {
   };
 
   const stopAllAudio = () => {
+    cancelAnimationFrame(rafRef.current);
     try { sourceRef.current?.stop(); } catch { /* already stopped */ }
     setIsPlaying(false);
     setPlayingStem(null);
   };
 
-  const handlePlayProcessed = async () => {
+  const startScrubberLoop = (ctx: AudioContext, decoded: AudioBuffer) => {
+    cancelAnimationFrame(rafRef.current);
+    const tick = () => {
+      const elapsed = ctx.currentTime - playStartTimeRef.current;
+      const pos = Math.min(1, (playOffsetRef.current + elapsed) / decoded.duration);
+      scrubberRef.current?.setPosition(pos);
+      if (pos < 0.9995) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
+  const updatePlugin = <K extends keyof PluginState>(plugin: K, updates: Partial<PluginState[K]>) => {
+    setPlugins(prev => ({ ...prev, [plugin]: { ...prev[plugin], ...updates } }));
+  };
+
+  const handlePlayProcessed = async (startOffset = 0) => {
     if (!processedBlob) return;
-    if (isPlaying && abMode === "processed") { stopAllAudio(); return; }
+    if (isPlaying && abMode === "processed" && startOffset === 0) { stopAllAudio(); return; }
     stopAllAudio();
     const ctx = getAudioContext();
-    const ab = await processedBlob.arrayBuffer();
-    const decoded = await ctx.decodeAudioData(ab);
+    if (!decodedBufferRef.current) {
+      const ab = await processedBlob.arrayBuffer();
+      decodedBufferRef.current = await ctx.decodeAudioData(ab);
+    }
+    const decoded = decodedBufferRef.current;
     const source = ctx.createBufferSource();
     source.buffer = decoded;
-    source.connect(ctx.destination);
-    source.start();
-    source.onended = () => setIsPlaying(false);
+    const chain = buildPluginChain(ctx, source);
+    chain.connect(ctx.destination);
+    source.start(0, startOffset);
+    source.onended = () => { setIsPlaying(false); cancelAnimationFrame(rafRef.current); };
     sourceRef.current = source;
+    playStartTimeRef.current = ctx.currentTime;
+    playOffsetRef.current = startOffset;
     setAbMode("processed");
     setIsPlaying(true);
+    startScrubberLoop(ctx, decoded);
+  };
+
+  const handleSeek = async (pct: number) => {
+    if (!decodedBufferRef.current) return;
+    const offset = pct * decodedBufferRef.current.duration;
+    playOffsetRef.current = offset;
+    if (isPlaying && abMode === "processed") {
+      await handlePlayProcessed(offset);
+    }
   };
 
   const handlePlayAb = async (which: "original" | "processed") => {
@@ -377,16 +480,27 @@ export default function Studio() {
     const alreadyPlaying = isPlaying && abMode === which;
     stopAllAudio();
     if (alreadyPlaying) return;
-    const ab = await blob.arrayBuffer();
-    const decoded = await ctx.decodeAudioData(ab);
+    let decoded: AudioBuffer;
+    if (which === "processed" && decodedBufferRef.current) {
+      decoded = decodedBufferRef.current;
+    } else {
+      const ab = await blob.arrayBuffer();
+      decoded = await ctx.decodeAudioData(ab);
+      if (which === "processed") decodedBufferRef.current = decoded;
+    }
     const source = ctx.createBufferSource();
     source.buffer = decoded;
-    source.connect(ctx.destination);
+    const chain = which === "processed" ? buildPluginChain(ctx, source) : source;
+    chain.connect(ctx.destination);
     source.start();
-    source.onended = () => setIsPlaying(false);
+    source.onended = () => { setIsPlaying(false); cancelAnimationFrame(rafRef.current); };
     sourceRef.current = source;
+    playStartTimeRef.current = ctx.currentTime;
+    playOffsetRef.current = 0;
     setAbMode(which);
     setIsPlaying(true);
+    if (which === "processed") startScrubberLoop(ctx, decoded);
+    else scrubberRef.current?.setPosition(0);
   };
 
   const handlePlayStem = async (name: string, blob: Blob) => {
@@ -945,6 +1059,27 @@ export default function Studio() {
                 {state === "done" && mode !== "stem_split" && stats && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
 
+                    {/* Waveform Scrubber */}
+                    <div className="rounded-xl overflow-hidden border border-border/30 bg-black/30 p-3 space-y-1.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Processed Waveform</p>
+                        {isPlaying && abMode === "processed" && (
+                          <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Live
+                          </span>
+                        )}
+                      </div>
+                      <WaveformScrubber
+                        ref={scrubberRef}
+                        points={waveformAfter}
+                        duration={duration}
+                        onSeek={handleSeek}
+                        accentColor="#f59e0b"
+                        height={88}
+                      />
+                    </div>
+
                     {/* A/B Comparison */}
                     {originalUrl && processedUrl && (
                       <div className="rounded-lg bg-secondary/30 border border-border/30 overflow-hidden">
@@ -1009,9 +1144,34 @@ export default function Studio() {
                       </div>
                     ))}
 
+                    {/* Plugin Chain Rack */}
+                    <div className="rounded-xl border border-border/30 overflow-hidden">
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2.5 bg-secondary/20 hover:bg-secondary/30 transition-colors"
+                        onClick={() => setShowPlugins(v => !v)}
+                      >
+                        <Plug className="w-3.5 h-3.5 text-violet-400" />
+                        <span className="text-xs font-bold text-left flex-1">Plugin Chain</span>
+                        {(plugins.eq.enabled || plugins.comp.enabled || plugins.reverb.enabled || plugins.limiter.enabled) && (
+                          <span className="text-[9px] font-bold text-violet-400 bg-violet-500/15 border border-violet-500/25 px-1.5 py-0.5 rounded-full">ACTIVE</span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">{showPlugins ? "▲" : "▼"}</span>
+                      </button>
+                      {showPlugins && (
+                        <div className="p-3 border-t border-border/20">
+                          <StudioPluginRack
+                            plugins={plugins}
+                            onChange={updatePlugin}
+                            isPro={isPro}
+                            hasSplits={hasSplits}
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     {/* Download */}
                     <div className="flex gap-2 pt-1">
-                      <Button variant="outline" className="flex-1" onClick={handlePlayProcessed} data-testid="button-play">
+                      <Button variant="outline" className="flex-1" onClick={() => handlePlayProcessed()} data-testid="button-play">
                         {isPlaying ? <><Square className="w-4 h-4 mr-2" />Stop</> : <><Play className="w-4 h-4 mr-2" />Preview</>}
                       </Button>
                       {(mode === "voice_change" || mode === "denoise" || (mode === "master" && !isSampleResult) || (mode === "voice_remove" && hasSplits) || (mode === "standard" && isPro)) ? (
