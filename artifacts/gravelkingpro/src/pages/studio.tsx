@@ -129,6 +129,8 @@ export default function Studio() {
   } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isSampleResult, setIsSampleResult] = useState(false);
+  const [playingStem, setPlayingStem] = useState<string | null>(null);
+  const [abMode, setAbMode] = useState<"original" | "processed">("original");
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -343,14 +345,17 @@ export default function Studio() {
     }
   };
 
+  const stopAllAudio = () => {
+    try { sourceRef.current?.stop(); } catch { /* already stopped */ }
+    setIsPlaying(false);
+    setPlayingStem(null);
+  };
+
   const handlePlayProcessed = async () => {
     if (!processedBlob) return;
+    if (isPlaying && abMode === "processed") { stopAllAudio(); return; }
+    stopAllAudio();
     const ctx = getAudioContext();
-    if (isPlaying) {
-      sourceRef.current?.stop();
-      setIsPlaying(false);
-      return;
-    }
     const ab = await processedBlob.arrayBuffer();
     const decoded = await ctx.decodeAudioData(ab);
     const source = ctx.createBufferSource();
@@ -359,7 +364,44 @@ export default function Studio() {
     source.start();
     source.onended = () => setIsPlaying(false);
     sourceRef.current = source;
+    setAbMode("processed");
     setIsPlaying(true);
+  };
+
+  const handlePlayAb = async (which: "original" | "processed") => {
+    const blob = which === "original"
+      ? (loadedFileRef.current ? new Blob([await loadedFileRef.current.arrayBuffer()]) : null)
+      : processedBlob;
+    if (!blob) return;
+    const ctx = getAudioContext();
+    const alreadyPlaying = isPlaying && abMode === which;
+    stopAllAudio();
+    if (alreadyPlaying) return;
+    const ab = await blob.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(ab);
+    const source = ctx.createBufferSource();
+    source.buffer = decoded;
+    source.connect(ctx.destination);
+    source.start();
+    source.onended = () => setIsPlaying(false);
+    sourceRef.current = source;
+    setAbMode(which);
+    setIsPlaying(true);
+  };
+
+  const handlePlayStem = async (name: string, blob: Blob) => {
+    const ctx = getAudioContext();
+    if (playingStem === name) { stopAllAudio(); return; }
+    stopAllAudio();
+    const ab = await blob.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(ab);
+    const source = ctx.createBufferSource();
+    source.buffer = decoded;
+    source.connect(ctx.destination);
+    source.start();
+    source.onended = () => setPlayingStem(null);
+    sourceRef.current = source;
+    setPlayingStem(name);
   };
 
   const downloadBlob = (blob: Blob, name: string) => {
@@ -844,11 +886,24 @@ export default function Studio() {
                       })
                       .map(({ name, blob }) => {
                         const meta = STEM_LABELS[name] ?? { label: name, color: "text-foreground", description: "" };
+                        const stemPlaying = playingStem === name;
                         return (
-                          <div key={name} className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/50 border border-border/40">
-                            <div>
+                          <div key={name} className="flex items-center gap-2 p-2.5 rounded-lg bg-secondary/50 border border-border/40">
+                            <button
+                              onClick={() => handlePlayStem(name, blob)}
+                              className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-colors border ${
+                                stemPlaying
+                                  ? "bg-amber-500 border-amber-500 text-black"
+                                  : "border-border/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {stemPlaying
+                                ? <Square className="w-3 h-3 fill-current" />
+                                : <Play className="w-3 h-3" />}
+                            </button>
+                            <div className="flex-1 min-w-0">
                               <span className={`text-sm font-semibold ${meta.color}`}>{meta.label}</span>
-                              <p className="text-[11px] text-muted-foreground mt-0.5">{meta.description}</p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{meta.description}</p>
                             </div>
                             {hasSplits ? (
                               <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={() => handleDownloadStem(name, blob)}>
@@ -876,26 +931,46 @@ export default function Studio() {
                 {state === "done" && mode !== "stem_split" && stats && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
 
-                    {/* Before / After comparison */}
+                    {/* A/B Comparison */}
                     {originalUrl && processedUrl && (
-                      <div className="space-y-2 p-3 rounded-lg bg-secondary/30 border border-border/30">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-medium text-muted-foreground">Before / After</p>
+                      <div className="rounded-lg bg-secondary/30 border border-border/30 overflow-hidden">
+                        <div className="flex items-center justify-between px-3 pt-3 pb-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">A/B Compare</p>
                           {isSampleResult && (
                             <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-sky-500/30 text-sky-400">
-                              30s Sample Preview
+                              30s Sample
                             </Badge>
                           )}
                         </div>
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-[10px] text-amber-400 font-medium mb-1">▶ Original</p>
-                            <audio src={originalUrl} controls className="w-full h-8" style={{ colorScheme: "dark" }} />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-emerald-400 font-medium mb-1">▶ Processed</p>
-                            <audio src={processedUrl} controls className="w-full h-8" style={{ colorScheme: "dark" }} />
-                          </div>
+                        <div className="flex gap-2 px-3 pb-3">
+                          <button
+                            onClick={() => handlePlayAb("original")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border text-sm font-semibold transition-all ${
+                              isPlaying && abMode === "original"
+                                ? "bg-amber-500 border-amber-500 text-black"
+                                : "border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                            }`}
+                          >
+                            {isPlaying && abMode === "original"
+                              ? <><Square className="w-3.5 h-3.5 fill-current" /> Stop</>
+                              : <><Play className="w-3.5 h-3.5" /> Original</>}
+                          </button>
+                          <button
+                            onClick={() => handlePlayAb("processed")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border text-sm font-semibold transition-all ${
+                              isPlaying && abMode === "processed"
+                                ? "bg-emerald-500 border-emerald-500 text-black"
+                                : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                            }`}
+                          >
+                            {isPlaying && abMode === "processed"
+                              ? <><Square className="w-3.5 h-3.5 fill-current" /> Stop</>
+                              : <><Play className="w-3.5 h-3.5" /> Processed</>}
+                          </button>
+                        </div>
+                        <div className="flex text-[10px] text-center border-t border-border/20">
+                          <div className="flex-1 py-1.5 text-amber-400/60">← tap to compare</div>
+                          <div className="flex-1 py-1.5 text-emerald-400/60">tap to compare →</div>
                         </div>
                       </div>
                     )}
