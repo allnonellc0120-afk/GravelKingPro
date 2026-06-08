@@ -22,21 +22,21 @@ type ProcessState = "idle" | "loading" | "ready" | "processing" | "done";
 type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master" | "voice_change" | "denoise";
 
 const MASTER_PRESETS_UI = [
-  { id: "normal",    label: "Normal",    description: "Balanced loudness. Good for any content.", free: true },
-  { id: "broadcast", label: "Broadcast", description: "EBU R128 broadcast standard for streaming.", free: false },
-  { id: "vinyl",     label: "Vinyl",     description: "Warm analog character with boosted lows.", free: false },
-  { id: "podcast",   label: "Podcast",   description: "Voice clarity with dynamic compression.", free: false },
-  { id: "club",      label: "Club",      description: "Heavy bass and punchy transients.", free: false },
-  { id: "film",      label: "Film",      description: "Wide cinematic dynamics with presence.", free: false },
+  { id: "normal",    label: "Normal",    description: "Balanced loudness. Good for any content.", free: true,  emoji: "⚖️", accent: "#94a3b8", glow: "rgba(148,163,184,0.18)", bg: "linear-gradient(135deg,#1e293b 0%,#0f172a 100%)" },
+  { id: "broadcast", label: "Broadcast", description: "EBU R128 broadcast standard for streaming.", free: false, emoji: "📡", accent: "#3b82f6", glow: "rgba(59,130,246,0.18)",   bg: "linear-gradient(135deg,#1e3a5f 0%,#0c1a2e 100%)" },
+  { id: "vinyl",     label: "Vinyl",     description: "Warm analog character with boosted lows.", free: false, emoji: "💿", accent: "#f59e0b", glow: "rgba(245,158,11,0.18)",   bg: "linear-gradient(135deg,#451a03 0%,#1c0a00 100%)" },
+  { id: "podcast",   label: "Podcast",   description: "Voice clarity with dynamic compression.", free: false, emoji: "🎙️", accent: "#22c55e", glow: "rgba(34,197,94,0.18)",    bg: "linear-gradient(135deg,#052e16 0%,#021a0d 100%)" },
+  { id: "club",      label: "Club",      description: "Heavy bass and punchy transients.", free: false, emoji: "🔊", accent: "#a855f7", glow: "rgba(168,85,247,0.18)",   bg: "linear-gradient(135deg,#2e1065 0%,#13043a 100%)" },
+  { id: "film",      label: "Film",      description: "Wide cinematic dynamics with presence.", free: false, emoji: "🎬", accent: "#ef4444", glow: "rgba(239,68,68,0.18)",    bg: "linear-gradient(135deg,#450a0a 0%,#1f0505 100%)" },
 ] as const;
 type MasterPresetId = (typeof MASTER_PRESETS_UI)[number]["id"];
 
 const VOICE_PRESETS_UI = [
-  { id: "normal",   label: "Normal",   description: "Light room ambience — subtle warmth.", emoji: "🎤" },
-  { id: "robot",    label: "Robot",    description: "Rapid vibrato + metallic echo.", emoji: "🤖" },
-  { id: "chipmunk", label: "Chipmunk", description: "Higher pitch and faster tempo.", emoji: "🐿️" },
-  { id: "deep",     label: "Deep",     description: "Lower pitch, slower, heavier.", emoji: "🦁" },
-  { id: "alien",    label: "Alien",    description: "Vibrato + reverb + pitch shift.", emoji: "👽" },
+  { id: "normal",   label: "Normal",   description: "Light room ambience — subtle warmth.", emoji: "🎤", accent: "#94a3b8", glow: "rgba(148,163,184,0.15)", bg: "linear-gradient(135deg,#1e293b,#0f172a)" },
+  { id: "robot",    label: "Robot",    description: "Rapid vibrato + metallic echo.",        emoji: "🤖", accent: "#06b6d4", glow: "rgba(6,182,212,0.18)",   bg: "linear-gradient(135deg,#083344,#021726)" },
+  { id: "chipmunk", label: "Chipmunk", description: "Higher pitch and faster tempo.",         emoji: "🐿️", accent: "#f97316", glow: "rgba(249,115,22,0.18)", bg: "linear-gradient(135deg,#431407,#1f0a03)" },
+  { id: "deep",     label: "Deep",     description: "Lower pitch, slower, heavier.",          emoji: "🦁", accent: "#ef4444", glow: "rgba(239,68,68,0.18)",   bg: "linear-gradient(135deg,#450a0a,#1f0505)" },
+  { id: "alien",    label: "Alien",    description: "Vibrato + reverb + pitch shift.",         emoji: "👽", accent: "#4ade80", glow: "rgba(74,222,128,0.18)",  bg: "linear-gradient(135deg,#052e16,#021a0d)" },
 ];
 type VoicePresetId = "normal" | "robot" | "chipmunk" | "deep" | "alien";
 
@@ -707,17 +707,23 @@ export default function Studio() {
                           <button
                             key={p.id}
                             onClick={() => setMasterPreset(p.id as MasterPresetId)}
-                            className={`relative text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                              selected ? "border-amber-500 bg-amber-500/10"
-                              : "border-border/40 bg-secondary/20 hover:border-amber-500/50 cursor-pointer"
-                            }`}
+                            style={{
+                              background: p.bg,
+                              borderColor: selected ? p.accent : `${p.accent}44`,
+                              boxShadow: selected ? `0 0 18px ${p.glow}, inset 0 1px 0 rgba(255,255,255,0.06)` : "inset 0 1px 0 rgba(255,255,255,0.04)",
+                            }}
+                            className="relative text-left p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer group hover:scale-[1.02] active:scale-[0.98]"
                           >
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-xs font-semibold">{p.label}</span>
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="text-2xl leading-none">{p.emoji}</span>
                               {!isPro && (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-500/30 text-sky-400">Sample</Badge>
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-sky-500/30 text-sky-400 bg-sky-500/10">Sample</Badge>
+                              )}
+                              {selected && (
+                                <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: p.accent }} />
                               )}
                             </div>
+                            <div className="text-sm font-bold mb-0.5" style={{ color: selected ? p.accent : "#f1f5f9" }}>{p.label}</div>
                             <p className="text-[10px] text-muted-foreground leading-snug">{p.description}</p>
                           </button>
                         );
@@ -730,23 +736,31 @@ export default function Studio() {
                 {mode === "voice_change" && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Voice Effect</label>
-                    <div className="grid grid-cols-1 gap-1.5">
+                    <div className="grid grid-cols-1 gap-2">
                       {VOICE_PRESETS_UI.map((p) => {
                         const selected = voicePreset === p.id;
                         return (
                           <button
                             key={p.id}
                             onClick={() => setVoicePreset(p.id as VoicePresetId)}
-                            className={`flex items-center gap-3 text-left px-3 py-2 rounded-lg border transition-colors ${
-                              selected ? "border-pink-500 bg-pink-500/10" : "border-border/40 bg-secondary/20 hover:border-pink-500/40 cursor-pointer"
-                            }`}
+                            style={{
+                              background: p.bg,
+                              borderColor: selected ? p.accent : `${p.accent}33`,
+                              boxShadow: selected ? `0 0 16px ${p.glow}, inset 0 1px 0 rgba(255,255,255,0.06)` : "inset 0 1px 0 rgba(255,255,255,0.04)",
+                            }}
+                            className="flex items-center gap-3 text-left px-3 py-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
                           >
-                            <span className="text-lg">{p.emoji}</span>
-                            <div>
-                              <div className="text-xs font-semibold">{p.label}</div>
-                              <div className="text-[10px] text-muted-foreground">{p.description}</div>
+                            <div
+                              className="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0"
+                              style={{ background: `${p.accent}22`, border: `1px solid ${p.accent}44` }}
+                            >
+                              {p.emoji}
                             </div>
-                            {selected && <CheckCircle2 className="w-3.5 h-3.5 text-pink-400 ml-auto" />}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-bold leading-tight" style={{ color: selected ? p.accent : "#f1f5f9" }}>{p.label}</div>
+                              <div className="text-[10px] text-muted-foreground mt-0.5">{p.description}</div>
+                            </div>
+                            {selected && <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: p.accent }} />}
                           </button>
                         );
                       })}

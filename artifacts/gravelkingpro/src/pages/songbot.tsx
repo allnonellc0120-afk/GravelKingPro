@@ -26,11 +26,15 @@ const GENRES: { id: Genre; label: string; emoji: string; img: string }[] = [
   { id: "country", label: "Country", emoji: "🎸", img: "https://thumbs.dreamstime.com/b/silhouette-young-free-woman-straw-hat-playing-country-music-guitar-sunset-copy-space-183269471.jpg" },
 ];
 
-const MOODS: { id: Mood; label: string }[] = [
-  { id: "uplifting", label: "Uplifting" }, { id: "dark", label: "Dark" },
-  { id: "romantic", label: "Romantic" }, { id: "aggressive", label: "Aggressive" },
-  { id: "chill", label: "Chill" }, { id: "melancholic", label: "Melancholic" },
-  { id: "triumphant", label: "Triumphant" }, { id: "introspective", label: "Introspective" },
+const MOODS: { id: Mood; label: string; emoji: string; accent: string; glow: string; bg: string }[] = [
+  { id: "uplifting",     label: "Uplifting",     emoji: "☀️", accent: "#f59e0b", glow: "rgba(245,158,11,0.2)",  bg: "linear-gradient(135deg,#451a03,#1c0a00)" },
+  { id: "dark",          label: "Dark",           emoji: "🌑", accent: "#a855f7", glow: "rgba(168,85,247,0.2)",  bg: "linear-gradient(135deg,#2e1065,#13043a)" },
+  { id: "romantic",      label: "Romantic",       emoji: "💕", accent: "#f43f5e", glow: "rgba(244,63,94,0.2)",   bg: "linear-gradient(135deg,#4c0519,#200210)" },
+  { id: "aggressive",    label: "Aggressive",     emoji: "⚡", accent: "#ef4444", glow: "rgba(239,68,68,0.2)",   bg: "linear-gradient(135deg,#450a0a,#1f0505)" },
+  { id: "chill",         label: "Chill",          emoji: "🌊", accent: "#06b6d4", glow: "rgba(6,182,212,0.2)",   bg: "linear-gradient(135deg,#083344,#021726)" },
+  { id: "melancholic",   label: "Melancholic",    emoji: "🌧️", accent: "#3b82f6", glow: "rgba(59,130,246,0.2)",  bg: "linear-gradient(135deg,#1e3a5f,#0c1a2e)" },
+  { id: "triumphant",    label: "Triumphant",     emoji: "🏆", accent: "#22c55e", glow: "rgba(34,197,94,0.2)",   bg: "linear-gradient(135deg,#052e16,#021a0d)" },
+  { id: "introspective", label: "Introspective",  emoji: "🪞", accent: "#8b5cf6", glow: "rgba(139,92,246,0.2)",  bg: "linear-gradient(135deg,#2e1065,#13043a)" },
 ];
 
 const THEMES: Record<Genre, string[]> = {
@@ -388,12 +392,12 @@ export default function SongBot() {
 
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">Genre</label>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-4 gap-2">
                     {GENRES.map((g) => (
                       <button
                         key={g.id}
                         onClick={() => setGenre(g.id)}
-                        className={`relative overflow-hidden rounded-lg border text-xs transition-all h-16 ${genre === g.id ? "border-amber-500 ring-1 ring-amber-500/50" : "border-border/40 hover:border-amber-500/40"}`}
+                        className={`relative overflow-hidden rounded-xl border-2 text-xs transition-all duration-200 h-20 hover:scale-[1.03] active:scale-[0.97] ${genre === g.id ? "border-amber-500 shadow-lg shadow-amber-500/20" : "border-white/10 hover:border-amber-500/50"}`}
                       >
                         <img
                           src={g.img}
@@ -401,10 +405,11 @@ export default function SongBot() {
                           className="absolute inset-0 w-full h-full object-cover"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                         />
-                        <div className={`absolute inset-0 transition-opacity ${genre === g.id ? "bg-amber-500/30" : "bg-black/55 hover:bg-black/40"}`} />
-                        <div className="relative z-10 flex flex-col items-center justify-center h-full gap-0.5">
-                          <div className="text-sm">{g.emoji}</div>
-                          <div className="text-[10px] font-semibold text-white drop-shadow">{g.label}</div>
+                        <div className={`absolute inset-0 transition-all duration-200 ${genre === g.id ? "bg-amber-500/25" : "bg-black/60 hover:bg-black/45"}`} />
+                        {genre === g.id && <div className="absolute inset-0 ring-1 ring-inset ring-amber-400/30 rounded-xl" />}
+                        <div className="relative z-10 flex flex-col items-center justify-center h-full gap-1">
+                          <div className="text-lg leading-none drop-shadow-lg">{g.emoji}</div>
+                          <div className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">{g.label}</div>
                         </div>
                       </button>
                     ))}
@@ -421,16 +426,25 @@ export default function SongBot() {
 
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">Mood</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {MOODS.map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => setMood(m.id)}
-                        className={`text-left px-3 py-1.5 rounded-lg border text-xs transition-colors ${mood === m.id ? "border-amber-500 bg-amber-500/10 text-amber-400" : "border-border/40 bg-secondary/20 hover:border-amber-500/40"}`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    {MOODS.map((m) => {
+                      const selected = mood === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => setMood(m.id)}
+                          style={{
+                            background: m.bg,
+                            borderColor: selected ? m.accent : `${m.accent}33`,
+                            boxShadow: selected ? `0 0 14px ${m.glow}` : undefined,
+                          }}
+                          className="flex items-center gap-2 text-left px-3 py-2 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <span className="text-base leading-none">{m.emoji}</span>
+                          <span className="text-xs font-semibold" style={{ color: selected ? m.accent : "#f1f5f9" }}>{m.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
