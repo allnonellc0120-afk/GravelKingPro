@@ -357,10 +357,12 @@ export default function Pricing() {
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
                   <FeatureRow yes>Everything in Pro</FeatureRow>
-                  <FeatureRow yes>Enterprise benchmarking</FeatureRow>
-                  <FeatureRow yes>Custom reports</FeatureRow>
-                  <FeatureRow yes>Dedicated support</FeatureRow>
-                  <FeatureRow yes>SLA guarantee</FeatureRow>
+                  <FeatureRow yes>1T-scale audio graph processing</FeatureRow>
+                  <FeatureRow yes>Morris Law V2 access</FeatureRow>
+                  <FeatureRow yes>White-label WAV &amp; PDF exports</FeatureRow>
+                  <FeatureRow yes>Custom benchmark reports</FeatureRow>
+                  <FeatureRow yes>Dedicated account manager</FeatureRow>
+                  <FeatureRow yes>99.9% uptime SLA guarantee</FeatureRow>
                 </ul>
               </CardContent>
               <CardFooter>

@@ -171,17 +171,17 @@ function NotifyBanner() {
               >
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div>
-                  <p className="font-semibold text-emerald-400">You're on the list!</p>
-                  <p className="text-sm text-muted-foreground">We'll email you the moment payments go live.</p>
+                  <p className="font-semibold text-emerald-400">Check your inbox!</p>
+                  <p className="text-sm text-muted-foreground">We've sent your free trial link — 3 days on us.</p>
                 </div>
               </motion.div>
             ) : (
               <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <p className="font-semibold text-amber-400 mb-0.5">
-                  Payments launching very soon
+                  Pro is live — get 3 days free
                 </p>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Leave your email and we'll notify you the moment Pro subscriptions open.
+                  Enter your email and we'll send you a direct link to activate your free trial. No commitment.
                 </p>
                 <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm">
                   <Input
@@ -200,7 +200,7 @@ function NotifyBanner() {
                     disabled={state === "loading"}
                     data-testid="button-notify-submit"
                   >
-                    {state === "loading" ? "…" : "Notify me"}
+                    {state === "loading" ? "…" : "Get Free Trial"}
                   </Button>
                 </form>
               </motion.div>
@@ -257,6 +257,56 @@ export default function Home() {
                 <button onClick={login} className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</button> to save your processing history and unlock your free trial.
               </p>
             )}
+
+            {/* DAW preview mockup */}
+            <div className="mt-6 rounded-xl border border-white/10 bg-black/60 backdrop-blur-sm overflow-hidden shadow-2xl shadow-black/60 max-w-2xl mx-auto text-left">
+              {/* Transport bar */}
+              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/8 bg-white/3">
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-500/70" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-500/70" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-500/70" />
+                </div>
+                <span className="text-[10px] font-mono text-white/30 tracking-widest">MIX STUDIO</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <div className="flex gap-1">
+                    {["▐▐","▶","■"].map((s,i) => (
+                      <div key={i} className={`w-6 h-5 rounded text-[8px] flex items-center justify-center border ${i===1 ? "border-amber-500/60 text-amber-400 bg-amber-500/10" : "border-white/10 text-white/30"}`}>{s}</div>
+                    ))}
+                  </div>
+                  <div className="font-mono text-[10px] text-amber-400/80 border border-amber-500/20 rounded px-1.5 py-0.5 bg-amber-500/5">0:00.000</div>
+                </div>
+              </div>
+              {/* Tracks */}
+              {[
+                { label: "Kick",   color: "bg-amber-500",   bars: [0.9,0.1,0.85,0.1,0.88,0.1,0.9,0.1,0.85,0.1,0.9,0.1,0.88,0.1,0.9,0.1] },
+                { label: "Vocals", color: "bg-purple-400",  bars: [0.4,0.6,0.55,0.7,0.45,0.65,0.5,0.72,0.48,0.63,0.52,0.68,0.44,0.71,0.5,0.6] },
+                { label: "Bass",   color: "bg-cyan-400",    bars: [0.7,0.65,0.72,0.68,0.7,0.66,0.71,0.67,0.69,0.64,0.73,0.68,0.7,0.65,0.72,0.67] },
+                { label: "FX",     color: "bg-emerald-400", bars: [0.2,0.3,0.25,0.35,0.28,0.22,0.32,0.18,0.27,0.33,0.21,0.29,0.26,0.31,0.23,0.28] },
+              ].map((track) => (
+                <div key={track.label} className="flex items-stretch border-b border-white/5 last:border-0">
+                  <div className="w-16 shrink-0 px-3 py-2 flex flex-col justify-center gap-0.5 border-r border-white/5">
+                    <span className="text-[10px] font-medium text-white/60">{track.label}</span>
+                    <div className="flex gap-1">
+                      <div className="text-[8px] px-1 rounded border border-white/10 text-white/20">M</div>
+                      <div className="text-[8px] px-1 rounded border border-white/10 text-white/20">S</div>
+                    </div>
+                  </div>
+                  <div className="flex-1 flex items-center gap-px px-2 py-2">
+                    {track.bars.map((h, i) => (
+                      <div key={i} className={`flex-1 rounded-sm ${track.color} opacity-70`} style={{ height: `${h * 28}px` }} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="px-4 py-1.5 flex items-center gap-2 bg-white/2">
+                <span className="text-[9px] text-white/20 font-medium tracking-widest uppercase">Plugins active</span>
+                {["EQ","Comp","Reverb","Limiter"].map(p => (
+                  <span key={p} className="text-[9px] px-1.5 py-0.5 rounded border border-amber-500/20 text-amber-400/50 bg-amber-500/5">{p}</span>
+                ))}
+                <span className="ml-auto text-[9px] text-white/20">Pro only</span>
+              </div>
+            </div>
           </div>
         </div>
 
