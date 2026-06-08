@@ -47,7 +47,35 @@ app.post(
   },
 );
 
-app.use(cors({ credentials: true, origin: true }));
+// Build an exact-match allowlist from REPLIT_DOMAINS (comma-separated in prod).
+// In development any localhost / 127.0.0.1 origin is also permitted.
+const trustedOrigins: Set<string> = new Set(
+  (process.env.REPLIT_DOMAINS ?? "")
+    .split(",")
+    .map(d => d.trim())
+    .filter(Boolean)
+    .map(d => `https://${d}`),
+);
+
+app.use(
+  cors({
+    credentials: true,
+    origin(requestOrigin, callback) {
+      // Same-origin and server-to-server requests have no Origin header — allow.
+      if (!requestOrigin) return callback(null, true);
+      // Exact match against the allowlist.
+      if (trustedOrigins.has(requestOrigin)) return callback(null, true);
+      // Permit localhost in development only.
+      if (
+        process.env.NODE_ENV !== "production" &&
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin)
+      ) {
+        return callback(null, true);
+      }
+      callback(new Error(`CORS: origin not allowed: ${requestOrigin}`));
+    },
+  }),
+);
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

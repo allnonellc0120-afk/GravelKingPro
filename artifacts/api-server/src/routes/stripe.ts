@@ -134,12 +134,13 @@ stripeRouter.post('/stripe/portal', async (req: Request, res: Response) => {
     }
 
     const stripe = await getUncachableStripeClient();
-    const origin = (req.headers.origin as string | undefined) ??
-      `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    // Derive return_url from server-side config only — never from req.headers.origin,
+    // which an attacker-controlled page could set to their own domain.
+    const appOrigin = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]?.trim() ?? "localhost"}`;
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${origin}/account`,
+      return_url: `${appOrigin}/account`,
     });
     res.json({ url: portalSession.url });
   } catch (err: unknown) {
