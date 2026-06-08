@@ -397,7 +397,7 @@ export default function SongBot() {
                       <button
                         key={g.id}
                         onClick={() => setGenre(g.id)}
-                        className={`relative overflow-hidden rounded-xl border-2 text-xs transition-all duration-200 h-20 hover:scale-[1.03] active:scale-[0.97] ${genre === g.id ? "border-amber-500 shadow-lg shadow-amber-500/20" : "border-white/10 hover:border-amber-500/50"}`}
+                        className={`relative overflow-hidden rounded-xl border-2 text-xs transition-all duration-200 h-28 hover:scale-[1.03] active:scale-[0.97] ${genre === g.id ? "border-amber-500 shadow-lg shadow-amber-500/20" : "border-white/10 hover:border-amber-500/50"}`}
                       >
                         <img
                           src={g.img}

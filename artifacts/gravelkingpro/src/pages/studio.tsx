@@ -19,17 +19,21 @@ import { Link } from "wouter";
 import { getWaveformPoints } from "@/lib/audioKernel";
 import { WaveformScrubber, type WaveformScrubberHandle } from "@/components/waveform-scrubber";
 import { StudioPluginRack, DEFAULT_PLUGIN_STATE, type PluginState } from "@/components/studio-plugin-rack";
+import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
 
 type ProcessState = "idle" | "loading" | "ready" | "processing" | "done";
 type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master" | "voice_change" | "denoise";
 
 const MASTER_PRESETS_UI = [
-  { id: "normal",    label: "Normal",    description: "Balanced loudness. Good for any content.", free: true,  emoji: "⚖️", accent: "#94a3b8", glow: "rgba(148,163,184,0.18)", bg: "linear-gradient(135deg,#1e293b 0%,#0f172a 100%)" },
-  { id: "broadcast", label: "Broadcast", description: "EBU R128 broadcast standard for streaming.", free: false, emoji: "📡", accent: "#3b82f6", glow: "rgba(59,130,246,0.18)",   bg: "linear-gradient(135deg,#1e3a5f 0%,#0c1a2e 100%)" },
-  { id: "vinyl",     label: "Vinyl",     description: "Warm analog character with boosted lows.", free: false, emoji: "💿", accent: "#f59e0b", glow: "rgba(245,158,11,0.18)",   bg: "linear-gradient(135deg,#451a03 0%,#1c0a00 100%)" },
-  { id: "podcast",   label: "Podcast",   description: "Voice clarity with dynamic compression.", free: false, emoji: "🎙️", accent: "#22c55e", glow: "rgba(34,197,94,0.18)",    bg: "linear-gradient(135deg,#052e16 0%,#021a0d 100%)" },
-  { id: "club",      label: "Club",      description: "Heavy bass and punchy transients.", free: false, emoji: "🔊", accent: "#a855f7", glow: "rgba(168,85,247,0.18)",   bg: "linear-gradient(135deg,#2e1065 0%,#13043a 100%)" },
-  { id: "film",      label: "Film",      description: "Wide cinematic dynamics with presence.", free: false, emoji: "🎬", accent: "#ef4444", glow: "rgba(239,68,68,0.18)",    bg: "linear-gradient(135deg,#450a0a 0%,#1f0505 100%)" },
+  { id: "normal",     label: "Normal",      description: "Balanced loudness. Good for any content.",        free: true,  emoji: "⚖️",  accent: "#94a3b8", glow: "rgba(148,163,184,0.18)", bg: "linear-gradient(135deg,#1e293b 0%,#0f172a 100%)", img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&q=80" },
+  { id: "broadcast",  label: "Broadcast",   description: "EBU R128 broadcast standard. -23 LUFS.",          free: false, emoji: "📡",  accent: "#3b82f6", glow: "rgba(59,130,246,0.18)",   bg: "linear-gradient(135deg,#1e3a5f 0%,#0c1a2e 100%)", img: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=400&q=80" },
+  { id: "vinyl",      label: "Vinyl",       description: "Warm analog character with boosted lows.",        free: false, emoji: "💿",  accent: "#f59e0b", glow: "rgba(245,158,11,0.18)",   bg: "linear-gradient(135deg,#451a03 0%,#1c0a00 100%)", img: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=400&q=80" },
+  { id: "podcast",    label: "Podcast",     description: "Voice clarity with dynamic compression.",         free: false, emoji: "🎙️", accent: "#22c55e", glow: "rgba(34,197,94,0.18)",    bg: "linear-gradient(135deg,#052e16 0%,#021a0d 100%)", img: "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&q=80" },
+  { id: "club",       label: "Club",        description: "Heavy bass and punchy transients.",               free: false, emoji: "🔊",  accent: "#a855f7", glow: "rgba(168,85,247,0.18)",   bg: "linear-gradient(135deg,#2e1065 0%,#13043a 100%)", img: "https://images.unsplash.com/photo-1571266028253-6c7f4e8e8a0e?w=400&q=80" },
+  { id: "film",       label: "Film",        description: "Wide cinematic dynamics with presence.",          free: false, emoji: "🎬",  accent: "#ef4444", glow: "rgba(239,68,68,0.18)",    bg: "linear-gradient(135deg,#450a0a 0%,#1f0505 100%)", img: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80" },
+  { id: "youtube",    label: "YouTube",     description: "-14 LUFS — YouTube loudness standard.",           free: false, emoji: "▶️",  accent: "#ff0000", glow: "rgba(255,0,0,0.22)",      bg: "linear-gradient(135deg,#450000 0%,#1f0000 100%)", img: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&q=80" },
+  { id: "soundcloud", label: "SoundCloud",  description: "-11 LUFS — Loud & punchy for SoundCloud.",        free: false, emoji: "☁️",  accent: "#ff5500", glow: "rgba(255,85,0,0.22)",     bg: "linear-gradient(135deg,#431407 0%,#1f0a03 100%)", img: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?w=400&q=80" },
+  { id: "apple",      label: "Apple Music", description: "-16 LUFS — Apple Sound Check standard.",          free: false, emoji: "🍎",  accent: "#fc3c44", glow: "rgba(252,60,68,0.22)",    bg: "linear-gradient(135deg,#3b0a0a 0%,#1a0404 100%)", img: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&q=80" },
 ] as const;
 type MasterPresetId = (typeof MASTER_PRESETS_UI)[number]["id"];
 
@@ -813,36 +817,40 @@ export default function Studio() {
                 {/* Mastering presets grid */}
                 {mode === "master" && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Preset</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Preset</label>
+                      <span className="text-[10px] text-muted-foreground">3 platform targets included</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
                       {MASTER_PRESETS_UI.map((p) => {
                         const selected = masterPreset === p.id;
                         return (
                           <button
                             key={p.id}
                             onClick={() => setMasterPreset(p.id as MasterPresetId)}
-                            style={{
-                              background: p.bg,
-                              borderColor: selected ? p.accent : `${p.accent}44`,
-                              boxShadow: selected ? `0 0 18px ${p.glow}, inset 0 1px 0 rgba(255,255,255,0.06)` : "inset 0 1px 0 rgba(255,255,255,0.04)",
-                            }}
-                            className="relative text-left p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer group hover:scale-[1.02] active:scale-[0.98]"
+                            style={{ borderColor: selected ? p.accent : `${p.accent}40`, boxShadow: selected ? `0 0 18px ${p.glow}` : undefined }}
+                            className="relative overflow-hidden rounded-xl border-2 h-24 transition-all duration-200 cursor-pointer hover:scale-[1.03] active:scale-[0.97]"
                           >
-                            <div className="flex items-start justify-between mb-2">
-                              <span className="text-2xl leading-none">{p.emoji}</span>
-                              {!isPro && (
-                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-sky-500/30 text-sky-400 bg-sky-500/10">Sample</Badge>
-                              )}
-                              {selected && (
-                                <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: p.accent }} />
-                              )}
+                            {"img" in p && (
+                              <img src={(p as any).img} alt={p.label} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            )}
+                            <div className="absolute inset-0" style={{ background: selected ? `${p.bg.replace("100%)", "100%) / 0.55")}` : "rgba(0,0,0,0.62)" }} />
+                            {selected && <div className="absolute inset-0 ring-2 ring-inset rounded-xl" style={{ borderColor: p.accent }} />}
+                            <div className="relative z-10 flex flex-col items-center justify-center h-full gap-1 px-1">
+                              <span className="text-xl leading-none drop-shadow-lg">{p.emoji}</span>
+                              <div className="text-[10px] font-bold text-white drop-shadow-md text-center leading-tight">{p.label}</div>
+                              {selected && <CheckCircle2 className="w-3 h-3" style={{ color: p.accent }} />}
+                              {!isPro && !p.free && <div className="text-[8px] text-sky-400 font-semibold">Sample</div>}
                             </div>
-                            <div className="text-sm font-bold mb-0.5" style={{ color: selected ? p.accent : "#f1f5f9" }}>{p.label}</div>
-                            <p className="text-[10px] text-muted-foreground leading-snug">{p.description}</p>
                           </button>
                         );
                       })}
                     </div>
+                    {masterPreset && (
+                      <p className="text-[10px] text-muted-foreground px-1">
+                        {MASTER_PRESETS_UI.find(p => p.id === masterPreset)?.description}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1192,6 +1200,35 @@ export default function Studio() {
             </Card>
           </motion.div>
         )}
+        {/* ── Live Vocal Monitor ── */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card className="border-border/30 bg-card/40 overflow-hidden">
+            <div
+              className="relative h-24 overflow-hidden"
+              style={{ backgroundImage: "url(https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80)", backgroundSize: "cover", backgroundPosition: "center" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-transparent" />
+              <div className="relative z-10 flex items-center gap-4 h-full px-5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                  <Mic2 className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Live Vocal Monitor</h3>
+                  <p className="text-xs text-muted-foreground">Sing or speak through 6 voice presets — compressor, 3-band EQ, reverb, echo — in real time</p>
+                </div>
+                <div className="ml-auto hidden sm:flex items-center gap-1.5">
+                  {["EQ", "COMP", "REVERB", "ECHO"].map(tag => (
+                    <span key={tag} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/25 text-emerald-400">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <CardContent className="p-4">
+              <LiveVocalMonitor />
+            </CardContent>
+          </Card>
+        </motion.div>
+
       </motion.div>
     </Layout>
   );
