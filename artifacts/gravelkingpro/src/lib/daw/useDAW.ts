@@ -192,7 +192,7 @@ export function useDAW() {
     return ctxRef.current;
   };
 
-  const maxDuration = tracks.reduce((m, t) => Math.max(m, t.duration), 0);
+  const maxDuration = tracks.reduce((m, t) => Math.max(m, t.startOffset + t.duration), 0);
 
   // ── teardown ──
   const teardown = useCallback(() => {
@@ -245,8 +245,10 @@ export function useDAW() {
       const buf = track.editedBuffer ?? track.buffer;
       const audible = hasSolo ? track.solo : !track.muted;
 
-      // Skip tracks whose content has already ended at this seek offset
-      if (offset >= buf.duration) continue;
+      const clipStart = track.startOffset;
+
+      // Skip tracks whose content has already ended before current playback position
+      if (offset >= clipStart + buf.duration) continue;
 
       const source = ctx.createBufferSource();
       source.buffer = buf;
@@ -271,7 +273,12 @@ export function useDAW() {
       gainNode.connect(panNode);
       panNode.connect(masterGain);
 
-      source.start(startAt, offset);
+      // startOffset places the clip later in the timeline:
+      //   clipOffset = how far into the buffer to start (if we're already past clipStart)
+      //   clipDelay  = how long after startAt to schedule the source (if clipStart is in future)
+      const clipOffset = Math.max(0, offset - clipStart);
+      const clipDelay  = Math.max(0, clipStart - offset);
+      source.start(startAt + clipDelay, clipOffset);
       activeTracksRef.current.set(track.id, { source, gain: gainNode, pan: panNode, plugins: plugMap });
     }
 
@@ -342,6 +349,7 @@ export function useDAW() {
         id, name: file.name.replace(/\.[^/.]+$/, ""),
         file, buffer, editedBuffer: null,
         peaks, duration: buffer.duration,
+        startOffset: 0,
         muted: false, solo: false,
         volume: 0.85, pan: 0,
         plugins: [], region: null,
@@ -617,6 +625,10 @@ export function useDAW() {
   // ── cleanup on unmount ──
   useEffect(() => () => teardown(), [teardown]);
 
+  const setTrackStartOffset = useCallback((trackId: string, secs: number) => {
+    setTracks(p => p.map(t => t.id === trackId ? { ...t, startOffset: Math.max(0, secs) } : t));
+  }, []);
+
   return {
     tracks, isPlaying, position, masterVolume, loop, bpm, setBpm,
     masterPlugins, maxDuration, masterAnalRef,
@@ -624,6 +636,7 @@ export function useDAW() {
     play, pause, stop, seek,
     setMasterVolume, setLoop,
     setTrackVolume, setTrackPan, toggleMute, toggleSolo,
+    setTrackStartOffset,
     addPlugin, removePlugin, togglePlugin, reorderPlugin, updatePlugin,
     updateMasterPlugin, setMasterPlugins,
     setRegion, applyTrim, applyDelete, resetEdit,

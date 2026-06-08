@@ -20,6 +20,7 @@ export interface TrackState {
   editedBuffer: AudioBuffer | null;
   peaks: number[];
   duration: number;
+  startOffset: number;
   muted: boolean;
   solo: boolean;
   volume: number;
