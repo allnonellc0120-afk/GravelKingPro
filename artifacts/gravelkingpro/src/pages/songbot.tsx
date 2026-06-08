@@ -15,15 +15,15 @@ type Genre = "hiphop" | "rnb" | "pop" | "trap" | "lofi" | "gospel" | "soul" | "c
 type Mood = "uplifting" | "dark" | "romantic" | "aggressive" | "chill" | "melancholic" | "triumphant" | "introspective";
 type Structure = "verse-chorus" | "aaba" | "verse-chorus-bridge" | "through-composed";
 
-const GENRES: { id: Genre; label: string; emoji: string }[] = [
-  { id: "hiphop", label: "Hip Hop", emoji: "🎤" },
-  { id: "rnb", label: "R&B", emoji: "🎵" },
-  { id: "pop", label: "Pop", emoji: "🌟" },
-  { id: "trap", label: "Trap", emoji: "🔥" },
-  { id: "lofi", label: "Lo-fi", emoji: "☕" },
-  { id: "gospel", label: "Gospel", emoji: "✨" },
-  { id: "soul", label: "Soul", emoji: "💿" },
-  { id: "country", label: "Country", emoji: "🎸" },
+const GENRES: { id: Genre; label: string; emoji: string; img: string }[] = [
+  { id: "hiphop", label: "Hip Hop", emoji: "🎤", img: "https://media.istockphoto.com/id/2111019920/photo/aspiring-rapper-recording-a-new-track-in-a-soundproof-studio-at-night.jpg?s=612x612&w=0&k=20&c=xtqwolfuS5JS9dLc9KXR4Ib05p7M3FuUHrrOPSovpMs=" },
+  { id: "rnb", label: "R&B", emoji: "🎵", img: "https://i.pinimg.com/originals/a4/5d/49/a45d49891278b235f60abe4232b0cd47.jpg" },
+  { id: "pop", label: "Pop", emoji: "🌟", img: "https://static.vecteezy.com/system/resources/thumbnails/068/599/062/small/stage-with-bright-concert-lighting-spotlights-prepared-for-live-music-performance-photo.jpg" },
+  { id: "trap", label: "Trap", emoji: "🔥", img: "https://media.istockphoto.com/id/147301554/photo/hip-hop-dancer-balancing-on-one-leg.jpg?s=612x612&w=0&k=20&c=nKPD0szexyhiOZjN0ezgpLc6-67ACnoXL36RcbOJtAQ=" },
+  { id: "lofi", label: "Lo-fi", emoji: "☕", img: "https://images.alphacoders.com/135/thumb-1920-1357322.jpeg" },
+  { id: "gospel", label: "Gospel", emoji: "✨", img: "https://static.vecteezy.com/system/resources/thumbnails/052/265/936/small/choir-singing-in-harmony-during-dynamic-performance-gospel-choir-at-african-american-black-church-photo.jpg" },
+  { id: "soul", label: "Soul", emoji: "💿", img: "https://media.gettyimages.com/id/1327551471/photo/cheerful-young-man-playing-guitar-and-singing-to-his-girlfriend-on-the-field-during-a-sunset.jpg?s=612x612&w=0&k=20&c=RkDWCEFWziH9gmUls5_Jz2JLHU3WQZcPseTru5IEdt8=" },
+  { id: "country", label: "Country", emoji: "🎸", img: "https://thumbs.dreamstime.com/b/silhouette-young-free-woman-straw-hat-playing-country-music-guitar-sunset-copy-space-183269471.jpg" },
 ];
 
 const MOODS: { id: Mood; label: string }[] = [
@@ -393,10 +393,19 @@ export default function SongBot() {
                       <button
                         key={g.id}
                         onClick={() => setGenre(g.id)}
-                        className={`text-center py-1.5 px-2 rounded-lg border text-xs transition-colors ${genre === g.id ? "border-amber-500 bg-amber-500/10 text-amber-400" : "border-border/40 bg-secondary/20 hover:border-amber-500/40"}`}
+                        className={`relative overflow-hidden rounded-lg border text-xs transition-all h-16 ${genre === g.id ? "border-amber-500 ring-1 ring-amber-500/50" : "border-border/40 hover:border-amber-500/40"}`}
                       >
-                        <div className="text-base">{g.emoji}</div>
-                        <div className="text-[10px] mt-0.5">{g.label}</div>
+                        <img
+                          src={g.img}
+                          alt={g.label}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <div className={`absolute inset-0 transition-opacity ${genre === g.id ? "bg-amber-500/30" : "bg-black/55 hover:bg-black/40"}`} />
+                        <div className="relative z-10 flex flex-col items-center justify-center h-full gap-0.5">
+                          <div className="text-sm">{g.emoji}</div>
+                          <div className="text-[10px] font-semibold text-white drop-shadow">{g.label}</div>
+                        </div>
                       </button>
                     ))}
                   </div>

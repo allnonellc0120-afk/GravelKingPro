@@ -21,6 +21,7 @@ const FEATURES = [
     badgeColor: "border-sky-500/40 text-sky-400",
     href: "/studio",
     cta: "Try it free",
+    img: "https://p3.hippopx.com/preview/152/995/female-artist-recording-song-professional-music-studio-female-singer-recording-vocals-microphone-music-production-studio-recording-artist-recording-music-studio-thumbnail.jpg",
   },
   {
     icon: <Scissors className="w-6 h-6 text-emerald-400" />,
@@ -30,6 +31,7 @@ const FEATURES = [
     badgeColor: "border-sky-500/40 text-sky-400",
     href: "/studio",
     cta: "Try it free",
+    img: "https://static.vecteezy.com/system/resources/thumbnails/067/167/854/small/soundwave-in-blue-a-vibrant-mesmerizing-blue-soundwave-pulses-with-energy-against-a-dark-backdrop-embodying-the-dynamic-essence-of-audio-frequencies-free-video.jpg",
   },
   {
     icon: <Wand2 className="w-6 h-6 text-sky-400" />,
@@ -39,6 +41,7 @@ const FEATURES = [
     badgeColor: "border-emerald-500/40 text-emerald-400",
     href: "/studio",
     cta: "Master now",
+    img: "https://audiosorcerer.com/images/blog/2024/07/Mastering-For-Vinyl-Blog-Image-3-1024x536.jpg",
   },
   {
     icon: <Layers className="w-6 h-6 text-amber-400" />,
@@ -48,6 +51,7 @@ const FEATURES = [
     badgeColor: "border-amber-500/40 text-amber-400",
     href: "/mix",
     cta: "Open Studio",
+    img: "https://media.istockphoto.com/id/1393796601/photo/podcast-recording-studio-with-microphones-and-equalizer-for-recording-online-radio-broadcasts.jpg?s=612x612&w=0&k=20&c=hjSlStVKVGmWp2VY_YVF3MNHnOzKLeAKbtiasTM_xjo=",
   },
   {
     icon: <Music2 className="w-6 h-6 text-pink-400" />,
@@ -57,6 +61,7 @@ const FEATURES = [
     badgeColor: "border-pink-500/40 text-pink-400",
     href: "/beatmaker",
     cta: "Make a beat",
+    img: "https://media.istockphoto.com/id/2111019920/photo/aspiring-rapper-recording-a-new-track-in-a-soundproof-studio-at-night.jpg?s=612x612&w=0&k=20&c=xtqwolfuS5JS9dLc9KXR4Ib05p7M3FuUHrrOPSovpMs=",
   },
   {
     icon: <Pen className="w-6 h-6 text-violet-400" />,
@@ -66,6 +71,7 @@ const FEATURES = [
     badgeColor: "border-violet-500/40 text-violet-400",
     href: "/songbot",
     cta: "Write a song",
+    img: "https://images.alphacoders.com/135/thumb-1920-1357322.jpeg",
   },
 ];
 
@@ -106,34 +112,41 @@ export default function Home() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-12">
 
         {/* ── Hero ── */}
-        <div className="text-center space-y-5 pt-4">
-          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 text-xs font-medium text-amber-400">
-            <Zap className="w-3.5 h-3.5" /> Server-side audio processing — your files never leave our servers
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight leading-tight">
-            Professional audio tools,<br />
-            <span className="text-amber-500">no plugin required.</span>
-          </h1>
-          <p className="text-muted-foreground text-base max-w-xl mx-auto">
-            GravelKing Productions handles voice removal, stem splitting, mastering, beat-making, and songwriting — entirely on the server. Upload a file or pick a tool and go.
-          </p>
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <Link href="/studio">
-              <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-11 px-6">
-                <Play className="w-4 h-4 mr-2 fill-current" /> Open Studio — It's Free
-              </Button>
-            </Link>
-            <Link href="/pricing">
-              <Button variant="outline" className="h-11 px-6 border-border/40">
-                See Pricing <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          </div>
-          {!isAuthenticated && (
-            <p className="text-xs text-muted-foreground">
-              <button onClick={login} className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</button> to save your processing history and unlock your free trial.
+        <div className="relative rounded-2xl overflow-hidden text-center space-y-5 pt-4 pb-10 px-4">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(https://p3.hippopx.com/preview/938/421/black-microphone-studio-microphone-shock-mount-dark-backdrop-audio-recording-recording-setup-professional-audio-black-background-microphone-stand-recording-equipment-thumbnail.jpg)` }}
+          />
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="relative z-10 space-y-5 pt-4">
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 text-xs font-medium text-amber-400">
+              <Zap className="w-3.5 h-3.5" /> Server-side audio processing — your files never leave our servers
+            </div>
+            <h1 className="text-4xl font-bold tracking-tight leading-tight">
+              Professional audio tools,<br />
+              <span className="text-amber-500">no plugin required.</span>
+            </h1>
+            <p className="text-muted-foreground text-base max-w-xl mx-auto">
+              GravelKing Productions handles voice removal, stem splitting, mastering, beat-making, and songwriting — entirely on the server. Upload a file or pick a tool and go.
             </p>
-          )}
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <Link href="/studio">
+                <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-12 px-8 text-base shadow-lg shadow-amber-500/20">
+                  <Play className="w-4 h-4 mr-2 fill-current" /> Open Studio — It's Free
+                </Button>
+              </Link>
+              <Link href="/pricing">
+                <Button variant="outline" className="h-12 px-8 text-base border-white/30 text-white hover:bg-white/10">
+                  See Pricing <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+            {!isAuthenticated && (
+              <p className="text-xs text-muted-foreground">
+                <button onClick={login} className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</button> to save your processing history and unlock your free trial.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* ── Features ── */}
@@ -148,19 +161,26 @@ export default function Home() {
             {FEATURES.map((f, i) => (
               <motion.div key={f.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
                 <Link href={f.href}>
-                  <Card className="border-border/30 bg-card/40 hover:border-border/60 hover:bg-card/60 transition-all cursor-pointer h-full group">
-                    <CardContent className="p-5 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="w-10 h-10 rounded-lg bg-secondary/60 flex items-center justify-center">
-                          {f.icon}
-                        </div>
-                        <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${f.badgeColor}`}>{f.badge}</Badge>
+                  <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:border transition-all cursor-pointer h-full group overflow-hidden">
+                    <div className="relative h-36 overflow-hidden">
+                      <img
+                        src={f.img}
+                        alt={f.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+                      <div className="absolute top-3 right-3">
+                        <Badge variant="outline" className={`text-[10px] px-2 py-0.5 backdrop-blur-sm bg-black/40 ${f.badgeColor}`}>{f.badge}</Badge>
                       </div>
-                      <div>
-                        <h3 className="font-semibold mb-1 group-hover:text-amber-400 transition-colors">{f.title}</h3>
-                        <p className="text-xs text-muted-foreground leading-relaxed">{f.description}</p>
+                      <div className="absolute bottom-3 left-3 w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center border border-white/10">
+                        {f.icon}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-amber-500 font-medium">
+                    </div>
+                    <CardContent className="p-4 space-y-2">
+                      <h3 className="font-semibold group-hover:text-amber-400 transition-colors">{f.title}</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{f.description}</p>
+                      <div className="flex items-center gap-1 text-xs text-amber-500 font-medium pt-1">
                         {f.cta} <ChevronRight className="w-3.5 h-3.5" />
                       </div>
                     </CardContent>
