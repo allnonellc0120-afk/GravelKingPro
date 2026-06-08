@@ -16,6 +16,7 @@ import BeatMaker from "@/pages/beatmaker";
 import DownloadPage from "@/pages/download";
 import BeatsPage from "@/pages/beats";
 import LyricsPage from "@/pages/lyrics";
+import Account from "@/pages/account";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/download" component={DownloadPage} />
       <Route path="/beats" component={BeatsPage} />
       <Route path="/lyrics" component={LyricsPage} />
+      <Route path="/account" component={Account} />
       <Route component={NotFound} />
     </Switch>
   );

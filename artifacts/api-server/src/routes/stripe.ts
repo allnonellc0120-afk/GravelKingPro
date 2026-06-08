@@ -128,4 +128,31 @@ stripeRouter.get("/stripe/subscription-status", async (req: any, res) => {
   }
 });
 
+// Open Stripe Billing Portal — lets users cancel, update card, etc.
+stripeRouter.post("/stripe/portal", async (req: any, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  try {
+    const stripe = getStripe();
+    const origin = req.headers.origin ||
+      `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+
+    const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
+    if (!dbUser?.stripeCustomerId) {
+      res.status(400).json({ error: "No billing account found. Subscribe first." });
+      return;
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: dbUser.stripeCustomerId,
+      return_url: `${origin}/account`,
+    });
+    res.json({ url: session.url });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default stripeRouter;

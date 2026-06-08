@@ -1,12 +1,14 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Zap, Menu, X } from "lucide-react";
+import { Zap, Menu, X, User, LogIn } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/lib/context";
+import { useAuth } from "@workspace/replit-auth-web";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { isPro } = useAppState();
+  const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const links = [
@@ -20,6 +22,13 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
   ];
+
+  const displayName = user
+    ? ([user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Account")
+    : null;
+  const initials = user
+    ? ([user.firstName?.[0], user.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "U")
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
@@ -51,6 +60,33 @@ export function Layout({ children }: { children: ReactNode }) {
             >
               Download
             </Link>
+
+            {/* User avatar / sign in */}
+            {user ? (
+              <Link href="/account">
+                <div className={`flex items-center gap-2 cursor-pointer group ${location === "/account" ? "opacity-100" : "opacity-80 hover:opacity-100"} transition-opacity`}>
+                  {user.profileImageUrl ? (
+                    <img
+                      src={user.profileImageUrl}
+                      alt={displayName ?? ""}
+                      className="w-8 h-8 rounded-full object-cover border-2 border-border/40 group-hover:border-amber-500/60 transition-colors"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-amber-500/20 border-2 border-amber-500/30 group-hover:border-amber-500/60 flex items-center justify-center text-amber-500 font-bold text-xs transition-colors">
+                      {initials}
+                    </div>
+                  )}
+                  <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors hidden lg:block">
+                    {displayName}
+                  </span>
+                </div>
+              </Link>
+            ) : (
+              <a href="/api/login" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors">
+                <LogIn className="w-4 h-4" />
+                <span>Sign in</span>
+              </a>
+            )}
           </nav>
 
           {/* Mobile hamburger */}
@@ -86,6 +122,36 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 Download Free
               </Link>
+
+              {/* Mobile account / sign in */}
+              {user ? (
+                <Link
+                  href="/account"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-3 text-sm font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary/60 mt-1 ${
+                    location === "/account" ? "text-amber-500 bg-secondary/40" : "text-muted-foreground"
+                  }`}
+                >
+                  {user.profileImageUrl ? (
+                    <img src={user.profileImageUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 font-bold text-[10px]">
+                      {initials}
+                    </div>
+                  )}
+                  <span>My Account</span>
+                </Link>
+              ) : (
+                <a
+                  href="/api/login"
+                  className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary/60 text-muted-foreground mt-1"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign in
+                </a>
+              )}
+
               <Link
                 href="/contact"
                 onClick={() => setMobileOpen(false)}
@@ -109,6 +175,11 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link href="/contact" className="hover:text-amber-500 transition-colors">Contact</Link>
             <Link href="/download" className="hover:text-amber-500 transition-colors">Download</Link>
             <Link href="/pricing" className="hover:text-amber-500 transition-colors">Pricing</Link>
+            <Link href="/account" className="hover:text-amber-500 transition-colors">
+              <span className="flex items-center gap-1">
+                <User className="w-3 h-3" />Account
+              </span>
+            </Link>
             <a href="https://gravelkingpro.it.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition-colors">gravelkingpro.it.com</a>
           </div>
         </div>
