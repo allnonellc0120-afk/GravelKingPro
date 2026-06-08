@@ -1,3 +1,2 @@
-- [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
-- [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
-- [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
+- [DAW Float32Array types](daw-float32array.md) — TypeScript 5.9 generics on typed arrays require explicit Float32Array<ArrayBuffer> casts
+- [Layout noPadding prop](layout-noPadding.md) — Layout component supports noPadding for full-height pages like the DAW

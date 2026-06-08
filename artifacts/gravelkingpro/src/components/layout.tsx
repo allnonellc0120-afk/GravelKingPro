@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
 
-export function Layout({ children }: { children: ReactNode }) {
+export function Layout({ children, noPadding }: { children: ReactNode; noPadding?: boolean }) {
   const [location] = useLocation();
   const { isPro } = useAppState();
   const { user } = useAuth();
@@ -164,7 +164,7 @@ export function Layout({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className={noPadding ? "flex-1 flex flex-col overflow-hidden" : "flex-1 container mx-auto px-4 py-8"}>
         {children}
       </main>
 
