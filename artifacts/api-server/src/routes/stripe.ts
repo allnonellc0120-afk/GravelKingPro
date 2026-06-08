@@ -51,12 +51,19 @@ stripeRouter.post("/stripe/checkout", async (req: any, res) => {
     const origin = req.headers.origin ||
       `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
 
+    // Fetch the price to determine if it's a monthly sub (gets 3-day trial)
+    const price = await stripe.prices.retrieve(priceId);
+    const isMonthly = price.recurring?.interval === "month";
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
-      success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/pricing?checkout=cancelled`,
+      ...(isMonthly && {
+        subscription_data: { trial_period_days: 3 },
+      }),
     };
 
     // Attach existing Stripe customer if user is already linked
@@ -89,7 +96,11 @@ stripeRouter.get("/stripe/subscription-status", async (req: any, res) => {
       expand: ["line_items.data.price.product"],
     });
 
-    const active = session.payment_status === "paid" || session.status === "complete";
+    // "no_payment_required" covers trial-period checkouts
+    const active =
+      session.payment_status === "paid" ||
+      session.payment_status === "no_payment_required" ||
+      session.status === "complete";
 
     // Determine tier from the first line item's product metadata
     let tier: string | null = null;

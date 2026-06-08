@@ -4,11 +4,12 @@ import { useAppState, type SubscriptionTier } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, X, Gift, CheckCircle2, Sparkles } from "lucide-react";
+import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 type PlanId = "splits" | "pro" | "node_auditor";
+type BillingInterval = "weekly" | "monthly";
 
 const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
   splits: "GravelKing Splits",
@@ -22,6 +23,7 @@ export default function Pricing() {
   const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
+  const [proBilling, setProBilling] = useState<BillingInterval>("monthly");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function Pricing() {
     }
   }, []);
 
-  const handleCheckout = async (planId: PlanId) => {
+  const handleCheckout = async (planId: PlanId, interval?: BillingInterval) => {
     setLoadingTier(planId);
     try {
       const productsRes = await fetch("/api/stripe/products");
@@ -76,7 +78,16 @@ export default function Pricing() {
         return;
       }
 
-      const priceId = product.prices[0].id;
+      // For Pro, pick the price matching the chosen billing interval
+      let priceId: string;
+      if (planId === "pro" && interval) {
+        const stripeInterval = interval === "weekly" ? "week" : "month";
+        const match = product.prices.find((p: any) => p.recurring?.interval === stripeInterval);
+        priceId = match?.id ?? product.prices[0].id;
+      } else {
+        priceId = product.prices[0].id;
+      }
+
       const checkoutRes = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -215,7 +226,7 @@ export default function Pricing() {
             </Card>
           </motion.div>
 
-          {/* Pro */}
+          {/* GravelKing Pro */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="flex flex-col h-full border-amber-500/30 bg-card/60 relative overflow-hidden">
               <div className="absolute top-0 right-0 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
@@ -224,10 +235,73 @@ export default function Pricing() {
               <CardHeader>
                 <CardTitle className="text-lg text-amber-500">GravelKing Pro</CardTitle>
                 <CardDescription>Full studio for audio professionals</CardDescription>
-                <div className="mt-3">
-                  <span className="text-3xl font-bold">$39.99</span>
-                  <span className="text-muted-foreground text-sm">/mo</span>
+
+                {/* Weekly / Monthly toggle */}
+                <div className="mt-3 flex items-center gap-1 bg-secondary/40 rounded-lg p-1 w-fit">
+                  <button
+                    onClick={() => setProBilling("weekly")}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                      proBilling === "weekly"
+                        ? "bg-amber-500 text-black shadow"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setProBilling("monthly")}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                      proBilling === "monthly"
+                        ? "bg-amber-500 text-black shadow"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Monthly
+                  </button>
                 </div>
+
+                <AnimatePresence mode="wait">
+                  {proBilling === "weekly" ? (
+                    <motion.div
+                      key="weekly"
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                      className="mt-2"
+                    >
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-bold">$9.99</span>
+                        <span className="text-muted-foreground text-sm">/week</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <Zap className="w-3 h-3 text-amber-400" />
+                        <span className="text-xs text-amber-400 font-medium">Flexible, cancel anytime</span>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="monthly"
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                      className="mt-2"
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold">$19.99</span>
+                        <span className="text-muted-foreground text-sm line-through opacity-50">$29.99</span>
+                        <span className="text-muted-foreground text-sm">/mo</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full">
+                          ✦ 3-day free trial
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">then $19.99/mo</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
@@ -239,7 +313,7 @@ export default function Pricing() {
                   <FeatureRow yes>Priority support</FeatureRow>
                 </ul>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex-col gap-2">
                 {isCurrent("pro") ? (
                   <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-amber-500/10 text-amber-500 border-amber-500/20" data-testid="badge-pro-current">
                     Current Plan
@@ -247,14 +321,23 @@ export default function Pricing() {
                 ) : isUpgrade("pro") ? (
                   <Button
                     className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold"
-                    onClick={() => handleCheckout("pro")}
+                    onClick={() => handleCheckout("pro", proBilling)}
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-pro"
                   >
-                    {loadingTier === "pro" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Upgrade to Pro"}
+                    {loadingTier === "pro"
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</>
+                      : proBilling === "monthly"
+                        ? "Start Free Trial"
+                        : "Get Pro Weekly"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
+                )}
+                {proBilling === "monthly" && isUpgrade("pro") && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    No charge for 3 days — cancel any time before trial ends
+                  </p>
                 )}
               </CardFooter>
             </Card>
