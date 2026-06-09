@@ -7,3 +7,4 @@
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
+- [Deployment build typechecks all artifacts](deploy-typecheck-all.md) — prod publish runs full repo typecheck incl. Expo mobile; one TS error anywhere blocks the whole deploy
