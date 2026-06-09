@@ -11,6 +11,7 @@ import beatRouter from "./beatmaker";
 import downloadRouter from "./download";
 import beatsRouter from "./beats";
 import waitlistRouter from "./waitlist";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(beatRouter);
 router.use(downloadRouter);
 router.use(beatsRouter);
 router.use(waitlistRouter);
+router.use(analyticsRouter);
 
 export default router;

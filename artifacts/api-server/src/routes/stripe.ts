@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { storage } from '../storage';
 import { getUncachableStripeClient } from '../stripeClient';
+import { recordAnalyticsEvent } from '../analytics';
 import type Stripe from 'stripe';
 
 const stripeRouter = Router();
@@ -79,6 +80,16 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
     };
 
     const session = await stripe.checkout.sessions.create(sessionParams);
+
+    // Funnel event — best-effort, must never block checkout.
+    const visitorId = (req.cookies as Record<string, string>)?.gk_vid ?? null;
+    void recordAnalyticsEvent({
+      type: 'checkout_started',
+      visitorId,
+      sessionId: user.sessionId ?? user.id,
+      path: '/checkout',
+      metadata: { priceId },
+    }).catch(() => { /* ignore analytics failures */ });
 
     res.cookie('gk_session', user.sessionId ?? user.id, {
       httpOnly: true,

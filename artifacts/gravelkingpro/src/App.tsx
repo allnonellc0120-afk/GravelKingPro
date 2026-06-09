@@ -17,6 +17,8 @@ import DownloadPage from "@/pages/download";
 import BeatsPage from "@/pages/beats";
 import LyricsPage from "@/pages/lyrics";
 import Account from "@/pages/account";
+import AdminAnalytics from "@/pages/admin-analytics";
+import { PageTracker } from "@/lib/useAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,7 @@ function Router() {
       <Route path="/beats" component={BeatsPage} />
       <Route path="/lyrics" component={LyricsPage} />
       <Route path="/account" component={Account} />
+      <Route path="/admin" component={AdminAnalytics} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -47,6 +50,7 @@ function App() {
       <TooltipProvider>
         <AppProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <PageTracker />
             <Router />
           </WouterRouter>
           <Toaster />
