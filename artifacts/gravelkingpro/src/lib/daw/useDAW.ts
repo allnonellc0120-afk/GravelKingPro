@@ -2,6 +2,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { TrackState, PluginDef, PluginType, Region, TRACK_COLORS, PLUGIN_DEFAULTS } from "./types";
 import { getWaveformPoints, audioBufferToWav } from "@/lib/audioKernel";
 import { useToast } from "@/hooks/use-toast";
+import {
+  SavedProject,
+  audioBufferToBase64,
+  base64ToAudioBuffer,
+} from "./projectStorage";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -629,6 +634,95 @@ export function useDAW() {
     setTracks(p => p.map(t => t.id === trackId ? { ...t, startOffset: Math.max(0, secs) } : t));
   }, []);
 
+  // ── project save/load ──
+
+  const getProjectSnapshot = useCallback(async (name: string): Promise<SavedProject> => {
+    const all = tracksRef.current;
+    const savedTracks = await Promise.all(all.map(async t => {
+      const buf = t.editedBuffer ?? t.buffer;
+      const wavBase64 = buf ? await audioBufferToBase64(buf) : "";
+      return {
+        id: t.id,
+        name: t.name,
+        wavBase64,
+        peaks: t.peaks,
+        duration: t.duration,
+        startOffset: t.startOffset,
+        muted: t.muted,
+        solo: t.solo,
+        volume: t.volume,
+        pan: t.pan,
+        plugins: t.plugins,
+        region: t.region,
+        color: t.color,
+        edited: t.edited,
+      };
+    }));
+    return {
+      id: crypto.randomUUID(),
+      name,
+      savedAt: Date.now(),
+      bpm,
+      masterVolume,
+      loop,
+      masterPlugins,
+      tracks: savedTracks,
+    };
+  }, [bpm, masterVolume, loop, masterPlugins]);
+
+  const restoreProject = useCallback(async (project: SavedProject) => {
+    if (isPlayingRef.current) teardown();
+    offsetRef.current = 0;
+    setPosition(0);
+
+    const ctx = getCtx();
+    if (ctx.state === "suspended") await ctx.resume();
+
+    const restored: TrackState[] = await Promise.all(
+      project.tracks.map(async st => {
+        let buffer: AudioBuffer | null = null;
+        let editedBuffer: AudioBuffer | null = null;
+        if (st.wavBase64) {
+          const decoded = await base64ToAudioBuffer(ctx, st.wavBase64);
+          buffer = decoded;
+          if (st.edited) {
+            editedBuffer = decoded;
+          }
+        }
+        const effectiveBuf = editedBuffer ?? buffer;
+        const peaks = effectiveBuf
+          ? getWaveformPoints(new Float32Array(effectiveBuf.getChannelData(0)), 200)
+          : st.peaks;
+        return {
+          id: st.id,
+          name: st.name,
+          file: new File([], st.name),
+          buffer,
+          editedBuffer,
+          peaks,
+          duration: st.duration,
+          startOffset: st.startOffset,
+          muted: st.muted,
+          solo: st.solo,
+          volume: st.volume,
+          pan: st.pan,
+          plugins: st.plugins,
+          region: st.region,
+          color: st.color,
+          edited: st.edited,
+        };
+      })
+    );
+
+    setBpm(project.bpm);
+    setMasterVolumeState(project.masterVolume);
+    masterVolRef.current = project.masterVolume;
+    setLoop(project.loop);
+    loopRef.current = project.loop;
+    setMasterPlugins(project.masterPlugins);
+    setTracks(restored);
+  }, [teardown]);
+
   return {
     tracks, isPlaying, position, masterVolume, loop, bpm, setBpm,
     masterPlugins, maxDuration, masterAnalRef,
@@ -641,5 +735,6 @@ export function useDAW() {
     updateMasterPlugin, setMasterPlugins,
     setRegion, applyTrim, applyDelete, resetEdit,
     exportMix,
+    getProjectSnapshot, restoreProject,
   };
 }
