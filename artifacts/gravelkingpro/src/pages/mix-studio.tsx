@@ -11,6 +11,7 @@ import { Transport } from "@/components/daw/Transport";
 import { ChannelStrip } from "@/components/daw/ChannelStrip";
 import { MasterBus } from "@/components/daw/MasterBus";
 import { TimelineRuler } from "@/components/daw/TimelineRuler";
+import { ProjectManager } from "@/components/daw/ProjectManager";
 
 function ProGate() {
   return (
@@ -104,6 +105,11 @@ export default function MixStudio() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <ProjectManager
+              hasUnsavedTracks={daw.tracks.length > 0}
+              onSave={daw.getProjectSnapshot}
+              onLoad={daw.restoreProject}
+            />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 border border-amber-500/25 rounded px-2.5 py-1 hover:border-amber-400/40 transition-colors"
