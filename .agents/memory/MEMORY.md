@@ -7,4 +7,5 @@
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
-- [Deployment build typechecks all artifacts](deploy-typecheck-all.md) — prod publish runs full repo typecheck incl. Expo mobile; one TS error anywhere blocks the whole deploy
+- [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless not ffmpeg; read real build logs via listDeploymentBuilds/getDeploymentBuild
+- [Deployment builds each artifact separately](deploy-typecheck-all.md) — no repo-wide build; each artifact builds via its own artifact.toml; mockup-sandbox excluded; read real logs via listDeploymentBuilds
