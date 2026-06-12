@@ -24,6 +24,18 @@ uri = "file://artifacts/gravelkingpro-promo/public/images/plugins.png"
 type = "image"
 title = "Audio plugins visual metaphor"
 
+[[generated]]
+id = "sWR6UUWPA0i5WL4v5gfdI"
+uri = "file://artifacts/gravelkingpro-promo/public/images/merch_hat.png"
+type = "image"
+title = "GravelKing cap"
+
+[[generated]]
+id = "w_oo1V1dTs5dVREmW97v8"
+uri = "file://artifacts/gravelkingpro-promo/public/images/merch_shirt.png"
+type = "image"
+title = "GravelKing t-shirt"
+
 [[outputs]]
 id = "whvKht8bnIVNiskggSZrV"
 uri = "file://GravelKingPro_Product_Overview.md"
