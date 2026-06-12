@@ -8,40 +8,25 @@ import { Scene4 } from './video_scenes/Scene4';
 import { Scene5 } from './video_scenes/Scene5';
 import { Scene6 } from './video_scenes/Scene6';
 import { Scene7 } from './video_scenes/Scene7';
-import { Scene8 } from './video_scenes/Scene8';
-import { Scene9 } from './video_scenes/Scene9';
-import { Scene10 } from './video_scenes/Scene10';
-import { Scene11 } from './video_scenes/Scene11';
-import { Scene12 } from './video_scenes/Scene12';
 
 export const SCENE_DURATIONS = {
-  problem: 8000,
-  reveal: 6000,
-  promise: 6000,
-  features1: 12000,
-  features2: 12000,
-  studio: 10000,
-  authenticity: 12000,
-  merch1: 7000,
-  merch2: 7000,
-  merch3: 7000,
-  pricing: 10000,
-  outro: 10000,
+  intro: 5800,
+  reveal: 5800,
+  artist: 8000,
+  features: 5800,
+  screens: 5800,
+  merch: 6000,
+  outro: 5800,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
-  problem: Scene1,
+  intro: Scene1,
   reveal: Scene2,
-  promise: Scene3,
-  features1: Scene4,
-  features2: Scene5,
-  studio: Scene6,
-  authenticity: Scene7,
-  merch1: Scene8,
-  merch2: Scene9,
-  merch3: Scene10,
-  pricing: Scene11,
-  outro: Scene12,
+  artist: Scene3,
+  features: Scene4,
+  screens: Scene5,
+  merch: Scene6,
+  outro: Scene7,
 };
 
 const SCENE_START_SEC: Record<string, number> = (() => {
@@ -95,7 +80,7 @@ export default function VideoTemplate({
       <div className="absolute inset-0 pointer-events-none opacity-20">
         <motion.div
           className="absolute rounded-full blur-[100px] mix-blend-screen"
-          style={{ background: 'var(--color-primary)', width: '40vw', height: '40vw' }}
+          style={{ background: 'var(--color-primary, #e94560)', width: '40vw', height: '40vw' }}
           animate={{
             x: ['-20vw', '50vw', '10vw', '-20vw'],
             y: ['-10vh', '30vh', '60vh', '-10vh'],
@@ -121,7 +106,7 @@ export default function VideoTemplate({
 
       <audio
         ref={audioRef}
-        src={`${import.meta.env.BASE_URL}audio/bg_music.mp3`}
+        src={`${import.meta.env.BASE_URL}audio/composite_audio.mp3`}
         preload="auto"
         autoPlay
         muted={muted}
