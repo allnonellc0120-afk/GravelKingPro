@@ -9,4 +9,5 @@
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
 - [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless not ffmpeg; read real build logs via listDeploymentBuilds/getDeploymentBuild
 - [Deployment builds each artifact separately](deploy-typecheck-all.md) — no repo-wide build; each artifact builds via its own artifact.toml; mockup-sandbox excluded; read real logs via listDeploymentBuilds
-- [Prod DB schema not auto-migrated on deploy](deploy-prod-db-schema.md) — publishing does NOT run drizzle push on prod; new tables must be applied to the prod DB separately or inserts silently no-op
+- [video-js scaffold tsconfig](video-js-scaffold-tsconfig.md) — new video artifacts miss the DOM lib override; tsc fails on window/document until you add lib: [esnext, dom, dom.iterable]
+- [Prod DB schema migrates on Publish](deploy-prod-db-schema.md) — Publish auto-diffs dev→prod schema & applies it; never manually migrate prod (prod is read-only); to ship a schema change, re-publish
