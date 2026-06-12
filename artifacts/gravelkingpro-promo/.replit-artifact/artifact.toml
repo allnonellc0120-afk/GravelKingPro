@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/gravelkingpro-promo/"
+title = "GravelKing Pro — Promo"
+version = "1.0.0"
+id = "artifacts/gravelkingpro-promo"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/gravelkingpro-promo/" ]
+localPort = 24393
+
+[services.development]
+run = "pnpm --filter @workspace/gravelkingpro-promo run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gravelkingpro-promo", "run", "build" ]
+publicDir = "artifacts/gravelkingpro-promo/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24393"
+BASE_PATH = "/gravelkingpro-promo/"

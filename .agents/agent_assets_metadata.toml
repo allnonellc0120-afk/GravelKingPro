@@ -12,8 +12,44 @@ uri = "file://attached_assets/generated_images/gravelking_productions_mobile_app
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "8JHOiEVeHDBDSMsO7YyAj"
+uri = "file://artifacts/gravelkingpro-promo/public/images/dashboard.png"
+type = "image"
+title = "GravelKing Pro Dashboard UI Mockup"
+
+[[generated]]
+id = "6-xDa-hVSTTGtjc0Xw9UO"
+uri = "file://artifacts/gravelkingpro-promo/public/images/plugins.png"
+type = "image"
+title = "Audio plugins visual metaphor"
+
 [[outputs]]
 id = "whvKht8bnIVNiskggSZrV"
 uri = "file://GravelKingPro_Product_Overview.md"
 type = "text"
 title = "GravelKing Productions — Product Overview"
+
+[[outputs]]
+id = "xy5yDjWn3gNLHsu85ixsn"
+uri = "file://artifacts/gravelkingpro-promo/public/images/merch_1.jpg"
+type = "image"
+title = "streetwear fashion apparel model looking cool moody lighting"
+
+[[outputs]]
+id = "NTqFac3qbFamRFsiwdibx"
+uri = "file://artifacts/gravelkingpro-promo/public/images/merch_2.jpg"
+type = "image"
+title = "streetwear fashion apparel model looking cool moody lighting"
+
+[[outputs]]
+id = "M8xDppDd2LYH6eMLMr47x"
+uri = "file://artifacts/gravelkingpro-promo/public/images/merch_3.jpg"
+type = "image"
+title = "streetwear fashion apparel model looking cool moody lighting"
+
+[[outputs]]
+id = "18uDO4OT_sLzcNpdJOIaF"
+uri = "file://artifacts/gravelkingpro-promo/public/audio/bg_music.mp3"
+type = "audio"
+title = "background music"
