@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 
 export function Scene4() {
   const [phase, setPhase] = useState(0);
@@ -8,90 +8,60 @@ export function Scene4() {
     const timers = [
       setTimeout(() => setPhase(1), 500),
       setTimeout(() => setPhase(2), 1500),
-      setTimeout(() => setPhase(3), 4000),
-      setTimeout(() => setPhase(4), 5000),
-      setTimeout(() => setPhase(5), 6500),
-      setTimeout(() => setPhase(6), 8000),
+      setTimeout(() => setPhase(3), 2500),
     ];
     return () => timers.forEach(t => clearTimeout(t));
   }, []);
 
   return (
-    <motion.div 
-      className="absolute inset-0 flex bg-black"
+    <motion.div
+      className="absolute inset-0 flex items-center bg-black overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, x: -100 }}
+      exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.8 }}
     >
-      <div className="w-1/2 h-full flex flex-col justify-center px-16 relative z-10">
-        <motion.h2 
-          className="text-[4vw] font-black text-white leading-tight mb-8"
+      <video
+        src={`${import.meta.env.BASE_URL}videos/keyboard_play.mp4`}
+        className="absolute right-0 w-[60%] h-full object-cover opacity-70"
+        autoPlay
+        muted
+        playsInline
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
+      
+      <div className="relative z-10 pl-16 w-[60%]">
+        <motion.h2
+          className="text-[5vw] font-black uppercase text-white leading-tight shadow-black drop-shadow-2xl"
           initial={{ opacity: 0, x: -50 }}
-          animate={phase >= 1 ? { opacity: 1, x: 0 } : { opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
         >
-          All-in-one<br/>Production Suite.
+          All-in-one <br />
+          <span className="text-amber-500">Production Suite</span>
         </motion.h2>
 
-        <motion.div 
-          className="mb-12"
-          initial={{ opacity: 0, y: 20 }}
-          animate={phase >= 2 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-        >
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 rounded bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
-              <span className="text-purple-400 font-bold text-xl">V</span>
-            </div>
-            <h3 className="text-[2.5vw] font-bold text-white">Voice Removal</h3>
-          </div>
-          <p className="text-[1.5vw] text-white/60 ml-16">Strip vocals instantly. Get clean instrumentals.</p>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={phase >= 4 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-        >
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 rounded bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
-              <span className="text-emerald-400 font-bold text-xl">S</span>
-            </div>
-            <h3 className="text-[2.5vw] font-bold text-white">Stem Splitting</h3>
-          </div>
-          <p className="text-[1.5vw] text-white/60 ml-16">Separate bass, mid, highs, and instruments.</p>
-        </motion.div>
-      </div>
-
-      <div className="w-1/2 h-full relative overflow-hidden bg-[#09090b] border-l border-white/10 flex items-center justify-center">
-        {/* Visualizer for Voice Removal */}
-        <motion.div 
-          className="absolute inset-0 flex items-center justify-center"
-          initial={{ opacity: 0 }}
-          animate={phase >= 3 && phase < 5 ? { opacity: 1 } : { opacity: 0 }}
-        >
-          <div className="w-64 h-64 rounded-full border-2 border-purple-500/50 flex items-center justify-center relative">
-            <motion.div className="w-full h-full rounded-full border-2 border-purple-500 absolute" animate={{ scale: [1, 1.5], opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 2 }} />
-            <span className="text-purple-400 font-bold text-2xl">VOCALS</span>
-          </div>
-        </motion.div>
-
-        {/* Visualizer for Stem Splitting */}
-        <motion.div 
-          className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-          initial={{ opacity: 0 }}
-          animate={phase >= 5 ? { opacity: 1 } : { opacity: 0 }}
-        >
-          {['BASS', 'MID', 'HIGH', 'INST'].map((stem, i) => (
-            <motion.div 
-              key={stem}
-              className="w-64 h-12 bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold"
-              initial={{ x: 100, opacity: 0 }}
-              animate={phase >= 5 ? { x: 0, opacity: 1 } : { x: 100, opacity: 0 }}
-              transition={{ delay: i * 0.1 }}
+        <div className="mt-12 flex flex-col gap-8">
+          {[
+            { title: "Voice Removal", desc: "Strip vocals instantly. Get clean instrumentals." },
+            { title: "Stem Splitting", desc: "Separate bass, mid, highs, and instruments." },
+          ].map((item, i) => (
+            <motion.div
+              key={item.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={phase >= i + 1 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             >
-              {stem}
+              <div className="flex items-center gap-4 mb-2">
+                <div className="w-12 h-12 rounded bg-amber-500/20 flex items-center justify-center border border-amber-500/50">
+                  <div className="w-4 h-4 rounded-full bg-amber-500" />
+                </div>
+                <h3 className="text-[2.5vw] font-bold text-white shadow-black drop-shadow-md">{item.title}</h3>
+              </div>
+              <p className="text-[1.5vw] text-white/70 ml-16">{item.desc}</p>
             </motion.div>
           ))}
-        </motion.div>
+        </div>
       </div>
     </motion.div>
   );
