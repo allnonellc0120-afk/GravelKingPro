@@ -59,6 +59,57 @@ function emitRemoteAlert(
   telemetryBus.emit("remote_alert", event);
 }
 
+type RetryableFailure = { ok: false; retryable: true; reason: "request_failed" | "non_ok_status"; detail: string };
+type TerminalFailure = { ok: false; retryable: false; reason: RemoteInvalidReason; detail: string };
+type AttemptResult =
+  | { ok: true; wav: Buffer; headers: Record<string, string> }
+  | RetryableFailure
+  | TerminalFailure;
+
+async function attemptRemoteProcessing(
+  file: Express.Multer.File,
+  multiplier: number,
+  sliceSize: number,
+  requestHeaders: Record<string, string>,
+  remoteUrl: string,
+): Promise<AttemptResult> {
+  try {
+    const response = await fetch(`${remoteUrl}/process-audio`, {
+      method: "POST",
+      headers: requestHeaders,
+      body: new Uint8Array(file.buffer),
+      signal: AbortSignal.timeout(30_000),
+      redirect: "error",
+    });
+
+    if (!response.ok) {
+      return { ok: false, retryable: true, reason: "non_ok_status", detail: `HTTP ${response.status} ${response.statusText}` };
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("audio")) {
+      return { ok: false, retryable: false, reason: "invalid_content_type", detail: `content-type: ${contentType || "(none)"}` };
+    }
+
+    const wav = Buffer.from(await response.arrayBuffer());
+    // The remote may report an "audio/*" content-type while returning truncated,
+    // empty, or non-WAV bytes. Never label such payloads as premium MLK v3 output —
+    // reject them here so the caller falls back to local processing.
+    if (!isValidWav(wav)) {
+      return { ok: false, retryable: false, reason: "invalid_wav", detail: `${wav.length} bytes — failed RIFF/WAV header check` };
+    }
+
+    const responseHeaders: Record<string, string> = {};
+    ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count", "X-GK-Kernel"].forEach((h) => {
+      const v = response.headers.get(h);
+      if (v) responseHeaders[h] = v;
+    });
+    return { ok: true, wav, headers: responseHeaders };
+  } catch (err) {
+    return { ok: false, retryable: true, reason: "request_failed", detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 async function tryRemoteProcessing(
   file: Express.Multer.File,
   multiplier: number,
@@ -81,50 +132,30 @@ async function tryRemoteProcessing(
   const apiKey = getRemoteApiKey();
   if (apiKey) requestHeaders["Authorization"] = `Bearer ${apiKey}`;
 
-  try {
-    const response = await fetch(`${remoteUrl}/process-audio`, {
-      method: "POST",
-      headers: requestHeaders,
-      body: new Uint8Array(file.buffer),
-      signal: AbortSignal.timeout(30_000),
-      redirect: "error",
-    });
+  const first = await attemptRemoteProcessing(file, multiplier, sliceSize, requestHeaders, remoteUrl);
 
-    if (!response.ok) {
-      emitRemoteAlert(log, "non_ok_status", remoteUrl, `HTTP ${response.status} ${response.statusText}`);
-      return null;
-    }
+  if (first.ok) return { wav: first.wav, headers: first.headers };
 
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("audio")) {
-      emitRemoteAlert(log, "invalid_content_type", remoteUrl, `content-type: ${contentType || "(none)"}`);
-      return null;
-    }
-
-    const wav = Buffer.from(await response.arrayBuffer());
-    // The remote may report an "audio/*" content-type while returning truncated,
-    // empty, or non-WAV bytes. Never label such payloads as premium MLK v3 output —
-    // reject them here so the caller falls back to local processing.
-    if (!isValidWav(wav)) {
-      emitRemoteAlert(log, "invalid_wav", remoteUrl, `${wav.length} bytes — failed RIFF/WAV header check`);
-      return null;
-    }
-
-    const responseHeaders: Record<string, string> = {};
-    ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count", "X-GK-Kernel"].forEach((h) => {
-      const v = response.headers.get(h);
-      if (v) responseHeaders[h] = v;
-    });
-    return { wav, headers: responseHeaders };
-  } catch (err) {
-    emitRemoteAlert(
-      log,
-      "request_failed",
-      remoteUrl,
-      err instanceof Error ? err.message : String(err),
-    );
+  // Terminal failures (corrupt payload) — no retry, alert immediately.
+  if (!first.retryable) {
+    emitRemoteAlert(log, first.reason, remoteUrl, first.detail);
     return null;
   }
+
+  // Transient failure — wait 500 ms then retry once.
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  const second = await attemptRemoteProcessing(file, multiplier, sliceSize, requestHeaders, remoteUrl);
+
+  if (second.ok) return { wav: second.wav, headers: second.headers };
+
+  // Both attempts failed — alert once with the final failure detail.
+  const finalReason = second.retryable ? second.reason : second.reason;
+  const finalDetail = second.retryable
+    ? `${second.detail} (after retry; first attempt: ${first.detail})`
+    : second.detail;
+  emitRemoteAlert(log, finalReason, remoteUrl, finalDetail);
+  return null;
 }
 
 // ── Audio helpers ─────────────────────────────────────────────────────────────
