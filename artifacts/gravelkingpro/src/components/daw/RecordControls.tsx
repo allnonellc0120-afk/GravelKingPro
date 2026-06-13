@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Mic, Square, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +33,7 @@ export function RecordControls({ isRecording, disabled, listInputDevices, onStar
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedId, setSelectedId] = useState<string>(loadSavedDevice);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [level, setLevel] = useState(0);
 
   const refreshDevices = useCallback(async () => {
     const all = await listInputDevices();
@@ -75,6 +76,86 @@ export function RecordControls({ isRecording, disabled, listInputDevices, onStar
     return () => md.removeEventListener("devicechange", refreshDevices);
   }, [refreshDevices]);
 
+  // ── live input-level monitoring ──
+  // While the picker is open (and not actively recording), open a temporary
+  // getUserMedia stream on the selected device, run it through an AnalyserNode,
+  // and drive a VU bar. Everything is torn down when the menu closes or the
+  // device changes so the mic is released and no context leaks.
+  const monitorRef = useRef<{
+    stream: MediaStream;
+    ctx: AudioContext;
+    raf: number;
+  } | null>(null);
+
+  const stopMonitor = useCallback(() => {
+    const m = monitorRef.current;
+    if (!m) return;
+    monitorRef.current = null;
+    cancelAnimationFrame(m.raf);
+    m.stream.getTracks().forEach(t => t.stop());
+    void m.ctx.close().catch(() => {});
+    setLevel(0);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen || isRecording) {
+      stopMonitor();
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const constraints: MediaStreamConstraints = {
+          audio:
+            selectedId !== DEFAULT_VALUE
+              ? { deviceId: { exact: selectedId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+              : { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        const ctx = new AudioContext();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.6;
+        source.connect(analyser);
+        const data = new Float32Array(analyser.fftSize);
+
+        const tick = () => {
+          analyser.getFloatTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+          const rms = Math.sqrt(sum / data.length);
+          // Smooth the bar: rise fast, fall a little slower for a natural VU feel.
+          setLevel(prev => {
+            const next = Math.min(1, rms * 3.5);
+            return next > prev ? next : prev * 0.82 + next * 0.18;
+          });
+          const raf = requestAnimationFrame(tick);
+          if (monitorRef.current) monitorRef.current.raf = raf;
+        };
+
+        monitorRef.current = { stream, ctx, raf: requestAnimationFrame(tick) };
+      } catch {
+        // Permission denied / device busy — silently skip; the recording flow
+        // surfaces a toast on the real attempt.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      stopMonitor();
+    };
+  }, [menuOpen, isRecording, selectedId, stopMonitor]);
+
+  useEffect(() => stopMonitor, [stopMonitor]);
+
   const handleRecordClick = () => {
     if (isRecording) {
       onStop();
@@ -88,6 +169,9 @@ export function RecordControls({ isRecording, disabled, listInputDevices, onStar
     selectedId === DEFAULT_VALUE || !selectedDevice
       ? "System default"
       : selectedDevice.label || "Microphone";
+
+  const SEGMENTS = 12;
+  const litSegments = Math.round(level * SEGMENTS);
 
   return (
     <div className="flex items-center">
@@ -132,6 +216,37 @@ export function RecordControls({ isRecording, disabled, listInputDevices, onStar
               No inputs detected yet. Allow microphone access, then reopen this menu.
             </p>
           )}
+          <DropdownMenuSeparator />
+          <div className="px-2 py-1.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] text-muted-foreground">Input level</span>
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {Math.round(level * 100)}%
+              </span>
+            </div>
+            <div className="flex items-center gap-[2px] h-3" aria-hidden>
+              {Array.from({ length: SEGMENTS }).map((_, i) => {
+                const lit = i < litSegments;
+                const color =
+                  i >= SEGMENTS - 2
+                    ? "bg-red-500"
+                    : i >= SEGMENTS - 5
+                      ? "bg-yellow-400"
+                      : "bg-green-500";
+                return (
+                  <div
+                    key={i}
+                    className={`flex-1 h-full rounded-[1px] transition-colors duration-75 ${
+                      lit ? color : "bg-white/10"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Speak or play to confirm the right input is selected.
+            </p>
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
