@@ -146,6 +146,23 @@ function parseWav(buf: Buffer): WavFormat {
   throw new Error("Invalid WAV: no data chunk found");
 }
 
+/**
+ * Validate that a buffer is a well-formed RIFF/WAV with a non-trivial data
+ * chunk. Reuses `parseWav` (RIFF/WAVE magic + fmt + data chunk) and additionally
+ * requires the data payload to carry at least one full sample frame so that
+ * truncated or empty "audio/*" responses are rejected.
+ */
+export function isValidWav(buf: Buffer): boolean {
+  try {
+    const { numChannels, bitsPerSample, dataSize } = parseWav(buf);
+    if (numChannels < 1 || bitsPerSample < 8) return false;
+    const frameBytes = numChannels * (bitsPerSample / 8);
+    return frameBytes > 0 && dataSize >= frameBytes;
+  } catch {
+    return false;
+  }
+}
+
 /** Build a canonical 44-byte PCM WAV header for the given format + data size. */
 function buildWavHeader(
   numChannels:   number,
