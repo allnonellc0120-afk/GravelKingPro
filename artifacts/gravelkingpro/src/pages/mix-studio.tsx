@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import { Upload, Lock, Download, Music, Mic, Square } from "lucide-react";
+import { Upload, Lock, Download, Music } from "lucide-react";
 import { useDAW } from "@/lib/daw/useDAW";
 import { Transport } from "@/components/daw/Transport";
 import { ChannelStrip } from "@/components/daw/ChannelStrip";
 import { MasterBus } from "@/components/daw/MasterBus";
 import { TimelineRuler } from "@/components/daw/TimelineRuler";
 import { ProjectManager } from "@/components/daw/ProjectManager";
+import { RecordControls } from "@/components/daw/RecordControls";
 
 function ProGate() {
   return (
@@ -110,18 +111,13 @@ export default function MixStudio() {
               onSave={daw.getProjectSnapshot}
               onLoad={daw.restoreProject}
             />
-            <button
-              onClick={() => (daw.isRecording ? daw.stopRecording() : daw.startRecording())}
+            <RecordControls
+              isRecording={daw.isRecording}
               disabled={!daw.isRecording && daw.tracks.length >= 8}
-              title={daw.isRecording ? "Stop recording" : "Record from microphone or audio input"}
-              className={`flex items-center gap-1.5 text-xs rounded px-2.5 py-1 border transition-colors disabled:opacity-40 ${
-                daw.isRecording
-                  ? "text-white bg-red-500/80 border-red-400/60 animate-pulse"
-                  : "text-red-400 hover:text-red-300 border-red-500/25 hover:border-red-400/40"
-              }`}
-            >
-              {daw.isRecording ? <><Square className="w-3 h-3" /> Stop</> : <><Mic className="w-3 h-3" /> Record</>}
-            </button>
+              listInputDevices={daw.listInputDevices}
+              onStart={daw.startRecording}
+              onStop={daw.stopRecording}
+            />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 border border-amber-500/25 rounded px-2.5 py-1 hover:border-amber-400/40 transition-colors"
