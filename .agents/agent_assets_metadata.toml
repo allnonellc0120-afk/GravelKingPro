@@ -77,3 +77,15 @@ id = "0bGSRLzCk7DLVtbry7L7A"
 uri = "file://artifacts/gravelkingpro-promo/public/audio/gravelking_pro_soundtrack.mp3"
 type = "audio"
 title = "gravelking_pro_soundtrack"
+
+[[outputs]]
+id = "dLolvStuoJdfJufxjGvra"
+uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_WhitePaper.pdf"
+type = "pdf"
+title = "GravelKingPro MLK v3 White Paper (PDF)"
+
+[[outputs]]
+id = "Kap8xFsaJ_kX--TvbfwwH"
+uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_PitchDeck.pdf"
+type = "pdf"
+title = "GravelKingPro MLK v3 Pitch Deck (PDF)"
