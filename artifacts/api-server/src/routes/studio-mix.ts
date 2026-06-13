@@ -2,12 +2,13 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { unlink } from "fs/promises";
+import { readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio } from "../lib/entitlement";
+import { applyMLKv3 } from "../kernel-v3";
 
 const execFileAsync = promisify(execFile);
 
@@ -80,6 +81,7 @@ studioRouter.post(
 
     try {
       // Validate each track: extension + duration
+      const durations: number[] = [];
       for (const file of files) {
         const ext = sanitizeExt(file.originalname);
         if (ext === "mid" || ext === "midi") {
@@ -94,6 +96,7 @@ studioRouter.post(
           });
           return;
         }
+        durations.push(duration);
       }
 
       const arrangement = (req.body.arrangement as string) === "layer" ? "layer" : "sequential";
@@ -107,6 +110,21 @@ studioRouter.post(
       const pitchRatio = Math.pow(2, totalSemitones / 12);
       const clampedPitch = Math.min(Math.max(pitchRatio, 0.1), 4.0);
       const clampedSpeed = Math.min(Math.max(speed, 0.25), 4.0);
+
+      // Bound total output duration so the buffered MLK v3 carve cannot OOM the
+      // API. Sequential mixes sum track lengths; layered mixes take the longest.
+      // Speeds below 1.0 lengthen the output (output duration ≈ input / speed).
+      const combinedInput =
+        arrangement === "sequential"
+          ? durations.reduce((a, b) => a + b, 0)
+          : Math.max(...durations);
+      if (combinedInput / clampedSpeed > MAX_AUDIO_DURATION_S) {
+        res.status(422).json({
+          success: false,
+          error: `The combined mix exceeds the maximum allowed duration of ${Math.floor(MAX_AUDIO_DURATION_S / 60)} minutes. Use fewer or shorter tracks, or a higher speed.`,
+        });
+        return;
+      }
 
       // Use the paths multer already wrote to disk
       const inputPaths = files.map((f) => f.path);
@@ -173,25 +191,20 @@ studioRouter.post(
 
       await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 120_000 });
 
-      // Stream the output file directly to avoid loading entire WAV into memory
-      const { createReadStream } = await import("fs");
-      const { stat } = await import("fs/promises");
-      const { size } = await stat(outputPath);
+      // Carve the combined mix through the MLK v3 kernel before returning it.
+      const mixedWav = await readFile(outputPath);
+      const { buf: carvedWav, parity } = applyMLKv3(mixedWav);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_mix.wav"`);
-      res.setHeader("Content-Length", String(size));
+      res.setHeader("Content-Length", String(carvedWav.length));
       res.setHeader("X-GK-Mode", "studio-mix");
       res.setHeader("X-GK-Routing", "local");
       res.setHeader("X-GK-Track-Count", String(n));
       res.setHeader("X-GK-Arrangement", arrangement);
-
-      const stream = createReadStream(outputPath);
-      stream.pipe(res);
-      await new Promise<void>((resolve, reject) => {
-        stream.on("end", resolve);
-        stream.on("error", reject);
-      });
+      res.setHeader("X-GK-Kernel", "MLK_v3");
+      res.setHeader("X-GK-Parity", parity);
+      res.send(carvedWav);
     } catch (err: any) {
       if (!res.headersSent) {
         res.status(500).json({ success: false, error: err.message ?? "Studio mix failed." });
