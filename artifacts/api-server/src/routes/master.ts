@@ -9,6 +9,7 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
+import { applyMLKv3 } from "../kernel-v3";
 
 /** Optional denoise stage folded into mastering (applied before the preset). */
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
@@ -187,13 +188,18 @@ masterRouter.post(
         await incrementUsage(usageUserId, "totalDownloads");
       }
 
+      // Carve the mastered output through the MLK v3 kernel before returning it.
+      const { buf: carvedBuffer, parity } = applyMLKv3(wavBuffer);
+
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_master_${presetName}.wav"`);
       res.setHeader("X-GK-Mode", "master");
       res.setHeader("X-GK-Preset", presetName);
       res.setHeader("X-GK-Denoise", denoise ? "true" : "false");
       res.setHeader("X-GK-Sample", isSample ? "true" : "false");
-      res.send(wavBuffer);
+      res.setHeader("X-GK-Kernel", "MLK_v3");
+      res.setHeader("X-GK-Parity", parity);
+      res.send(carvedBuffer);
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });
     } finally {

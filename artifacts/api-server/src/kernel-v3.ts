@@ -97,3 +97,94 @@ export function float32ToBuffer(samples: number[]): Buffer {
   }
   return buf;
 }
+
+// ── Shared WAV helper ─────────────────────────────────────────────────────────
+// Every audio route that produces a WAV runs its output through `applyMLKv3` so
+// the whole app applies the GravelKing MLK v3 protocol consistently.
+
+interface WavFormat {
+  numChannels:   number;
+  sampleRate:    number;
+  bitsPerSample: number;
+  dataOffset:    number;
+  dataSize:      number;
+}
+
+/**
+ * Parse a RIFF/WAVE buffer by walking its chunks. ffmpeg-written WAVs are not
+ * guaranteed to have a fixed 44-byte header — they may carry a LIST/INFO
+ * metadata chunk before (or after) the `data` chunk — so we must locate the
+ * `fmt ` and `data` chunks explicitly rather than assuming offsets.
+ */
+function parseWav(buf: Buffer): WavFormat {
+  if (
+    buf.length < 12 ||
+    buf.toString("ascii", 0, 4) !== "RIFF" ||
+    buf.toString("ascii", 8, 12) !== "WAVE"
+  ) {
+    throw new Error("Invalid WAV: missing RIFF/WAVE header");
+  }
+  let offset = 12;
+  let fmt: Omit<WavFormat, "dataOffset" | "dataSize"> | null = null;
+  while (offset + 8 <= buf.length) {
+    const chunkId   = buf.toString("ascii", offset, offset + 4);
+    const chunkSize = buf.readUInt32LE(offset + 4);
+    const body      = offset + 8;
+    if (chunkId === "fmt ") {
+      fmt = {
+        numChannels:   buf.readUInt16LE(body + 2),
+        sampleRate:    buf.readUInt32LE(body + 4),
+        bitsPerSample: buf.readUInt16LE(body + 14),
+      };
+    } else if (chunkId === "data") {
+      if (!fmt) throw new Error("Invalid WAV: data chunk before fmt chunk");
+      return { ...fmt, dataOffset: body, dataSize: Math.min(chunkSize, buf.length - body) };
+    }
+    // RIFF chunks are word-aligned (padded to an even byte count).
+    offset = body + chunkSize + (chunkSize % 2);
+  }
+  throw new Error("Invalid WAV: no data chunk found");
+}
+
+/** Build a canonical 44-byte PCM WAV header for the given format + data size. */
+function buildWavHeader(
+  numChannels:   number,
+  sampleRate:    number,
+  bitsPerSample: number,
+  dataSize:      number,
+): Buffer {
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const byteRate   = sampleRate * blockAlign;
+  const header     = Buffer.alloc(44);
+  header.write("RIFF", 0, "ascii");
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write("WAVE", 8, "ascii");
+  header.write("fmt ", 12, "ascii");
+  header.writeUInt32LE(16, 16);             // fmt chunk size (PCM)
+  header.writeUInt16LE(1, 20);              // audio format = PCM
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36, "ascii");
+  header.writeUInt32LE(dataSize, 40);
+  return header;
+}
+
+/**
+ * Apply the MLK v3 kernel to a pcm_s16le WAV buffer: parse the WAV, carve the
+ * PCM payload through `mlk_v3`, and re-encode with a canonical header. This is
+ * the single shared entry point used by every audio route.
+ */
+export function applyMLKv3(wavBuf: Buffer, multiplier: number = 0.75): { buf: Buffer; parity: string } {
+  const { numChannels, sampleRate, bitsPerSample, dataOffset, dataSize } = parseWav(wavBuf);
+  const pcm = wavBuf.subarray(dataOffset, dataOffset + dataSize);
+
+  const samples  = bufferToFloat32(pcm);
+  const { processed, stats } = mlk_v3(samples, multiplier, 2);
+  const outPcm   = float32ToBuffer(processed);
+
+  const header = buildWavHeader(numChannels, sampleRate, bitsPerSample, outPcm.length);
+  return { buf: Buffer.concat([header, outPcm]), parity: stats.parity };
+}

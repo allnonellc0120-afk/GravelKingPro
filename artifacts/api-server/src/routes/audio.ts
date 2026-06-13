@@ -5,7 +5,7 @@ import { promisify } from "util";
 import { writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
-import { gravelking_opt, verifyParity } from "../kernel";
+import { mlk_v3 } from "../kernel-v3";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 import { db, processRunsTable } from "@workspace/db";
 import {
@@ -75,7 +75,7 @@ async function tryRemoteProcessing(
 
     const wav = Buffer.from(await response.arrayBuffer());
     const responseHeaders: Record<string, string> = {};
-    ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count"].forEach((h) => {
+    ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count", "X-GK-Kernel"].forEach((h) => {
       const v = response.headers.get(h);
       if (v) responseHeaders[h] = v;
     });
@@ -532,24 +532,29 @@ audioRouter.post(
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
       res.setHeader("X-GK-Routing", "remote");
+      // The remote V3 kernel is the canonical MLK v3 processor; mark it so every
+      // standard response carries the MLK v3 marker. A remote-provided value wins.
+      res.setHeader("X-GK-Kernel", "MLK_v3");
       Object.entries(remote.headers).forEach(([k, v]) => res.setHeader(k, v));
       res.send(remote.wav);
       return;
     }
 
-    // Local kernel fallback
+    // Local kernel fallback — MLK v3 multi-band carving (matches the rest of the app).
     try {
       const { samples, sampleRate } = await decodeToFloat32(req.file.buffer, ext);
-      const result = gravelking_opt(Array.from(samples), multiplier, sliceSize);
-      const parityStatus = verifyParity(result.processed);
-      const wavBuffer = await encodeToWav(new Float32Array(result.processed), sampleRate);
+      const { processed, stats } = mlk_v3(Array.from(samples), multiplier, sliceSize);
+      const parityStatus = stats.parity;
+      const efficiency = stats.gainChange;
+      const decayRate = 1 - multiplier;
+      const wavBuffer = await encodeToWav(new Float32Array(processed), sampleRate);
 
       const event: TelemetryEvent = {
         routing: "local",
         parity: parityStatus,
-        efficiency: result.stats.efficiency.toFixed(4),
-        decayRate: result.stats.decayRate.toFixed(4),
-        sampleCount: String(result.processed.length),
+        efficiency: efficiency.toFixed(4),
+        decayRate: decayRate.toFixed(4),
+        sampleCount: String(processed.length),
         timestamp: new Date().toISOString(),
         remoteUrl: getRemoteUrl(),
       };
@@ -560,9 +565,9 @@ audioRouter.post(
           userId: req.user.id,
           routing: "local",
           parity: parityStatus,
-          efficiency: result.stats.efficiency,
-          decayRate: result.stats.decayRate,
-          sampleCount: result.processed.length,
+          efficiency,
+          decayRate,
+          sampleCount: processed.length,
           fileName: req.file.originalname,
         }).catch(() => {});
       }
@@ -571,9 +576,10 @@ audioRouter.post(
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
       res.setHeader("X-GK-Routing", "local");
       res.setHeader("X-GK-Parity", parityStatus);
-      res.setHeader("X-GK-Efficiency", result.stats.efficiency.toFixed(4));
-      res.setHeader("X-GK-Decay-Rate", result.stats.decayRate.toFixed(4));
-      res.setHeader("X-GK-Sample-Count", String(result.processed.length));
+      res.setHeader("X-GK-Efficiency", efficiency.toFixed(4));
+      res.setHeader("X-GK-Decay-Rate", decayRate.toFixed(4));
+      res.setHeader("X-GK-Sample-Count", String(processed.length));
+      res.setHeader("X-GK-Kernel", "MLK_v3");
       res.send(wavBuffer);
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
