@@ -62,6 +62,119 @@ function computeEQCurve(params: Record<string, number>): string {
   return points.join(" ");
 }
 
+// ── Interactive EQ graph (draggable band nodes) ────────────────────────────
+
+const EQ_W = 200, EQ_H = 60;
+const EQ_MIN_DB = -18, EQ_MAX_DB = 18;
+
+// Log-frequency axis spanning 20 Hz – 20 kHz (matches computeEQCurve).
+const freqToX = (f: number) => (Math.log(f / 20) / Math.log(1000)) * EQ_W;
+const xToFreq = (x: number) => 20 * Math.pow(1000, Math.max(0, Math.min(1, x / EQ_W)));
+const gainToY = (g: number) =>
+  EQ_H / 2 - (((g - EQ_MIN_DB) / (EQ_MAX_DB - EQ_MIN_DB)) - 0.5) * EQ_H * 0.9;
+const yToGain = (y: number) => {
+  const frac = 0.5 + (EQ_H / 2 - y) / (EQ_H * 0.9);
+  return frac * (EQ_MAX_DB - EQ_MIN_DB) + EQ_MIN_DB;
+};
+
+interface EQBand { freqKey: string; gainKey: string; fMin: number; fMax: number; label: string; }
+const EQ_BANDS: EQBand[] = [
+  { freqKey: "b1f", gainKey: "b1g", fMin: 20,   fMax: 500,   label: "Low" },
+  { freqKey: "b2f", gainKey: "b2g", fMin: 200,  fMax: 5000,  label: "Mid" },
+  { freqKey: "b3f", gainKey: "b3g", fMin: 1000, fMax: 16000, label: "Hi-Mid" },
+  { freqKey: "b4f", gainKey: "b4g", fMin: 4000, fMax: 20000, label: "High" },
+];
+
+function InteractiveEQ({ params, onUpdate }: {
+  params: Record<string, number>;
+  onUpdate: (key: string, value: number) => void;
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dragRef = useRef<number | null>(null);
+  const curve = computeEQCurve(params);
+
+  // Highlight the 0–3000 Hz region (where most musical body & presence lives).
+  const lowBandX = freqToX(3000);
+
+  const toViewBox = useCallback((clientX: number, clientY: number) => {
+    const rect = svgRef.current!.getBoundingClientRect();
+    return {
+      x: ((clientX - rect.left) / rect.width) * EQ_W,
+      y: ((clientY - rect.top) / rect.height) * EQ_H,
+    };
+  }, []);
+
+  const applyDrag = useCallback((bandIdx: number, clientX: number, clientY: number) => {
+    const band = EQ_BANDS[bandIdx];
+    const { x, y } = toViewBox(clientX, clientY);
+    const f = Math.round(Math.max(band.fMin, Math.min(band.fMax, xToFreq(x))));
+    const g = Math.round(Math.max(EQ_MIN_DB, Math.min(EQ_MAX_DB, yToGain(y))) * 2) / 2;
+    onUpdate(band.freqKey, f);
+    onUpdate(band.gainKey, g);
+  }, [toViewBox, onUpdate]);
+
+  const onPointerDown = useCallback((bandIdx: number) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    dragRef.current = bandIdx;
+    applyDrag(bandIdx, e.clientX, e.clientY);
+  }, [applyDrag]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (dragRef.current === null) return;
+    applyDrag(dragRef.current, e.clientX, e.clientY);
+  }, [applyDrag]);
+
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    dragRef.current = null;
+    try { (e.target as Element).releasePointerCapture(e.pointerId); } catch { /* noop */ }
+  }, []);
+
+  return (
+    <svg
+      ref={svgRef}
+      viewBox="0 0 200 60"
+      className="w-full rounded bg-black/40 border border-border/20 touch-none"
+      style={{ height: 60 }}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      {/* 0–3000 Hz focus region */}
+      <rect x="0" y="0" width={lowBandX} height={EQ_H} fill="#f59e0b" opacity="0.06" />
+      <line x1={lowBandX} y1="0" x2={lowBandX} y2={EQ_H} stroke="#f59e0b" strokeWidth="0.75" strokeDasharray="2 2" opacity="0.4" />
+      <text x={lowBandX - 3} y={EQ_H - 3} textAnchor="end" fontSize="6" fill="#f59e0b" opacity="0.7">3 kHz</text>
+      {/* 0 dB line */}
+      <line x1="0" y1="30" x2="200" y2="30" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+      {/* Response curve */}
+      <polyline points={curve} fill="none" stroke="#f59e0b" strokeWidth="1.5" />
+      {/* Draggable band nodes */}
+      {EQ_BANDS.map((band, i) => {
+        const f = params[band.freqKey] ?? band.fMin;
+        const g = params[band.gainKey] ?? 0;
+        const inFocus = f <= 3000;
+        return (
+          <g key={band.freqKey}>
+            <circle
+              cx={freqToX(f)}
+              cy={gainToY(g)}
+              r={dragRef.current === i ? 4.5 : 3.5}
+              fill={inFocus ? "#f59e0b" : "#64748b"}
+              stroke="#000"
+              strokeWidth="0.75"
+              className="cursor-grab"
+              style={{ touchAction: "none" }}
+              onPointerDown={onPointerDown(i)}
+            >
+              <title>{`${band.label}: ${Math.round(f)} Hz, ${g.toFixed(1)} dB — drag to adjust`}</title>
+            </circle>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ── Knob-style param control ───────────────────────────────────────────────
 
 function ParamRow({ meta, value, onChange }: {
@@ -93,15 +206,16 @@ function PluginPanel({ plugin, onUpdate }: {
 }) {
   const meta = PLUGIN_PARAM_META[plugin.type];
   const params = plugin.params;
-  const eqPoints = plugin.type === "eq" ? computeEQCurve(params) : null;
 
   return (
     <div className="space-y-2 pt-1">
-      {eqPoints && (
-        <svg viewBox="0 0 200 60" className="w-full rounded bg-black/40 border border-border/20" style={{ height: 60 }}>
-          <line x1="0" y1="30" x2="200" y2="30" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-          <polyline points={eqPoints} fill="none" stroke="#f59e0b" strokeWidth="1.5" />
-        </svg>
+      {plugin.type === "eq" && (
+        <>
+          <InteractiveEQ params={params} onUpdate={onUpdate} />
+          <p className="text-[9px] text-muted-foreground/70 text-center -mt-1">
+            Drag the dots to shape the curve · highlighted band = 0–3 kHz
+          </p>
+        </>
       )}
       {meta.map(m => (
         <ParamRow

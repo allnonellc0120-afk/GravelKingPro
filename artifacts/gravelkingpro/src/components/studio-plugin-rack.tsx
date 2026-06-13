@@ -65,7 +65,7 @@ function PluginRow({ label, accent, emoji, enabled, onToggle, locked, lockLabel,
 
         {locked ? (
           <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
-            {lockLabel ?? "PRO"}
+            {lockLabel ?? "STUDIO"}
           </span>
         ) : (
           <div className="text-muted-foreground">
@@ -121,7 +121,7 @@ export function StudioPluginRack({ plugins, onChange, isPro, hasSplits }: Props)
         {!isPro && (
           <Link href="/pricing">
             <span className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer underline underline-offset-2">
-              Unlock All → Pro
+              Unlock All → Studio
             </span>
           </Link>
         )}
@@ -135,7 +135,7 @@ export function StudioPluginRack({ plugins, onChange, isPro, hasSplits }: Props)
         enabled={plugins.eq.enabled}
         onToggle={(v) => onChange("eq", { enabled: v })}
         locked={!canEq}
-        lockLabel={hasSplits ? undefined : "SPLITS"}
+        lockLabel={hasSplits ? undefined : "WEEKLY"}
       >
         <ParamRow label="Low Shelf" value={plugins.eq.low[0] > 0 ? `+${plugins.eq.low[0]}` : String(plugins.eq.low[0])} unit=" dB">
           <Slider value={plugins.eq.low} onValueChange={(v) => onChange("eq", { low: v })} min={-12} max={12} step={0.5} />
@@ -209,7 +209,7 @@ export function StudioPluginRack({ plugins, onChange, isPro, hasSplits }: Props)
         <div className="flex items-center gap-2 mt-2 p-2.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
           <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           <p className="text-[11px] text-amber-400/80">
-            Plugin chain is a <strong>Pro</strong> feature. EQ unlocks with <strong>Splits</strong>.{" "}
+            Plugin chain is a <strong>Studio</strong> feature. EQ unlocks with <strong>Weekly</strong>.{" "}
             <Link href="/pricing" className="underline text-amber-400 hover:text-amber-300">Upgrade →</Link>
           </p>
         </div>

@@ -1,15 +1,18 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { ChevronDown, ChevronUp, RotateCcw, Scissors, Trash2, ZoomIn, ZoomOut } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
-import { TrackState, PluginType, PluginDef, Region } from "@/lib/daw/types";
+import { TrackState, PluginType, Region } from "@/lib/daw/types";
 import { Waveform } from "./Waveform";
 import { PluginRack } from "./PluginRack";
+import { Knob } from "./Knob";
+import { TrackMeter } from "./TrackMeter";
 
 interface ChannelStripProps {
   track: TrackState;
   position: number;
   bpm?: number;
   totalDuration?: number;
+  isPlaying?: boolean;
+  getTrackAnalyser?: (id: string) => AnalyserNode | null;
   onSeek: (secs: number) => void;
   onRemove: (id: string) => void;
   onVolumeChange: (id: string, v: number) => void;
@@ -29,7 +32,7 @@ interface ChannelStripProps {
 }
 
 export function ChannelStrip({
-  track, position, bpm, totalDuration, onSeek, onRemove,
+  track, position, bpm, totalDuration, isPlaying, getTrackAnalyser, onSeek, onRemove,
   onVolumeChange, onPanChange, onToggleMute, onToggleSolo,
   onAddPlugin, onRemovePlugin, onTogglePlugin, onUpdatePlugin, onReorderPlugin,
   onSetRegion, onApplyTrim, onApplyDelete, onResetEdit, onSetStartOffset,
@@ -37,6 +40,14 @@ export function ChannelStrip({
   const [showPlugins, setShowPlugins] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [scrollOffset, setScrollOffset] = useState(0);
+
+  const getAnalyser = useCallback(
+    () => (getTrackAnalyser ? getTrackAnalyser(track.id) : null),
+    [getTrackAnalyser, track.id],
+  );
+
+  // Convert linear track volume (0–1.x) to a dB readout for the knob display.
+  const volDb = track.volume > 0.0001 ? 20 * Math.log10(track.volume) : -60;
 
   const fmtOffset = (secs: number) => {
     if (bpm && bpm > 0) {
@@ -125,36 +136,34 @@ export function ChannelStrip({
 
       {/* Body: volume + waveform */}
       <div className="flex gap-0 bg-black/20">
-        {/* Left: fader + pan */}
-        <div className="flex flex-col items-center gap-2 px-2 py-3 border-r border-border/10 w-14 shrink-0">
-          {/* Volume fader (vertical) */}
-          <div className="flex-1 flex items-center justify-center w-full">
-            <div className="h-24 flex items-center">
-              <Slider
-                orientation="vertical"
-                value={[Math.round(track.volume * 100)]}
-                onValueChange={([v]) => onVolumeChange(track.id, v / 100)}
-                min={0} max={100} step={1}
-                className="h-full"
-              />
-            </div>
-          </div>
-          <span className="text-[9px] font-mono text-muted-foreground">
-            {Math.round(track.volume * 100)}
-          </span>
+        {/* Left: meter + detented volume/pan knobs */}
+        <div className="flex flex-col items-center gap-2.5 px-2 py-3 border-r border-border/10 w-[72px] shrink-0">
+          {/* Live per-stem level meter */}
+          <TrackMeter getAnalyser={getAnalyser} active={!!isPlaying} color={track.color} />
 
-          {/* Pan */}
-          <div className="w-full space-y-0.5">
-            <Slider
-              value={[Math.round(track.pan * 100)]}
-              onValueChange={([v]) => onPanChange(track.id, v / 100)}
-              min={-100} max={100} step={1}
-              className="w-full"
-            />
-            <div className="text-[9px] font-mono text-center text-muted-foreground">
-              {track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(-track.pan * 100)}`}
-            </div>
-          </div>
+          {/* Volume — detented knob (snaps to 5% steps, double-click → 100%/0 dB) */}
+          <Knob
+            value={Math.round(track.volume * 100)}
+            min={0} max={150} step={5}
+            detentCenter={100}
+            size={42}
+            color={track.color}
+            label="Vol"
+            display={`${volDb <= -60 ? "-∞" : volDb.toFixed(1)} dB`}
+            onChange={v => onVolumeChange(track.id, v / 100)}
+          />
+
+          {/* Pan — detented knob with center detent */}
+          <Knob
+            value={Math.round(track.pan * 100)}
+            min={-100} max={100} step={5}
+            detentCenter={0}
+            size={38}
+            color={track.color}
+            label="Pan"
+            display={track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(-track.pan * 100)}`}
+            onChange={v => onPanChange(track.id, v / 100)}
+          />
         </div>
 
         {/* Right: waveform + region context menu */}

@@ -155,6 +155,7 @@ interface ActiveTrack {
   source: AudioBufferSourceNode;
   gain: GainNode;
   pan: StereoPannerNode;
+  analyser: AnalyserNode;
   plugins: Map<string, PluginNodeResult>;
 }
 
@@ -173,10 +174,16 @@ export function useDAW() {
     { id: "m-lim", type: "compressor", enabled: true,  params: { threshold: -1, ratio: 20, attack: 0, release: 100, knee: 0, makeup: 0 } },
   ]);
 
+  const [isRecording, setIsRecording] = useState(false);
+
   const ctxRef         = useRef<AudioContext | null>(null);
   const activeTracksRef = useRef<Map<string, ActiveTrack>>(new Map());
+  const trackAnalRef   = useRef<Map<string, AnalyserNode>>(new Map());
   const masterGainRef  = useRef<GainNode | null>(null);
   const masterAnalRef  = useRef<AnalyserNode | null>(null);
+  const recStreamRef   = useRef<MediaStream | null>(null);
+  const recorderRef    = useRef<MediaRecorder | null>(null);
+  const recChunksRef   = useRef<Blob[]>([]);
   const masterPlugNR   = useRef<Map<string, PluginNodeResult>>(new Map());
   const rafRef         = useRef<number>(0);
   const playStartRef   = useRef<number>(0);
@@ -206,6 +213,7 @@ export function useDAW() {
       try { at.source.stop(); } catch {}
     });
     activeTracksRef.current.clear();
+    trackAnalRef.current.clear();
     masterPlugNR.current.clear();
     setIsPlaying(false);
     isPlayingRef.current = false;
@@ -278,13 +286,19 @@ export function useDAW() {
       gainNode.connect(panNode);
       panNode.connect(masterGain);
 
+      // Per-track analyser for live level metering (taps the post-fader signal).
+      const trackAnal = ctx.createAnalyser();
+      trackAnal.fftSize = 256;
+      panNode.connect(trackAnal);
+      trackAnalRef.current.set(track.id, trackAnal);
+
       // startOffset places the clip later in the timeline:
       //   clipOffset = how far into the buffer to start (if we're already past clipStart)
       //   clipDelay  = how long after startAt to schedule the source (if clipStart is in future)
       const clipOffset = Math.max(0, offset - clipStart);
       const clipDelay  = Math.max(0, clipStart - offset);
       source.start(startAt + clipDelay, clipOffset);
-      activeTracksRef.current.set(track.id, { source, gain: gainNode, pan: panNode, plugins: plugMap });
+      activeTracksRef.current.set(track.id, { source, gain: gainNode, pan: panNode, analyser: trackAnal, plugins: plugMap });
     }
 
     offsetRef.current = offset;
@@ -370,6 +384,82 @@ export function useDAW() {
     if (isPlayingRef.current) stop();
     setTracks(prev => prev.filter(t => t.id !== id));
   }, [stop]);
+
+  // ── live recording (getUserMedia → MediaRecorder → new track) ──
+  // deviceId is optional: pass a specific input (mic / USB / interface) chosen
+  // from enumerateDevices, or omit for the system default.
+  const startRecording = useCallback(async (deviceId?: string) => {
+    if (recorderRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast({ title: "Recording unavailable", description: "This device or browser does not support audio capture.", variant: "destructive" });
+      return;
+    }
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: deviceId
+          ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+          : { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      recStreamRef.current = stream;
+      recChunksRef.current = [];
+
+      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "";
+      const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      recorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        const blob = new Blob(recChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        recStreamRef.current?.getTracks().forEach(t => t.stop());
+        recStreamRef.current = null;
+        recorderRef.current = null;
+        recChunksRef.current = [];
+        setIsRecording(false);
+        if (blob.size === 0) return;
+        const stamp = new Date().toLocaleTimeString().replace(/[: ]/g, "-");
+        const file = new File([blob], `Recording ${stamp}.webm`, { type: blob.type });
+        await addTrack(file);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (e: any) {
+      recStreamRef.current?.getTracks().forEach(t => t.stop());
+      recStreamRef.current = null;
+      recorderRef.current = null;
+      setIsRecording(false);
+      const denied = e?.name === "NotAllowedError" || e?.name === "SecurityError";
+      toast({
+        title: denied ? "Microphone blocked" : "Could not start recording",
+        description: denied ? "Allow microphone access in your browser to record." : (e?.message ?? "Unknown error"),
+        variant: "destructive",
+      });
+    }
+  }, [toast, addTrack]);
+
+  const stopRecording = useCallback(() => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  }, []);
+
+  const listInputDevices = useCallback(async (): Promise<MediaDeviceInfo[]> => {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(d => d.kind === "audioinput");
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const getTrackAnalyser = useCallback((id: string): AnalyserNode | null => {
+    return trackAnalRef.current.get(id) ?? null;
+  }, []);
 
   // ── track strip controls (live) ──
   const setTrackVolume = useCallback((id: string, v: number) => {
@@ -726,6 +816,8 @@ export function useDAW() {
   return {
     tracks, isPlaying, position, masterVolume, loop, bpm, setBpm,
     masterPlugins, maxDuration, masterAnalRef,
+    isRecording, startRecording, stopRecording, listInputDevices,
+    getTrackAnalyser,
     addTrack, removeTrack,
     play, pause, stop, seek,
     setMasterVolume, setLoop,

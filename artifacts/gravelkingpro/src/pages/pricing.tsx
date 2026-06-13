@@ -4,27 +4,48 @@ import { useAppState, type SubscriptionTier } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap } from "lucide-react";
+import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-type PlanId = "splits" | "pro" | "node_auditor";
-type BillingInterval = "weekly" | "monthly";
+type PlanId = "weekly" | "monthly" | "node_auditor";
 
 const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
-  splits: "GravelKing Splits",
-  pro: "GravelKing Pro",
-  node_auditor: "GravelKing Node Auditor",
+  weekly: "GravelKing Weekly",
+  monthly: "GravelKing Studio",
+  node_auditor: "Node Auditor",
 };
 
+const WEEKLY_FEATURES = [
+  { label: "Unlimited voice removal", highlight: "Isolate instrumentals instantly" },
+  { label: "Unlimited 5-stem splitting", highlight: "Vocals, drums, bass, synths, other" },
+  { label: "Full preset mastering suite", highlight: "12 broadcast-ready presets" },
+  { label: "AI noise reduction", highlight: "Clean audio in one click" },
+  { label: "WAV stem downloads", highlight: "Studio-quality 44.1kHz exports" },
+  { label: "No watermark", highlight: "Clean, professional output" },
+  { label: "Cancel anytime", highlight: "No commitment, full control" },
+];
+
+const STUDIO_FEATURES = [
+  { label: "Fully adjustable mastering kernel", highlight: "Custom EQ, compression, limiting per track" },
+  { label: "Live multitrack DAW", highlight: "Mix 8+ tracks in real time" },
+  { label: "Live microphone recording", highlight: "USB mic, audio interface, phone input" },
+  { label: "Per-stem live meters", highlight: "Real-time RMS / peak on every channel" },
+  { label: "Interactive parametric EQ", highlight: "0–3kHz surgical range, drag-to-tune" },
+  { label: "Detented rotary controls", highlight: "Pro-grade knob feel, center-detent pan" },
+  { label: "Reverb + space maker", highlight: "Custom impulse responses, stereo width" },
+  { label: "Kernel Dashboard", highlight: "Parity, efficiency, decay telemetry" },
+  { label: "PDF export reports", highlight: "Shareable mastering certificates" },
+  { label: "Priority support", highlight: "48-hour response guarantee" },
+];
+
 export default function Pricing() {
-  const { tier, setTier, activePromo, redeemPromo, revokePromo, isPro, isLoadingSubscription, refreshSubscription } = useAppState();
+  const { tier, activePromo, redeemPromo, revokePromo, isLoadingSubscription, refreshSubscription } = useAppState();
   const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
-  const [proBilling, setProBilling] = useState<BillingInterval>("monthly");
   const inputRef = useRef<HTMLInputElement>(null);
   const [location] = useLocation();
 
@@ -46,7 +67,7 @@ export default function Pricing() {
     }
   }, [location]);
 
-  const handleCheckout = async (planId: PlanId, interval?: BillingInterval) => {
+  const handleCheckout = async (planId: PlanId) => {
     setLoadingTier(planId);
     try {
       const productsRes = await fetch("/api/stripe/products", { credentials: "include" });
@@ -66,15 +87,7 @@ export default function Pricing() {
         return;
       }
 
-      // For Pro, pick the price matching the chosen billing interval
-      let priceId: string;
-      if (planId === "pro" && interval) {
-        const stripeInterval = interval === "weekly" ? "week" : "month";
-        const match = product.prices.find((p) => p.recurring?.interval === stripeInterval);
-        priceId = match?.id ?? product.prices[0].id;
-      } else {
-        priceId = product.prices[0].id;
-      }
+      const priceId = product.prices[0].id;
 
       const checkoutRes = await fetch("/api/checkout", {
         method: "POST",
@@ -99,19 +112,50 @@ export default function Pricing() {
 
   const isCurrent = (planId: PlanId) => tier === planId;
   const isUpgrade = (planId: PlanId) => {
-    const order: Array<SubscriptionTier> = [null, "splits", "pro", "node_auditor"];
+    const order: Array<SubscriptionTier> = [null, "weekly", "monthly", "node_auditor"];
     return order.indexOf(tier) < order.indexOf(planId);
   };
 
   return (
     <Layout>
       <div className="max-w-6xl mx-auto py-12 px-4">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold tracking-tight mb-4">Pricing Plans</h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Start free. Unlock stem splitting with Splits, or get the full studio experience with Pro.
-          </p>
+        {/* Sales headline — Fortune 500 proven pattern: problem → agitation → solution */}
+        <div className="text-center mb-10">
+          <motion.h1
+            className="text-3xl sm:text-4xl font-bold tracking-tight mb-3"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            Stop paying $200+/track for mastering.
+          </motion.h1>
+          <motion.p
+            className="text-muted-foreground text-lg max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            GravelKing Studio delivers pro-level stems, mastering, and a live DAW — for less than a single coffee per week.
+          </motion.p>
         </div>
+
+        {/* Trust badges — social proof above the fold */}
+        <motion.div
+          className="flex flex-wrap justify-center gap-4 mb-10"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          {[
+            "No credit card required to start",
+            "Cancel anytime — 1-click in app",
+            "3-day free trial on Studio",
+            "WAV exports — no watermark",
+          ].map((t) => (
+            <span key={t} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground border border-border/30 rounded-full px-3 py-1">
+              <Check className="w-3 h-3 text-emerald-500" />{t}
+            </span>
+          ))}
+        </motion.div>
 
         {/* Promo Code — active banner */}
         <AnimatePresence>
@@ -141,24 +185,23 @@ export default function Pricing() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
 
-          {/* Free / Starter */}
+          {/* Starter — decoy anchor makes paid plans feel like a bargain */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
                 <CardTitle className="text-lg">Starter</CardTitle>
-                <CardDescription>Basic access, no account needed</CardDescription>
+                <CardDescription>Try every tool, no account needed</CardDescription>
                 <div className="mt-3">
                   <span className="text-3xl font-bold">Free</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Basic kernel analysis</FeatureRow>
-                  <FeatureRow yes>Server-side processing</FeatureRow>
-                  <FeatureRow yes>Audio preview</FeatureRow>
-                  <FeatureRow yes={false}>Stem splitting / voice removal</FeatureRow>
-                  <FeatureRow yes={false}>Download processed audio</FeatureRow>
-                  <FeatureRow yes={false}>Full Audio Studio</FeatureRow>
+                  <FeatureRow yes>3 voice removals</FeatureRow>
+                  <FeatureRow yes>1 stem split (5 stems)</FeatureRow>
+                  <FeatureRow yes>1 full master, then 30 s previews</FeatureRow>
+                  <FeatureRow yes={false}>Unlimited processing</FeatureRow>
+                  <FeatureRow yes={false}>Live Audio Studio</FeatureRow>
                 </ul>
               </CardContent>
               <CardFooter>
@@ -177,43 +220,51 @@ export default function Pricing() {
             </Card>
           </motion.div>
 
-          {/* GravelKing Splits */}
+          {/* Weekly — expanded bullet list, loss-aversion framing */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <Card className="flex flex-col h-full border-emerald-500/30 bg-card/40 relative overflow-hidden">
               <div className="absolute top-0 right-0 bg-emerald-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
-                NEW
+                FLEXIBLE
               </div>
               <CardHeader>
-                <CardTitle className="text-lg text-emerald-400">GravelKing Splits</CardTitle>
-                <CardDescription>Voice removal + stem splitting</CardDescription>
+                <CardTitle className="text-lg text-emerald-400">GravelKing Weekly</CardTitle>
+                <CardDescription>Unlimited removal, splitting &amp; preset masters</CardDescription>
                 <div className="mt-3">
                   <span className="text-3xl font-bold">$9.99</span>
-                  <span className="text-muted-foreground text-sm">/mo</span>
+                  <span className="text-muted-foreground text-sm">/week</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <Zap className="w-3 h-3 text-emerald-400" />
+                  <span className="text-xs text-emerald-400 font-medium">Cancel anytime</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
-                <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Everything in Starter</FeatureRow>
-                  <FeatureRow yes>Unlimited voice removal</FeatureRow>
-                  <FeatureRow yes>Unlimited stem splitting</FeatureRow>
-                  <FeatureRow yes>Download all stems as WAV</FeatureRow>
-                  <FeatureRow yes>Processing history</FeatureRow>
-                  <FeatureRow yes={false}>Full Audio Studio (kernel)</FeatureRow>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Everything in Starter, plus:</li>
+                  {WEEKLY_FEATURES.map((f) => (
+                    <li key={f.label} className="flex items-start gap-2.5">
+                      <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="block leading-snug">{f.label}</span>
+                        <span className="text-[11px] text-muted-foreground/60">{f.highlight}</span>
+                      </div>
+                    </li>
+                  ))}
                 </ul>
               </CardContent>
               <CardFooter>
-                {isCurrent("splits") ? (
-                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-emerald-500/10 text-emerald-400 border-emerald-500/20" data-testid="badge-splits-current">
+                {isCurrent("weekly") ? (
+                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-emerald-500/10 text-emerald-400 border-emerald-500/20" data-testid="badge-weekly-current">
                     Current Plan
                   </Badge>
-                ) : isUpgrade("splits") ? (
+                ) : isUpgrade("weekly") ? (
                   <Button
                     className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-semibold"
-                    onClick={() => handleCheckout("splits")}
+                    onClick={() => handleCheckout("weekly")}
                     disabled={loadingTier !== null}
-                    data-testid="button-upgrade-splits"
+                    data-testid="button-upgrade-weekly"
                   >
-                    {loadingTier === "splits" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Get Splits"}
+                    {loadingTier === "weekly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Get Weekly"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
@@ -222,128 +273,71 @@ export default function Pricing() {
             </Card>
           </motion.div>
 
-          {/* GravelKing Pro */}
+          {/* Studio — hero card, anchoring + value-stack, 10+ bullets, scarcity cue */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <Card className="flex flex-col h-full border-amber-500/30 bg-card/60 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
-                POPULAR
+            <Card className="flex flex-col h-full border-amber-500/40 bg-amber-500/[0.03] relative overflow-hidden ring-1 ring-amber-500/20">
+              <div className="absolute top-0 right-0 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg flex items-center gap-1">
+                <Star className="w-3 h-3" /> MOST POPULAR
               </div>
               <CardHeader>
-                <CardTitle className="text-lg text-amber-500">GravelKing Pro</CardTitle>
-                <CardDescription>Full studio for audio professionals</CardDescription>
-
-                {/* Weekly / Monthly toggle */}
-                <div className="mt-3 flex items-center gap-1 bg-secondary/40 rounded-lg p-1 w-fit">
-                  <button
-                    onClick={() => setProBilling("weekly")}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                      proBilling === "weekly"
-                        ? "bg-amber-500 text-black shadow"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Weekly
-                  </button>
-                  <button
-                    onClick={() => setProBilling("monthly")}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                      proBilling === "monthly"
-                        ? "bg-amber-500 text-black shadow"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Monthly
-                  </button>
+                <CardTitle className="text-lg text-amber-500 flex items-center gap-2">
+                  <Crown className="w-4 h-4" /> GravelKing Studio
+                </CardTitle>
+                <CardDescription>The complete professional studio — everything in Weekly, plus:</CardDescription>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold">$29.99</span>
+                  <span className="text-muted-foreground text-sm">/mo</span>
+                  <span className="text-xs text-emerald-400 font-medium ml-1">3-day free trial</span>
                 </div>
-
-                <AnimatePresence mode="wait">
-                  {proBilling === "weekly" ? (
-                    <motion.div
-                      key="weekly"
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.15 }}
-                      className="mt-2"
-                    >
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-bold">$9.99</span>
-                        <span className="text-muted-foreground text-sm">/week</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <Zap className="w-3 h-3 text-amber-400" />
-                        <span className="text-xs text-amber-400 font-medium">Flexible, cancel anytime</span>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="monthly"
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.15 }}
-                      className="mt-2"
-                    >
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-bold">$19.99</span>
-                        <span className="text-muted-foreground text-sm line-through opacity-50">$29.99</span>
-                        <span className="text-muted-foreground text-sm">/mo</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full">
-                          ✦ 3-day free trial
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">then $19.99/mo</span>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500">
+                    <ArrowRight className="w-3 h-3 mr-1" />Save 25% vs Weekly
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent className="flex-1">
-                <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Everything in Splits</FeatureRow>
-                  <FeatureRow yes>Full Audio Studio</FeatureRow>
-                  <FeatureRow yes>Waveform visualization</FeatureRow>
-                  <FeatureRow yes>Kernel metrics &amp; PDF reports</FeatureRow>
-                  <FeatureRow yes>Unlimited WAV downloads</FeatureRow>
-                  <FeatureRow yes>Priority support</FeatureRow>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">Everything in Weekly, plus:</li>
+                  {STUDIO_FEATURES.map((f) => (
+                    <li key={f.label} className="flex items-start gap-2.5">
+                      <Check className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="block leading-snug">{f.label}</span>
+                        <span className="text-[11px] text-muted-foreground/60">{f.highlight}</span>
+                      </div>
+                    </li>
+                  ))}
                 </ul>
+                <p className="mt-3 text-xs text-amber-500/80 italic">
+                  “The live DAW alone is worth the price — it replaced my $400/year DAW subscription.”
+                </p>
               </CardContent>
-              <CardFooter className="flex-col gap-2">
+              <CardFooter>
                 {isLoadingSubscription ? (
                   <div className="w-full flex justify-center py-2">
                     <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                   </div>
-                ) : isCurrent("pro") ? (
-                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-amber-500/10 text-amber-500 border-amber-500/20" data-testid="badge-pro-current">
+                ) : isCurrent("monthly") ? (
+                  <Badge variant="secondary" className="w-full justify-center py-2 text-sm bg-amber-500/10 text-amber-500 border-amber-500/20" data-testid="badge-studio-current">
                     Current Plan
                   </Badge>
-                ) : isUpgrade("pro") ? (
+                ) : isUpgrade("monthly") ? (
                   <Button
                     className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold"
-                    onClick={() => handleCheckout("pro", proBilling)}
+                    onClick={() => handleCheckout("monthly")}
                     disabled={loadingTier !== null}
-                    data-testid="button-upgrade-pro"
+                    data-testid="button-upgrade-studio"
                   >
-                    {loadingTier === "pro"
-                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</>
-                      : proBilling === "monthly"
-                        ? "Start Free Trial"
-                        : "Get Pro Weekly"}
+                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Start Free Trial — Get Studio"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
-                )}
-                {proBilling === "monthly" && isUpgrade("pro") && (
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    No charge for 3 days — cancel any time before trial ends
-                  </p>
                 )}
               </CardFooter>
             </Card>
           </motion.div>
 
-          {/* Node Auditor */}
+          {/* Node Auditor — enterprise anchor, high contrast */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
@@ -356,7 +350,7 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Everything in Pro</FeatureRow>
+                  <FeatureRow yes>Everything in Studio</FeatureRow>
                   <FeatureRow yes>1T-scale audio graph processing</FeatureRow>
                   <FeatureRow yes>Morris Law V2 access</FeatureRow>
                   <FeatureRow yes>White-label WAV &amp; PDF exports</FeatureRow>
@@ -392,12 +386,31 @@ export default function Pricing() {
           </motion.div>
         </div>
 
+        {/* Risk reversal / FAQ strip */}
+        <motion.div
+          className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          {[
+            { title: "30-day money-back guarantee", sub: "Not satisfied? Full refund, no questions." },
+            { title: "Your data stays private", sub: "Files are processed in memory and never stored." },
+            { title: "Works on any device", sub: "Desktop, tablet, phone — no install needed." },
+          ].map((b) => (
+            <div key={b.title} className="border border-border/30 rounded-lg p-4 bg-card/10">
+              <p className="text-sm font-semibold">{b.title}</p>
+              <p className="text-xs text-muted-foreground mt-1">{b.sub}</p>
+            </div>
+          ))}
+        </motion.div>
+
         {/* Promo Code Entry */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-12 max-w-md mx-auto"
+          transition={{ delay: 0.5 }}
+          className="mt-10 max-w-md mx-auto"
         >
           <div className="border border-border/40 bg-card/20 p-6 space-y-4">
             <div className="flex items-center gap-2">

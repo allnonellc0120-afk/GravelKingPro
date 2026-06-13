@@ -3,6 +3,26 @@ import { eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import type { User } from '@workspace/db';
 
+/** Map a subscription's price/product into a canonical tier string. */
+function deriveTier(
+  metaTier: string | null,
+  interval: string | null,
+  unitAmount: number | null,
+): 'free' | 'weekly' | 'monthly' | 'node_auditor' {
+  if (metaTier === 'weekly' || metaTier === 'monthly' || metaTier === 'node_auditor') {
+    return metaTier;
+  }
+  // Legacy metadata values from the previous pricing structure.
+  if (metaTier === 'splits') return 'weekly';
+  if (metaTier === 'pro') return 'monthly';
+
+  // Fall back to deriving from the price shape.
+  if ((unitAmount ?? 0) >= 40000) return 'node_auditor';
+  if (interval === 'week') return 'weekly';
+  if (interval === 'month') return 'monthly';
+  return 'free';
+}
+
 export class Storage {
   async getUserBySession(sessionId: string): Promise<User | null> {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.sessionId, sessionId));
@@ -18,24 +38,50 @@ export class Storage {
     return user;
   }
 
-  async getUserSubscriptionStatus(user: User): Promise<{ isPro: boolean; plan: string | null }> {
+  async getUserSubscriptionStatus(
+    user: User,
+  ): Promise<{ isPro: boolean; plan: string | null; tier: string | null }> {
     if (!user.stripeCustomerId) {
-      return { isPro: false, plan: null };
+      return { isPro: false, plan: null, tier: null };
     }
 
+    // Resolve the active subscription's tier through its price/product.
+    // Prefer explicit product metadata.tier; fall back to price shape.
     const result = await db.execute(
-      sql`SELECT s.id, s.status
+      sql`SELECT p.metadata->>'tier' AS tier_meta,
+                 pr.recurring->>'interval' AS interval,
+                 pr.unit_amount AS unit_amount
           FROM stripe.subscriptions s
+          JOIN stripe.subscription_items si ON si.subscription = s.id
+          JOIN stripe.prices pr ON pr.id = si.price
+          LEFT JOIN stripe.products p ON p.id = pr.product
           WHERE s.customer = ${user.stripeCustomerId}
           AND s.status IN ('active', 'trialing')
-          LIMIT 1`
+          ORDER BY pr.unit_amount DESC NULLS LAST
+          LIMIT 1`,
     );
 
     if (result.rows.length === 0) {
-      return { isPro: false, plan: null };
+      return { isPro: false, plan: null, tier: null };
     }
 
-    return { isPro: true, plan: 'Pro' };
+    const row = result.rows[0] as Record<string, unknown>;
+    const tier = deriveTier(
+      row.tier_meta as string | null,
+      row.interval as string | null,
+      row.unit_amount as number | null,
+    );
+
+    const plan =
+      tier === 'node_auditor'
+        ? 'Node Auditor'
+        : tier === 'monthly'
+          ? 'Studio'
+          : tier === 'weekly'
+            ? 'Weekly'
+            : null;
+
+    return { isPro: tier !== 'free', plan, tier };
   }
 
   async linkStripeCustomer(userId: string, stripeCustomerId: string): Promise<User> {

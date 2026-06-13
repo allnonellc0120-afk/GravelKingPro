@@ -20,19 +20,19 @@ const TIER_META = {
     icon: <Zap className="w-4 h-4 text-muted-foreground" />,
     description: "Free plan — limited access",
   },
-  splits: {
-    label: "GravelKing Splits",
+  weekly: {
+    label: "GravelKing Weekly",
     color: "text-emerald-400",
     border: "border-emerald-500/30",
     icon: <Scissors className="w-4 h-4 text-emerald-400" />,
-    description: "Voice removal + unlimited stem splitting",
+    description: "Unlimited voice removal, stem splitting + preset masters",
   },
-  pro: {
-    label: "GravelKing Pro",
+  monthly: {
+    label: "GravelKing Studio",
     color: "text-amber-500",
     border: "border-amber-500/30",
     icon: <Crown className="w-4 h-4 text-amber-500" />,
-    description: "Full Audio Studio + all tools unlocked",
+    description: "Adjustable mastering kernel + live DAW unlocked",
   },
   node_auditor: {
     label: "Node Auditor",
@@ -44,10 +44,10 @@ const TIER_META = {
 } as const;
 
 const TIER_FEATURES: Record<string, string[]> = {
-  null:         ["Basic kernel analysis", "Audio preview (30s)"],
-  splits:       ["Everything in Starter", "Unlimited voice removal", "Unlimited stem splitting", "Download WAV stems"],
-  pro:          ["Everything in Splits", "Full Audio Studio", "Waveform + plugin chain", "PDF reports", "Unlimited WAV downloads"],
-  node_auditor: ["Everything in Pro", "Enterprise benchmarking", "Custom reports", "SLA guarantee", "Dedicated support"],
+  null:         ["3 free voice removals", "1 free stem split", "1 free full master", "Audio preview (30s)"],
+  weekly:       ["Everything in Starter", "Unlimited voice removal", "Unlimited 5-stem splitting", "All preset masters + denoise", "Download WAV stems"],
+  monthly:      ["Everything in Weekly", "Adjustable mastering kernel", "Live DAW + recording", "Waveform + plugin chain", "PDF reports"],
+  node_auditor: ["Everything in Studio", "Enterprise benchmarking", "Custom reports", "SLA guarantee", "Dedicated support"],
 };
 
 export default function Account() {
@@ -204,11 +204,11 @@ export default function Account() {
                     </Button>
                   </Link>
                 )}
-                {tier === "splits" && (
+                {tier === "weekly" && (
                   <Link href="/pricing" className="flex-1">
                     <Button className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2">
                       <Crown className="w-4 h-4" />
-                      Upgrade to Pro
+                      Upgrade to Studio
                     </Button>
                   </Link>
                 )}
@@ -224,7 +224,7 @@ export default function Account() {
               {[
                 { href: "/studio", label: "Audio Studio" },
                 { href: "/mix", label: "Mix Studio" },
-                { href: "/beatmaker", label: "Beat Maker" },
+                { href: "/beats", label: "Beats Library" },
                 { href: "/pricing", label: "View Plans" },
               ].map(({ href, label }) => (
                 <Link key={href} href={href}>

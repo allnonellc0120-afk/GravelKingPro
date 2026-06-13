@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
-import { hasPaidSubscription } from "../lib/entitlement";
+import { hasStudio } from "../lib/entitlement";
 
 const execFileAsync = promisify(execFile);
 
@@ -34,10 +34,6 @@ type VoicePreset = {
 
 const VOICE_PRESETS: Record<string, VoicePreset> = {
   normal:   { semitoneOffset: 0,  extraFilters: [] },
-  robot:    { semitoneOffset: -2, extraFilters: ["vibrato=f=30:d=0.85"] },
-  chipmunk: { semitoneOffset: 10, extraFilters: [] },
-  deep:     { semitoneOffset: -9, extraFilters: [] },
-  alien:    { semitoneOffset: 5,  extraFilters: ["aecho=0.8:0.9:50:0.4", "vibrato=f=6:d=0.5"] },
 };
 
 function buildAtempo(speed: number): string {
@@ -59,12 +55,12 @@ studioRouter.post(
   studioConcurrency,
   upload.array("tracks", 8),
   async (req: Request, res: Response) => {
-    // ── Pro subscription gate ────────────────────────────────────────────────────
-    if (!await hasPaidSubscription(req)) {
+    // ── Studio (monthly) subscription gate ───────────────────────────────────────
+    if (!await hasStudio(req)) {
       res.status(403).json({
         success: false,
-        error: "Mix Studio export requires a Pro subscription.",
-        code: "PRO_REQUIRED",
+        error: "The live DAW and Mix Studio export require a GravelKing Studio (monthly) subscription.",
+        code: "STUDIO_REQUIRED",
       });
       return;
     }

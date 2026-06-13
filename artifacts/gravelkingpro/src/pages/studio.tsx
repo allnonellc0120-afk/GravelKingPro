@@ -14,7 +14,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
-import { useAuth } from "@workspace/replit-auth-web";
 import { Link } from "wouter";
 import { getWaveformPoints } from "@/lib/audioKernel";
 import { WaveformScrubber, type WaveformScrubberHandle } from "@/components/waveform-scrubber";
@@ -22,9 +21,11 @@ import { StudioPluginRack, DEFAULT_PLUGIN_STATE, type PluginState } from "@/comp
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
 
 type ProcessState = "idle" | "loading" | "ready" | "processing" | "done";
-type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master" | "voice_change" | "denoise";
+type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master";
 
 const MASTER_PRESETS_UI = [
+  { id: "baseline",   label: "Baseline",    description: "Balanced, +10% low end at YouTube loudness. Recommended.", free: true,  emoji: "🎚️", accent: "#38bdf8", glow: "rgba(56,189,248,0.20)",  bg: "linear-gradient(135deg,#0c2a3f 0%,#06121c 100%)", img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&q=80" },
+  { id: "spacious",   label: "Spacious",    description: "Baseline + reverb & stereo space maker for width.", free: false, emoji: "🌌",  accent: "#a78bfa", glow: "rgba(167,139,250,0.20)", bg: "linear-gradient(135deg,#1e1b4b 0%,#0b0a1f 100%)", img: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=400&q=80" },
   { id: "normal",     label: "Normal",      description: "Balanced loudness. Good for any content.",        free: true,  emoji: "⚖️",  accent: "#94a3b8", glow: "rgba(148,163,184,0.18)", bg: "linear-gradient(135deg,#1e293b 0%,#0f172a 100%)", img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&q=80" },
   { id: "broadcast",  label: "Broadcast",   description: "EBU R128 broadcast standard. -23 LUFS.",          free: false, emoji: "📡",  accent: "#3b82f6", glow: "rgba(59,130,246,0.18)",   bg: "linear-gradient(135deg,#1e3a5f 0%,#0c1a2e 100%)", img: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=400&q=80" },
   { id: "vinyl",      label: "Vinyl",       description: "Warm analog character with boosted lows.",        free: false, emoji: "💿",  accent: "#f59e0b", glow: "rgba(245,158,11,0.18)",   bg: "linear-gradient(135deg,#451a03 0%,#1c0a00 100%)", img: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=400&q=80" },
@@ -37,15 +38,6 @@ const MASTER_PRESETS_UI = [
 ] as const;
 type MasterPresetId = (typeof MASTER_PRESETS_UI)[number]["id"];
 
-const VOICE_PRESETS_UI = [
-  { id: "normal",   label: "Normal",   description: "Light room ambience — subtle warmth.", emoji: "🎤", accent: "#94a3b8", glow: "rgba(148,163,184,0.15)", bg: "linear-gradient(135deg,#1e293b,#0f172a)" },
-  { id: "robot",    label: "Robot",    description: "Rapid vibrato + metallic echo.",        emoji: "🤖", accent: "#06b6d4", glow: "rgba(6,182,212,0.18)",   bg: "linear-gradient(135deg,#083344,#021726)" },
-  { id: "chipmunk", label: "Chipmunk", description: "Higher pitch and faster tempo.",         emoji: "🐿️", accent: "#f97316", glow: "rgba(249,115,22,0.18)", bg: "linear-gradient(135deg,#431407,#1f0a03)" },
-  { id: "deep",     label: "Deep",     description: "Lower pitch, slower, heavier.",          emoji: "🦁", accent: "#ef4444", glow: "rgba(239,68,68,0.18)",   bg: "linear-gradient(135deg,#450a0a,#1f0505)" },
-  { id: "alien",    label: "Alien",    description: "Vibrato + reverb + pitch shift.",         emoji: "👽", accent: "#4ade80", glow: "rgba(74,222,128,0.18)",  bg: "linear-gradient(135deg,#052e16,#021a0d)" },
-];
-type VoicePresetId = "normal" | "robot" | "chipmunk" | "deep" | "alien";
-
 const MODES: Array<{
   value: ProcessMode;
   label: string;
@@ -56,7 +48,7 @@ const MODES: Array<{
   {
     value: "master",
     label: "Mastering",
-    description: "Apply a professional mastering preset — Normal is free, 5 more for paid plans",
+    description: "Apply a professional mastering preset with optional denoise — first full download free",
     icon: <Wand2 className="w-4 h-4 text-sky-400" />,
     requiresStudio: false,
   },
@@ -70,52 +62,58 @@ const MODES: Array<{
   {
     value: "stem_split",
     label: "Stem Splitting",
-    description: "Splits into bass, midrange, highs (+ instrumental for stereo files)",
+    description: "Splits into 5 stems: vocals, drums, bass, other, and a full instrumental",
     icon: <Scissors className="w-4 h-4 text-emerald-400" />,
-    requiresStudio: false,
-  },
-  {
-    value: "voice_change",
-    label: "Voice Changer",
-    description: "Transform vocals with 5 effects: Robot, Chipmunk, Deep, Alien, Normal",
-    icon: <Volume2 className="w-4 h-4 text-pink-400" />,
-    requiresStudio: false,
-  },
-  {
-    value: "denoise",
-    label: "Denoise",
-    description: "Remove background hiss, hum, and broadband noise using FFT analysis",
-    icon: <Waves className="w-4 h-4 text-teal-400" />,
     requiresStudio: false,
   },
   {
     value: "standard",
     label: "GravelKing Kernel",
-    description: "Full kernel signal carving — amplitude, parity, efficiency (Pro only)",
+    description: "Full kernel signal carving — amplitude, parity, efficiency (Studio only)",
     icon: <Layers className="w-4 h-4 text-amber-500" />,
     requiresStudio: true,
   },
 ];
 
 const STEM_LABELS: Record<string, { label: string; color: string; description: string }> = {
-  "bass.wav":         { label: "Bass",        color: "text-orange-400",  description: "Sub-bass & bass (< 250 Hz)" },
-  "midrange.wav":     { label: "Midrange",    color: "text-amber-400",   description: "Instruments & melody (250 Hz – 4 kHz)" },
-  "highs.wav":        { label: "Highs",       color: "text-sky-400",     description: "Presence & air (> 4 kHz)" },
-  "instrumental.wav": { label: "Instrumental",color: "text-purple-400",  description: "Vocals removed (stereo only)" },
+  "GKP_vocals.wav":       { label: "Vocals",       color: "text-pink-400",    description: "Isolated lead & backing vocals" },
+  "GKP_drums.wav":        { label: "Drums",        color: "text-amber-400",   description: "Kick, snare, hats & percussion" },
+  "GKP_bass.wav":         { label: "Bass",         color: "text-orange-400",  description: "Bass guitar & sub-bass" },
+  "GKP_other.wav":        { label: "Other",        color: "text-sky-400",     description: "Synths, guitars & everything else" },
+  "GKP_instrumental.wav": { label: "Instrumental", color: "text-purple-400",  description: "Full mix with vocals removed" },
 };
+const STEM_ORDER = ["GKP_vocals.wav", "GKP_drums.wav", "GKP_bass.wav", "GKP_other.wav", "GKP_instrumental.wav"];
+
+type UsageRemaining = { voice_remove: number; stem_split: number; master: number };
+type PaywallInfo = { feature: ProcessMode; limit: number; used: number; message: string };
 
 export default function Studio() {
-  const { isPro, hasSplits, usedFreeSplit, setUsedFreeSplit } = useAppState();
-  const { isAuthenticated } = useAuth();
+  const { isPro, hasSplits } = useAppState();
   const { toast } = useToast();
+
+  // Server-driven free-use accounting. -1 = unlimited (paid). null = unknown.
+  const [remaining, setRemaining] = useState<UsageRemaining | null>(null);
+  const [paywall, setPaywall] = useState<PaywallInfo | null>(null);
+
+  const refreshUsage = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/usage/status", { credentials: "include" });
+      if (resp.ok) {
+        const data = await resp.json() as { remaining: UsageRemaining };
+        setRemaining(data.remaining);
+      }
+    } catch { /* offline — leave as-is */ }
+  }, []);
+
+  useEffect(() => { void refreshUsage(); }, [refreshUsage]);
 
   const [state, setState] = useState<ProcessState>("idle");
   const [progress, setProgress] = useState(0);
   const [multiplier, setMultiplier] = useState([0.75]);
   const [sliceSize, setSliceSize] = useState("2");
   const [mode, setMode] = useState<ProcessMode>("master");
-  const [masterPreset, setMasterPreset] = useState<MasterPresetId>("normal");
-  const [voicePreset, setVoicePreset] = useState<VoicePresetId>("normal");
+  const [masterPreset, setMasterPreset] = useState<MasterPresetId>("baseline");
+  const [denoiseOn, setDenoiseOn] = useState(false);
   const [tempo, setTempo] = useState([1.0]);
   const [semitones, setSemitones] = useState([0]);
   const [fileName, setFileName] = useState("");
@@ -124,6 +122,7 @@ export default function Studio() {
   const [waveformAfter, setWaveformAfter] = useState<number[]>([]);
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
+  const [processedFormat, setProcessedFormat] = useState<"wav" | "mp3">("wav");
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [stemBlobs, setStemBlobs] = useState<Array<{ name: string; blob: Blob }>>([]);
   const [stats, setStats] = useState<{
@@ -218,8 +217,8 @@ export default function Studio() {
   }, [plugins]);
 
   const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("audio/")) {
-      toast({ title: "Invalid file", description: "Please upload an audio file (MP3, WAV, etc.)", variant: "destructive" });
+    if (!file.type.startsWith("audio/") && !file.type.startsWith("video/")) {
+      toast({ title: "Invalid file", description: "Please upload an audio or video file (MP3, WAV, MP4, MOV, etc.)", variant: "destructive" });
       return;
     }
     if (originalUrl) URL.revokeObjectURL(originalUrl);
@@ -265,19 +264,8 @@ export default function Studio() {
     if (state !== "ready" || !loadedFileRef.current) return;
 
     if (mode === "standard" && !isPro) {
-      toast({ title: "Pro required", description: "GravelKing Kernel processing requires a Pro subscription.", variant: "destructive" });
+      toast({ title: "Studio required", description: "GravelKing Standard processing requires a Studio subscription.", variant: "destructive" });
       return;
-    }
-
-    if (mode === "voice_remove" || mode === "stem_split") {
-      if (!isAuthenticated) {
-        toast({ title: "Sign in required", description: "Please sign in to use voice removal and stem splitting.", variant: "destructive" });
-        return;
-      }
-      if (!hasSplits && usedFreeSplit) {
-        toast({ title: "Free trial used", description: "Upgrade to GravelKing Splits for unlimited voice removal and stem splitting.", variant: "destructive" });
-        return;
-      }
     }
 
     setState("processing");
@@ -302,12 +290,21 @@ export default function Studio() {
         const formData = new FormData();
         formData.append("audio", loadedFileRef.current);
         formData.append("preset", masterPreset);
+        formData.append("denoise", denoiseOn ? "true" : "false");
         const response = await fetch("/api/kernel/master", {
           method: "POST",
           credentials: "include",
           body: formData,
         });
         clearInterval(progressInterval);
+        if (response.status === 402) {
+          const err = await response.json().catch(() => null);
+          if (err?.code === "LIMIT_REACHED") {
+            setPaywall({ feature: "master", limit: err.limit ?? 1, used: err.used ?? 1, message: err.error ?? "" });
+            setState("ready");
+            return;
+          }
+        }
         if (!response.ok) {
           const err = await response.json().catch(() => ({ error: "Mastering failed." }));
           throw new Error(err.error ?? "Mastering failed.");
@@ -338,7 +335,6 @@ export default function Studio() {
       formData.append("mode", mode);
       formData.append("tempo", String(tempo[0]));
       formData.append("semitones", String(semitones[0]));
-      if (mode === "voice_change") formData.append("voice_preset", voicePreset);
 
       const response = await fetch("/api/kernel/process-audio", {
         method: "POST",
@@ -348,10 +344,26 @@ export default function Studio() {
 
       clearInterval(progressInterval);
 
+      if (response.status === 402) {
+        const err = await response.json().catch(() => null);
+        if (err?.code === "LIMIT_REACHED") {
+          setPaywall({
+            feature: (err.feature as ProcessMode) ?? mode,
+            limit: err.limit ?? 0,
+            used: err.used ?? 0,
+            message: err.error ?? "",
+          });
+          setState("ready");
+          return;
+        }
+      }
+
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: "Server error" }));
         throw new Error(err.error || "Processing failed");
       }
+
+      const freeRemainingHeader = response.headers.get("X-GK-Free-Remaining");
 
       setProgress(95);
       const contentType = response.headers.get("content-type") ?? "";
@@ -376,7 +388,9 @@ export default function Studio() {
 
         setProgress(100);
         setState("done");
-        if (!hasSplits && !usedFreeSplit) setUsedFreeSplit(true);
+        if (freeRemainingHeader !== null) {
+          setRemaining((r) => r ? { ...r, stem_split: Math.max(0, parseInt(freeRemainingHeader, 10)) } : r);
+        }
         return;
       }
 
@@ -387,9 +401,11 @@ export default function Studio() {
       const efficiency = response.headers.get("X-GK-Efficiency") ?? "0";
       const decayRate = response.headers.get("X-GK-Decay-Rate") ?? "0";
       const sampleCount = response.headers.get("X-GK-Sample-Count") ?? "0";
+      const fmt = response.headers.get("X-GK-Format") ?? "wav";
 
       setProcessedBlob(wavBlob);
       setProcessedUrl(url);
+      setProcessedFormat(fmt === "mp3" ? "mp3" : "wav");
 
       const ctx = getAudioContext();
       const arrayBuf = await wavBlob.arrayBuffer();
@@ -403,15 +419,14 @@ export default function Studio() {
         decayRate: mode === "standard" ? `${(parseFloat(decayRate) * 100).toFixed(1)}%` : "—",
         samples: mode === "standard" ? parseInt(sampleCount).toLocaleString() : "—",
         parity,
-        mode: mode === "voice_remove" ? "Voice Removal"
-             : mode === "voice_change" ? `Voice: ${voicePreset}`
-             : mode === "denoise" ? "Denoise"
-             : undefined,
+        mode: mode === "voice_remove" ? "Voice Removal" : undefined,
       });
 
       setProgress(100);
       setState("done");
-      if (mode === "voice_remove" && !hasSplits && !usedFreeSplit) setUsedFreeSplit(true);
+      if (mode === "voice_remove" && freeRemainingHeader !== null) {
+        setRemaining((r) => r ? { ...r, voice_remove: Math.max(0, parseInt(freeRemainingHeader, 10)) } : r);
+      }
     } catch (err: any) {
       clearInterval(progressInterval);
       setProgress(0);
@@ -535,11 +550,10 @@ export default function Studio() {
     if (!processedBlob) return;
     const suffix = mode === "voice_remove" ? "instrumental"
                  : mode === "master" ? `${masterPreset}_master`
-                 : mode === "voice_change" ? `voice_${voicePreset}`
-                 : mode === "denoise" ? "denoised"
                  : "processed";
-    downloadBlob(processedBlob, `GravelKing_${fileName.replace(/\.[^.]+$/, "")}_${suffix}.wav`);
-    toast({ title: "Downloaded", description: "Your processed audio is ready." });
+    const ext = processedFormat;
+    downloadBlob(processedBlob, `GravelKing_${fileName.replace(/\.[^.]+$/, "")}_${suffix}.${ext}`);
+    toast({ title: "Downloaded", description: `Your processed audio is ready (${ext.toUpperCase()}).` });
   };
 
   const handleDownloadStem = (name: string, blob: Blob) => {
@@ -576,13 +590,15 @@ export default function Studio() {
 
   const selectedMode = MODES.find(m => m.value === mode)!;
   const selectedPresetInfo = MASTER_PRESETS_UI.find(p => p.id === masterPreset)!;
-  const canUseSplit = hasSplits || (!usedFreeSplit && isAuthenticated);
-  const canProcess =
-    mode === "standard" ? isPro :
-    (mode === "voice_remove" || mode === "stem_split") ? canUseSplit :
-    true; // master, voice_change, denoise are always available
+  // Server is the source of truth; the UI only previews remaining counts.
+  // We never hard-block here — the server returns 402 when limits are hit,
+  // which drives the paywall funnel. canProcess only blocks the Studio kernel.
+  const voiceRemovalsLeft = remaining ? remaining.voice_remove : null;
+  const stemSplitsLeft = remaining ? remaining.stem_split : null;
+  const mastersLeft = remaining ? remaining.master : null;
+  const canProcess = mode === "standard" ? isPro : true;
 
-  const isFreeMode = mode === "voice_change" || mode === "denoise" || mode === "master";
+  const isFreeMode = mode === "master";
 
   return (
     <Layout>
@@ -608,7 +624,7 @@ export default function Studio() {
             {hasSplits && !isPro && (
               <Link href="/pricing">
                 <Badge variant="outline" className="border-amber-500/30 text-amber-500 cursor-pointer hover:bg-amber-500/10 px-3 py-1">
-                  Splits Plan — Upgrade to Pro
+                  Weekly Plan — Upgrade to Studio
                 </Badge>
               </Link>
             )}
@@ -620,10 +636,10 @@ export default function Studio() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
-              { icon: <Waves className="w-4 h-4 text-teal-400" />, label: "Denoise", tag: "Free" },
-              { icon: <Volume2 className="w-4 h-4 text-pink-400" />, label: "Voice Changer", tag: "Free" },
-              { icon: <Wand2 className="w-4 h-4 text-sky-400" />, label: "Mastering", tag: "Sample Free" },
+              { icon: <Wand2 className="w-4 h-4 text-sky-400" />, label: "Mastering", tag: "1 Free" },
+              { icon: <Mic2 className="w-4 h-4 text-purple-400" />, label: "Voice Removal", tag: "3 Free" },
               { icon: <Scissors className="w-4 h-4 text-emerald-400" />, label: "Stem Split", tag: "1 Free" },
+              { icon: <Waves className="w-4 h-4 text-teal-400" />, label: "Denoise", tag: "In Master" },
             ].map((f) => (
               <div key={f.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/30 border border-border/30">
                 {f.icon}
@@ -639,7 +655,7 @@ export default function Studio() {
             className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
             <div className="flex items-center gap-2.5 text-sm">
               <Lock className="w-4 h-4 text-amber-500 shrink-0" />
-              <span className="text-amber-400/90">You're on <strong>GravelKing Splits</strong> — voice removal and stem splitting are unlocked. Upgrade to Pro for the full studio.</span>
+              <span className="text-amber-400/90">You're on <strong>GravelKing Weekly</strong> — unlimited voice removal, stem splitting and preset masters. Upgrade to Studio (monthly) for the adjustable mastering kernel and live DAW.</span>
             </div>
             <Link href="/pricing">
               <Button size="sm" variant="outline" className="shrink-0 border-amber-500/30 text-amber-500 h-8 text-xs">
@@ -663,7 +679,7 @@ export default function Studio() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="audio/*"
+              accept="audio/*,video/*"
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             />
@@ -673,8 +689,8 @@ export default function Studio() {
                   <Upload className="w-7 h-7 text-amber-500" />
                 </div>
                 <div className="text-center">
-                  <p className="font-semibold">Drop your audio file here</p>
-                  <p className="text-sm text-muted-foreground mt-1">WAV, MP3, M4A, FLAC supported</p>
+                  <p className="font-semibold">Drop your audio or video file here</p>
+                  <p className="text-sm text-muted-foreground mt-1">WAV, MP3, MP4, M4A, FLAC, MOV supported</p>
                 </div>
               </>
             )}
@@ -745,14 +761,11 @@ export default function Studio() {
                           <div className="flex items-center gap-2">
                             {m.icon}
                             <span>{m.label}</span>
-                            {(m.value === "voice_change" || m.value === "denoise") && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-emerald-500/30 text-emerald-400">Free</Badge>
-                            )}
                             {m.value === "master" && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-sky-500/30 text-sky-400">Normal Free</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-sky-500/30 text-sky-400">1 Free</Badge>
                             )}
                             {m.requiresStudio && !isPro && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-amber-500/30 text-amber-500">Pro</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 border-amber-500/30 text-amber-500">Studio</Badge>
                             )}
                           </div>
                         </SelectItem>
@@ -762,16 +775,20 @@ export default function Studio() {
                   <p className="text-xs text-muted-foreground">{selectedMode.description}</p>
 
                   {/* Mode notices */}
-                  {mode === "master" && !isPro && (
+                  {mode === "master" && !hasSplits && (
                     <div className="flex items-start gap-1.5 text-xs text-sky-400/80 bg-sky-500/10 border border-sky-500/20 rounded-md p-2.5">
                       <Wand2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      Try any preset free — you'll hear a 30-second sample. <Link href="/pricing" className="text-amber-500 underline font-medium ml-0.5">Upgrade to Pro</Link> to download the full master.
+                      {mastersLeft === null
+                        ? <>Your first full master is free — after that you'll hear a 30-second preview.</>
+                        : mastersLeft > 0
+                          ? <>You have <strong className="mx-0.5">{mastersLeft} free full master{mastersLeft === 1 ? "" : "s"}</strong> left — after that you'll hear a 30-second preview.</>
+                          : <>Free master used — you'll hear a 30-second preview. <Link href="/pricing" className="text-amber-500 underline font-medium ml-0.5">Subscribe</Link> for unlimited full masters.</>}
                     </div>
                   )}
-                  {mode === "master" && isPro && (
+                  {mode === "master" && hasSplits && (
                     <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
                       <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      Pro — all presets unlocked with full-length download.
+                      Subscribed — all presets unlocked with full-length download.
                     </div>
                   )}
                   {mode === "voice_remove" && (
@@ -783,33 +800,46 @@ export default function Studio() {
                   {mode === "stem_split" && (
                     <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-secondary/40 rounded-md p-2.5">
                       <Scissors className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-400" />
-                      Returns bass, midrange, and highs. Instrumental stem added for stereo files.
+                      Returns 5 stems: vocals, drums, bass, other, and a full instrumental.
                     </div>
                   )}
-                  {(mode === "voice_remove" || mode === "stem_split") && !hasSplits && !usedFreeSplit && isAuthenticated && (
-                    <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      You have <strong className="mx-0.5">1 free use</strong> of the voice splitter remaining.
-                    </div>
+                  {mode === "voice_remove" && !hasSplits && (
+                    voiceRemovalsLeft === null || voiceRemovalsLeft > 0 ? (
+                      <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        {voiceRemovalsLeft === null
+                          ? <>Free voice removals available.</>
+                          : <>You have <strong className="mx-0.5">{voiceRemovalsLeft} free voice removal{voiceRemovalsLeft === 1 ? "" : "s"}</strong> remaining.</>}
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
+                        <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        Free voice removals used.{" "}
+                        <Link href="/pricing" className="underline font-medium ml-0.5">Subscribe to Weekly</Link> for unlimited use.
+                      </div>
+                    )
                   )}
-                  {(mode === "voice_remove" || mode === "stem_split") && !hasSplits && usedFreeSplit && (
-                    <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
-                      <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      Free trial used.{" "}
-                      <Link href="/pricing" className="underline font-medium ml-0.5">Upgrade to Splits</Link> for unlimited use.
-                    </div>
+                  {mode === "stem_split" && !hasSplits && (
+                    stemSplitsLeft === null || stemSplitsLeft > 0 ? (
+                      <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        {stemSplitsLeft === null
+                          ? <>Free stem split available.</>
+                          : <>You have <strong className="mx-0.5">{stemSplitsLeft} free stem split{stemSplitsLeft === 1 ? "" : "s"}</strong> remaining.</>}
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
+                        <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        Free stem split used.{" "}
+                        <Link href="/pricing" className="underline font-medium ml-0.5">Subscribe to Weekly</Link> for unlimited use.
+                      </div>
+                    )
                   )}
                   {mode === "standard" && !isPro && (
                     <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
                       <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      GravelKing Kernel requires a Pro subscription.{" "}
+                      GravelKing Kernel requires the Studio (monthly) subscription.{" "}
                       <Link href="/pricing" className="underline font-medium">Upgrade</Link>
-                    </div>
-                  )}
-                  {(mode === "voice_change" || mode === "denoise") && (
-                    <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      This mode is completely free — no account needed.
                     </div>
                   )}
                 </div>
@@ -854,40 +884,38 @@ export default function Studio() {
                   </div>
                 )}
 
-                {/* Voice changer presets */}
-                {mode === "voice_change" && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Voice Effect</label>
-                    <div className="grid grid-cols-1 gap-2">
-                      {VOICE_PRESETS_UI.map((p) => {
-                        const selected = voicePreset === p.id;
-                        return (
-                          <button
-                            key={p.id}
-                            onClick={() => setVoicePreset(p.id as VoicePresetId)}
-                            style={{
-                              background: p.bg,
-                              borderColor: selected ? p.accent : `${p.accent}33`,
-                              boxShadow: selected ? `0 0 16px ${p.glow}, inset 0 1px 0 rgba(255,255,255,0.06)` : "inset 0 1px 0 rgba(255,255,255,0.04)",
-                            }}
-                            className="flex items-center gap-3 text-left px-3 py-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
-                          >
-                            <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0"
-                              style={{ background: `${p.accent}22`, border: `1px solid ${p.accent}44` }}
-                            >
-                              {p.emoji}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold leading-tight" style={{ color: selected ? p.accent : "#f1f5f9" }}>{p.label}</div>
-                              <div className="text-[10px] text-muted-foreground mt-0.5">{p.description}</div>
-                            </div>
-                            {selected && <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: p.accent }} />}
-                          </button>
-                        );
-                      })}
+                {/* Denoise toggle (mastering) */}
+                {mode === "master" && (
+                  <button
+                    type="button"
+                    onClick={() => setDenoiseOn((v) => !v)}
+                    className="w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                    style={{
+                      borderColor: denoiseOn ? "#2dd4bf" : "rgba(45,212,191,0.25)",
+                      background: denoiseOn ? "rgba(45,212,191,0.10)" : "transparent",
+                      boxShadow: denoiseOn ? "0 0 16px rgba(45,212,191,0.18)" : undefined,
+                    }}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: "rgba(45,212,191,0.14)", border: "1px solid rgba(45,212,191,0.3)" }}
+                    >
+                      <Waves className="w-5 h-5 text-teal-300" />
                     </div>
-                  </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold leading-tight text-teal-200">Denoise</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">Remove background hiss, hum & broadband noise before mastering.</div>
+                    </div>
+                    <div
+                      className="w-9 h-5 rounded-full relative shrink-0 transition-colors"
+                      style={{ background: denoiseOn ? "#2dd4bf" : "rgba(148,163,184,0.3)" }}
+                    >
+                      <div
+                        className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
+                        style={{ left: denoiseOn ? "calc(100% - 1.125rem)" : "0.125rem" }}
+                      />
+                    </div>
+                  </button>
                 )}
 
                 {/* Standard-only params */}
@@ -974,12 +1002,10 @@ export default function Studio() {
                   {state === "processing"
                     ? `Processing... ${progress}%`
                     : !canProcess
-                    ? <><Lock className="w-4 h-4 mr-2" />{mode === "standard" ? "Pro Required" : "Upgrade Required"}</>
-                    : mode === "master"       ? <><Wand2 className="w-4 h-4 mr-2" />Apply {selectedPresetInfo?.label} Master</>
+                    ? <><Lock className="w-4 h-4 mr-2" />{mode === "standard" ? "Studio Required" : "Upgrade Required"}</>
+                    : mode === "master"       ? <><Wand2 className="w-4 h-4 mr-2" />Apply {selectedPresetInfo?.label} Master{denoiseOn ? " + Denoise" : ""}</>
                     : mode === "voice_remove" ? <><Mic2 className="w-4 h-4 mr-2" />Remove Vocals</>
                     : mode === "stem_split"   ? <><Scissors className="w-4 h-4 mr-2" />Split into Stems</>
-                    : mode === "voice_change" ? <><Volume2 className="w-4 h-4 mr-2" />Apply {VOICE_PRESETS_UI.find(p => p.id === voicePreset)?.emoji} {VOICE_PRESETS_UI.find(p => p.id === voicePreset)?.label} Voice</>
-                    : mode === "denoise"      ? <><Waves className="w-4 h-4 mr-2" />Remove Noise</>
                     : "Process with GravelKing"}
                 </Button>
                 {state === "processing" && <Progress value={progress} className="h-1.5" />}
@@ -996,9 +1022,7 @@ export default function Studio() {
                   {mode === "standard" && "Processed on the GravelKing server"}
                   {mode === "voice_remove" && "Center-channel cancelled instrumental"}
                   {mode === "stem_split" && "Frequency-separated stems"}
-                  {mode === "master" && `Mastered with the ${selectedPresetInfo?.label} preset`}
-                  {mode === "voice_change" && `Voice transformed: ${VOICE_PRESETS_UI.find(p => p.id === voicePreset)?.label}`}
-                  {mode === "denoise" && "Background noise removed"}
+                  {mode === "master" && `Mastered with the ${selectedPresetInfo?.label} preset${denoiseOn ? " + denoise" : ""}`}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1016,10 +1040,7 @@ export default function Studio() {
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
                     {stemBlobs
                       .slice()
-                      .sort((a, b) => {
-                        const order = ["bass.wav", "midrange.wav", "highs.wav", "instrumental.wav"];
-                        return order.indexOf(a.name) - order.indexOf(b.name);
-                      })
+                      .sort((a, b) => STEM_ORDER.indexOf(a.name) - STEM_ORDER.indexOf(b.name))
                       .map(({ name, blob }) => {
                         const meta = STEM_LABELS[name] ?? { label: name, color: "text-foreground", description: "" };
                         const stemPlaying = playingStem === name;
@@ -1041,17 +1062,9 @@ export default function Studio() {
                               <span className={`text-sm font-semibold ${meta.color}`}>{meta.label}</span>
                               <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{meta.description}</p>
                             </div>
-                            {hasSplits ? (
-                              <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={() => handleDownloadStem(name, blob)}>
-                                <Download className="w-3.5 h-3.5 mr-1.5" />WAV
-                              </Button>
-                            ) : (
-                              <Link href="/pricing" className="shrink-0">
-                                <Button size="sm" variant="outline" className="h-8 text-xs border-amber-500/30 text-amber-500">
-                                  <Lock className="w-3.5 h-3.5 mr-1.5" />Splits
-                                </Button>
-                              </Link>
-                            )}
+                            <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={() => handleDownloadStem(name, blob)}>
+                              <Download className="w-3.5 h-3.5 mr-1.5" />WAV
+                            </Button>
                           </div>
                         );
                       })}
@@ -1182,14 +1195,14 @@ export default function Studio() {
                       <Button variant="outline" className="flex-1" onClick={() => handlePlayProcessed()} data-testid="button-play">
                         {isPlaying ? <><Square className="w-4 h-4 mr-2" />Stop</> : <><Play className="w-4 h-4 mr-2" />Preview</>}
                       </Button>
-                      {(mode === "voice_change" || mode === "denoise" || (mode === "master" && !isSampleResult) || (mode === "voice_remove" && hasSplits) || (mode === "standard" && isPro)) ? (
+                      {((mode === "master" && !isSampleResult) || mode === "voice_remove" || (mode === "standard" && isPro)) ? (
                         <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={handleDownload} data-testid="button-download">
-                          <Download className="w-4 h-4 mr-2" /> Download WAV
+                          <Download className="w-4 h-4 mr-2" /> Download {processedFormat.toUpperCase()}
                         </Button>
                       ) : (
                         <Link href="/pricing" className="flex-1">
                           <Button variant="outline" className="w-full border-amber-500/30 text-amber-500" data-testid="button-upgrade-download">
-                            <Lock className="w-4 h-4 mr-2" /> {mode === "master" ? "Upgrade to Pro to Download" : "Upgrade to Download"}
+                            <Lock className="w-4 h-4 mr-2" /> {mode === "master" ? "Subscribe to Download Full Master" : "Upgrade to Download"}
                           </Button>
                         </Link>
                       )}
@@ -1230,6 +1243,84 @@ export default function Studio() {
         </motion.div>
 
       </motion.div>
+
+      {/* ── Paywall funnel ── */}
+      <AnimatePresence>
+        {paywall && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setPaywall(null)}
+            data-testid="paywall-overlay"
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.94, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-2xl border border-amber-500/30 bg-card shadow-2xl overflow-hidden"
+            >
+              <div className="relative h-28 overflow-hidden">
+                <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#3b2a05 0%,#1a1304 100%)" }} />
+                <div className="relative z-10 flex flex-col items-center justify-center h-full gap-2">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+                    <Lock className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">
+                    {paywall.feature === "voice_remove" ? "Free voice removals used"
+                      : paywall.feature === "stem_split" ? "Free stem split used"
+                      : "Free master used"}
+                  </h3>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  {paywall.message || "You've reached your free limit. Subscribe for unlimited access."}
+                </p>
+
+                <div className="space-y-2">
+                  <Link href="/pricing">
+                    <button className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer text-left">
+                      <div>
+                        <div className="text-sm font-bold text-amber-300">GravelKing Weekly</div>
+                        <div className="text-[11px] text-muted-foreground">Unlimited voice removal, stem splitting & preset masters</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-white">$9.99</div>
+                        <div className="text-[10px] text-muted-foreground">/week</div>
+                      </div>
+                    </button>
+                  </Link>
+                  <Link href="/pricing">
+                    <button className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 border-sky-500/40 bg-sky-500/5 hover:bg-sky-500/15 transition-colors cursor-pointer text-left">
+                      <div>
+                        <div className="text-sm font-bold text-sky-300">GravelKing Studio</div>
+                        <div className="text-[11px] text-muted-foreground">Everything in Weekly + adjustable mastering & live DAW</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-white">$29.99</div>
+                        <div className="text-[10px] text-muted-foreground">/month</div>
+                      </div>
+                    </button>
+                  </Link>
+                </div>
+
+                <button
+                  onClick={() => setPaywall(null)}
+                  className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                  data-testid="button-paywall-dismiss"
+                >
+                  {processedBlob || stemBlobs.length > 0
+                    ? "Maybe later — keep my earlier free download"
+                    : "Maybe later"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }
