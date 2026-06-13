@@ -281,9 +281,21 @@ export default function Studio() {
 
     let fakeProgress = 0;
     const progressInterval = setInterval(() => {
-      fakeProgress = Math.min(fakeProgress + 3, 88);
-      setProgress(fakeProgress);
+      fakeProgress = fakeProgress + Math.max(0.3, (91 - fakeProgress) * 0.055);
+      setProgress(Math.min(fakeProgress, 91));
     }, 200);
+
+    const abortController = new AbortController();
+    const fetchTimeout = setTimeout(() => abortController.abort(), 120_000);
+    const slowToast = setTimeout(() => {
+      toast({ title: "Still working…", description: "Large files can take up to a minute — hang tight." });
+    }, 18_000);
+
+    const cleanupTimers = () => {
+      clearInterval(progressInterval);
+      clearTimeout(fetchTimeout);
+      clearTimeout(slowToast);
+    };
 
     try {
       if (mode === "master") {
@@ -295,8 +307,9 @@ export default function Studio() {
           method: "POST",
           credentials: "include",
           body: formData,
+          signal: abortController.signal,
         });
-        clearInterval(progressInterval);
+        cleanupTimers();
         if (response.status === 402) {
           const err = await response.json().catch(() => null);
           if (err?.code === "LIMIT_REACHED") {
@@ -340,9 +353,10 @@ export default function Studio() {
         method: "POST",
         credentials: "include",
         body: formData,
+        signal: abortController.signal,
       });
 
-      clearInterval(progressInterval);
+      cleanupTimers();
 
       if (response.status === 402) {
         const err = await response.json().catch(() => null);
@@ -428,9 +442,16 @@ export default function Studio() {
         setRemaining((r) => r ? { ...r, voice_remove: Math.max(0, parseInt(freeRemainingHeader, 10)) } : r);
       }
     } catch (err: any) {
-      clearInterval(progressInterval);
+      cleanupTimers();
       setProgress(0);
-      toast({ title: "Processing failed", description: err.message, variant: "destructive" });
+      const isAbort = err?.name === "AbortError";
+      toast({
+        title: isAbort ? "Request timed out" : "Processing failed",
+        description: isAbort
+          ? "The server took too long to respond. Try a shorter file or try again."
+          : err.message,
+        variant: "destructive",
+      });
       setState("ready");
     }
   };
