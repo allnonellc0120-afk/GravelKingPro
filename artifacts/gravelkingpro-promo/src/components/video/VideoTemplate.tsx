@@ -8,6 +8,7 @@ import { Scene4 } from './video_scenes/Scene4';
 import { Scene5 } from './video_scenes/Scene5';
 import { Scene6 } from './video_scenes/Scene6';
 import { Scene7 } from './video_scenes/Scene7';
+import { Scene8 } from './video_scenes/Scene8';
 
 export const SCENE_DURATIONS = {
   intro: 16000,
@@ -17,6 +18,7 @@ export const SCENE_DURATIONS = {
   screens: 20000,
   merch: 16000,
   outro: 20000,
+  hammer: 14000,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
@@ -27,6 +29,7 @@ const SCENE_COMPONENTS: Record<string, ComponentType> = {
   screens: Scene5,
   merch: Scene6,
   outro: Scene7,
+  hammer: Scene8,
 };
 
 const SCENE_START_SEC: Record<string, number> = (() => {
