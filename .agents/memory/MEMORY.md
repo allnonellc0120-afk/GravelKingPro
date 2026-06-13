@@ -2,6 +2,7 @@
 - [Layout noPadding prop](layout-noPadding.md) — Layout component supports noPadding for full-height pages like the DAW
 - [DAW IR cache](daw-ir-cache.md) — makeIR() blocks main thread 5–20ms at large reverb sizes; must be memoized
 - [DAW specialParams pattern](daw-special-params.md) — PluginNodeResult has specialParams for non-AudioParam live updates
+- [getUserMedia exact deviceId fallback](getusermedia-exact-fallback.md) — exact deviceId throws OverconstrainedError if device gone; retry without constraint to fall back to default
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
 - [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove/stem_split use fast in-process MLK v3 (Demucs dead-pathed); never assume 44-byte WAV header on ffmpeg output

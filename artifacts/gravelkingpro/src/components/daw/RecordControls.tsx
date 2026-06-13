@@ -19,10 +19,19 @@ interface Props {
 }
 
 const DEFAULT_VALUE = "__default__";
+const STORAGE_KEY = "gk:daw:inputDeviceId";
+
+function loadSavedDevice(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) || DEFAULT_VALUE;
+  } catch {
+    return DEFAULT_VALUE;
+  }
+}
 
 export function RecordControls({ isRecording, disabled, listInputDevices, onStart, onStop }: Props) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedId, setSelectedId] = useState<string>(DEFAULT_VALUE);
+  const [selectedId, setSelectedId] = useState<string>(loadSavedDevice);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const refreshDevices = useCallback(async () => {
@@ -32,17 +41,34 @@ export function RecordControls({ isRecording, disabled, listInputDevices, onStar
     // selectable inputs.
     const list = all.filter(d => d.deviceId);
     setDevices(list);
-    // If the previously chosen device disappeared (unplugged), fall back to default.
+    // If the previously chosen device disappeared (unplugged), fall back to
+    // default — but only when we can actually enumerate inputs. Before mic
+    // permission is granted the list is empty, so keep the saved choice rather
+    // than wiping it; it will be validated once the devices become known.
     setSelectedId(prev =>
-      prev !== DEFAULT_VALUE && !list.some(d => d.deviceId === prev) ? DEFAULT_VALUE : prev
+      prev !== DEFAULT_VALUE && list.length > 0 && !list.some(d => d.deviceId === prev)
+        ? DEFAULT_VALUE
+        : prev
     );
   }, [listInputDevices]);
+
+  // Persist the chosen input so it is restored on the next visit.
+  useEffect(() => {
+    try {
+      if (selectedId === DEFAULT_VALUE) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, selectedId);
+    } catch {
+      /* localStorage unavailable — selection simply won't persist */
+    }
+  }, [selectedId]);
 
   useEffect(() => {
     if (menuOpen) refreshDevices();
   }, [menuOpen, refreshDevices]);
 
   useEffect(() => {
+    // Validate the restored selection against currently-connected inputs on load.
+    refreshDevices();
     const md = navigator.mediaDevices;
     if (!md?.addEventListener) return;
     md.addEventListener("devicechange", refreshDevices);
