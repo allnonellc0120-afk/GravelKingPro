@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Download, CheckCircle2, Lock, Zap, Globe, Server, Wifi,
-  Package, Shield, Monitor, ExternalLink,
+  Package, Shield, Monitor, ExternalLink, FileText, Film,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -211,6 +211,65 @@ export default function DownloadPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Commercial Downloads — PDFs & Assets */}
+        <Card className="border-amber-500/25 bg-amber-500/5">
+          <CardContent className="p-6 space-y-4">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <FileText className="w-4 h-4 text-amber-500" /> Commercial Documents &amp; Assets
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Official GravelKing Pro publications — free to download, share, and distribute.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                {
+                  title: "MLK v3 White Paper",
+                  desc: "6-page technical document. Brand story, engine architecture, real benchmark numbers.",
+                  file: "GravelKingPro_MLKv3_WhitePaper.pdf",
+                  icon: <FileText className="w-5 h-5 text-amber-400" />,
+                  badge: "6 pages",
+                },
+                {
+                  title: "MLK v3 Pitch Deck",
+                  desc: "7-slide investor/partner deck. Problem, solution, numbers, product suite, opportunity.",
+                  file: "GravelKingPro_MLKv3_PitchDeck.pdf",
+                  icon: <Film className="w-5 h-5 text-amber-400" />,
+                  badge: "7 slides",
+                },
+              ].map((doc) => (
+                <div
+                  key={doc.file}
+                  className="flex flex-col gap-3 p-4 rounded-xl border border-amber-500/20 bg-card/40"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                      {doc.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold">{doc.title}</span>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-400">
+                          {doc.badge}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{doc.desc}</p>
+                    </div>
+                  </div>
+                  <a href={`/${doc.file}`} download>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1.5" /> Download PDF
+                    </Button>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <p className="text-center text-xs text-muted-foreground">
           © {new Date().getFullYear()} GravelKing Productions · All N One LLC ·{" "}
