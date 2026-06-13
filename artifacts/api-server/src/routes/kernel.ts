@@ -132,13 +132,13 @@ kernelRouter.post("/kernel/process", (req, res) => {
     const result = gravelking_opt(data, multiplier, slice_size);
     const status = verifyParity(result.processed);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       status,
       data: result,
     });
   } catch (error: any) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       error: error.message,
     });

@@ -6,7 +6,8 @@ import { writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
 import { mlk_v3, isValidWav } from "../kernel-v3";
-import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
+import { telemetryBus, type TelemetryEvent, type RemoteAlertEvent, type RemoteInvalidReason } from "../lib/telemetry";
+import type { Logger } from "pino";
 import { db, processRunsTable } from "@workspace/db";
 import {
   mlkVocalRemoval,
@@ -38,10 +39,31 @@ function getRemoteApiKey(): string | null {
   return process.env.REMOTE_KERNEL_API_KEY?.trim() || null;
 }
 
+function emitRemoteAlert(
+  log: Logger,
+  reason: RemoteInvalidReason,
+  remoteUrl: string,
+  detail: string,
+): void {
+  const event: RemoteAlertEvent = {
+    type: "remote_invalid_output",
+    reason,
+    remoteUrl,
+    detail,
+    timestamp: new Date().toISOString(),
+  };
+  log.warn(
+    { event: "remote_invalid_output", reason, remoteUrl, detail },
+    "Remote upgrade kernel returned invalid output — falling back to local processing",
+  );
+  telemetryBus.emit("remote_alert", event);
+}
+
 async function tryRemoteProcessing(
   file: Express.Multer.File,
   multiplier: number,
   sliceSize: number,
+  log: Logger,
   stemId = 1
 ): Promise<{ wav: Buffer; headers: Record<string, string> } | null> {
   const remoteUrl = getRemoteUrl();
@@ -68,23 +90,39 @@ async function tryRemoteProcessing(
       redirect: "error",
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      emitRemoteAlert(log, "non_ok_status", remoteUrl, `HTTP ${response.status} ${response.statusText}`);
+      return null;
+    }
 
     const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("audio")) return null;
+    if (!contentType.includes("audio")) {
+      emitRemoteAlert(log, "invalid_content_type", remoteUrl, `content-type: ${contentType || "(none)"}`);
+      return null;
+    }
 
     const wav = Buffer.from(await response.arrayBuffer());
     // The remote may report an "audio/*" content-type while returning truncated,
     // empty, or non-WAV bytes. Never label such payloads as premium MLK v3 output —
     // reject them here so the caller falls back to local processing.
-    if (!isValidWav(wav)) return null;
+    if (!isValidWav(wav)) {
+      emitRemoteAlert(log, "invalid_wav", remoteUrl, `${wav.length} bytes — failed RIFF/WAV header check`);
+      return null;
+    }
+
     const responseHeaders: Record<string, string> = {};
     ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count", "X-GK-Kernel"].forEach((h) => {
       const v = response.headers.get(h);
       if (v) responseHeaders[h] = v;
     });
     return { wav, headers: responseHeaders };
-  } catch {
+  } catch (err) {
+    emitRemoteAlert(
+      log,
+      "request_failed",
+      remoteUrl,
+      err instanceof Error ? err.message : String(err),
+    );
     return null;
   }
 }
@@ -508,7 +546,7 @@ audioRouter.post(
     }
 
     // ── Standard mode: try remote first ────────────────────────────────────────
-    const remote = await tryRemoteProcessing(req.file, multiplier, sliceSize);
+    const remote = await tryRemoteProcessing(req.file, multiplier, sliceSize, req.log);
     if (remote) {
       const event: TelemetryEvent = {
         routing: "remote",
