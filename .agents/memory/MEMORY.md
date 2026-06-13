@@ -4,6 +4,7 @@
 - [DAW specialParams pattern](daw-special-params.md) — PluginNodeResult has specialParams for non-AudioParam live updates
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
+- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove/stem_split use fast in-process MLK v3 (Demucs dead-pathed); never assume 44-byte WAV header on ffmpeg output
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts

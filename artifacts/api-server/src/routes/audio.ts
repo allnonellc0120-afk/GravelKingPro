@@ -9,11 +9,10 @@ import { gravelking_opt, verifyParity } from "../kernel";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 import { db, processRunsTable } from "@workspace/db";
 import {
-  gnsStemSplit,
-  gnsVocalRemoval,
-  GNS_PROTOCOL,
-  GNS_MODEL,
-  GNS_STACK,
+  mlkVocalRemoval,
+  mlkStemSplit,
+  MLK_PROTOCOL,
+  MLK_KERNEL,
 } from "../gkp-separator";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
@@ -350,16 +349,25 @@ audioRouter.post(
       }
     }
 
-    // ── Voice removal — GNS (GravelKing Neural Separator) v1 ─────────────────
+    // ── Voice removal — Morris Law Kernel v3 (fast local separation) ─────────
     if (mode === "voice_remove") {
       try {
-        // GNS neural separation → MLK v3 post-processing (GravelKing Protocol)
-        const gnsResult = await gnsVocalRemoval(req.file.buffer, ext, multiplier);
-        let wavBuffer = await applyTempoAndPitch(gnsResult.instrumental, tempo, semitones);
+        // Center-channel separation is an inherently local ffmpeg operation: the
+        // remote generic kernel endpoint has no separation contract, so routing
+        // raw audio there could return a non-separated mix. We separate locally
+        // and carve the instrumental with the MLK v3 kernel — fast, in-process,
+        // and always completes (no neural net to stall at "88%").
+        const { channels } = await getAudioInfo(req.file.buffer, ext);
+        const mlk = await mlkVocalRemoval(req.file.buffer, ext, channels, multiplier);
+        const instrumentalBuf = mlk.instrumental;
+        const kernelParity = mlk.kernelParity;
+        const routing = "local";
+        const stack = mlk.stack;
+        let wavBuffer = await applyTempoAndPitch(instrumentalBuf, tempo, semitones);
 
         const event: TelemetryEvent = {
-          routing: "local",
-          parity: gnsResult.kernelParity,
+          routing,
+          parity: kernelParity,
           efficiency: "1.0000",
           decayRate: "0.0000",
           sampleCount: String(wavBuffer.length / 2),
@@ -371,8 +379,8 @@ audioRouter.post(
         if (req.isAuthenticated()) {
           db.insert(processRunsTable).values({
             userId: req.user.id,
-            routing: "local",
-            parity: gnsResult.kernelParity,
+            routing,
+            parity: kernelParity,
             efficiency: 1,
             decayRate: 0,
             sampleCount: wavBuffer.length / 2,
@@ -401,8 +409,8 @@ audioRouter.post(
             res.setHeader("Content-Type", "audio/mpeg");
             res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.mp3"`);
             res.setHeader("X-GK-Mode", "voice_remove");
-            res.setHeader("X-GK-Routing", "local");
-            res.setHeader("X-GK-Parity", gnsResult.kernelParity);
+            res.setHeader("X-GK-Routing", routing);
+            res.setHeader("X-GK-Parity", kernelParity);
             res.setHeader("X-GK-Format", "mp3");
             res.send(mp3Buf);
           } finally {
@@ -413,15 +421,15 @@ audioRouter.post(
           res.setHeader("Content-Type", "audio/wav");
           res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.wav"`);
           res.setHeader("X-GK-Mode", "voice_remove");
-          res.setHeader("X-GK-Routing", "local");
-          res.setHeader("X-GK-Parity", gnsResult.kernelParity);
+          res.setHeader("X-GK-Routing", routing);
+          res.setHeader("X-GK-Parity", kernelParity);
           res.setHeader("X-GK-Efficiency", "1.0000");
           res.setHeader("X-GK-Decay-Rate", "0.0000");
           res.setHeader("X-GK-Sample-Count", String(wavBuffer.length / 2));
-          res.setHeader("X-GK-Separator", "GNS_v1");
-          res.setHeader("X-GK-Model", GNS_MODEL);
-          res.setHeader("X-GK-Protocol", GNS_PROTOCOL);
-          res.setHeader("X-GK-Stack", GNS_STACK);
+          res.setHeader("X-GK-Separator", "MLK_v3");
+          res.setHeader("X-GK-Model", MLK_KERNEL);
+          res.setHeader("X-GK-Protocol", MLK_PROTOCOL);
+          res.setHeader("X-GK-Stack", stack);
           res.send(wavBuffer);
         }
         return;
@@ -431,18 +439,19 @@ audioRouter.post(
       }
     }
 
-    // ── Stem splitting — GNS (GravelKing Neural Separator) v1 ────────────────
+    // ── Stem splitting — Morris Law Kernel v3 (fast local) ───────────────────
     if (mode === "stem_split") {
       try {
-        // GNS 4-stem neural separation → MLK v3 post-processing (GravelKing Protocol)
-        const gnsResult = await gnsStemSplit(req.file.buffer, ext, multiplier);
+        // Fast in-process MLK v3 band/spatial split — completes in seconds.
+        const { channels } = await getAudioInfo(req.file.buffer, ext);
+        const mlkResult = await mlkStemSplit(req.file.buffer, ext, channels, multiplier);
 
         const event: TelemetryEvent = {
           routing: "local",
-          parity: gnsResult.kernelParity,
+          parity: mlkResult.kernelParity,
           efficiency: "1.0000",
           decayRate: "0.0000",
-          sampleCount: String(gnsResult.zipBuffer.length),
+          sampleCount: String(mlkResult.zipBuffer.length),
           timestamp: new Date().toISOString(),
           remoteUrl: getRemoteUrl(),
         };
@@ -452,10 +461,10 @@ audioRouter.post(
           db.insert(processRunsTable).values({
             userId: req.user.id,
             routing: "local",
-            parity: gnsResult.kernelParity,
+            parity: mlkResult.kernelParity,
             efficiency: 1,
             decayRate: 0,
-            sampleCount: gnsResult.zipBuffer.length,
+            sampleCount: mlkResult.zipBuffer.length,
             fileName: req.file.originalname,
           }).catch(() => {});
         }
@@ -470,13 +479,13 @@ audioRouter.post(
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_stems.zip"`);
         res.setHeader("X-GK-Mode", "stem_split");
         res.setHeader("X-GK-Routing", "local");
-        res.setHeader("X-GK-Parity", gnsResult.kernelParity);
-        res.setHeader("X-GK-Stems", gnsResult.stems.join(","));
-        res.setHeader("X-GK-Separator", "GNS_v1");
-        res.setHeader("X-GK-Model", GNS_MODEL);
-        res.setHeader("X-GK-Protocol", GNS_PROTOCOL);
-        res.setHeader("X-GK-Stack", GNS_STACK);
-        res.send(gnsResult.zipBuffer);
+        res.setHeader("X-GK-Parity", mlkResult.kernelParity);
+        res.setHeader("X-GK-Stems", mlkResult.stems.join(","));
+        res.setHeader("X-GK-Separator", "MLK_v3");
+        res.setHeader("X-GK-Model", MLK_KERNEL);
+        res.setHeader("X-GK-Protocol", MLK_PROTOCOL);
+        res.setHeader("X-GK-Stack", mlkResult.stack);
+        res.send(mlkResult.zipBuffer);
         return;
       } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
