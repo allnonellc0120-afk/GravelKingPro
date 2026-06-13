@@ -394,13 +394,24 @@ export function useDAW() {
       toast({ title: "Recording unavailable", description: "This device or browser does not support audio capture.", variant: "destructive" });
       return;
     }
+    const baseAudio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    const openStream = (id?: string) =>
+      navigator.mediaDevices.getUserMedia({
+        audio: id ? { deviceId: { exact: id }, ...baseAudio } : baseAudio,
+      });
     try {
-      const constraints: MediaStreamConstraints = {
-        audio: deviceId
-          ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-          : { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        stream = await openStream(deviceId);
+      } catch (err: any) {
+        // The chosen / remembered input is no longer connected — fall back to
+        // the system default instead of failing the recording outright.
+        if (deviceId && (err?.name === "OverconstrainedError" || err?.name === "NotFoundError")) {
+          stream = await openStream(undefined);
+        } else {
+          throw err;
+        }
+      }
       recStreamRef.current = stream;
       recChunksRef.current = [];
 
