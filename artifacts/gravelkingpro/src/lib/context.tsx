@@ -13,7 +13,7 @@ export type Results = {
   runDate: string;
 } | null;
 
-export type SubscriptionTier = "splits" | "pro" | "node_auditor" | null;
+export type SubscriptionTier = "weekly" | "monthly" | "node_auditor" | null;
 
 const PROMO_CODES: Record<string, SubscriptionTier> = {
   iliveforhope: "node_auditor",
@@ -22,14 +22,15 @@ const PROMO_STORAGE_KEY = "gkp_promo_code";
 
 interface AppState {
   tier: SubscriptionTier;
+  /** weekly+ : unlimited voice removal / stem split + preset masters */
   hasSplits: boolean;
+  /** monthly+ (Studio) : adjustable mastering + live DAW */
+  isStudio: boolean;
+  /** Backwards-compatible alias for isStudio (Studio-gated features) */
   isPro: boolean;
   plan: string | null;
   isLoadingSubscription: boolean;
   setTier: (tier: SubscriptionTier) => void;
-  setIsPro: (value: boolean) => void;
-  usedFreeSplit: boolean;
-  setUsedFreeSplit: (v: boolean) => void;
   refreshSubscription: () => Promise<void>;
   results: Results;
   setResults: (results: Results) => void;
@@ -44,11 +45,26 @@ interface AppState {
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
-function tierFromUser(subscriptionTier?: string | null, isPro?: boolean): SubscriptionTier {
-  if (subscriptionTier === "splits") return "splits";
-  if (subscriptionTier === "pro" || subscriptionTier === "node_auditor") return subscriptionTier;
-  if (isPro) return "pro";
-  return null;
+/** Map any stored/legacy plan string into the canonical client tier. */
+function normalizePlan(plan?: string | null): SubscriptionTier {
+  if (!plan) return null;
+  const p = plan.toLowerCase().trim();
+  switch (p) {
+    case "weekly":
+      return "weekly";
+    case "monthly":
+    case "studio":
+      return "monthly";
+    case "node_auditor":
+      return "node_auditor";
+    // Legacy values from the previous pricing structure.
+    case "splits":
+      return "weekly";
+    case "pro":
+      return "monthly";
+    default:
+      return null;
+  }
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -56,7 +72,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<string | null>(null);
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
   const [activePromo, setActivePromo] = useState<string | null>(null);
-  const [usedFreeSplit, setUsedFreeSplit] = useState(false);
   const [results, setResults] = useState<Results>(null);
   const [hasRun, setHasRun] = useState(false);
 
@@ -74,12 +89,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (resp.ok) {
         const data = await resp.json() as { isPro: boolean; plan: string | null };
         setPlan(data.plan);
-        // Derive tier from plan string
-        const t = data.plan === "splits" ? "splits"
-          : data.plan === "pro" ? "pro"
-          : data.plan === "node_auditor" ? "node_auditor"
-          : null;
-        setUserTier(t);
+        setUserTier(normalizePlan(data.plan));
       }
     } catch {
       // Network error — leave tier as-is
@@ -93,15 +103,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refreshSubscription]);
 
   const promoTier: SubscriptionTier = activePromo ? (PROMO_CODES[activePromo] ?? null) : null;
-  const tierOrder: Array<SubscriptionTier> = [null, "splits", "pro", "node_auditor"];
+  const tierOrder: Array<SubscriptionTier> = [null, "weekly", "monthly", "node_auditor"];
   const effectiveTier: SubscriptionTier =
     tierOrder.indexOf(promoTier) > tierOrder.indexOf(userTier) ? promoTier : userTier;
 
-  const hasSplits = effectiveTier !== null;
-  const isPro = effectiveTier === "pro" || effectiveTier === "node_auditor";
+  const tierRank = tierOrder.indexOf(effectiveTier);
+  const hasSplits = tierRank >= tierOrder.indexOf("weekly");
+  const isStudio = tierRank >= tierOrder.indexOf("monthly");
+  const isPro = isStudio;
 
   const setTier = (t: SubscriptionTier) => setUserTier(t);
-  const setIsPro = (value: boolean) => setUserTier(value ? "pro" : null);
 
   const redeemPromo = useCallback((code: string): boolean => {
     const normalized = code.trim().toLowerCase();
@@ -122,13 +133,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       tier: effectiveTier,
       hasSplits,
+      isStudio,
       isPro,
       plan,
       isLoadingSubscription,
       setTier,
-      setIsPro,
-      usedFreeSplit,
-      setUsedFreeSplit,
       refreshSubscription,
       results,
       setResults,

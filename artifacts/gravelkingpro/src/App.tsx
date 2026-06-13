@@ -11,11 +11,8 @@ import Studio from "@/pages/studio";
 import MixStudio from "@/pages/mix-studio";
 import KernelDashboard from "@/pages/kernel";
 import Contact from "@/pages/contact";
-import SongBot from "@/pages/songbot";
-import BeatMaker from "@/pages/beatmaker";
 import DownloadPage from "@/pages/download";
 import BeatsPage from "@/pages/beats";
-import LyricsPage from "@/pages/lyrics";
 import Account from "@/pages/account";
 import AdminAnalytics from "@/pages/admin-analytics";
 import { PageTracker } from "@/lib/useAnalytics";
@@ -32,11 +29,8 @@ function Router() {
       <Route path="/report" component={Report} />
       <Route path="/kernel" component={KernelDashboard} />
       <Route path="/contact" component={Contact} />
-      <Route path="/songbot" component={SongBot} />
-      <Route path="/beatmaker" component={BeatMaker} />
       <Route path="/download" component={DownloadPage} />
       <Route path="/beats" component={BeatsPage} />
-      <Route path="/lyrics" component={LyricsPage} />
       <Route path="/account" component={Account} />
       <Route path="/admin" component={AdminAnalytics} />
       <Route component={NotFound} />

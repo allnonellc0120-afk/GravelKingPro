@@ -7,8 +7,7 @@ import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
 import { gravelking_opt, verifyParity } from "../kernel";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
-import { db, processRunsTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, processRunsTable } from "@workspace/db";
 import {
   gnsStemSplit,
   gnsVocalRemoval,
@@ -19,7 +18,8 @@ import {
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
-import { hasPaidSubscription } from "../lib/entitlement";
+import { hasStudio, hasUnlimitedSplits, resolveTier } from "../lib/entitlement";
+import { getUsageUser, incrementUsage, FREE_LIMITS, type UsageField } from "../lib/usage";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -28,7 +28,7 @@ const audioRouter = Router();
 const audioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
 const audioConcurrency = concurrencyLimit(3);
 
-type ProcessMode = "standard" | "voice_remove" | "stem_split" | "voice_change" | "denoise";
+type ProcessMode = "standard" | "voice_remove" | "stem_split";
 
 // ── Remote routing ────────────────────────────────────────────────────────────
 function getRemoteUrl(): string | null {
@@ -151,15 +151,6 @@ async function applyTempoAndPitch(inputBuf: Buffer, tempo: number, semitones: nu
   return processWithFilter(inputBuf, "wav", filter, 2);
 }
 
-/** Voice change presets → ffmpeg filter strings. */
-const VOICE_CHANGE_FILTERS: Record<string, string> = {
-  normal:   "aecho=0.6:0.88:20:0.1",
-  robot:    "vibrato=f=30:d=0.9,aecho=0.9:0.9:4:0.6",
-  chipmunk: "rubberband=tempo=1.25:pitch=1.5",
-  deep:     "rubberband=tempo=0.82:pitch=0.6",
-  alien:    "vibrato=f=7:d=0.95,aecho=0.85:0.85:55:0.65,rubberband=pitch=1.18",
-};
-
 /** Apply an ffmpeg audio filter directly to a file and return a WAV buffer. */
 async function processWithFilter(
   inputBuf: Buffer,
@@ -261,6 +252,26 @@ audioRouter.get("/kernel/routing", async (_req, res) => {
   });
 });
 
+// ── Usage status ──────────────────────────────────────────────────────────────
+// Drives the free-tier UI (remaining runs + studio gate) without consuming a run.
+audioRouter.get("/usage/status", async (req: Request, res: Response) => {
+  const tier = await resolveTier(req);
+  const unlimited = tier !== "free";
+  const usageUser = await getUsageUser(req, res);
+  const remaining = (field: UsageField): number =>
+    unlimited ? -1 : Math.max(0, FREE_LIMITS[field] - (usageUser[field] ?? 0));
+
+  res.json({
+    tier,
+    limits: FREE_LIMITS,
+    remaining: {
+      voice_remove: remaining("freeVoiceRemovals"),
+      stem_split: remaining("freeStemSplits"),
+      master: remaining("freeMasterDownloads"),
+    },
+  });
+});
+
 // ── Main processing endpoint ──────────────────────────────────────────────────
 audioRouter.post(
   "/kernel/process-audio",
@@ -279,7 +290,6 @@ audioRouter.post(
     const mode: ProcessMode = (req.body.mode as ProcessMode) ?? "standard";
     const tempo = Math.min(2.5, Math.max(0.25, parseFloat((req.body.tempo as string) ?? "1.0")));
     const semitones = Math.min(12, Math.max(-12, parseFloat((req.body.semitones as string) ?? "0")));
-    const voicePreset = (req.body.voice_preset as string) ?? "normal";
 
     // ── Duration guard ──────────────────────────────────────────────────────────
     const duration = await probeAudioDuration(req.file.buffer, ext);
@@ -291,61 +301,53 @@ audioRouter.post(
       return;
     }
 
-    // ── Denoise (free) ─────────────────────────────────────────────────────────
-    if (mode === "denoise") {
-      try {
-        let wavBuffer = await processWithFilter(req.file.buffer, ext, "afftdn=nf=-25,anlmdn=s=7");
-        wavBuffer = await applyTempoAndPitch(wavBuffer, tempo, semitones);
-        res.setHeader("Content-Type", "audio/wav");
-        res.setHeader("Content-Disposition", `attachment; filename="gravelking_denoised.wav"`);
-        res.setHeader("X-GK-Mode", "denoise");
-        res.setHeader("X-GK-Routing", "local");
-        res.setHeader("X-GK-Parity", "VALIDATED");
-        res.send(wavBuffer);
-        return;
-      } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
-        return;
-      }
-    }
-
-    // ── Voice change (free) ────────────────────────────────────────────────────
-    if (mode === "voice_change") {
-      try {
-        const filter = VOICE_CHANGE_FILTERS[voicePreset] ?? VOICE_CHANGE_FILTERS["normal"];
-        let wavBuffer = await processWithFilter(req.file.buffer, ext, filter);
-        wavBuffer = await applyTempoAndPitch(wavBuffer, tempo, semitones);
-        res.setHeader("Content-Type", "audio/wav");
-        res.setHeader("Content-Disposition", `attachment; filename="gravelking_voice.wav"`);
-        res.setHeader("X-GK-Mode", "voice_change");
-        res.setHeader("X-GK-Routing", "local");
-        res.setHeader("X-GK-Parity", "VALIDATED");
-        res.send(wavBuffer);
-        return;
-      } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
-        return;
-      }
-    }
-
-    // ── Free-tier gate for split modes ─────────────────────────────────────────
+    // ── Free-tier limits for split modes ───────────────────────────────────────
+    // weekly+ tiers are unlimited; free users get a fixed number of runs each,
+    // tracked server-side per user / gk_session. On exhaustion we return a
+    // 402 LIMIT_REACHED payload that drives the paywall funnel.
     let isFreeUse = false;
+    let usageField: UsageField | null = null;
+    let usageUserId: string | null = null;
+    let freeRemaining = 0;
     if (mode === "voice_remove" || mode === "stem_split") {
-      if (!req.isAuthenticated()) {
-        res.status(401).json({ success: false, error: "Please sign in to use voice removal and stem splitting." });
-        return;
+      const unlimited = await hasUnlimitedSplits(req);
+      if (!unlimited) {
+        usageField = mode === "voice_remove" ? "freeVoiceRemovals" : "freeStemSplits";
+        const usageUser = await getUsageUser(req, res);
+        usageUserId = usageUser.id;
+        const used = usageUser[usageField] ?? 0;
+        const limit = FREE_LIMITS[usageField];
+        if (used >= limit) {
+          res.status(402).json({
+            success: false,
+            code: "LIMIT_REACHED",
+            feature: mode,
+            limit,
+            used,
+            error:
+              mode === "voice_remove"
+                ? `You've used all ${limit} free voice removals. Subscribe to GravelKing Weekly for unlimited access.`
+                : `You've used your free stem split. Subscribe to GravelKing Weekly for unlimited access.`,
+            fallback: { action: "subscribe", url: "/pricing" },
+          });
+          return;
+        }
+        const usedTotal = usageUser.totalDownloads ?? 0;
+        if (usedTotal >= FREE_LIMITS.totalDownloads) {
+          res.status(402).json({
+            success: false,
+            code: "LIMIT_REACHED",
+            feature: mode,
+            limit: FREE_LIMITS.totalDownloads,
+            used: usedTotal,
+            error: "You've used your free download. Subscribe to GravelKing Weekly for unlimited access.",
+            fallback: { action: "subscribe", url: "/pricing" },
+          });
+          return;
+        }
+        isFreeUse = true;
+        freeRemaining = limit - used - 1;
       }
-      const [gateUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
-      const hasPaidTier = !!gateUser?.subscriptionTier;
-      if (!hasPaidTier && gateUser?.usedFreeSplit) {
-        res.status(403).json({
-          success: false,
-          error: "You've used your free voice/stem split. Upgrade to GravelKing Splits for unlimited access.",
-          code: "FREE_TRIAL_EXHAUSTED",
-        });
-        return;
-      }
-      isFreeUse = !hasPaidTier;
     }
 
     // ── Voice removal — GNS (GravelKing Neural Separator) v1 ─────────────────
@@ -378,23 +380,50 @@ audioRouter.post(
           }).catch(() => {});
         }
 
-        if (isFreeUse && req.isAuthenticated()) {
-          db.update(usersTable).set({ usedFreeSplit: true }).where(eq(usersTable.id, req.user.id)).catch(() => {});
+        if (isFreeUse && usageField && usageUserId) {
+          await incrementUsage(usageUserId, usageField);
+          await incrementUsage(usageUserId, "totalDownloads");
+          res.setHeader("X-GK-Free-Remaining", String(freeRemaining));
         }
 
-        res.setHeader("Content-Type", "audio/wav");
-        res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.wav"`);
-        res.setHeader("X-GK-Mode", "voice_remove");
-        res.setHeader("X-GK-Routing", "local");
-        res.setHeader("X-GK-Parity", gnsResult.kernelParity);
-        res.setHeader("X-GK-Efficiency", "1.0000");
-        res.setHeader("X-GK-Decay-Rate", "0.0000");
-        res.setHeader("X-GK-Sample-Count", String(wavBuffer.length / 2));
-        res.setHeader("X-GK-Separator", "GNS_v1");
-        res.setHeader("X-GK-Model", GNS_MODEL);
-        res.setHeader("X-GK-Protocol", GNS_PROTOCOL);
-        res.setHeader("X-GK-Stack", GNS_STACK);
-        res.send(wavBuffer);
+        // MP3 fallback for free users; WAV for paid users.
+        const mp3Wanted = !await hasUnlimitedSplits(req);
+        if (mp3Wanted) {
+          const mp3Id = randomUUID();
+          const mp3InPath = `/tmp/gk_vr_in_${mp3Id}.wav`;
+          const mp3OutPath = `/tmp/gk_vr_out_${mp3Id}.mp3`;
+          await writeFile(mp3InPath, wavBuffer);
+          try {
+            await execFileAsync("ffmpeg", [
+              "-y", "-i", mp3InPath, "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100", mp3OutPath,
+            ], { maxBuffer: 50 * 1024 * 1024, timeout: 30_000 });
+            const mp3Buf = await readFile(mp3OutPath);
+            res.setHeader("Content-Type", "audio/mpeg");
+            res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.mp3"`);
+            res.setHeader("X-GK-Mode", "voice_remove");
+            res.setHeader("X-GK-Routing", "local");
+            res.setHeader("X-GK-Parity", gnsResult.kernelParity);
+            res.setHeader("X-GK-Format", "mp3");
+            res.send(mp3Buf);
+          } finally {
+            await unlink(mp3InPath).catch(() => {});
+            await unlink(mp3OutPath).catch(() => {});
+          }
+        } else {
+          res.setHeader("Content-Type", "audio/wav");
+          res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.wav"`);
+          res.setHeader("X-GK-Mode", "voice_remove");
+          res.setHeader("X-GK-Routing", "local");
+          res.setHeader("X-GK-Parity", gnsResult.kernelParity);
+          res.setHeader("X-GK-Efficiency", "1.0000");
+          res.setHeader("X-GK-Decay-Rate", "0.0000");
+          res.setHeader("X-GK-Sample-Count", String(wavBuffer.length / 2));
+          res.setHeader("X-GK-Separator", "GNS_v1");
+          res.setHeader("X-GK-Model", GNS_MODEL);
+          res.setHeader("X-GK-Protocol", GNS_PROTOCOL);
+          res.setHeader("X-GK-Stack", GNS_STACK);
+          res.send(wavBuffer);
+        }
         return;
       } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
@@ -431,8 +460,10 @@ audioRouter.post(
           }).catch(() => {});
         }
 
-        if (isFreeUse && req.isAuthenticated()) {
-          db.update(usersTable).set({ usedFreeSplit: true }).where(eq(usersTable.id, req.user.id)).catch(() => {});
+        if (isFreeUse && usageField && usageUserId) {
+          await incrementUsage(usageUserId, usageField);
+          await incrementUsage(usageUserId, "totalDownloads");
+          res.setHeader("X-GK-Free-Remaining", String(freeRemaining));
         }
 
         res.setHeader("Content-Type", "application/zip");
@@ -453,12 +484,12 @@ audioRouter.post(
       }
     }
 
-    // ── Pro subscription gate for standard mode ─────────────────────────────────
-    if (!await hasPaidSubscription(req)) {
+    // ── Studio-only gate for standard mode ─────────────────────────────────────
+    if (!await hasStudio(req)) {
       res.status(403).json({
         success: false,
-        error: "GravelKing Standard processing requires a Pro subscription.",
-        code: "PRO_REQUIRED",
+        error: "GravelKing Standard processing requires a GravelKing Studio subscription.",
+        code: "STUDIO_REQUIRED",
       });
       return;
     }

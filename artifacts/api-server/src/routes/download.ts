@@ -9,16 +9,14 @@ const README_CONTENT = `# GravelKing Productions — Free Edition v1.0
 GravelKing Productions Free Edition runs on your local machine using Node.js and ffmpeg.
 Free features process audio locally. Paid features route to gravelkingpro.it.com automatically.
 
-## Free Features (100% Local)
-- Noise Reduction (Denoise) — afftdn / anlmdn ffmpeg filters
-- Voice Changer — vibrato, echo, pitch, warmth, telephone effects
-- 30-second Mastering preview (all 6 presets)
-- Beat Maker — 30-second MLK v3 instrumentals
-- Songwriter — full lyric + structure generator
+## Free Tier (limited, 100% local processing)
+- Voice Removal — 3 free runs (downloadable WAV)
+- Stem Splitting — 1 free run (5 stems: vocals, drums, bass, other, instrumental)
+- Mastering — 1 full free download, then 30-second previews (all presets, denoise toggle)
 
 ## Paid Features (Connects to gravelkingpro.it.com)
-- GravelKing Splits ($9.99/mo): Voice Removal, Stem Splitting (unlimited)
-- GravelKing Pro ($39.99/mo): Full Mastering download, Mix Studio, Beat Maker (up to 120s)
+- GravelKing Weekly ($9.99/week): unlimited voice removal + stem splitting, preset mastering with denoise
+- GravelKing Studio ($29.99/mo): everything in Weekly plus fully adjustable mastering and the live DAW (multitrack mixing, recording, per-stem live metrics)
 - Node Auditor ($499/mo): Kernel Dashboard, remote endpoint access, raw telemetry
 
 ## Setup Instructions

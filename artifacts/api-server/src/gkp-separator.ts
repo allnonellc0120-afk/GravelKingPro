@@ -72,8 +72,32 @@ export interface GNSResult {
   stack:        string;
 }
 
+/** Mix several WAV files into a single instrumental WAV via ffmpeg amix. */
+async function mixStemsToInstrumental(stemPaths: string[]): Promise<Buffer> {
+  const outPath = `/tmp/gns_inst_${randomUUID()}.wav`;
+  const inputArgs = stemPaths.flatMap((p) => ["-i", p]);
+  await execFileAsync(
+    "ffmpeg",
+    [
+      "-y",
+      ...inputArgs,
+      "-filter_complex",
+      `amix=inputs=${stemPaths.length}:normalize=0`,
+      "-acodec",
+      "pcm_s16le",
+      outPath,
+    ],
+    { maxBuffer: 200 * 1024 * 1024, timeout: 120_000 },
+  );
+  const buf = await readFile(outPath);
+  await unlink(outPath).catch(() => {});
+  return buf;
+}
+
 /**
- * GNS Stem Split — 4-stem separation (vocals / drums / bass / other).
+ * GNS Stem Split — 5-stem separation.
+ * htdemucs yields vocals / drums / bass / other; we additionally synthesize a
+ * full "instrumental" stem (everything except vocals) for a total of 5 stems.
  * Each stem is processed through MLK v3 post-separation.
  */
 export async function gnsStemSplit(
@@ -115,6 +139,18 @@ export async function gnsStemSplit(
       const label = file.replace(".wav", "");
       zipInput[`GKP_${label}.wav`] = new Uint8Array(buf);
       stemNames.push(label);
+    }
+
+    // ── Stage 3: synthesize a 5th "instrumental" stem (everything but vocals) ─
+    const instrumentalSources = stemFiles
+      .filter((f) => !/vocal/i.test(f))
+      .map((f) => join(stemDir, f));
+    if (instrumentalSources.length > 1) {
+      const instRaw = await mixStemsToInstrumental(instrumentalSources);
+      const { buf, parity } = applyMLKv3(instRaw, multiplier);
+      if (parity !== "MLK_V3_VALIDATED") kernelParity = parity;
+      zipInput["GKP_instrumental.wav"] = new Uint8Array(buf);
+      stemNames.push("instrumental");
     }
 
     return {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import { Upload, Lock, Download, Music } from "lucide-react";
+import { Upload, Lock, Download, Music, Mic, Square } from "lucide-react";
 import { useDAW } from "@/lib/daw/useDAW";
 import { Transport } from "@/components/daw/Transport";
 import { ChannelStrip } from "@/components/daw/ChannelStrip";
@@ -23,12 +23,12 @@ function ProGate() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Mix Studio</h1>
           <p className="text-muted-foreground text-lg">
-            The full DAW — multi-track editing, plugins, real-time audio processing — requires a Pro plan.
+            The full DAW — multi-track editing, live recording, plugins, real-time audio processing — requires the Studio plan ($29.99/mo).
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button asChild size="lg" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-            <Link href="/pricing">Upgrade to Pro</Link>
+            <Link href="/pricing">Upgrade to Studio</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
             <Link href="/studio">Try Basic Studio</Link>
@@ -54,8 +54,8 @@ export default function MixStudio() {
         toast({ title: "MIDI not supported", description: "Convert to WAV or MP3 first.", variant: "destructive" });
         return false;
       }
-      if (!f.type.startsWith("audio/")) {
-        toast({ title: "Not an audio file", description: f.name, variant: "destructive" });
+      if (!f.type.startsWith("audio/") && !f.type.startsWith("video/")) {
+        toast({ title: "Not an audio/video file", description: f.name, variant: "destructive" });
         return false;
       }
       return true;
@@ -99,7 +99,7 @@ export default function MixStudio() {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/20 shrink-0 bg-black/30">
           <div className="flex items-center gap-2">
             <h1 className="text-base font-bold tracking-tight">Mix Studio</h1>
-            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">Pro</Badge>
+            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">Studio</Badge>
             <span className="text-[11px] text-muted-foreground hidden sm:block">
               {daw.tracks.length}/8 tracks
             </span>
@@ -110,6 +110,18 @@ export default function MixStudio() {
               onSave={daw.getProjectSnapshot}
               onLoad={daw.restoreProject}
             />
+            <button
+              onClick={() => (daw.isRecording ? daw.stopRecording() : daw.startRecording())}
+              disabled={!daw.isRecording && daw.tracks.length >= 8}
+              title={daw.isRecording ? "Stop recording" : "Record from microphone or audio input"}
+              className={`flex items-center gap-1.5 text-xs rounded px-2.5 py-1 border transition-colors disabled:opacity-40 ${
+                daw.isRecording
+                  ? "text-white bg-red-500/80 border-red-400/60 animate-pulse"
+                  : "text-red-400 hover:text-red-300 border-red-500/25 hover:border-red-400/40"
+              }`}
+            >
+              {daw.isRecording ? <><Square className="w-3 h-3" /> Stop</> : <><Mic className="w-3 h-3" /> Record</>}
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 border border-amber-500/25 rounded px-2.5 py-1 hover:border-amber-400/40 transition-colors"
@@ -131,7 +143,7 @@ export default function MixStudio() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="audio/*"
+          accept="audio/*,video/*"
           multiple
           className="hidden"
           onChange={e => addFiles(e.target.files)}
@@ -174,6 +186,8 @@ export default function MixStudio() {
                   position={daw.position}
                   bpm={daw.bpm}
                   totalDuration={daw.maxDuration}
+                  isPlaying={daw.isPlaying}
+                  getTrackAnalyser={daw.getTrackAnalyser}
                   onSeek={daw.seek}
                   onRemove={daw.removeTrack}
                   onVolumeChange={daw.setTrackVolume}

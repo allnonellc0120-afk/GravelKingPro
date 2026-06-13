@@ -36,6 +36,12 @@ uri = "file://artifacts/gravelkingpro-promo/public/images/merch_shirt.png"
 type = "image"
 title = "GravelKing t-shirt"
 
+[[generated]]
+id = "Xa4T26EJb-3zMBldYP87o"
+uri = "file://artifacts/gravelkingpro-promo/public/images/gk_hammer_logo.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "whvKht8bnIVNiskggSZrV"
 uri = "file://GravelKingPro_Product_Overview.md"
@@ -65,3 +71,9 @@ id = "18uDO4OT_sLzcNpdJOIaF"
 uri = "file://artifacts/gravelkingpro-promo/public/audio/bg_music.mp3"
 type = "audio"
 title = "promo background bed"
+
+[[outputs]]
+id = "0bGSRLzCk7DLVtbry7L7A"
+uri = "file://artifacts/gravelkingpro-promo/public/audio/gravelking_pro_soundtrack.mp3"
+type = "audio"
+title = "gravelking_pro_soundtrack"

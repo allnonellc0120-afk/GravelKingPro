@@ -165,7 +165,7 @@ export default function KernelDashboard() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Kernel Dashboard</h1>
             <p className="text-muted-foreground">
-              The GravelKing Kernel Dashboard is restricted to <strong className="text-amber-400">Pro</strong> and <strong className="text-amber-400">Node Auditor</strong> subscribers. Full telemetry, routing config, live SSE events, and PDF reports.
+              The GravelKing Kernel Dashboard is restricted to <strong className="text-amber-400">Studio</strong> and <strong className="text-amber-400">Node Auditor</strong> subscribers. Full telemetry, routing config, live SSE events, and PDF reports.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 text-left">
@@ -185,7 +185,7 @@ export default function KernelDashboard() {
           </div>
           <Link href="/pricing">
             <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-11 px-8">
-              Upgrade to Pro — $39.99/mo
+              Upgrade to Studio — $29.99/mo
             </Button>
           </Link>
           <p className="text-xs text-muted-foreground">Node Auditor ($499) includes remote kernel endpoint access.</p>

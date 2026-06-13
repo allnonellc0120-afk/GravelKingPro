@@ -10,13 +10,13 @@ import { Scene6 } from './video_scenes/Scene6';
 import { Scene7 } from './video_scenes/Scene7';
 
 export const SCENE_DURATIONS = {
-  intro: 5800,
-  reveal: 5800,
-  artist: 8000,
-  features: 5800,
-  screens: 5800,
-  merch: 6000,
-  outro: 5800,
+  intro: 16000,
+  reveal: 16000,
+  artist: 15000,
+  features: 16000,
+  screens: 20000,
+  merch: 16000,
+  outro: 20000,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
@@ -106,7 +106,7 @@ export default function VideoTemplate({
 
       <audio
         ref={audioRef}
-        src={`${import.meta.env.BASE_URL}audio/composite_audio.mp3`}
+        src={`${import.meta.env.BASE_URL}audio/gravelking_pro_soundtrack.mp3`}
         preload="auto"
         autoPlay
         muted={muted}

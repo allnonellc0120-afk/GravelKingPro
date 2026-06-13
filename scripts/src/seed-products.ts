@@ -5,7 +5,12 @@ async function ensureProduct(stripe: Stripe, name: string, description: string, 
   const existing = await stripe.products.search({ query: `name:'${name}' AND active:'true'` });
   if (existing.data.length > 0) {
     console.log(`${name} already exists: ${existing.data[0].id}`);
-    return existing.data[0];
+    const product = existing.data[0];
+    if (product.metadata?.tier !== tier) {
+      await stripe.products.update(product.id, { metadata: { ...product.metadata, tier } });
+      console.log(`  Updated ${name} metadata.tier=${tier}`);
+    }
+    return product;
   }
   console.log(`Creating product: ${name}...`);
   const product = await stripe.products.create({ name, description, metadata: { tier } });
@@ -41,30 +46,29 @@ async function createProducts() {
   try {
     const stripe = await getUncachableStripeClient();
 
-    // GravelKing Splits — $9.99/month
-    const splits = await ensureProduct(
+    // GravelKing Weekly — $9.99/week
+    const weekly = await ensureProduct(
       stripe,
-      'GravelKing Splits',
-      'Unlimited stem splitting and voice removal with downloadable WAV stems. No Studio access.',
-      'splits',
+      'GravelKing Weekly',
+      'Unlimited 2-stem voice removal and stem splitting with downloadable WAV stems, plus preset mastering (with denoise). No live Studio.',
+      'weekly',
     );
-    await ensurePrice(stripe, splits, 999, 'month');
+    await ensurePrice(stripe, weekly, 999, 'week');
 
-    // GravelKing Pro — $9.99/week  and  $19.99/month (monthly gets 3-day trial in checkout)
-    const pro = await ensureProduct(
+    // GravelKing Studio — $29.99/month
+    const studio = await ensureProduct(
       stripe,
-      'GravelKing Pro',
-      'Full server-side audio processing, unlimited runs, plugin chain, waveform studio, and priority support.',
-      'pro',
+      'GravelKing Studio',
+      'Everything in Weekly plus fully adjustable mastering and the live DAW — multitrack mixing, recording, and per-stem live metrics.',
+      'monthly',
     );
-    await ensurePrice(stripe, pro, 999,  'week');
-    await ensurePrice(stripe, pro, 1999, 'month');
+    await ensurePrice(stripe, studio, 2999, 'month');
 
     // Node Auditor — $499/month
     const auditor = await ensureProduct(
       stripe,
       'Node Auditor',
-      'Enterprise-scale benchmarking, dedicated support, custom reports.',
+      'Enterprise benchmarking at 1T scale, Morris Law V2 access, dedicated support, and custom reports.',
       'node_auditor',
     );
     await ensurePrice(stripe, auditor, 49900, 'month');
