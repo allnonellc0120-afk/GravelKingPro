@@ -5,6 +5,10 @@ description: How to verify Studio(monthly)-gated audio routes in dev, plus the s
 
 How to verify the paid Studio audio paths (`process-audio` mode=standard, `studio-mix`) end-to-end without touching production code.
 
+## Now automated
+- There is a repeatable test: registered validation step `studio-audio` → `pnpm --filter @workspace/api-server run test`. It runs the real Express `app` in-process (esbuild-bundled like `build.mjs`, since api-server has no tsx), seeds a monthly session, and asserts 200 + `X-GK-Kernel: MLK_v3` + ffprobe-decodable WAV for both endpoints, the studio-mix combined-duration 422 guard, 403 STUDIO_REQUIRED with no session, plus the remote branch against an in-process mock (toggled via `process.env.REMOTE_KERNEL_URL`, read per request).
+- **Note:** `REMOTE_KERNEL_URL` is set in dev to an offline Cloud Run URL, so any in-process test of the *local* path must `delete process.env.REMOTE_KERNEL_URL` first or it tries remote → fails → falls back.
+
 ## Bypassing the Studio gate in dev (no auth UI)
 - The `gk_session` → Stripe entitlement path is **unusable in dev**: the `stripe.*` mirror tables are empty, so the lookup 500s. Use the OIDC path instead.
 - Seed one `public.users` row with `subscription_tier='monthly'` and one `public.sessions` row. Authenticate by sending the unsigned session id as `Authorization: Bearer <sid>` (the server's `getSessionId` accepts the Bearer form). `resolveTier`'s OIDC branch reads `users.subscription_tier` by `req.user.id`.
