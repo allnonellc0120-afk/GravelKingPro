@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Zap, AlertCircle, RefreshCw } from "lucide-react";
+import { Play, AlertCircle, RefreshCw } from "lucide-react";
 
 type APIResponse = {
   success: boolean;
@@ -23,9 +24,10 @@ type APIResponse = {
 };
 
 type RunResult = {
-  label: string;
+  mlk: boolean;
   parity: string;
   peak: number;
+  rms: number;
   efficiency: number;
   gainChangeDb: number;
   realtimeRatio: number | null;
@@ -34,9 +36,10 @@ type RunResult = {
 
 function normalise(resp: APIResponse): RunResult {
   return {
-    label: resp.mlk ? "MLK v3" : "RAW",
+    mlk: resp.mlk,
     parity: resp.metrics.parity,
     peak: resp.metrics.peak,
+    rms: resp.metrics.rms,
     efficiency: resp.metrics.efficiency * 100,
     gainChangeDb: resp.metrics.gainChangeDb,
     realtimeRatio: resp.timing.realtimeRatio,
@@ -44,88 +47,69 @@ function normalise(resp: APIResponse): RunResult {
   };
 }
 
+function parityBadge(parity: string) {
+  if (parity === "MLK_V3_VALIDATED")
+    return { label: "VALIDATED", cls: "bg-emerald-500/20 text-emerald-400" };
+  if (parity === "BASELINE")
+    return { label: "BASELINE", cls: "bg-secondary text-muted-foreground" };
+  return { label: "VIOLATION", cls: "bg-red-500/20 text-red-400" };
+}
+
 const METRICS: {
-  key: keyof Omit<RunResult, "label" | "parity">;
+  key: keyof Omit<RunResult, "mlk" | "parity">;
   label: string;
   fmt: (v: number | null) => string;
   winnerIs: "lower" | "higher" | null;
 }[] = [
-  {
-    key: "peak",
-    label: "Peak Level",
-    fmt: (v) => (v === null ? "—" : v.toFixed(3)),
-    winnerIs: "lower",
-  },
-  {
-    key: "efficiency",
-    label: "Headroom Efficiency",
-    fmt: (v) => (v === null ? "—" : v.toFixed(1) + "%"),
-    winnerIs: "higher",
-  },
-  {
-    key: "realtimeRatio",
-    label: "Realtime Ratio",
-    fmt: (v) => (v === null ? "N/A" : v.toFixed(1) + "x"),
-    winnerIs: null,
-  },
-  {
-    key: "gainChangeDb",
-    label: "Gain Adjustment",
-    fmt: (v) => (v === null || v === 0 ? "None" : v.toFixed(2) + " dB"),
-    winnerIs: null,
-  },
+  { key: "peak", label: "Peak Level", fmt: (v) => (v == null ? "—" : v.toFixed(3)), winnerIs: "lower" },
+  { key: "rms", label: "RMS Level", fmt: (v) => (v == null ? "—" : v.toFixed(4)), winnerIs: null },
+  { key: "efficiency", label: "Headroom Efficiency", fmt: (v) => (v == null ? "—" : v.toFixed(1) + "%"), winnerIs: "higher" },
+  { key: "gainChangeDb", label: "Gain Adjustment", fmt: (v) => (v == null || v === 0 ? "None" : v.toFixed(2) + " dB"), winnerIs: null },
+  { key: "realtimeRatio", label: "Realtime Ratio", fmt: (v) => (v == null ? "N/A" : v.toFixed(1) + "x"), winnerIs: null },
 ];
 
 function ResultColumn({
   result,
   other,
-  focused,
+  active,
 }: {
   result: RunResult;
-  other: RunResult;
-  focused: boolean;
+  other: RunResult | null;
+  active: boolean;
 }) {
-  const isMLK = result.label === "MLK v3";
+  const isMLK = result.mlk;
+  const badge = parityBadge(result.parity);
 
   return (
-    <motion.div
-      layout
-      className={`flex-1 rounded-xl border p-4 space-y-3 transition-colors duration-300 ${
-        focused
+    <div
+      className={`flex-1 rounded-xl border p-4 space-y-3 transition-all duration-300 ${
+        active
           ? isMLK
-            ? "border-amber-500/50 bg-amber-500/5"
-            : "border-slate-500/40 bg-slate-500/5"
-          : "border-border/30 bg-card/20 opacity-70"
+            ? "border-amber-500/50 bg-amber-500/5 shadow-[0_0_20px_rgba(245,158,11,0.08)]"
+            : "border-slate-400/40 bg-slate-500/5"
+          : "border-border/25 bg-card/15 opacity-55"
       }`}
     >
-      {/* Header */}
+      {/* Column header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span
-            className={`text-sm font-bold ${isMLK ? "text-amber-400" : "text-muted-foreground"}`}
-          >
-            {result.label}
+          <span className={`text-sm font-extrabold ${isMLK ? "text-amber-400" : "text-slate-300"}`}>
+            {isMLK ? "MLK v3" : "RAW"}
           </span>
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
-              result.parity === "MLK_V3_VALIDATED"
-                ? "bg-amber-500/20 text-amber-400"
-                : "bg-secondary text-muted-foreground"
-            }`}
-          >
-            {result.parity === "MLK_V3_VALIDATED" ? "VALIDATED" : "BASELINE"}
+          <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${badge.cls}`}>
+            {badge.label}
           </span>
         </div>
         <span className="text-[10px] font-mono text-muted-foreground">
-          {result.timeMs < 1 ? "<1" : result.timeMs.toFixed(0)} ms
+          {result.timeMs < 1 ? "<1ms" : result.timeMs.toFixed(0) + "ms"}
         </span>
       </div>
 
       {/* Metrics */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {METRICS.map((m) => {
           const val = result[m.key] as number | null;
-          const otherVal = other[m.key] as number | null;
+          const otherVal = other ? (other[m.key] as number | null) : null;
           const isBetter =
             m.winnerIs !== null && val !== null && otherVal !== null
               ? m.winnerIs === "lower"
@@ -135,46 +119,39 @@ function ResultColumn({
           return (
             <div
               key={m.key}
-              className={`flex items-center justify-between px-3 py-2 rounded-lg ${
+              className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${
                 isBetter
                   ? "bg-amber-500/10 border border-amber-500/20"
-                  : "bg-secondary/30 border border-border/20"
+                  : "bg-secondary/30 border border-border/15"
               }`}
             >
-              <span className="text-xs text-muted-foreground">{m.label}</span>
-              <span
-                className={`font-mono text-xs font-bold ${
-                  isBetter ? "text-amber-400" : "text-foreground"
-                }`}
-              >
+              <span className="text-muted-foreground">{m.label}</span>
+              <span className={`font-mono font-bold ${isBetter ? "text-amber-400" : "text-foreground"}`}>
                 {m.fmt(val)}
-                {isBetter && (
-                  <span className="ml-1 text-amber-500 text-[9px]">✓</span>
-                )}
+                {isBetter && <span className="ml-1 text-[9px]">✓</span>}
               </span>
             </div>
           );
         })}
       </div>
 
-      {/* Description */}
       <p className="text-[10px] text-muted-foreground leading-relaxed">
         {isMLK
-          ? "Three-band amplitude carving · Phase-coherent recombination · 0.92 peak ceiling"
-          : "Unprocessed signal · No kernel applied · Full dynamic range preserved"}
+          ? "Three-band amplitude carving · Phase-coherent recombination · 0.92 ceiling"
+          : "Unprocessed signal · No kernel applied · Raw dynamic range"}
       </p>
-    </motion.div>
+    </div>
   );
 }
 
 export function MLKComparison() {
+  const [mlkOn, setMlkOn] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [rawResult, setRawResult] = useState<RunResult | null>(null);
   const [mlkResult, setMlkResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [focusedSide, setFocusedSide] = useState<"raw" | "mlk">("mlk");
 
-  const runDemo = async (mlk: boolean): Promise<RunResult> => {
+  const runSingle = async (mlk: boolean): Promise<RunResult> => {
     const res = await fetch("/api/kernel/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -186,138 +163,163 @@ export function MLKComparison() {
     return normalise(json);
   };
 
-  const handleRun = async () => {
+  const handleToggle = async (on: boolean) => {
+    setMlkOn(on);
     setIsRunning(true);
     setError(null);
     try {
-      const [raw, mlk] = await Promise.all([runDemo(false), runDemo(true)]);
-      setRawResult(raw);
-      setMlkResult(mlk);
-      setFocusedSide("mlk");
+      const result = await runSingle(on);
+      if (on) setMlkResult(result);
+      else setRawResult(result);
     } catch (err: any) {
-      setError(err.message || "Could not run demo.");
+      setError(err.message || "Kernel error");
     } finally {
       setIsRunning(false);
     }
   };
 
-  const hasResults = rawResult !== null && mlkResult !== null;
+  const handleRunBoth = async () => {
+    setIsRunning(true);
+    setError(null);
+    try {
+      const [raw, mlk] = await Promise.all([runSingle(false), runSingle(true)]);
+      setRawResult(raw);
+      setMlkResult(mlk);
+    } catch (err: any) {
+      setError(err.message || "Kernel error");
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const hasRaw = rawResult !== null;
+  const hasMlk = mlkResult !== null;
+  const hasBoth = hasRaw && hasMlk;
+  const hasAny = hasRaw || hasMlk;
 
   return (
     <div className="space-y-4">
-      {/* Header row */}
+      {/* Header + toggle */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold tracking-tight">MLK v3 — Live Before / After</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Same audio sample, two paths. See exactly what the kernel changes.
+            Toggle MLK v3 ON or OFF — runs that mode through the kernel instantly.
           </p>
         </div>
-        {hasResults && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Focus:</span>
-            <div className="flex rounded-lg overflow-hidden border border-border/40">
-              <button
-                onClick={() => setFocusedSide("raw")}
-                className={`px-3 py-1 text-xs font-semibold transition-colors ${
-                  focusedSide === "raw"
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                RAW
-              </button>
-              <button
-                onClick={() => setFocusedSide("mlk")}
-                className={`px-3 py-1 text-xs font-semibold transition-colors ${
-                  focusedSide === "mlk"
-                    ? "bg-amber-500/20 text-amber-400"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                MLK v3
-              </button>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRun}
-              disabled={isRunning}
-              className="h-8 px-3 text-xs text-muted-foreground"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRunning ? "animate-spin" : ""}`} />
-              {isRunning ? "Running…" : "Rerun"}
-            </Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-semibold ${!mlkOn ? "text-foreground" : "text-muted-foreground"}`}>
+            RAW
+          </span>
+          <Switch
+            checked={mlkOn}
+            onCheckedChange={handleToggle}
+            disabled={isRunning}
+            className="data-[state=checked]:bg-amber-500"
+          />
+          <span className={`text-xs font-semibold ${mlkOn ? "text-amber-400" : "text-muted-foreground"}`}>
+            MLK v3
+          </span>
+          {isRunning && (
+            <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+          )}
+        </div>
+      </div>
+
+      {/* Current mode indicator */}
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
+        mlkOn
+          ? "border-amber-500/30 bg-amber-500/8 text-amber-400"
+          : "border-border/30 bg-secondary/20 text-muted-foreground"
+      }`}>
+        <span className="font-semibold">{mlkOn ? "MLK v3 ON" : "RAW (no kernel)"}</span>
+        <span className="opacity-60">·</span>
+        <span>{mlkOn ? "three-band amplitude carving active" : "signal passed through unmodified"}</span>
+        {isRunning && <span className="ml-auto">processing…</span>}
+        {!isRunning && !hasAny && (
+          <span className="ml-auto opacity-60">flip toggle or press Run Demo to process</span>
+        )}
+        {!isRunning && hasAny && !hasBoth && (
+          <button
+            onClick={handleRunBoth}
+            className="ml-auto text-amber-400 hover:text-amber-300 underline underline-offset-2"
+          >
+            run other side too →
+          </button>
+        )}
+        {!isRunning && hasBoth && (
+          <button
+            onClick={handleRunBoth}
+            className="ml-auto opacity-60 hover:opacity-100 flex items-center gap-1"
+          >
+            <RefreshCw className="w-3 h-3" /> rerun both
+          </button>
         )}
       </div>
 
-      {/* Before first run */}
-      {!hasResults && (
-        <div className="flex flex-col items-center gap-3 py-10 border border-dashed border-border/40 rounded-xl bg-secondary/10">
-          <Zap className="w-8 h-8 text-amber-500/60" />
+      {/* Initial run prompt */}
+      {!hasAny && (
+        <div className="flex flex-col items-center gap-3 py-8 border border-dashed border-border/40 rounded-xl bg-secondary/10">
           <p className="text-sm text-muted-foreground text-center max-w-xs">
-            Hit <strong className="text-foreground">Run Demo</strong> to fire the built-in sample
-            through both RAW and MLK v3 simultaneously — results appear side-by-side.
+            Flip the toggle above to run one mode, or run both simultaneously for a full side-by-side comparison.
           </p>
           <Button
-            onClick={handleRun}
+            onClick={handleRunBoth}
             disabled={isRunning}
             className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-10 px-8"
           >
             <Play className="w-4 h-4 mr-2 fill-current" />
-            {isRunning ? "Running…" : "Run Demo"}
+            {isRunning ? "Running…" : "Run Demo — Both Sides"}
           </Button>
-          {error && (
-            <div className="flex items-center gap-2 text-xs text-red-400">
-              <AlertCircle className="w-3.5 h-3.5" />
-              {error}
-            </div>
-          )}
         </div>
       )}
 
-      {/* Side-by-side results */}
-      <AnimatePresence>
-        {hasResults && rawResult && mlkResult && (
+      {/* Single result (only one side run yet) */}
+      {hasAny && !hasBoth && (
+        <AnimatePresence mode="wait">
           <motion.div
-            key="results"
+            key={hasRaw ? "raw-only" : "mlk-only"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <ResultColumn
+              result={(hasRaw ? rawResult : mlkResult)!}
+              other={null}
+              active={true}
+            />
+          </motion.div>
+        </AnimatePresence>
+      )}
+
+      {/* Side-by-side both results */}
+      {hasBoth && (
+        <AnimatePresence>
+          <motion.div
+            key="both"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             className="flex flex-col sm:flex-row gap-3"
           >
-            <ResultColumn
-              result={rawResult}
-              other={mlkResult}
-              focused={focusedSide === "raw"}
-            />
+            <ResultColumn result={rawResult!} other={mlkResult} active={!mlkOn} />
 
-            {/* VS divider */}
             <div className="flex sm:flex-col items-center justify-center gap-1 shrink-0">
               <div className="h-px sm:h-full sm:w-px flex-1 bg-border/30" />
-              <Badge
-                variant="outline"
-                className="text-[10px] shrink-0 border-border/40 text-muted-foreground px-2"
-              >
+              <Badge variant="outline" className="text-[10px] shrink-0 border-border/40 text-muted-foreground px-2">
                 VS
               </Badge>
               <div className="h-px sm:h-full sm:w-px flex-1 bg-border/30" />
             </div>
 
-            <ResultColumn
-              result={mlkResult}
-              other={rawResult}
-              focused={focusedSide === "mlk"}
-            />
+            <ResultColumn result={mlkResult!} other={rawResult} active={mlkOn} />
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      )}
 
-      {/* Error after run */}
-      {error && hasResults && (
-        <div className="flex items-center gap-2 text-xs text-red-400 pt-1">
-          <AlertCircle className="w-3.5 h-3.5" />
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-red-400">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           {error}
         </div>
       )}
