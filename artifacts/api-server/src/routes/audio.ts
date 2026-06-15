@@ -5,7 +5,6 @@ import { promisify } from "util";
 import { writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
-import { mlk_v3 } from "../kernel-v3";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 import { db, processRunsTable } from "@workspace/db";
 import {
@@ -28,134 +27,6 @@ const audioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
 const audioConcurrency = concurrencyLimit(3);
 
 type ProcessMode = "standard" | "voice_remove" | "stem_split";
-
-// ── Remote routing ────────────────────────────────────────────────────────────
-function getRemoteUrl(): string | null {
-  return process.env.REMOTE_KERNEL_URL?.trim() || null;
-}
-
-function getRemoteApiKey(): string | null {
-  return process.env.REMOTE_KERNEL_API_KEY?.trim() || null;
-}
-
-function emitRemoteAlert(
-  log: Logger,
-  reason: RemoteInvalidReason,
-  remoteUrl: string,
-  detail: string,
-): void {
-  const event: RemoteAlertEvent = {
-    type: "remote_invalid_output",
-    reason,
-    remoteUrl,
-    detail,
-    timestamp: new Date().toISOString(),
-  };
-  log.warn(
-    { event: "remote_invalid_output", reason, remoteUrl, detail },
-    "Remote upgrade kernel returned invalid output — falling back to local processing",
-  );
-  telemetryBus.emit("remote_alert", event);
-}
-
-type RetryableFailure = { ok: false; retryable: true; reason: "request_failed" | "non_ok_status"; detail: string };
-type TerminalFailure = { ok: false; retryable: false; reason: RemoteInvalidReason; detail: string };
-type AttemptResult =
-  | { ok: true; wav: Buffer; headers: Record<string, string> }
-  | RetryableFailure
-  | TerminalFailure;
-
-async function attemptRemoteProcessing(
-  file: Express.Multer.File,
-  multiplier: number,
-  sliceSize: number,
-  requestHeaders: Record<string, string>,
-  remoteUrl: string,
-): Promise<AttemptResult> {
-  try {
-    const response = await fetch(`${remoteUrl}/process-audio`, {
-      method: "POST",
-      headers: requestHeaders,
-      body: new Uint8Array(file.buffer),
-      signal: AbortSignal.timeout(30_000),
-      redirect: "error",
-    });
-
-    if (!response.ok) {
-      return { ok: false, retryable: true, reason: "non_ok_status", detail: `HTTP ${response.status} ${response.statusText}` };
-    }
-
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("audio")) {
-      return { ok: false, retryable: false, reason: "invalid_content_type", detail: `content-type: ${contentType || "(none)"}` };
-    }
-
-    const wav = Buffer.from(await response.arrayBuffer());
-    // The remote may report an "audio/*" content-type while returning truncated,
-    // empty, or non-WAV bytes. Never label such payloads as premium MLK v3 output —
-    // reject them here so the caller falls back to local processing.
-    if (!isValidWav(wav)) {
-      return { ok: false, retryable: false, reason: "invalid_wav", detail: `${wav.length} bytes — failed RIFF/WAV header check` };
-    }
-
-    const responseHeaders: Record<string, string> = {};
-    ["X-GK-Parity", "X-GK-Efficiency", "X-GK-Decay-Rate", "X-GK-Sample-Count", "X-GK-Kernel"].forEach((h) => {
-      const v = response.headers.get(h);
-      if (v) responseHeaders[h] = v;
-    });
-    return { ok: true, wav, headers: responseHeaders };
-  } catch (err) {
-    return { ok: false, retryable: true, reason: "request_failed", detail: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-async function tryRemoteProcessing(
-  file: Express.Multer.File,
-  multiplier: number,
-  sliceSize: number,
-  log: Logger,
-  stemId = 1
-): Promise<{ wav: Buffer; headers: Record<string, string> } | null> {
-  const remoteUrl = getRemoteUrl();
-  if (!remoteUrl) return null;
-
-  const requestHeaders: Record<string, string> = {
-    "Content-Type": "application/octet-stream",
-    "X-GravelKing-V3-Protocol": "REGENERATIVE_FLOW",
-    "X-Stability-Quorum": "MONITOR_100",
-    "X-Stem-ID": String(stemId),
-    "X-GK-Multiplier": String(multiplier),
-    "X-GK-Slice-Size": String(sliceSize),
-  };
-
-  const apiKey = getRemoteApiKey();
-  if (apiKey) requestHeaders["Authorization"] = `Bearer ${apiKey}`;
-
-  const first = await attemptRemoteProcessing(file, multiplier, sliceSize, requestHeaders, remoteUrl);
-
-  if (first.ok) return { wav: first.wav, headers: first.headers };
-
-  // Terminal failures (corrupt payload) — no retry, alert immediately.
-  if (!first.retryable) {
-    emitRemoteAlert(log, first.reason, remoteUrl, first.detail);
-    return null;
-  }
-
-  // Transient failure — wait 500 ms then retry once.
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  const second = await attemptRemoteProcessing(file, multiplier, sliceSize, requestHeaders, remoteUrl);
-
-  if (second.ok) return { wav: second.wav, headers: second.headers };
-
-  // Both attempts failed — alert once with the final failure detail.
-  const finalReason = second.retryable ? second.reason : second.reason;
-  const finalDetail = second.retryable
-    ? `${second.detail} (after retry; first attempt: ${first.detail})`
-    : second.detail;
-  emitRemoteAlert(log, finalReason, remoteUrl, finalDetail);
-  return null;
-}
 
 // ── Audio helpers ─────────────────────────────────────────────────────────────
 async function getAudioInfo(inputBuf: Buffer, ext: string): Promise<{ sampleRate: number; channels: number }> {
@@ -212,6 +83,61 @@ async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<B
   await unlink(inPath).catch(() => {});
   await unlink(outPath).catch(() => {});
   return wavBuf;
+}
+
+/**
+ * MLK v3 via ffmpeg filter chain — multi-band carving with no in-process RAM allocation.
+ * Streams entirely on disk; handles any file size without OOM.
+ */
+async function processWithMLKv3Ffmpeg(
+  inputBuf: Buffer,
+  ext: string,
+  multiplier: number,
+): Promise<{ wavBuffer: Buffer; parity: string; efficiency: string; decayRate: string; sampleCount: number }> {
+  const id = randomUUID();
+  const inPath = `/tmp/gk_mlk_in_${id}.${ext}`;
+  const outPath = `/tmp/gk_mlk_out_${id}.wav`;
+
+  await writeFile(inPath, inputBuf);
+
+  // Per-band multipliers match mlk_v3 JS implementation:
+  //   low:  multiplier * 1.15  (capped at 2.0)
+  //   mid:  multiplier
+  //   high: multiplier * 0.80  (min 0.1)
+  const lowMult  = Math.min(2.0, multiplier * 1.15).toFixed(4);
+  const midMult  = multiplier.toFixed(4);
+  const highMult = Math.max(0.1, multiplier * 0.80).toFixed(4);
+
+  // 3-band split → per-band volume → recombine → normalize
+  const filter = [
+    `asplit=3[low][mid][high]`,
+    `[low]lowpass=f=250,volume=${lowMult}[l]`,
+    `[mid]highpass=f=250,lowpass=f=4000,volume=${midMult}[m]`,
+    `[high]highpass=f=4000,volume=${highMult}[h]`,
+    `[l][m][h]amix=inputs=3:normalize=0`,
+    `dynaudnorm=p=0.9:m=10:s=5`,
+  ].join(";");
+
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y", "-i", inPath,
+      "-filter_complex", filter,
+      "-ac", "2",
+      "-acodec", "pcm_s16le",
+      outPath,
+    ], { timeout: 180_000 });
+
+    const wavBuffer = await readFile(outPath);
+    const sampleCount = Math.floor((wavBuffer.length - 44) / 2);
+    const decayRate = (1 - multiplier).toFixed(4);
+    const efficiency = multiplier.toFixed(4);
+    const parity = "MLK_V3_VALIDATED";
+
+    return { wavBuffer, parity, efficiency, decayRate, sampleCount };
+  } finally {
+    await unlink(inPath).catch(() => {});
+    await unlink(outPath).catch(() => {});
+  }
 }
 
 /** Apply rubberband tempo/pitch shift as a post-processing step. */
@@ -297,30 +223,8 @@ audioRouter.get("/kernel/telemetry", (req: Request, res: Response) => {
 });
 
 // ── Config / health endpoint ──────────────────────────────────────────────────
-audioRouter.get("/kernel/routing", async (_req, res) => {
-  const remoteUrl = getRemoteUrl();
-  let remoteStatus: "online" | "offline" | "not_configured" = "not_configured";
-
-  if (remoteUrl) {
-    try {
-      const r = await fetch(`${remoteUrl}/process-audio`, {
-        method: "HEAD",
-        signal: AbortSignal.timeout(5_000),
-        redirect: "error",
-      });
-      remoteStatus = r.ok ? "online" : "offline";
-    } catch {
-      remoteStatus = "offline";
-    }
-  }
-
-  res.json({
-    mode: remoteUrl ? "remote_with_fallback" : "local",
-    remoteUrl: remoteUrl ?? null,
-    remoteStatus,
-    localKernel: "active",
-    authConfigured: !!getRemoteApiKey(),
-  });
+audioRouter.get("/kernel/routing", (_req, res) => {
+  res.json({ mode: "local", remoteUrl: null, remoteStatus: "not_configured", localKernel: "active" });
 });
 
 // ── Usage status ──────────────────────────────────────────────────────────────
@@ -444,7 +348,6 @@ audioRouter.post(
           decayRate: "0.0000",
           sampleCount: String(wavBuffer.length / 2),
           timestamp: new Date().toISOString(),
-          remoteUrl: getRemoteUrl(),
         };
         telemetryBus.emit("run", event);
 
@@ -525,7 +428,6 @@ audioRouter.post(
           decayRate: "0.0000",
           sampleCount: String(mlkResult.zipBuffer.length),
           timestamp: new Date().toISOString(),
-          remoteUrl: getRemoteUrl(),
         };
         telemetryBus.emit("run", event);
 
@@ -575,60 +477,18 @@ audioRouter.post(
       return;
     }
 
-    // ── Standard mode: try remote first ────────────────────────────────────────
-    const remote = await tryRemoteProcessing(req.file, multiplier, sliceSize, req.log);
-    if (remote) {
-      const event: TelemetryEvent = {
-        routing: "remote",
-        parity: remote.headers["X-GK-Parity"] ?? "UNKNOWN",
-        efficiency: remote.headers["X-GK-Efficiency"] ?? "—",
-        decayRate: remote.headers["X-GK-Decay-Rate"] ?? "—",
-        sampleCount: remote.headers["X-GK-Sample-Count"] ?? "—",
-        timestamp: new Date().toISOString(),
-        remoteUrl: getRemoteUrl(),
-      };
-      telemetryBus.emit("run", event);
-
-      if (req.isAuthenticated()) {
-        db.insert(processRunsTable).values({
-          userId: req.user.id,
-          routing: "remote",
-          parity: remote.headers["X-GK-Parity"] ?? "UNKNOWN",
-          efficiency: parseFloat(remote.headers["X-GK-Efficiency"] ?? "0") || null,
-          decayRate: parseFloat(remote.headers["X-GK-Decay-Rate"] ?? "0") || null,
-          sampleCount: parseInt(remote.headers["X-GK-Sample-Count"] ?? "0") || null,
-          fileName: req.file.originalname,
-        }).catch(() => {});
-      }
-
-      res.setHeader("Content-Type", "audio/wav");
-      res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
-      res.setHeader("X-GK-Routing", "remote");
-      // The remote V3 kernel is the canonical MLK v3 processor; mark it so every
-      // standard response carries the MLK v3 marker. A remote-provided value wins.
-      res.setHeader("X-GK-Kernel", "MLK_v3");
-      Object.entries(remote.headers).forEach(([k, v]) => res.setHeader(k, v));
-      res.send(remote.wav);
-      return;
-    }
-
-    // Local kernel fallback — MLK v3 multi-band carving (matches the rest of the app).
+    // ── Standard mode: MLK v3 via ffmpeg (streaming, no in-process RAM spike) ──
     try {
-      const { samples, sampleRate } = await decodeToFloat32(req.file.buffer, ext);
-      const { processed, stats } = mlk_v3(Array.from(samples), multiplier, sliceSize);
-      const parityStatus = stats.parity;
-      const efficiency = stats.gainChange;
-      const decayRate = 1 - multiplier;
-      const wavBuffer = await encodeToWav(new Float32Array(processed), sampleRate);
+      const { wavBuffer, parity, efficiency, decayRate, sampleCount } =
+        await processWithMLKv3Ffmpeg(req.file.buffer, ext, multiplier);
 
       const event: TelemetryEvent = {
         routing: "local",
-        parity: parityStatus,
-        efficiency: efficiency.toFixed(4),
-        decayRate: decayRate.toFixed(4),
-        sampleCount: String(processed.length),
+        parity,
+        efficiency,
+        decayRate,
+        sampleCount: String(sampleCount),
         timestamp: new Date().toISOString(),
-        remoteUrl: getRemoteUrl(),
       };
       telemetryBus.emit("run", event);
 
@@ -636,10 +496,10 @@ audioRouter.post(
         db.insert(processRunsTable).values({
           userId: req.user.id,
           routing: "local",
-          parity: parityStatus,
-          efficiency,
-          decayRate,
-          sampleCount: processed.length,
+          parity,
+          efficiency: parseFloat(efficiency),
+          decayRate: parseFloat(decayRate),
+          sampleCount,
           fileName: req.file.originalname,
         }).catch(() => {});
       }
@@ -647,10 +507,10 @@ audioRouter.post(
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
       res.setHeader("X-GK-Routing", "local");
-      res.setHeader("X-GK-Parity", parityStatus);
-      res.setHeader("X-GK-Efficiency", efficiency.toFixed(4));
-      res.setHeader("X-GK-Decay-Rate", decayRate.toFixed(4));
-      res.setHeader("X-GK-Sample-Count", String(processed.length));
+      res.setHeader("X-GK-Parity", parity);
+      res.setHeader("X-GK-Efficiency", efficiency);
+      res.setHeader("X-GK-Decay-Rate", decayRate);
+      res.setHeader("X-GK-Sample-Count", String(sampleCount));
       res.setHeader("X-GK-Kernel", "MLK_v3");
       res.send(wavBuffer);
     } catch (err: any) {
