@@ -159,6 +159,46 @@ interface ActiveTrack {
   plugins: Map<string, PluginNodeResult>;
 }
 
+// ─── localStorage persistence helpers ───────────────────────────────────────
+
+const LS_KEY = "gkp_daw_settings";
+
+interface DAWSettings {
+  bpm: number;
+  masterVolume: number;
+  loop: boolean;
+  masterPlugins: PluginDef[];
+}
+
+const DEFAULT_MASTER_PLUGINS: PluginDef[] = [
+  { id: "m-eq",  type: "eq",  enabled: false, params: { ...PLUGIN_DEFAULTS.eq } },
+  { id: "m-lim", type: "compressor", enabled: true,  params: { threshold: -1, ratio: 20, attack: 0, release: 100, knee: 0, makeup: 0 } },
+];
+
+function loadDAWSettings(): DAWSettings {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<DAWSettings>;
+      return {
+        bpm: typeof parsed.bpm === "number" && parsed.bpm > 0 ? parsed.bpm : 120,
+        masterVolume: typeof parsed.masterVolume === "number" ? parsed.masterVolume : 0.85,
+        loop: typeof parsed.loop === "boolean" ? parsed.loop : false,
+        masterPlugins: Array.isArray(parsed.masterPlugins) && parsed.masterPlugins.length
+          ? parsed.masterPlugins
+          : DEFAULT_MASTER_PLUGINS,
+      };
+    }
+  } catch {}
+  return { bpm: 120, masterVolume: 0.85, loop: false, masterPlugins: DEFAULT_MASTER_PLUGINS };
+}
+
+function saveDAWSettings(settings: DAWSettings) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(settings));
+  } catch {}
+}
+
 // ─── hook ───────────────────────────────────────────────────────────────────
 
 export function useDAW() {
@@ -166,13 +206,13 @@ export function useDAW() {
   const [tracks, setTracks] = useState<TrackState[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
-  const [masterVolume, setMasterVolumeState] = useState(0.85);
-  const [loop, setLoop] = useState(false);
-  const [bpm, setBpm] = useState(120);
-  const [masterPlugins, setMasterPlugins] = useState<PluginDef[]>([
-    { id: "m-eq",  type: "eq",  enabled: false, params: { ...PLUGIN_DEFAULTS.eq } },
-    { id: "m-lim", type: "compressor", enabled: true,  params: { threshold: -1, ratio: 20, attack: 0, release: 100, knee: 0, makeup: 0 } },
-  ]);
+  // Read localStorage exactly once on mount — useRef initializer only runs once
+  const _initSettingsRef = useRef<DAWSettings | null>(null);
+  const _init = _initSettingsRef.current ?? (_initSettingsRef.current = loadDAWSettings());
+  const [masterVolume, setMasterVolumeState] = useState<number>(_init.masterVolume);
+  const [loop, setLoop] = useState<boolean>(_init.loop);
+  const [bpm, setBpm] = useState<number>(_init.bpm);
+  const [masterPlugins, setMasterPlugins] = useState<PluginDef[]>(_init.masterPlugins);
 
   const [isRecording, setIsRecording] = useState(false);
 
@@ -196,6 +236,11 @@ export function useDAW() {
   useEffect(() => { tracksRef.current = tracks; }, [tracks]);
   useEffect(() => { loopRef.current = loop; }, [loop]);
   useEffect(() => { masterVolRef.current = masterVolume; }, [masterVolume]);
+
+  // Persist DAW settings to localStorage whenever they change
+  useEffect(() => {
+    saveDAWSettings({ bpm, masterVolume, loop, masterPlugins });
+  }, [bpm, masterVolume, loop, masterPlugins]);
 
   const getCtx = (): AudioContext => {
     if (!ctxRef.current || ctxRef.current.state === "closed") {
