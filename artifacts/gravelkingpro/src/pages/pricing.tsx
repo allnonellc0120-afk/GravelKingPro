@@ -13,7 +13,7 @@ type PlanId = "weekly" | "monthly" | "node_auditor";
 
 const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
   weekly: "GravelKing Weekly",
-  monthly: "GravelKing Studio",
+  monthly: "GravelKing Pro Plus",
   node_auditor: "Node Auditor",
 };
 
@@ -28,14 +28,14 @@ const WEEKLY_FEATURES = [
 ];
 
 const STUDIO_FEATURES = [
+  { label: "MLK V3.5 Hardware Optimizer", highlight: "Runs locally — optimizes YOUR device for audio processing" },
+  { label: "CPU affinity + NUMA tuning", highlight: "Pins cores, locks memory, detects your hardware topology" },
+  { label: "Real benchmark metrics", highlight: "Live GFLOPS, parity, efficiency — not demo numbers" },
+  { label: "Guided step-by-step setup", highlight: "Click-through optimization walkthrough" },
   { label: "Fully adjustable mastering kernel", highlight: "Custom EQ, compression, limiting per track" },
   { label: "Live multitrack DAW", highlight: "Mix 8+ tracks in real time" },
   { label: "Live microphone recording", highlight: "USB mic, audio interface, phone input" },
   { label: "Per-stem live meters", highlight: "Real-time RMS / peak on every channel" },
-  { label: "Interactive parametric EQ", highlight: "0–3kHz surgical range, drag-to-tune" },
-  { label: "Detented rotary controls", highlight: "Pro-grade knob feel, center-detent pan" },
-  { label: "Reverb + space maker", highlight: "Custom impulse responses, stereo width" },
-  { label: "Kernel Dashboard", highlight: "Parity, efficiency, decay telemetry" },
   { label: "PDF export reports", highlight: "Shareable mastering certificates" },
   { label: "Priority support", highlight: "48-hour response guarantee" },
 ];
@@ -54,7 +54,17 @@ export default function Pricing() {
     const checkout = params.get("checkout");
 
     if (checkout === "success") {
+      const plan = params.get("plan");
       refreshSubscription().then(() => {
+        if (plan === "monthly") {
+          toast({
+            title: "Pro Plus activated!",
+            description: "Launching the MLK V3.5 Hardware Optimizer for your device...",
+          });
+          window.history.replaceState({}, "", "/optimizer");
+          window.location.href = "/optimizer";
+          return;
+        }
         toast({
           title: "Subscription activated!",
           description: "All features are now unlocked. Welcome aboard.",
@@ -93,7 +103,7 @@ export default function Pricing() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ priceId, plan: planId }),
       });
 
       if (!checkoutRes.ok) {
@@ -281,17 +291,17 @@ export default function Pricing() {
               </div>
               <CardHeader>
                 <CardTitle className="text-lg text-amber-500 flex items-center gap-2">
-                  <Crown className="w-4 h-4" /> GravelKing Studio
+                  <Crown className="w-4 h-4" /> GravelKing Pro Plus
                 </CardTitle>
-                <CardDescription>The complete professional studio — everything in Weekly, plus:</CardDescription>
+                <CardDescription>Studio tools + MLK V3.5 hardware optimizer — runs locally on your machine</CardDescription>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">$29.99</span>
+                  <span className="text-3xl font-bold">$39.99</span>
                   <span className="text-muted-foreground text-sm">/mo</span>
                   <span className="text-xs text-emerald-400 font-medium ml-1">3-day free trial</span>
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500">
-                    <ArrowRight className="w-3 h-3 mr-1" />Save 25% vs Weekly
+                    <ArrowRight className="w-3 h-3 mr-1" />Includes local hardware optimization
                   </Badge>
                 </div>
               </CardHeader>
@@ -328,7 +338,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-studio"
                   >
-                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Start Free Trial — Get Studio"}
+                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Start Free Trial — Get Pro Plus"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
@@ -342,7 +352,7 @@ export default function Pricing() {
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
                 <CardTitle className="text-lg">Node Auditor</CardTitle>
-                <CardDescription>Enterprise scale benchmarking</CardDescription>
+                <CardDescription>Unlimited optimization runs — up to 100 devices, personal use</CardDescription>
                 <div className="mt-3">
                   <span className="text-3xl font-bold">$499</span>
                   <span className="text-muted-foreground text-sm">/mo</span>
@@ -350,14 +360,18 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Everything in Studio</FeatureRow>
-                  <FeatureRow yes>1T-scale audio graph processing</FeatureRow>
-                  <FeatureRow yes>Morris Law V2 access</FeatureRow>
+                  <FeatureRow yes>Everything in Pro Plus</FeatureRow>
+                  <FeatureRow yes>Unlimited MLK V3.5 optimizer runs</FeatureRow>
+                  <FeatureRow yes>Up to 100 devices optimized</FeatureRow>
                   <FeatureRow yes>White-label WAV &amp; PDF exports</FeatureRow>
+                  <FeatureRow yes>Morris Law V3.5 access</FeatureRow>
                   <FeatureRow yes>Custom benchmark reports</FeatureRow>
-                  <FeatureRow yes>Dedicated account manager</FeatureRow>
-                  <FeatureRow yes>99.9% uptime SLA guarantee</FeatureRow>
+                  <FeatureRow yes={false}>Commercial resale or scaling</FeatureRow>
                 </ul>
+                <p className="mt-3 text-xs text-muted-foreground border border-border/30 rounded px-3 py-2">
+                  Personal use only. Need to optimize at scale or resell?{" "}
+                  <a href="/contact" className="text-amber-500 underline">Contact us for a commercial license.</a>
+                </p>
               </CardContent>
               <CardFooter>
                 {isLoadingSubscription ? (
