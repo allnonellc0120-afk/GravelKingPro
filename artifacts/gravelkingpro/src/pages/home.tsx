@@ -24,7 +24,7 @@ const FEATURES = [
     badgeColor: "border-sky-500/40 text-sky-400",
     href: "/studio",
     cta: "Try it free",
-    img: "https://p3.hippopx.com/preview/152/995/female-artist-recording-song-professional-music-studio-female-singer-recording-vocals-microphone-music-production-studio-recording-artist-recording-music-studio-thumbnail.jpg",
+    img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80",
   },
   {
     icon: <Scissors className="w-6 h-6 text-emerald-400" />,
@@ -34,7 +34,7 @@ const FEATURES = [
     badgeColor: "border-sky-500/40 text-sky-400",
     href: "/studio",
     cta: "Try it free",
-    img: "https://static.vecteezy.com/system/resources/thumbnails/067/167/854/small/soundwave-in-blue-a-vibrant-mesmerizing-blue-soundwave-pulses-with-energy-against-a-dark-backdrop-embodying-the-dynamic-essence-of-audio-frequencies-free-video.jpg",
+    img: "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=800&q=80",
   },
   {
     icon: <Wand2 className="w-6 h-6 text-sky-400" />,
@@ -54,17 +54,7 @@ const FEATURES = [
     badgeColor: "border-amber-500/40 text-amber-400",
     href: "/mix",
     cta: "Open Studio",
-    img: "https://media.istockphoto.com/id/1393796601/photo/podcast-recording-studio-with-microphones-and-equalizer-for-recording-online-radio-broadcasts.jpg?s=612x612&w=0&k=20&c=hjSlStVKVGmWp2VY_YVF3MNHnOzKLeAKbtiasTM_xjo=",
-  },
-  {
-    icon: <Scissors className="w-6 h-6 text-emerald-400" />,
-    title: "Stem Splitting",
-    description: "Separate any track into 5 stems — vocals, drums, bass, other, and a full instrumental. 1 free split.",
-    badge: "1 Free",
-    badgeColor: "border-emerald-500/40 text-emerald-400",
-    href: "/studio",
-    cta: "Split a track",
-    img: "https://media.istockphoto.com/id/2111019920/photo/aspiring-rapper-recording-a-new-track-in-a-soundproof-studio-at-night.jpg?s=612x612&w=0&k=20&c=xtqwolfuS5JS9dLc9KXR4Ib05p7M3FuUHrrOPSovpMs=",
+    img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80",
   },
 ];
 
@@ -216,7 +206,7 @@ export default function Home() {
         <div className="relative rounded-2xl overflow-hidden text-center space-y-5 pt-4 pb-10 px-4">
           <div
             className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(https://p3.hippopx.com/preview/938/421/black-microphone-studio-microphone-shock-mount-dark-backdrop-audio-recording-recording-setup-professional-audio-black-background-microphone-stand-recording-equipment-thumbnail.jpg)` }}
+            style={{ backgroundImage: `url(https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=1200&q=80)` }}
           />
           <div className="absolute inset-0 bg-black/70" />
           <div className="relative z-10 space-y-5 pt-4">

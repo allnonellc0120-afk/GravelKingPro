@@ -4,8 +4,8 @@ import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
-import { Upload, Lock, Download, Music, ZoomIn, ZoomOut } from "lucide-react";
+
+import { Upload, Download, Music, ZoomIn, ZoomOut } from "lucide-react";
 import { useDAW } from "@/lib/daw/useDAW";
 import { Transport } from "@/components/daw/Transport";
 import { ChannelStrip } from "@/components/daw/ChannelStrip";
@@ -14,34 +14,7 @@ import { TimelineRuler } from "@/components/daw/TimelineRuler";
 import { ProjectManager } from "@/components/daw/ProjectManager";
 import { RecordControls } from "@/components/daw/RecordControls";
 
-function ProGate() {
-  return (
-    <Layout>
-      <div className="max-w-2xl mx-auto text-center space-y-6 py-20">
-        <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
-          <Lock className="w-7 h-7 text-amber-500" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Mix Studio</h1>
-          <p className="text-muted-foreground text-lg">
-            The full DAW — multi-track editing, live recording, plugins, real-time audio processing — requires the Studio plan ($29.99/mo).
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button asChild size="lg" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-            <Link href="/pricing">Upgrade to Studio</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/studio">Try Basic Studio</Link>
-          </Button>
-        </div>
-      </div>
-    </Layout>
-  );
-}
-
 export default function MixStudio() {
-  const { isPro } = useAppState();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropId = useId();
