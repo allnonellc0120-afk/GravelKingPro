@@ -563,8 +563,11 @@ export default function Studio() {
     const a = document.createElement("a");
     a.href = url;
     a.download = name;
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
   const handleDownload = () => {
@@ -582,13 +585,18 @@ export default function Studio() {
   };
 
   const handleDownloadAllStems = () => {
-    stemBlobs.forEach(({ name, blob }) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `GravelKing_${fileName.replace(/\.[^.]+$/, "")}_${name}`;
-      a.click();
-      URL.revokeObjectURL(url);
+    stemBlobs.forEach(({ name, blob }, i) => {
+      setTimeout(() => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `GravelKing_${fileName.replace(/\.[^.]+$/, "")}_${name}`;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      }, i * 200);
     });
     toast({ title: "All stems downloading", description: `${stemBlobs.length} files` });
   };
