@@ -24,13 +24,13 @@ function NativeTabLayout() {
         <Icon sf={{ default: "music.note.list", selected: "music.note.list" }} />
         <Label>Beats</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="lyrics">
-        <Icon sf={{ default: "text.quote", selected: "text.quote" }} />
-        <Label>Lyrics</Label>
+      <NativeTabs.Trigger name="telemetry">
+        <Icon sf={{ default: "waveform", selected: "waveform" }} />
+        <Label>Telemetry</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="songbot">
-        <Icon sf={{ default: "pencil.line", selected: "pencil.line" }} />
-        <Label>Create</Label>
+      <NativeTabs.Trigger name="upgrade">
+        <Icon sf={{ default: "bolt", selected: "bolt.fill" }} />
+        <Label>Upgrade</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -65,7 +65,9 @@ function ClassicTabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+            <View
+              style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}
+            />
           ) : null,
       }}
     >
@@ -106,29 +108,32 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="lyrics"
+        name="telemetry"
         options={{
-          title: "Lyrics",
+          title: "Telemetry",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="text.quote" tintColor={color} size={24} />
+              <SymbolView name="waveform" tintColor={color} size={24} />
             ) : (
-              <Feather name="book-open" size={22} color={color} />
+              <Feather name="activity" size={22} color={color} />
             ),
         }}
       />
       <Tabs.Screen
-        name="songbot"
+        name="upgrade"
         options={{
-          title: "Create",
+          title: "Upgrade",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="pencil.line" tintColor={color} size={24} />
+              <SymbolView name="bolt" tintColor={color} size={24} />
             ) : (
-              <Feather name="edit-2" size={22} color={color} />
+              <Feather name="zap" size={22} color={color} />
             ),
         }}
       />
+      {/* Hidden screens — kept for router completeness */}
+      <Tabs.Screen name="lyrics" options={{ href: null }} />
+      <Tabs.Screen name="songbot" options={{ href: null }} />
     </Tabs>
   );
 }

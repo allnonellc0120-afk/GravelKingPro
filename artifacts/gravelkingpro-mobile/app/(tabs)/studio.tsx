@@ -15,17 +15,16 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { API_BASE } from "@/lib/api";
+import { apiFetch, API_BASE } from "@/lib/api";
 
 type Tool = {
   id: string;
   label: string;
   icon: keyof typeof Feather.glyphMap;
   desc: string;
-  endpoint: string;
-  field: string;
   color: string;
   note: string;
+  resultLabel: string;
 };
 
 const TOOLS: Tool[] = [
@@ -33,45 +32,62 @@ const TOOLS: Tool[] = [
     id: "stem_split",
     label: "Stem Split",
     icon: "scissors",
-    desc: "GNS neural separator splits your track into bass, drums, vocals, and other stems using Demucs htdemucs.",
-    endpoint: "/api/stem_split",
-    field: "audio",
+    desc: "Neural separator splits your track into bass, drums, vocals, and other stems using the GravelKing MLK v3 kernel.",
     color: "#10b981",
     note: "Supports MP3, WAV, FLAC · Returns ZIP of stems",
+    resultLabel: "stems.zip",
   },
   {
     id: "voice_remove",
     label: "Voice Remove",
     icon: "mic-off",
-    desc: "Strip vocals and extract a clean instrumental using GNS ML separation — not just FFT cancellation.",
-    endpoint: "/api/voice_remove",
-    field: "audio",
+    desc: "Strip vocals and extract a clean instrumental using GNS ML separation — Morris Law center-channel carving.",
     color: "#a855f7",
     note: "Supports MP3, WAV · Returns instrumental WAV",
+    resultLabel: "instrumental.wav",
   },
   {
     id: "master",
     label: "Mastering",
     icon: "radio",
-    desc: "Apply professional loudness, EQ, and dynamics to your track. Normal preset is free; 5 presets on paid plans.",
-    endpoint: "/api/master",
-    field: "audio",
+    desc: "Apply professional loudness, EQ, and dynamics to your track with the GravelKing mastering engine.",
     color: "#38bdf8",
     note: "Supports MP3, WAV · Returns mastered WAV",
+    resultLabel: "mastered.wav",
   },
   {
-    id: "denoise",
-    label: "Denoise",
-    icon: "wind",
-    desc: "Remove background noise, hiss, hum, and room artifacts from recordings using spectral gating.",
-    endpoint: "/api/denoise",
-    field: "audio",
-    color: "#f97316",
-    note: "Supports MP3, WAV · Returns clean WAV",
+    id: "standard",
+    label: "Kernel Process",
+    icon: "cpu",
+    desc: "Run the raw MLK v3 standard kernel process — full signal carving and parity analysis.",
+    color: "#f59e0b",
+    note: "Supports MP3, WAV · Returns processed WAV",
+    resultLabel: "processed.wav",
   },
 ];
 
 type Stage = "idle" | "picking" | "uploading" | "done" | "error";
+
+function buildFormData(
+  tool: Tool,
+  asset: { uri: string; name: string; mimeType?: string },
+): FormData {
+  const fd = new FormData();
+  fd.append("audio", {
+    uri: asset.uri,
+    name: asset.name,
+    type: asset.mimeType ?? "audio/mpeg",
+  } as unknown as Blob);
+  if (tool.id !== "master") {
+    fd.append("mode", tool.id);
+  }
+  return fd;
+}
+
+function endpointForTool(id: string): string {
+  if (id === "master") return "/api/kernel/master";
+  return "/api/kernel/process-audio";
+}
 
 export default function StudioScreen() {
   const colors = useColors();
@@ -83,6 +99,7 @@ export default function StudioScreen() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [upgradeNeeded, setUpgradeNeeded] = useState(false);
 
   const s = styles(colors);
 
@@ -91,6 +108,7 @@ export default function StudioScreen() {
     setStage("picking");
     setErrorMsg(null);
     setResultUrl(null);
+    setUpgradeNeeded(false);
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -107,17 +125,22 @@ export default function StudioScreen() {
       setFileName(asset.name);
       setStage("uploading");
 
-      const formData = new FormData();
-      formData.append(selectedTool.field, {
-        uri: asset.uri,
-        name: asset.name,
-        type: asset.mimeType ?? "audio/mpeg",
-      } as any);
+      const formData = buildFormData(selectedTool, asset);
+      const endpoint = endpointForTool(selectedTool.id);
 
-      const res = await fetch(`${API_BASE}${selectedTool.endpoint}`, {
+      const res = await apiFetch(endpoint, {
         method: "POST",
         body: formData,
       });
+
+      if (res.status === 402) {
+        const err = await res.json().catch(() => ({ error: "Upgrade required" }));
+        setErrorMsg(err.error ?? "You've reached the free tier limit.");
+        setUpgradeNeeded(true);
+        setStage("error");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Processing failed" }));
@@ -129,8 +152,8 @@ export default function StudioScreen() {
       setResultUrl(url);
       setStage("done");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      setErrorMsg(e.message ?? "Something went wrong");
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "Something went wrong");
       setStage("error");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
@@ -141,6 +164,7 @@ export default function StudioScreen() {
     setFileName(null);
     setResultUrl(null);
     setErrorMsg(null);
+    setUpgradeNeeded(false);
   }
 
   return (
@@ -154,10 +178,9 @@ export default function StudioScreen() {
     >
       <Text style={[s.heading, { color: colors.foreground }]}>Audio Studio</Text>
       <Text style={[s.sub, { color: colors.mutedForeground }]}>
-        GNS · Demucs htdemucs · MLK v3
+        GNS · MLK v3 · Morris Law Kernel
       </Text>
 
-      {/* Tool selector */}
       <Text style={[s.sectionLabel, { color: colors.mutedForeground }]}>SELECT TOOL</Text>
       <View style={s.toolRow}>
         {TOOLS.map((tool) => {
@@ -165,7 +188,11 @@ export default function StudioScreen() {
           return (
             <Pressable
               key={tool.id}
-              onPress={() => { setSelectedTool(tool); reset(); Haptics.selectionAsync(); }}
+              onPress={() => {
+                setSelectedTool(tool);
+                reset();
+                Haptics.selectionAsync();
+              }}
               style={({ pressed }) => [
                 s.toolTab,
                 {
@@ -175,8 +202,17 @@ export default function StudioScreen() {
                 },
               ]}
             >
-              <Feather name={tool.icon} size={16} color={active ? tool.color : colors.mutedForeground} />
-              <Text style={[s.toolTabLabel, { color: active ? colors.foreground : colors.mutedForeground }]}>
+              <Feather
+                name={tool.icon}
+                size={16}
+                color={active ? tool.color : colors.mutedForeground}
+              />
+              <Text
+                style={[
+                  s.toolTabLabel,
+                  { color: active ? colors.foreground : colors.mutedForeground },
+                ]}
+              >
                 {tool.label}
               </Text>
             </Pressable>
@@ -184,40 +220,49 @@ export default function StudioScreen() {
         })}
       </View>
 
-      {/* Tool detail card */}
-      <View style={[s.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View
+        style={[s.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
         <View style={[s.detailIcon, { backgroundColor: `${selectedTool.color}18` }]}>
           <Feather name={selectedTool.icon} size={24} color={selectedTool.color} />
         </View>
         <Text style={[s.detailTitle, { color: colors.foreground }]}>{selectedTool.label}</Text>
-        <Text style={[s.detailDesc, { color: colors.mutedForeground }]}>{selectedTool.desc}</Text>
-        <Text style={[s.detailNote, { color: colors.mutedForeground, borderTopColor: colors.border }]}>
+        <Text style={[s.detailDesc, { color: colors.mutedForeground }]}>
+          {selectedTool.desc}
+        </Text>
+        <Text
+          style={[s.detailNote, { color: colors.mutedForeground, borderTopColor: colors.border }]}
+        >
           {selectedTool.note}
         </Text>
       </View>
 
-      {/* Upload / Process */}
       {stage === "idle" || stage === "picking" ? (
         <Pressable
           onPress={handlePick}
           disabled={stage === "picking"}
           style={({ pressed }) => [
             s.uploadBtn,
-            { borderColor: selectedTool.color, opacity: pressed || stage === "picking" ? 0.6 : 1 },
+            {
+              borderColor: selectedTool.color,
+              opacity: pressed || stage === "picking" ? 0.6 : 1,
+            },
           ]}
         >
           <Feather name="upload" size={20} color={selectedTool.color} />
           <Text style={[s.uploadBtnText, { color: selectedTool.color }]}>
-            {stage === "picking" ? "Selecting file..." : "Pick Audio File"}
+            {stage === "picking" ? "Selecting file…" : "Pick Audio File"}
           </Text>
         </Pressable>
       ) : stage === "uploading" ? (
-        <View style={[s.stateCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View
+          style={[s.stateCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[s.stateTitle, { color: colors.foreground }]}>Processing…</Text>
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>{fileName}</Text>
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>
-            GNS is running — this may take 30–90 seconds
+            GNS kernel running — this may take 30–90 seconds
           </Text>
         </View>
       ) : stage === "done" && resultUrl ? (
@@ -227,21 +272,47 @@ export default function StudioScreen() {
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>{fileName}</Text>
           <Pressable
             onPress={() => Linking.openURL(resultUrl)}
-            style={({ pressed }) => [s.downloadBtn, { backgroundColor: "#10b981", opacity: pressed ? 0.75 : 1 }]}
+            style={({ pressed }) => [
+              s.downloadBtn,
+              { backgroundColor: "#10b981", opacity: pressed ? 0.75 : 1 },
+            ]}
           >
             <Feather name="download" size={16} color="#000" />
-            <Text style={s.downloadBtnText}>Download Result</Text>
+            <Text style={s.downloadBtnText}>
+              Download {selectedTool.resultLabel}
+            </Text>
           </Pressable>
           <Pressable onPress={reset} style={s.resetLink}>
-            <Text style={[s.resetLinkText, { color: colors.mutedForeground }]}>Process another file</Text>
+            <Text style={[s.resetLinkText, { color: colors.mutedForeground }]}>
+              Process another file
+            </Text>
           </Pressable>
         </View>
       ) : (
-        <View style={[s.stateCard, { backgroundColor: colors.card, borderColor: colors.destructive }]}>
-          <Feather name="alert-circle" size={32} color={colors.destructive} />
-          <Text style={[s.stateTitle, { color: colors.foreground }]}>Error</Text>
+        <View
+          style={[
+            s.stateCard,
+            { backgroundColor: colors.card, borderColor: colors.destructive },
+          ]}
+        >
+          <Feather
+            name={upgradeNeeded ? "lock" : "alert-circle"}
+            size={32}
+            color={upgradeNeeded ? colors.primary : colors.destructive}
+          />
+          <Text style={[s.stateTitle, { color: colors.foreground }]}>
+            {upgradeNeeded ? "Upgrade Required" : "Error"}
+          </Text>
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>{errorMsg}</Text>
-          <Pressable onPress={reset} style={[s.downloadBtn, { backgroundColor: colors.secondary }]}>
+          {upgradeNeeded ? (
+            <Text style={[s.upgradeHint, { color: colors.mutedForeground }]}>
+              Go to the Upgrade tab to subscribe and get unlimited access.
+            </Text>
+          ) : null}
+          <Pressable
+            onPress={reset}
+            style={[s.downloadBtn, { backgroundColor: colors.secondary }]}
+          >
             <Text style={[s.downloadBtnText, { color: colors.foreground }]}>Try Again</Text>
           </Pressable>
         </View>
@@ -264,42 +335,89 @@ const styles = (colors: ReturnType<typeof useColors>) =>
     root: { flex: 1 },
     content: { paddingHorizontal: 20, paddingBottom: 120 },
     heading: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
-    sub: { fontSize: 11, fontFamily: "Inter_400Regular", letterSpacing: 1, marginTop: 2, marginBottom: 24 },
-    sectionLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 2, marginBottom: 10 },
+    sub: {
+      fontSize: 11,
+      fontFamily: "Inter_400Regular",
+      letterSpacing: 1,
+      marginTop: 2,
+      marginBottom: 24,
+    },
+    sectionLabel: {
+      fontSize: 10,
+      fontFamily: "Inter_600SemiBold",
+      letterSpacing: 2,
+      marginBottom: 10,
+    },
     toolRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 },
     toolTab: {
-      flexDirection: "row", alignItems: "center", gap: 6,
-      paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
     },
     toolTabLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
     detailCard: { borderWidth: 1, padding: 20, gap: 10, marginBottom: 24 },
-    detailIcon: { width: 52, height: 52, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
+    detailIcon: {
+      width: 52,
+      height: 52,
+      alignItems: "center",
+      justifyContent: "center",
+      alignSelf: "flex-start",
+    },
     detailTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
     detailDesc: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20 },
     detailNote: {
-      fontSize: 10, fontFamily: "Inter_400Regular", paddingTop: 10,
-      borderTopWidth: 1, color: colors.mutedForeground, letterSpacing: 0.3,
+      fontSize: 10,
+      fontFamily: "Inter_400Regular",
+      paddingTop: 10,
+      borderTopWidth: 1,
+      letterSpacing: 0.3,
     },
     uploadBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center",
-      gap: 10, borderWidth: 1, borderStyle: "dashed", paddingVertical: 24, marginBottom: 24,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      borderWidth: 1,
+      borderStyle: "dashed",
+      paddingVertical: 24,
+      marginBottom: 24,
     },
     uploadBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
     stateCard: {
-      borderWidth: 1, padding: 28, alignItems: "center", gap: 10, marginBottom: 24,
+      borderWidth: 1,
+      padding: 28,
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 24,
     },
     stateTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
     stateSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" },
+    upgradeHint: {
+      fontSize: 11,
+      fontFamily: "Inter_400Regular",
+      textAlign: "center",
+      lineHeight: 16,
+    },
     downloadBtn: {
-      flexDirection: "row", alignItems: "center", gap: 8,
-      paddingHorizontal: 20, paddingVertical: 12, marginTop: 4,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      marginTop: 4,
     },
     downloadBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#000" },
     resetLink: { marginTop: 4, paddingVertical: 8 },
     resetLinkText: { fontSize: 12, fontFamily: "Inter_400Regular" },
     warningBox: {
-      flexDirection: "row", gap: 8, alignItems: "flex-start",
-      borderWidth: 1, padding: 12,
+      flexDirection: "row",
+      gap: 8,
+      alignItems: "flex-start",
+      borderWidth: 1,
+      padding: 12,
     },
     warningText: { fontSize: 11, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 16 },
   });

@@ -147,10 +147,17 @@ export default function HomeScreen() {
       <Text style={[s.sectionLabel, { color: colors.mutedForeground }]}>SUBSCRIPTION TIERS</Text>
       <View style={s.tiersRow}>
         {TIERS.map((t) => (
-          <View key={t.label} style={[s.tierCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Pressable
+            key={t.label}
+            onPress={() => router.push("/(tabs)/upgrade" as never)}
+            style={({ pressed }) => [
+              s.tierCard,
+              { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
             <Text style={[s.tierPrice, { color: t.color }]}>{t.price}</Text>
             <Text style={[s.tierLabel, { color: colors.mutedForeground }]}>{t.label}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
 

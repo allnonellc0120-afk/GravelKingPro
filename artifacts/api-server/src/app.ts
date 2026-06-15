@@ -48,13 +48,15 @@ app.post(
 );
 
 // Build an exact-match allowlist from REPLIT_DOMAINS (comma-separated in prod).
+// Also include the Replit dev domain and Expo web preview domain for development.
 // In development any localhost / 127.0.0.1 origin is also permitted.
 const trustedOrigins: Set<string> = new Set(
-  (process.env.REPLIT_DOMAINS ?? "")
-    .split(",")
-    .map(d => d.trim())
-    .filter(Boolean)
-    .map(d => `https://${d}`),
+  [
+    ...(process.env.REPLIT_DOMAINS ?? "").split(",").map(d => d.trim()).filter(Boolean).map(d => `https://${d}`),
+    process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null,
+    // Expo web preview: <id>.expo.<host> — derived from REPLIT_EXPO_DEV_DOMAIN
+    process.env.REPLIT_EXPO_DEV_DOMAIN ? `https://${process.env.REPLIT_EXPO_DEV_DOMAIN}` : null,
+  ].filter((d): d is string => typeof d === "string"),
 );
 
 app.use(
