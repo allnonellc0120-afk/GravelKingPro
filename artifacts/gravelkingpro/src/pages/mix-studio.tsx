@@ -1,11 +1,11 @@
-import { useCallback, useId, useRef } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import { Upload, Lock, Download, Music } from "lucide-react";
+import { Upload, Lock, Download, Music, ZoomIn, ZoomOut } from "lucide-react";
 import { useDAW } from "@/lib/daw/useDAW";
 import { Transport } from "@/components/daw/Transport";
 import { ChannelStrip } from "@/components/daw/ChannelStrip";
@@ -46,6 +46,39 @@ export default function MixStudio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropId = useId();
   const daw = useDAW();
+
+  const [waveZoom, setWaveZoom] = useState(1);
+  const [waveScroll, setWaveScroll] = useState(0);
+
+  const handleZoomIn = useCallback(() => {
+    setWaveZoom(z => {
+      const next = Math.min(16, z * 2);
+      setWaveScroll(o => {
+        const viewFrac = 1 / next;
+        const maxStart = 1 - viewFrac;
+        const center = o + (1 / z) / 2;
+        return Math.max(0, Math.min(maxStart, center - viewFrac / 2));
+      });
+      return next;
+    });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setWaveZoom(z => {
+      const next = Math.max(1, z / 2);
+      if (next === 1) setWaveScroll(0);
+      return next;
+    });
+  }, []);
+
+  const handleScroll = useCallback((offset: number) => {
+    setWaveZoom(z => {
+      const viewFrac = 1 / z;
+      const maxStart = 1 - viewFrac;
+      setWaveScroll(Math.max(0, Math.min(maxStart, offset)));
+      return z;
+    });
+  }, []);
 
   const addFiles = useCallback(async (incoming: FileList | null) => {
     if (!incoming) return;
@@ -145,9 +178,37 @@ export default function MixStudio() {
           onChange={e => addFiles(e.target.files)}
         />
 
-        {/* Timeline ruler */}
+        {/* Timeline ruler + global zoom controls */}
         {daw.tracks.length > 0 && (
-          <TimelineRuler duration={daw.maxDuration} position={daw.position} bpm={daw.bpm} />
+          <div className="flex items-stretch shrink-0">
+            {/* Zoom controls pinned to the left — same width as the track left panel */}
+            <div className="w-[88px] shrink-0 flex items-center justify-center gap-0.5 bg-black/40 border-b border-r border-border/20">
+              <button
+                onClick={handleZoomOut}
+                disabled={waveZoom <= 1}
+                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
+                title="Zoom out (all tracks)"
+              >
+                <ZoomOut className="w-3 h-3" />
+              </button>
+              <span className="text-[9px] font-mono text-muted-foreground w-6 text-center">{waveZoom}x</span>
+              <button
+                onClick={handleZoomIn}
+                disabled={waveZoom >= 16}
+                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
+                title="Zoom in (all tracks)"
+              >
+                <ZoomIn className="w-3 h-3" />
+              </button>
+            </div>
+            <TimelineRuler
+              duration={daw.maxDuration}
+              position={daw.position}
+              bpm={daw.bpm}
+              zoom={waveZoom}
+              scrollOffset={waveScroll}
+            />
+          </div>
         )}
 
         {/* Track list — scrollable */}
@@ -183,6 +244,11 @@ export default function MixStudio() {
                   bpm={daw.bpm}
                   totalDuration={daw.maxDuration}
                   isPlaying={daw.isPlaying}
+                  zoom={waveZoom}
+                  scrollOffset={waveScroll}
+                  onZoomIn={handleZoomIn}
+                  onZoomOut={handleZoomOut}
+                  onScroll={handleScroll}
                   getTrackAnalyser={daw.getTrackAnalyser}
                   onSeek={daw.seek}
                   onRemove={daw.removeTrack}
