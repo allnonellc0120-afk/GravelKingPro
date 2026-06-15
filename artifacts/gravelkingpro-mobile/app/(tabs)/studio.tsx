@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { MicLevelMeter } from "@/components/MicLevelMeter";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch, API_BASE } from "@/lib/api";
 
@@ -236,6 +237,8 @@ export default function StudioScreen() {
           {selectedTool.note}
         </Text>
       </View>
+
+      <MicLevelMeter key={selectedTool.id} accentColor={selectedTool.color} />
 
       {stage === "idle" || stage === "picking" ? (
         <Pressable
