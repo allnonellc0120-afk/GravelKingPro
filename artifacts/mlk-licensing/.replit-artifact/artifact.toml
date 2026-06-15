@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/mlk-licensing/"
+title = "MLK V3.5 Licensing Platform"
+version = "1.0.0"
+id = "artifacts/mlk-licensing"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/mlk-licensing/" ]
+localPort = 18783
+
+[services.development]
+run = "pnpm --filter @workspace/mlk-licensing run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mlk-licensing", "run", "build" ]
+publicDir = "artifacts/mlk-licensing/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18783"
+BASE_PATH = "/mlk-licensing/"

@@ -10,13 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: mlk
+    description: Morris Law Kernel V3.5 licensing, inquiry, and benchmark operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +25,300 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /mlk/products:
+    get:
+      operationId: getMlkProducts
+      tags: [mlk]
+      summary: List license tiers and pricing
+      responses:
+        "200":
+          description: License product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MlkProduct"
+
+  /mlk/inquiry:
+    post:
+      operationId: submitMlkInquiry
+      tags: [mlk]
+      summary: Submit a licensing inquiry
+      description: Captures prospect contact info and intended use case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MlkInquiryInput"
+      responses:
+        "201":
+          description: Inquiry received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlkInquiryResult"
+        "400":
+          description: Invalid input
+
+  /mlk/license/activate:
+    post:
+      operationId: activateMlkLicense
+      tags: [mlk]
+      summary: Activate a license key
+      description: Validates and activates a license key issued by GravelKing Enterprises
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MlkLicenseActivateInput"
+      responses:
+        "200":
+          description: Activation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlkLicenseStatus"
+        "401":
+          description: Invalid or expired license key
+
+  /mlk/license/status:
+    get:
+      operationId: getMlkLicenseStatus
+      tags: [mlk]
+      summary: Get current license status for this session
+      responses:
+        "200":
+          description: License status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlkLicenseStatus"
+
+  /mlk/benchmark/run:
+    post:
+      operationId: runMlkBenchmark
+      tags: [mlk]
+      summary: Run the MLK V3.5 benchmark
+      description: Executes the Morris Law Kernel and returns measured metrics. Full metrics require an active license; demo mode returns limited output.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MlkBenchmarkInput"
+      responses:
+        "200":
+          description: Benchmark results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlkBenchmarkResult"
+        "503":
+          description: Benchmark runner unavailable
+
+  /mlk/benchmark/history:
+    get:
+      operationId: getMlkBenchmarkHistory
+      tags: [mlk]
+      summary: Get benchmark run history for the current session
+      responses:
+        "200":
+          description: Past runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MlkBenchmarkRun"
+
+  /mlk/dashboard:
+    get:
+      operationId: getMlkDashboard
+      tags: [mlk]
+      summary: Get license dashboard summary
+      description: License info, run count, peak GFLOPS, recent activity
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlkDashboard"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    MlkProduct:
+      type: object
+      required: [id, name, description, priceLabel, matrixSize, features, tier]
+      properties:
+        id:
+          type: string
+        tier:
+          type: string
+          enum: [poc, enterprise, buyout]
+        name:
+          type: string
+        description:
+          type: string
+        priceLabel:
+          type: string
+        matrixSize:
+          type: integer
+        features:
+          type: array
+          items:
+            type: string
+        highlighted:
+          type: boolean
+
+    MlkInquiryInput:
+      type: object
+      required: [name, email, company, tier]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        company:
+          type: string
+        tier:
+          type: string
+          enum: [poc, enterprise, buyout]
+        nodeCount:
+          type: ["string", "null"]
+        message:
+          type: ["string", "null"]
+
+    MlkInquiryResult:
+      type: object
+      required: [id, message]
+      properties:
+        id:
+          type: integer
+        message:
+          type: string
+
+    MlkLicenseActivateInput:
+      type: object
+      required: [licenseKey, email]
+      properties:
+        licenseKey:
+          type: string
+        email:
+          type: string
+
+    MlkLicenseStatus:
+      type: object
+      required: [tier, active]
+      properties:
+        tier:
+          type: string
+          enum: [none, poc, enterprise, buyout]
+        active:
+          type: boolean
+        licenseKey:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        expiresAt:
+          type: ["string", "null"]
+        runsUsed:
+          type: integer
+
+    MlkBenchmarkInput:
+      type: object
+      properties:
+        matrixSize:
+          type: integer
+        iterations:
+          type: integer
+
+    MlkBenchmarkResult:
+      type: object
+      required: [matrixSize, gflops, peakGflops, minGflops, stdGflops, avgTimeSec, mmapLocked, numaAware, blasBackend, kernel, licensed, demo, timestamp]
+      properties:
+        matrixSize:
+          type: integer
+        gflops:
+          type: number
+        peakGflops:
+          type: number
+        minGflops:
+          type: number
+        stdGflops:
+          type: number
+        avgTimeSec:
+          type: number
+        mmapLocked:
+          type: boolean
+        numaAware:
+          type: boolean
+        blasBackend:
+          type: string
+        kernel:
+          type: string
+        licensed:
+          type: boolean
+        demo:
+          type: boolean
+        consultingNote:
+          type: ["string", "null"]
+        timestamp:
+          type: string
+
+    MlkBenchmarkRun:
+      type: object
+      required: [id, matrixSize, gflops, peakGflops, timestamp, demo]
+      properties:
+        id:
+          type: integer
+        matrixSize:
+          type: integer
+        gflops:
+          type: number
+        peakGflops:
+          type: number
+        demo:
+          type: boolean
+        timestamp:
+          type: string
+
+    MlkDashboard:
+      type: object
+      required: [tier, active, totalRuns, peakGflops, avgGflops, recentRuns]
+      properties:
+        tier:
+          type: string
+        active:
+          type: boolean
+        licenseKey:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        expiresAt:
+          type: ["string", "null"]
+        totalRuns:
+          type: integer
+        peakGflops:
+          type: number
+        avgGflops:
+          type: number
+        recentRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/MlkBenchmarkRun"
