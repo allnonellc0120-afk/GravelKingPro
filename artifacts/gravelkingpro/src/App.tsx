@@ -15,6 +15,7 @@ import DownloadPage from "@/pages/download";
 import BeatsPage from "@/pages/beats";
 import Account from "@/pages/account";
 import AdminAnalytics from "@/pages/admin-analytics";
+import AdminWaitlist from "@/pages/admin-waitlist";
 import { PageTracker } from "@/lib/useAnalytics";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/beats" component={BeatsPage} />
       <Route path="/account" component={Account} />
       <Route path="/admin" component={AdminAnalytics} />
+      <Route path="/admin/waitlist" component={AdminWaitlist} />
       <Route component={NotFound} />
     </Switch>
   );
