@@ -28,6 +28,13 @@ async function buildAll() {
     // - uses native modules and loads them dynamically (e.g. sharp)
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
+      // Externalize stripe and stripe-replit-sync so they run from node_modules at
+      // runtime.  stripe-replit-sync uses __dirname to locate its SQL migration
+      // files; if esbuild bundles it the __dirname points to our dist/ output
+      // folder and the migrations directory is never found, so runMigrations()
+      // silently skips all table creation.
+      "stripe",
+      "stripe-replit-sync",
       "*.node",
       "sharp",
       "better-sqlite3",

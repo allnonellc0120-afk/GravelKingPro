@@ -31,19 +31,13 @@ async function initStripe() {
     return;
   }
 
-  // Managed webhook + backfill only work when using the Replit Stripe integration
-  // (not a raw STRIPE_SECRET_KEY). Skip gracefully in raw-key mode.
-  if (process.env.STRIPE_SECRET_KEY) {
-    logger.info("Using raw STRIPE_SECRET_KEY — skipping managed webhook setup (Replit integration not connected)");
-    return;
-  }
-
   try {
     const stripeSync = await getStripeSync();
 
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-    logger.info({ url: `${webhookBaseUrl}/api/stripe/webhook` }, "Setting up managed webhook...");
-    await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`);
+    const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
+    logger.info({ url: webhookUrl }, "Setting up managed webhook...");
+    await stripeSync.findOrCreateManagedWebhook(webhookUrl);
     logger.info("Webhook configured");
 
     logger.info("Starting Stripe data backfill (runs in background)...");

@@ -45,6 +45,7 @@ A gravel-optimisation benchmarking tool with real Stripe subscription payments.
 - Connect Stripe via Integrations tab FIRST, then restart the API server — it logs an error on startup if Stripe isn't connected.
 - Run `seed-products` AFTER connecting Stripe — products must exist in Stripe before the pricing page can start a checkout.
 - `stripe` and `stripe-replit-sync` packages live at the workspace root (not in api-server package.json) — pnpm hoisting makes them accessible.
+- `stripe` and `stripe-replit-sync` are marked `external` in `build.mjs` so esbuild doesn't bundle them. They must stay external: `stripe-replit-sync` resolves migration SQL files via `__dirname` at runtime; if bundled, `__dirname` points to our `dist/` folder and migrations silently skip, leaving the stripe schema empty.
 
 ## Pointers
 

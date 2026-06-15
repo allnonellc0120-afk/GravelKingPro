@@ -17,3 +17,4 @@
 - [video-js scaffold tsconfig](video-js-scaffold-tsconfig.md) — new video artifacts miss the DOM lib override; tsc fails on window/document until you add lib: [esnext, dom, dom.iterable]
 - [Promo video conventions](promo-video-conventions.md) — promo "voice 0dB/instruments -2dB" is a Scene5 DAW visual, not an audio re-encode; scenes must track real product (no removed bloat)
 - [Prod DB schema migrates on Publish](deploy-prod-db-schema.md) — Publish auto-diffs dev→prod schema & applies it; never manually migrate prod (prod is read-only); to ship a schema change, re-publish
+- [stripe-replit-sync esbuild external](stripe-esbuild-external.md) — stripe + stripe-replit-sync must stay external in build.mjs or migrations silently skip (wrong __dirname)
