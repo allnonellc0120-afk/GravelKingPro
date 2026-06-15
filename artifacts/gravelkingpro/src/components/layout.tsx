@@ -15,7 +15,6 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
     { href: "/", label: "Dashboard" },
     { href: "/studio", label: "Studio" },
     { href: "/mix", label: "Mix Studio" },
-    { href: "/beats", label: "Beats" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
   ];

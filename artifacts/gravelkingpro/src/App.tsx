@@ -12,7 +12,6 @@ import MixStudio from "@/pages/mix-studio";
 import KernelDashboard from "@/pages/kernel";
 import Contact from "@/pages/contact";
 import DownloadPage from "@/pages/download";
-import BeatsPage from "@/pages/beats";
 import Account from "@/pages/account";
 import AdminAnalytics from "@/pages/admin-analytics";
 import AdminWaitlist from "@/pages/admin-waitlist";
@@ -32,7 +31,6 @@ function Router() {
       <Route path="/kernel" component={KernelDashboard} />
       <Route path="/contact" component={Contact} />
       <Route path="/download" component={DownloadPage} />
-      <Route path="/beats" component={BeatsPage} />
       <Route path="/account" component={Account} />
       <Route path="/admin" component={AdminAnalytics} />
       <Route path="/admin/waitlist" component={AdminWaitlist} />
