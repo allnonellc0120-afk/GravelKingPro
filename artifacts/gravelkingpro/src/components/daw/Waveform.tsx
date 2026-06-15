@@ -22,13 +22,15 @@ interface WaveformProps {
   onRegionChange?: (region: Region | null) => void;
   /** Arrangement mode: drag clip to new startOffset */
   onMoveClip?: (newStartOffset: number) => void;
+  /** Called when the user wheel-scrolls to pan the waveform view */
+  onScrollChange?: (newOffset: number) => void;
 }
 
 export function Waveform({
   peaks, duration, position, region, color,
   height = 64, zoom = 1, scrollOffset = 0, bpm,
   startOffset, totalDuration,
-  onSeek, onRegionChange, onMoveClip,
+  onSeek, onRegionChange, onMoveClip, onScrollChange,
 }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<{
@@ -353,6 +355,17 @@ export function Waveform({
     handleMouseMove(e);
   };
 
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    const { zoom, scrollOffset } = propsRef.current;
+    if (zoom <= 1) return;
+    e.preventDefault();
+    const viewFrac = 1 / zoom;
+    const delta = (e.deltaX !== 0 ? e.deltaX : e.deltaY) / 800;
+    const maxStart = 1 - viewFrac;
+    const newOffset = Math.max(0, Math.min(maxStart, scrollOffset + delta * viewFrac));
+    onScrollChange?.(newOffset);
+  };
+
   return (
     <canvas
       ref={canvasRef}
@@ -362,6 +375,7 @@ export function Waveform({
       onMouseMove={handleMouseMoveForCursor}
       onMouseUp={handleMouseUp}
       onMouseLeave={() => { dragRef.current = null; }}
+      onWheel={handleWheel}
     />
   );
 }

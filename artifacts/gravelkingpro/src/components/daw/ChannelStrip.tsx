@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { ChevronDown, ChevronUp, RotateCcw, Scissors, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { useState, useCallback } from "react";
+import { ChevronDown, ChevronUp, RotateCcw, Scissors, Trash2 } from "lucide-react";
 import { TrackState, PluginType, Region } from "@/lib/daw/types";
 import { Waveform } from "./Waveform";
 import { PluginRack } from "./PluginRack";
@@ -12,6 +12,11 @@ interface ChannelStripProps {
   bpm?: number;
   totalDuration?: number;
   isPlaying?: boolean;
+  zoom: number;
+  scrollOffset: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onScroll: (offset: number) => void;
   getTrackAnalyser?: (id: string) => AnalyserNode | null;
   onSeek: (secs: number) => void;
   onRemove: (id: string) => void;
@@ -32,14 +37,14 @@ interface ChannelStripProps {
 }
 
 export function ChannelStrip({
-  track, position, bpm, totalDuration, isPlaying, getTrackAnalyser, onSeek, onRemove,
+  track, position, bpm, totalDuration, isPlaying,
+  zoom, scrollOffset, onZoomIn, onZoomOut, onScroll,
+  getTrackAnalyser, onSeek, onRemove,
   onVolumeChange, onPanChange, onToggleMute, onToggleSolo,
   onAddPlugin, onRemovePlugin, onTogglePlugin, onUpdatePlugin, onReorderPlugin,
   onSetRegion, onApplyTrim, onApplyDelete, onResetEdit, onSetStartOffset,
 }: ChannelStripProps) {
   const [showPlugins, setShowPlugins] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [scrollOffset, setScrollOffset] = useState(0);
 
   const getAnalyser = useCallback(
     () => (getTrackAnalyser ? getTrackAnalyser(track.id) : null),
@@ -63,27 +68,6 @@ export function ChannelStrip({
     if (!bpm || bpm <= 0) return secs;
     const beatDur = 60 / bpm;
     return Math.round(secs / beatDur) * beatDur;
-  };
-
-  const handleZoomIn = () => {
-    setZoom(z => {
-      const next = Math.min(16, z * 2);
-      setScrollOffset(o => {
-        const viewFrac = 1 / next;
-        const maxStart = 1 - viewFrac;
-        const center = o + (1 / z) / 2;
-        return Math.max(0, Math.min(maxStart, center - viewFrac / 2));
-      });
-      return next;
-    });
-  };
-
-  const handleZoomOut = () => {
-    setZoom(z => {
-      const next = Math.max(1, z / 2);
-      if (next === 1) setScrollOffset(0);
-      return next;
-    });
   };
 
   return (
@@ -213,34 +197,15 @@ export function ChannelStrip({
             <span className="text-[10px] text-muted-foreground font-mono">
               {track.duration > 0 ? `${track.duration.toFixed(1)}s` : "—"}
             </span>
-            <div className="flex items-center gap-1">
-              {track.edited && (
-                <button
-                  onClick={() => onResetEdit(track.id)}
-                  className="text-[10px] text-amber-400/70 hover:text-amber-400 flex items-center gap-1 mr-1"
-                  title="Reset to original"
-                >
-                  <RotateCcw className="w-2.5 h-2.5" /> Reset
-                </button>
-              )}
+            {track.edited && (
               <button
-                onClick={handleZoomOut}
-                disabled={zoom <= 1}
-                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
-                title="Zoom out"
+                onClick={() => onResetEdit(track.id)}
+                className="text-[10px] text-amber-400/70 hover:text-amber-400 flex items-center gap-1"
+                title="Reset to original"
               >
-                <ZoomOut className="w-3 h-3" />
+                <RotateCcw className="w-2.5 h-2.5" /> Reset
               </button>
-              <span className="text-[9px] font-mono text-muted-foreground w-6 text-center">{zoom}x</span>
-              <button
-                onClick={handleZoomIn}
-                disabled={zoom >= 16}
-                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
-                title="Zoom in"
-              >
-                <ZoomIn className="w-3 h-3" />
-              </button>
-            </div>
+            )}
           </div>
 
           <Waveform
@@ -258,6 +223,7 @@ export function ChannelStrip({
             onSeek={onSeek}
             onMoveClip={offset => onSetStartOffset(track.id, offset)}
             onRegionChange={r => onSetRegion(track.id, r)}
+            onScrollChange={onScroll}
           />
 
           {/* Region action bar */}
