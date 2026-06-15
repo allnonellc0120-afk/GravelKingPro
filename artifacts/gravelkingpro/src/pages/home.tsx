@@ -63,7 +63,7 @@ const PLANS = [
     name: "Starter",
     price: "Free",
     color: "border-border/30",
-    features: ["3 free voice removals", "1 free stem split (5 stems)", "1 free full master", "Live vocal monitoring", "Beats library"],
+    features: ["3 free voice removals", "1 free stem split (5 stems)", "1 free full master", "Live vocal monitoring"],
   },
   {
     name: "GravelKing Weekly",
@@ -218,7 +218,7 @@ export default function Home() {
               <span className="text-amber-500">no plugin required.</span>
             </h1>
             <p className="text-muted-foreground text-base max-w-xl mx-auto">
-              GravelKing Productions handles voice removal, stem splitting, mastering, beat-making, and songwriting — entirely on the server. Upload a file or pick a tool and go.
+              GravelKing Productions handles voice removal, stem splitting, and mastering — entirely on the server. Upload a file or pick a tool and go.
             </p>
             <div className="flex items-center justify-center gap-3 flex-wrap">
               <Link href="/studio">

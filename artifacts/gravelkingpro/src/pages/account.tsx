@@ -224,7 +224,6 @@ export default function Account() {
               {[
                 { href: "/studio", label: "Audio Studio" },
                 { href: "/mix", label: "Mix Studio" },
-                { href: "/beats", label: "Beats Library" },
                 { href: "/pricing", label: "View Plans" },
               ].map(({ href, label }) => (
                 <Link key={href} href={href}>
