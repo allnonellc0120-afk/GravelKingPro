@@ -209,38 +209,44 @@ export default function MixStudio() {
             </div>
           ) : (
             <>
-              {daw.tracks.map(track => (
-                <ChannelStrip
-                  key={track.id}
-                  track={track}
-                  position={daw.position}
-                  bpm={daw.bpm}
-                  totalDuration={daw.maxDuration}
-                  isPlaying={daw.isPlaying}
-                  zoom={waveZoom}
-                  scrollOffset={waveScroll}
-                  onZoomIn={handleZoomIn}
-                  onZoomOut={handleZoomOut}
-                  onScroll={handleScroll}
-                  getTrackAnalyser={daw.getTrackAnalyser}
-                  onSeek={daw.seek}
-                  onRemove={daw.removeTrack}
-                  onVolumeChange={daw.setTrackVolume}
-                  onPanChange={daw.setTrackPan}
-                  onToggleMute={daw.toggleMute}
-                  onToggleSolo={daw.toggleSolo}
-                  onAddPlugin={daw.addPlugin}
-                  onRemovePlugin={daw.removePlugin}
-                  onTogglePlugin={daw.togglePlugin}
-                  onUpdatePlugin={daw.updatePlugin}
-                  onReorderPlugin={daw.reorderPlugin}
-                  onSetRegion={daw.setRegion}
-                  onApplyTrim={daw.applyTrim}
-                  onApplyDelete={daw.applyDelete}
-                  onResetEdit={daw.resetEdit}
-                  onSetStartOffset={daw.setTrackStartOffset}
-                />
-              ))}
+              {daw.tracks.map(track => {
+                const snapEdges = daw.tracks
+                  .filter(t => t.id !== track.id && t.duration > 0)
+                  .map(t => ({ start: t.startOffset, end: t.startOffset + t.duration }));
+                return (
+                  <ChannelStrip
+                    key={track.id}
+                    track={track}
+                    position={daw.position}
+                    bpm={daw.bpm}
+                    totalDuration={daw.maxDuration}
+                    isPlaying={daw.isPlaying}
+                    zoom={waveZoom}
+                    scrollOffset={waveScroll}
+                    snapEdges={snapEdges}
+                    onZoomIn={handleZoomIn}
+                    onZoomOut={handleZoomOut}
+                    onScroll={handleScroll}
+                    getTrackAnalyser={daw.getTrackAnalyser}
+                    onSeek={daw.seek}
+                    onRemove={daw.removeTrack}
+                    onVolumeChange={daw.setTrackVolume}
+                    onPanChange={daw.setTrackPan}
+                    onToggleMute={daw.toggleMute}
+                    onToggleSolo={daw.toggleSolo}
+                    onAddPlugin={daw.addPlugin}
+                    onRemovePlugin={daw.removePlugin}
+                    onTogglePlugin={daw.togglePlugin}
+                    onUpdatePlugin={daw.updatePlugin}
+                    onReorderPlugin={daw.reorderPlugin}
+                    onSetRegion={daw.setRegion}
+                    onApplyTrim={daw.applyTrim}
+                    onApplyDelete={daw.applyDelete}
+                    onResetEdit={daw.resetEdit}
+                    onSetStartOffset={daw.setTrackStartOffset}
+                  />
+                );
+              })}
               {daw.tracks.length < 8 && (
                 <button
                   onClick={() => fileInputRef.current?.click()}

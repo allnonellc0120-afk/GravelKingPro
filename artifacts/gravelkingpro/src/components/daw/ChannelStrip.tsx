@@ -6,6 +6,11 @@ import { PluginRack } from "./PluginRack";
 import { Knob } from "./Knob";
 import { TrackMeter } from "./TrackMeter";
 
+interface ClipEdge {
+  start: number;
+  end: number;
+}
+
 interface ChannelStripProps {
   track: TrackState;
   position: number;
@@ -14,6 +19,8 @@ interface ChannelStripProps {
   isPlaying?: boolean;
   zoom: number;
   scrollOffset: number;
+  /** Other clips' edges for magnetic snap; see Waveform.tsx */
+  snapEdges?: ClipEdge[];
   onZoomIn: () => void;
   onZoomOut: () => void;
   onScroll: (offset: number) => void;
@@ -38,7 +45,7 @@ interface ChannelStripProps {
 
 export function ChannelStrip({
   track, position, bpm, totalDuration, isPlaying,
-  zoom, scrollOffset, onZoomIn, onZoomOut, onScroll,
+  zoom, scrollOffset, snapEdges, onZoomIn, onZoomOut, onScroll,
   getTrackAnalyser, onSeek, onRemove,
   onVolumeChange, onPanChange, onToggleMute, onToggleSolo,
   onAddPlugin, onRemovePlugin, onTogglePlugin, onUpdatePlugin, onReorderPlugin,
@@ -220,6 +227,7 @@ export function ChannelStrip({
             zoom={zoom}
             scrollOffset={scrollOffset}
             bpm={bpm}
+            snapEdges={snapEdges}
             onSeek={onSeek}
             onMoveClip={offset => onSetStartOffset(track.id, offset)}
             onRegionChange={r => onSetRegion(track.id, r)}

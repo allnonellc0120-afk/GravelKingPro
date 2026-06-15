@@ -5,6 +5,12 @@ interface Region {
   end: number;
 }
 
+/** Start/end edges of other clips, used for magnetic snap detection */
+interface ClipEdge {
+  start: number;
+  end: number;
+}
+
 interface WaveformProps {
   peaks: number[];
   duration: number;
@@ -18,6 +24,12 @@ interface WaveformProps {
   /** Arrangement-mode props — when provided, canvas shows full timeline */
   startOffset?: number;
   totalDuration?: number;
+  /**
+   * Other clips' start/end edges for magnetic snap (arrangement mode only).
+   * Snap activates when clip edge is within SNAP_PX pixels of an edge.
+   * Hold Alt to disable snap.
+   */
+  snapEdges?: ClipEdge[];
   onSeek?: (seconds: number) => void;
   onRegionChange?: (region: Region | null) => void;
   /** Arrangement mode: drag clip to new startOffset */
@@ -26,10 +38,13 @@ interface WaveformProps {
   onScrollChange?: (newOffset: number) => void;
 }
 
+/** Snap threshold in canvas CSS pixels */
+const SNAP_PX = 8;
+
 export function Waveform({
   peaks, duration, position, region, color,
   height = 64, zoom = 1, scrollOffset = 0, bpm,
-  startOffset, totalDuration,
+  startOffset, totalDuration, snapEdges,
   onSeek, onRegionChange, onMoveClip, onScrollChange,
 }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,6 +55,8 @@ export function Waveform({
     clipStartOffset: number;
   } | null>(null);
   const rafRef = useRef<number>(0);
+  /** Time position (seconds) of the active snap highlight, or null */
+  const snapLineRef = useRef<number | null>(null);
 
   const isArrangement = totalDuration !== undefined && totalDuration > 0 && startOffset !== undefined;
   const timeLen = isArrangement ? totalDuration! : duration;
@@ -47,10 +64,12 @@ export function Waveform({
   const propsRef = useRef({
     peaks, duration, position, region, color, height,
     zoom, scrollOffset, bpm, startOffset, totalDuration, isArrangement, timeLen,
+    snapEdges,
   });
   propsRef.current = {
     peaks, duration, position, region, color, height,
     zoom, scrollOffset, bpm, startOffset, totalDuration, isArrangement, timeLen,
+    snapEdges,
   };
 
   const getViewWindow = () => {
@@ -156,9 +175,22 @@ export function Waveform({
         ctx.strokeStyle = `${color}50`;
         ctx.lineWidth = 1;
         ctx.strokeRect(vcx1 + 0.5, 0.5, vcx2 - vcx1 - 1, H - 1);
+      }
 
-        // Clip-name ghost label (left edge of visible clip)
-        // intentionally omitted — track name is in the strip header
+      // ── Magnetic snap highlight line ────────────────────────────────────────
+      const snapT = snapLineRef.current;
+      if (snapT !== null) {
+        const sx = mapX(snapT);
+        if (sx >= -1 && sx <= W + 1) {
+          ctx.save();
+          ctx.strokeStyle = "rgba(255,255,255,0.55)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 3]);
+          ctx.shadowColor = "rgba(255,255,255,0.4)";
+          ctx.shadowBlur = 4;
+          ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
+          ctx.restore();
+        }
       }
 
       // Playhead
@@ -290,6 +322,60 @@ export function Waveform({
     return Math.round(t / beatDur) * beatDur;
   };
 
+  /**
+   * Attempt to magnetically snap newOffset to another clip edge.
+   * Returns [snappedOffset, snapEdgeTime | null].
+   * altHeld disables snap.
+   *
+   * Four alignment cases, each with its own candidate-specific distance:
+   *   1. my start → edge.start  (delta = |clipStart - edge.start|)
+   *   2. my start → edge.end    (delta = |clipStart - edge.end|)
+   *   3. my end   → edge.start  (delta = |clipEnd   - edge.start|)
+   *   4. my end   → edge.end    (delta = |clipEnd   - edge.end|)
+   */
+  const magneticSnap = (
+    newOffset: number,
+    clipDuration: number,
+    canvasWidth: number,
+    altHeld: boolean,
+  ): [number, number | null] => {
+    const { snapEdges, isArrangement } = propsRef.current;
+    if (!isArrangement || altHeld || !snapEdges || snapEdges.length === 0) {
+      return [newOffset, null];
+    }
+
+    const { startFrac, endFrac } = getViewWindow();
+    const viewDuration = (endFrac - startFrac) * propsRef.current.timeLen;
+    const pxToTime = viewDuration / canvasWidth;
+    const threshold = SNAP_PX * pxToTime;
+
+    const clipStart = newOffset;
+    const clipEnd   = newOffset + clipDuration;
+
+    let bestDelta = threshold;
+    let bestSnap: number | null = null;
+    let bestEdge: number | null = null;
+
+    for (const edge of snapEdges) {
+      // Each tuple: [candidateOffset, snapHighlightTime, distance]
+      const cases: [number, number, number][] = [
+        [edge.start,                edge.start, Math.abs(clipStart - edge.start)],
+        [edge.end,                  edge.end,   Math.abs(clipStart - edge.end)  ],
+        [edge.start - clipDuration, edge.start, Math.abs(clipEnd   - edge.start)],
+        [edge.end   - clipDuration, edge.end,   Math.abs(clipEnd   - edge.end)  ],
+      ];
+      for (const [candidateOffset, edgeTime, delta] of cases) {
+        if (delta < bestDelta) {
+          bestDelta = delta;
+          bestSnap  = Math.max(0, candidateOffset);
+          bestEdge  = edgeTime;
+        }
+      }
+    }
+
+    return bestSnap !== null ? [bestSnap, bestEdge] : [newOffset, null];
+  };
+
   const isInsideClip = (globalT: number): boolean => {
     const { startOffset, duration, isArrangement } = propsRef.current;
     return !!(isArrangement && startOffset !== undefined && globalT >= startOffset && globalT <= startOffset + duration);
@@ -311,14 +397,28 @@ export function Waveform({
     if (!dragRef.current) return;
 
     if (dragRef.current.mode === "clip" && onMoveClip) {
+      const canvas = canvasRef.current;
       const rect = e.currentTarget.getBoundingClientRect();
-      const { startFrac, endFrac, } = getViewWindow();
+      const { startFrac, endFrac } = getViewWindow();
       const viewDuration = (endFrac - startFrac) * propsRef.current.timeLen;
       const dtPerPx = viewDuration / rect.width;
       const dx = e.clientX - dragRef.current.startX;
-      let newOffset = Math.max(0, dragRef.current.clipStartOffset + dx * dtPerPx);
-      if (e.shiftKey) newOffset = snapTime(newOffset, true);
-      onMoveClip(newOffset);
+      let rawOffset = Math.max(0, dragRef.current.clipStartOffset + dx * dtPerPx);
+
+      // Beat snap (Shift)
+      if (e.shiftKey) rawOffset = snapTime(rawOffset, true);
+
+      // Magnetic snap (unless Alt held)
+      const canvasW = canvas ? canvas.getBoundingClientRect().width : rect.width;
+      const [snappedOffset, snapEdgeTime] = magneticSnap(
+        rawOffset,
+        propsRef.current.duration,
+        canvasW,
+        e.altKey,
+      );
+
+      snapLineRef.current = snapEdgeTime;
+      onMoveClip(snappedOffset);
       return;
     }
 
@@ -339,9 +439,16 @@ export function Waveform({
     if (!dragRef.current) return;
     const dx = Math.abs(e.clientX - dragRef.current.startX);
     if (dx < 4 && onSeek) {
-      // small movement = seek click
       onSeek(dragRef.current.startTime);
       if (onRegionChange && !propsRef.current.isArrangement) onRegionChange(null);
+    }
+    snapLineRef.current = null;
+    dragRef.current = null;
+  };
+
+  const handleMouseLeave = () => {
+    if (dragRef.current?.mode === "clip") {
+      snapLineRef.current = null;
     }
     dragRef.current = null;
   };
@@ -374,7 +481,7 @@ export function Waveform({
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMoveForCursor}
       onMouseUp={handleMouseUp}
-      onMouseLeave={() => { dragRef.current = null; }}
+      onMouseLeave={handleMouseLeave}
       onWheel={handleWheel}
     />
   );
