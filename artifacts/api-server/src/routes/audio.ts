@@ -5,9 +5,8 @@ import { promisify } from "util";
 import { writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
-import { mlk_v3, isValidWav } from "../kernel-v3";
-import { telemetryBus, type TelemetryEvent, type RemoteAlertEvent, type RemoteInvalidReason } from "../lib/telemetry";
-import type { Logger } from "pino";
+import { mlk_v3 } from "../kernel-v3";
+import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 import { db, processRunsTable } from "@workspace/db";
 import {
   mlkVocalRemoval,
