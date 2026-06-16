@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { MicLevelMeter } from "@/components/MicLevelMeter";
+import { MicRecorder, type RecordedFile } from "@/components/MicRecorder";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch, API_BASE } from "@/lib/api";
 
@@ -101,31 +101,24 @@ export default function StudioScreen() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [upgradeNeeded, setUpgradeNeeded] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const s = styles(colors);
 
-  async function handlePick() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStage("picking");
+  // Shared upload + response pipeline used by both the mic recorder and the
+  // (secondary) file picker. `asset` is whatever produced the audio.
+  async function processAsset(asset: {
+    uri: string;
+    name: string;
+    mimeType?: string;
+  }) {
     setErrorMsg(null);
     setResultUrl(null);
     setUpgradeNeeded(false);
+    setFileName(asset.name);
+    setStage("uploading");
 
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["audio/*"],
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets?.length) {
-        setStage("idle");
-        return;
-      }
-
-      const asset = result.assets[0];
-      setFileName(asset.name);
-      setStage("uploading");
-
       const formData = buildFormData(selectedTool, asset);
       const endpoint = endpointForTool(selectedTool.id);
 
@@ -160,12 +153,49 @@ export default function StudioScreen() {
     }
   }
 
+  async function handleRecorded(file: RecordedFile) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await processAsset(file);
+  }
+
+  async function handlePick() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setStage("picking");
+    setErrorMsg(null);
+    setResultUrl(null);
+    setUpgradeNeeded(false);
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["audio/*"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        setStage("idle");
+        return;
+      }
+
+      const asset = result.assets[0];
+      await processAsset({
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType,
+      });
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "Something went wrong");
+      setStage("error");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  }
+
   function reset() {
     setStage("idle");
     setFileName(null);
     setResultUrl(null);
     setErrorMsg(null);
     setUpgradeNeeded(false);
+    setIsRecording(false);
   }
 
   return (
@@ -238,26 +268,17 @@ export default function StudioScreen() {
         </Text>
       </View>
 
-      <MicLevelMeter key={selectedTool.id} accentColor={selectedTool.color} />
+      <MicRecorder
+        key={selectedTool.id}
+        accentColor={selectedTool.color}
+        disabled={stage === "uploading" || stage === "picking"}
+        onRecordingChange={setIsRecording}
+        onRecorded={(file) => {
+          void handleRecorded(file);
+        }}
+      />
 
-      {stage === "idle" || stage === "picking" ? (
-        <Pressable
-          onPress={handlePick}
-          disabled={stage === "picking"}
-          style={({ pressed }) => [
-            s.uploadBtn,
-            {
-              borderColor: selectedTool.color,
-              opacity: pressed || stage === "picking" ? 0.6 : 1,
-            },
-          ]}
-        >
-          <Feather name="upload" size={20} color={selectedTool.color} />
-          <Text style={[s.uploadBtnText, { color: selectedTool.color }]}>
-            {stage === "picking" ? "Selecting file…" : "Pick Audio File"}
-          </Text>
-        </Pressable>
-      ) : stage === "uploading" ? (
+      {stage === "uploading" ? (
         <View
           style={[s.stateCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
@@ -291,7 +312,7 @@ export default function StudioScreen() {
             </Text>
           </Pressable>
         </View>
-      ) : (
+      ) : stage === "error" ? (
         <View
           style={[
             s.stateCard,
@@ -319,7 +340,21 @@ export default function StudioScreen() {
             <Text style={[s.downloadBtnText, { color: colors.foreground }]}>Try Again</Text>
           </Pressable>
         </View>
-      )}
+      ) : !isRecording ? (
+        <Pressable
+          onPress={handlePick}
+          disabled={stage === "picking"}
+          style={({ pressed }) => [
+            s.pickLink,
+            { opacity: pressed || stage === "picking" ? 0.6 : 1 },
+          ]}
+        >
+          <Feather name="folder" size={15} color={colors.mutedForeground} />
+          <Text style={[s.pickLinkText, { color: colors.mutedForeground }]}>
+            {stage === "picking" ? "Selecting file…" : "Or pick an audio file"}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {!API_BASE && (
         <View style={[s.warningBox, { borderColor: colors.border }]}>
@@ -378,17 +413,15 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       borderTopWidth: 1,
       letterSpacing: 0.3,
     },
-    uploadBtn: {
+    pickLink: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 10,
-      borderWidth: 1,
-      borderStyle: "dashed",
-      paddingVertical: 24,
+      gap: 8,
+      paddingVertical: 14,
       marginBottom: 24,
     },
-    uploadBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+    pickLinkText: { fontSize: 13, fontFamily: "Inter_500Medium" },
     stateCard: {
       borderWidth: 1,
       padding: 28,

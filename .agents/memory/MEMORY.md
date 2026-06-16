@@ -6,6 +6,7 @@
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
 - [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove/stem_split use fast in-process MLK v3 (Demucs dead-pathed); never assume 44-byte WAV header on ffmpeg output
+- [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — shared applyMLKv3 in kernel-v3.ts carves master/studio-mix/standard; remote standard path is canonical MLK v3 (don't double-carve); buffered carves must bound total output duration or OOM
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
