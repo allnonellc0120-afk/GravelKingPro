@@ -6,15 +6,13 @@ import {
   CheckCircle2,
   Download,
   Loader2,
-  Lock,
   Mail,
   RefreshCw,
   Send,
   AlertTriangle,
   XCircle,
 } from "lucide-react";
-
-const KEY_STORAGE = "gkp_admin_key";
+import { AdminGate, useAdminAuth } from "@/components/admin-gate";
 
 interface WaitlistEntry {
   id: number;
@@ -42,46 +40,34 @@ function fmt(date: string): string {
   });
 }
 
-export default function AdminWaitlist() {
-  const [adminKey, setAdminKey] = useState<string>(
-    () => sessionStorage.getItem(KEY_STORAGE) ?? "",
-  );
-  const [keyInput, setKeyInput] = useState("");
+// ── Dashboard (rendered only when AdminGate is unlocked) ──────────────────────
+
+function WaitlistDashboard() {
+  const { logout } = useAdminAuth();
   const [data, setData] = useState<WaitlistData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
   const [showCompose, setShowCompose] = useState(false);
-  const [subject, setSubject] = useState(
-    "GravelKing Pro payments are now live 🎉",
-  );
+  const [subject, setSubject] = useState("GravelKing Pro payments are now live 🎉");
   const [body, setBody] = useState(
     "Hey!\n\nWe're excited to let you know that GravelKing Pro subscription plans are now live. Head over to the site to grab your plan and unlock real-time metrics, PDF reports, WAV downloads, and more.\n\nhttps://gravelkingpro.com\n\n— The GravelKing Pro team",
   );
   const [fromName, setFromName] = useState("GravelKing Pro");
   const [fromEmail, setFromEmail] = useState("noreply@gravelkingpro.com");
   const [sending, setSending] = useState(false);
-  const [announceResult, setAnnounceResult] = useState<AnnounceResult | null>(
-    null,
-  );
+  const [announceResult, setAnnounceResult] = useState<AnnounceResult | null>(null);
   const [announceError, setAnnounceError] = useState<string | null>(null);
   const composeRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async (key: string) => {
-    if (!key) return;
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/waitlist/admin", {
-        headers: { "x-admin-key": key },
-        credentials: "include",
-      });
-      if (res.status === 403) {
-        sessionStorage.removeItem(KEY_STORAGE);
-        setAdminKey("");
-        setData(null);
-        setError("Invalid admin key.");
+      const res = await fetch("/api/waitlist/admin", { credentials: "include" });
+      if (res.status === 401 || res.status === 403) {
+        logout();
         return;
       }
       if (res.status === 503) {
@@ -95,33 +81,14 @@ export default function AdminWaitlist() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [logout]);
 
-  useEffect(() => {
-    if (adminKey) void load(adminKey);
-  }, [adminKey, load]);
-
-  const handleUnlock = () => {
-    const k = keyInput.trim();
-    if (!k) return;
-    sessionStorage.setItem(KEY_STORAGE, k);
-    setAdminKey(k);
-  };
-
-  const handleLock = () => {
-    sessionStorage.removeItem(KEY_STORAGE);
-    setAdminKey("");
-    setData(null);
-    setKeyInput("");
-  };
+  useEffect(() => { void load(); }, [load]);
 
   const handleExportCsv = async () => {
     setDownloading(true);
     try {
-      const res = await fetch("/api/waitlist/admin?format=csv", {
-        headers: { "x-admin-key": adminKey },
-        credentials: "include",
-      });
+      const res = await fetch("/api/waitlist/admin?format=csv", { credentials: "include" });
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -153,10 +120,7 @@ export default function AdminWaitlist() {
     try {
       const res = await fetch("/api/waitlist/admin/announce", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": adminKey,
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ subject, body, fromName, fromEmail }),
       });
@@ -168,50 +132,11 @@ export default function AdminWaitlist() {
       setAnnounceResult({ sent: json.sent ?? 0, failed: json.failed ?? 0 });
       setShowCompose(false);
     } catch (e) {
-      setAnnounceError(
-        e instanceof Error ? e.message : "Failed to send announcement.",
-      );
+      setAnnounceError(e instanceof Error ? e.message : "Failed to send announcement.");
     } finally {
       setSending(false);
     }
   };
-
-  if (!adminKey) {
-    return (
-      <Layout>
-        <div className="max-w-md mx-auto py-24 text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-secondary/40 border border-border/40 flex items-center justify-center mx-auto">
-            <Lock className="w-7 h-7 text-muted-foreground" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold mb-2">Waitlist Dashboard</h2>
-            <p className="text-muted-foreground text-sm">
-              Enter your admin key to view signups.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3">
-            <input
-              type="password"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleUnlock();
-              }}
-              placeholder="Admin key"
-              className="w-full px-4 py-2.5 rounded-md bg-secondary/40 border border-border/40 text-sm focus:outline-none focus:border-amber-500/60"
-            />
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <Button
-              onClick={handleUnlock}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
-            >
-              Unlock Dashboard
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -232,7 +157,7 @@ export default function AdminWaitlist() {
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => load(adminKey)}
+              onClick={() => void load()}
               disabled={loading}
             >
               {loading ? (
@@ -268,7 +193,7 @@ export default function AdminWaitlist() {
               variant="ghost"
               size="sm"
               className="text-muted-foreground"
-              onClick={handleLock}
+              onClick={() => void logout()}
             >
               Lock
             </Button>
@@ -286,16 +211,11 @@ export default function AdminWaitlist() {
           <div className="flex items-start gap-3 text-sm bg-green-500/10 border border-green-500/30 rounded-md px-4 py-3">
             <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold text-green-400">
-                Announcement sent!
-              </span>{" "}
+              <span className="font-semibold text-green-400">Announcement sent!</span>{" "}
               <span className="text-muted-foreground">
                 {announceResult.sent.toLocaleString()} email
                 {announceResult.sent !== 1 ? "s" : ""} delivered
-                {announceResult.failed > 0
-                  ? `, ${announceResult.failed.toLocaleString()} failed`
-                  : ""}
-                .
+                {announceResult.failed > 0 ? `, ${announceResult.failed.toLocaleString()} failed` : ""}.
               </span>
             </div>
           </div>
@@ -316,9 +236,7 @@ export default function AdminWaitlist() {
                   <Mail className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-amber-500">
-                    {data.total.toLocaleString()}
-                  </div>
+                  <div className="text-4xl font-bold text-amber-500">{data.total.toLocaleString()}</div>
                   <div className="text-sm text-muted-foreground mt-0.5">
                     {data.total === 1 ? "person" : "people"} on the waitlist
                   </div>
@@ -328,10 +246,7 @@ export default function AdminWaitlist() {
 
             {/* Compose panel */}
             {showCompose && (
-              <Card
-                ref={composeRef}
-                className="border-green-500/30 bg-green-500/5"
-              >
+              <Card ref={composeRef} className="border-green-500/30 bg-green-500/5">
                 <CardContent className="pt-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="font-semibold flex items-center gap-2">
@@ -349,21 +264,15 @@ export default function AdminWaitlist() {
 
                   <p className="text-xs text-muted-foreground">
                     This will send a plain-text email to all{" "}
-                    <span className="text-amber-400 font-medium">
-                      {data.total.toLocaleString()}
-                    </span>{" "}
+                    <span className="text-amber-400 font-medium">{data.total.toLocaleString()}</span>{" "}
                     waitlist recipients via Resend. Make sure{" "}
-                    <code className="bg-secondary/60 px-1 rounded text-xs">
-                      RESEND_API_KEY
-                    </code>{" "}
+                    <code className="bg-secondary/60 px-1 rounded text-xs">RESEND_API_KEY</code>{" "}
                     is configured and your sender domain is verified in Resend.
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-muted-foreground font-medium">
-                        From name
-                      </label>
+                      <label className="text-xs text-muted-foreground font-medium">From name</label>
                       <input
                         type="text"
                         value={fromName}
@@ -372,9 +281,7 @@ export default function AdminWaitlist() {
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-muted-foreground font-medium">
-                        From email
-                      </label>
+                      <label className="text-xs text-muted-foreground font-medium">From email</label>
                       <input
                         type="email"
                         value={fromEmail}
@@ -385,9 +292,7 @@ export default function AdminWaitlist() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">
-                      Subject
-                    </label>
+                    <label className="text-xs text-muted-foreground font-medium">Subject</label>
                     <input
                       type="text"
                       value={subject}
@@ -397,9 +302,7 @@ export default function AdminWaitlist() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">
-                      Body (plain text)
-                    </label>
+                    <label className="text-xs text-muted-foreground font-medium">Body (plain text)</label>
                     <textarea
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
@@ -416,12 +319,7 @@ export default function AdminWaitlist() {
                   )}
 
                   <div className="flex items-center gap-3 justify-end pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowCompose(false)}
-                      disabled={sending}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setShowCompose(false)} disabled={sending}>
                       Cancel
                     </Button>
                     <Button
@@ -430,11 +328,7 @@ export default function AdminWaitlist() {
                       onClick={() => void handleSendAnnouncement()}
                       disabled={sending || !subject.trim() || !body.trim()}
                     >
-                      {sending ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Send className="w-3.5 h-3.5" />
-                      )}
+                      {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                       {sending
                         ? "Sending…"
                         : `Send to ${data.total.toLocaleString()} recipient${data.total !== 1 ? "s" : ""}`}
@@ -459,15 +353,9 @@ export default function AdminWaitlist() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border/40">
-                          <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4 w-12">
-                            #
-                          </th>
-                          <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">
-                            Email
-                          </th>
-                          <th className="text-left text-xs text-muted-foreground font-medium py-2">
-                            Signed up
-                          </th>
+                          <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4 w-12">#</th>
+                          <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Email</th>
+                          <th className="text-left text-xs text-muted-foreground font-medium py-2">Signed up</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -476,15 +364,9 @@ export default function AdminWaitlist() {
                             key={entry.id}
                             className="border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
                           >
-                            <td className="py-2.5 pr-4 text-muted-foreground tabular-nums">
-                              {i + 1}
-                            </td>
-                            <td className="py-2.5 pr-4 font-mono text-xs text-foreground/90">
-                              {entry.email}
-                            </td>
-                            <td className="py-2.5 text-muted-foreground text-xs whitespace-nowrap">
-                              {fmt(entry.createdAt)}
-                            </td>
+                            <td className="py-2.5 pr-4 text-muted-foreground tabular-nums">{i + 1}</td>
+                            <td className="py-2.5 pr-4 font-mono text-xs text-foreground/90">{entry.email}</td>
+                            <td className="py-2.5 text-muted-foreground text-xs whitespace-nowrap">{fmt(entry.createdAt)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -497,5 +379,15 @@ export default function AdminWaitlist() {
         )}
       </div>
     </Layout>
+  );
+}
+
+// ── Page export ───────────────────────────────────────────────────────────────
+
+export default function AdminWaitlist() {
+  return (
+    <AdminGate title="Waitlist Dashboard" description="Enter your admin key to view signups.">
+      <WaitlistDashboard />
+    </AdminGate>
   );
 }

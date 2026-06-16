@@ -56,7 +56,7 @@ export const ActivateMlkLicenseBody = zod.object({
 })
 
 export const ActivateMlkLicenseResponse = zod.object({
-  "tier": zod.enum(['none', 'poc', 'enterprise', 'buyout']),
+  "tier": zod.enum(['none', 'dev', 'poc', 'enterprise', 'buyout']),
   "active": zod.boolean(),
   "licenseKey": zod.string().nullish(),
   "email": zod.string().nullish(),
@@ -70,7 +70,7 @@ export const ActivateMlkLicenseResponse = zod.object({
  * @summary Get current license status for this session
  */
 export const GetMlkLicenseStatusResponse = zod.object({
-  "tier": zod.enum(['none', 'poc', 'enterprise', 'buyout']),
+  "tier": zod.enum(['none', 'dev', 'poc', 'enterprise', 'buyout']),
   "active": zod.boolean(),
   "licenseKey": zod.string().nullish(),
   "email": zod.string().nullish(),
@@ -99,6 +99,11 @@ export const RunMlkBenchmarkResponse = zod.object({
   "mmapLocked": zod.boolean(),
   "numaAware": zod.boolean(),
   "blasBackend": zod.string(),
+  "cpuModel": zod.string().optional(),
+  "cores": zod.number().optional(),
+  "cpuFreqMhz": zod.number().optional(),
+  "numaNodes": zod.number().optional(),
+  "openmpThreads": zod.number().optional(),
   "kernel": zod.string(),
   "licensed": zod.boolean(),
   "demo": zod.boolean(),

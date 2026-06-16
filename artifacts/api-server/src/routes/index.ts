@@ -12,9 +12,11 @@ import beatsRouter from "./beats";
 import waitlistRouter from "./waitlist";
 import analyticsRouter from "./analytics";
 import mlkRouter from "./mlk";
+import adminAuthRouter from "./adminAuth";
 
 const router: IRouter = Router();
 
+router.use(adminAuthRouter);
 router.use(authRouter);
 router.use(healthRouter);
 router.use(kernelRouter);

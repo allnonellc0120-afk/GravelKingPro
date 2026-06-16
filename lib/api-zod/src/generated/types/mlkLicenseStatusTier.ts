@@ -11,6 +11,7 @@ export type MlkLicenseStatusTier = typeof MlkLicenseStatusTier[keyof typeof MlkL
 
 export const MlkLicenseStatusTier = {
   none: 'none',
+  dev: 'dev',
   poc: 'poc',
   enterprise: 'enterprise',
   buyout: 'buyout',

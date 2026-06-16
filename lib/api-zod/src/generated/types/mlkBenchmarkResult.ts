@@ -16,6 +16,11 @@ export interface MlkBenchmarkResult {
   mmapLocked: boolean;
   numaAware: boolean;
   blasBackend: string;
+  cpuModel?: string;
+  cores?: number;
+  cpuFreqMhz?: number;
+  numaNodes?: number;
+  openmpThreads?: number;
   kernel: string;
   licensed: boolean;
   demo: boolean;
