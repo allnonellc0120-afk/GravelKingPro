@@ -242,6 +242,16 @@ export function useDAW() {
     saveDAWSettings({ bpm, masterVolume, loop, masterPlugins });
   }, [bpm, masterVolume, loop, masterPlugins]);
 
+  // Warn before tab close / navigation when tracks are loaded
+  useEffect(() => {
+    if (tracks.length === 0) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [tracks.length]);
+
   const getCtx = (): AudioContext => {
     if (!ctxRef.current || ctxRef.current.state === "closed") {
       ctxRef.current = new AudioContext();
