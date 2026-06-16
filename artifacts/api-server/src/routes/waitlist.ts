@@ -6,18 +6,8 @@ import { Resend } from 'resend';
 
 const waitlistRouter = Router();
 
-function checkAdminKey(req: Request, res: Response): boolean {
-  const key = process.env.ADMIN_KEY?.trim() ?? '';
-  if (!key) {
-    res.status(503).json({ error: 'Admin key not configured on the server.' });
-    return false;
-  }
-  if (req.headers['x-admin-key'] !== key) {
-    res.status(403).json({ error: 'Forbidden.' });
-    return false;
-  }
-  return true;
-}
+// Admin guard imported from shared lib (accepts httpOnly cookie or x-admin-key header).
+import { requireAdmin as checkAdminKey } from '../lib/adminAuth';
 
 waitlistRouter.get('/waitlist/admin', async (req: Request, res: Response) => {
   if (!checkAdminKey(req, res)) return;

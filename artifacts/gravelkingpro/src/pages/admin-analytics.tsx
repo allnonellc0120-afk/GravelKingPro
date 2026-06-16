@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Users, Eye, CreditCard, Crown, Clock, DollarSign,
-  Loader2, Lock, RefreshCw, ArrowRight, AlertTriangle, BarChart3,
+  Loader2, RefreshCw, ArrowRight, AlertTriangle, BarChart3,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
+import { AdminGate, useAdminAuth } from "@/components/admin-gate";
 
 interface Summary {
   rangeDays: number;
@@ -20,7 +21,6 @@ interface Summary {
   topReferrers: Array<{ referrer: string | null; count: number }>;
 }
 
-const KEY_STORAGE = "gkp_admin_key";
 const RANGES = [7, 30, 90] as const;
 
 const fmt = (n: number): string => n.toLocaleString();
@@ -44,28 +44,24 @@ function StatCard({ icon, label, value, sub, accent }: {
   );
 }
 
-export default function AdminAnalytics() {
-  const [adminKey, setAdminKey] = useState<string>(() => sessionStorage.getItem(KEY_STORAGE) ?? "");
-  const [keyInput, setKeyInput] = useState("");
+// ── Dashboard (rendered only when AdminGate is unlocked) ──────────────────────
+
+function AnalyticsDashboard() {
+  const { logout } = useAdminAuth();
   const [days, setDays] = useState<number>(30);
   const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (key: string, range: number) => {
-    if (!key) return;
+  const load = useCallback(async (range: number) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/analytics/summary?days=${range}`, {
-        headers: { "x-admin-key": key },
         credentials: "include",
       });
-      if (res.status === 403) {
-        sessionStorage.removeItem(KEY_STORAGE);
-        setAdminKey("");
-        setData(null);
-        setError("Invalid admin key.");
+      if (res.status === 401 || res.status === 403) {
+        logout();
         return;
       }
       if (res.status === 503) {
@@ -79,58 +75,10 @@ export default function AdminAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [logout]);
 
-  useEffect(() => {
-    if (adminKey) void load(adminKey, days);
-  }, [adminKey, days, load]);
+  useEffect(() => { void load(days); }, [days, load]);
 
-  const handleUnlock = () => {
-    const k = keyInput.trim();
-    if (!k) return;
-    sessionStorage.setItem(KEY_STORAGE, k);
-    setAdminKey(k);
-  };
-
-  const handleLock = () => {
-    sessionStorage.removeItem(KEY_STORAGE);
-    setAdminKey("");
-    setData(null);
-    setKeyInput("");
-  };
-
-  // ── Gate ───────────────────────────────────────────────────────────────────
-  if (!adminKey) {
-    return (
-      <Layout>
-        <div className="max-w-md mx-auto py-24 text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-secondary/40 border border-border/40 flex items-center justify-center mx-auto">
-            <Lock className="w-7 h-7 text-muted-foreground" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold mb-2">Admin Analytics</h2>
-            <p className="text-muted-foreground text-sm">Enter your admin key to view traffic and revenue.</p>
-          </div>
-          <div className="flex flex-col gap-3">
-            <input
-              type="password"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleUnlock(); }}
-              placeholder="Admin key"
-              className="w-full px-4 py-2.5 rounded-md bg-secondary/40 border border-border/40 text-sm focus:outline-none focus:border-amber-500/60"
-            />
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <Button onClick={handleUnlock} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-              Unlock Dashboard
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // ── Dashboard ────────────────────────────────────────────────────────────--
   return (
     <Layout>
       <div className="max-w-6xl mx-auto py-8 space-y-6">
@@ -157,11 +105,11 @@ export default function AdminAnalytics() {
                 </button>
               ))}
             </div>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => load(adminKey, days)} disabled={loading}>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void load(days)} disabled={loading}>
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               Refresh
             </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={handleLock}>
+            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => void logout()}>
               Lock
             </Button>
           </div>
@@ -266,6 +214,16 @@ export default function AdminAnalytics() {
         )}
       </div>
     </Layout>
+  );
+}
+
+// ── Page export ───────────────────────────────────────────────────────────────
+
+export default function AdminAnalytics() {
+  return (
+    <AdminGate title="Admin Analytics" description="Enter your admin key to view traffic and revenue.">
+      <AnalyticsDashboard />
+    </AdminGate>
   );
 }
 

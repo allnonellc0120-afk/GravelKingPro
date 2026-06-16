@@ -151,6 +151,11 @@ async function getSessionLicense(req: import("express").Request) {
 router.get("/mlk/license/status", async (req, res) => {
   const license = await getSessionLicense(req);
   if (!license) {
+    // Owner/dev environment gets open usage without a paid license.
+    if (process.env.NODE_ENV === "development") {
+      res.json({ tier: "dev", active: true, licenseKey: null, email: null, company: "Developer (open usage)", expiresAt: null, runsUsed: 0 });
+      return;
+    }
     res.json({ tier: "none", active: false, licenseKey: null, email: null, company: null, expiresAt: null, runsUsed: 0 });
     return;
   }
@@ -177,7 +182,8 @@ function runBenchmarkProcess(matrixSize: number, iterations: number, licenseKey:
     }
 
     const scriptPath = `${process.cwd()}/../../.local/mlk-repo/morris_law_kernel_v35_fast.py`;
-    const proc = spawn("python3", [scriptPath], { env, timeout: 120_000 });
+    // Large matrices (8192) cost ~16s/iter on this hardware; allow headroom over the demo case.
+    const proc = spawn("python3", [scriptPath], { env, timeout: 240_000 });
 
     let stdout = "";
     let stderr = "";
@@ -190,9 +196,15 @@ function runBenchmarkProcess(matrixSize: number, iterations: number, licenseKey:
         return;
       }
       try {
-        const lines = stdout.trim().split("\n");
-        const jsonLine = [...lines].reverse().find((l: string) => l.startsWith("{")) ?? stdout.trim();
-        resolve(JSON.parse(jsonLine));
+        // The benchmark prints a pretty-printed (multi-line) JSON object via
+        // json.dumps(..., indent=2). Extract the whole object from the first
+        // "{" to the last "}" rather than a single line.
+        const start = stdout.indexOf("{");
+        const end = stdout.lastIndexOf("}");
+        if (start === -1 || end === -1 || end < start) {
+          throw new Error("no JSON object in output");
+        }
+        resolve(JSON.parse(stdout.slice(start, end + 1)) as Record<string, unknown>);
       } catch {
         reject(new Error(`Could not parse benchmark output: ${stdout.slice(0, 300)}`));
       }
@@ -207,10 +219,14 @@ router.post("/mlk/benchmark/run", async (req, res) => {
   const { matrixSize: reqSize, iterations: reqIter } = parsed.success ? parsed.data : {};
 
   const license = await getSessionLicense(req);
-  const demo = !license;
+  // The dev/owner gets open (uncapped) usage locally; paid license gating stays in production.
+  const isDev = process.env.NODE_ENV === "development";
+  const demo = !license && !isDev;
 
-  const matrixSize = demo ? 512 : Math.min(reqSize ?? 4096, license?.tier === "poc" ? 4096 : 8192);
-  const iterations = demo ? 3 : Math.min(reqIter ?? 8, 16);
+  const maxSize = license?.tier === "poc" ? 4096 : 8192;
+  const matrixSize = demo ? 512 : Math.min(reqSize ?? 4096, maxSize);
+  // Cap iterations for large matrices so a single run can't exceed the process timeout.
+  const iterations = demo ? 3 : Math.min(reqIter ?? 8, matrixSize >= 8192 ? 6 : 16);
   const sessionId = (req.cookies as Record<string, string>)["mlk_session"] ?? "anon";
 
   let result: Record<string, unknown>;
@@ -230,6 +246,11 @@ router.post("/mlk/benchmark/run", async (req, res) => {
   const mmapLocked = Boolean(result["mmap_locked"] ?? false);
   const numaAware = Boolean(result["numa_aware"] ?? false);
   const blasBackend = String(result["blas_backend"] ?? "OpenBLAS");
+  const cpuModel = String(result["cpu_model"] ?? "Unknown CPU");
+  const cores = Number(result["cores_available"] ?? 0);
+  const cpuFreqMhz = Number(result["cpu_freq_mhz"] ?? 0);
+  const numaNodes = Number(result["numa_nodes"] ?? 0);
+  const openmpThreads = Number(result["openmp_threads"] ?? 0);
 
   const [row] = await db.insert(mlkBenchmarkRunsTable).values({
     sessionId,
@@ -263,6 +284,11 @@ router.post("/mlk/benchmark/run", async (req, res) => {
     mmapLocked,
     numaAware,
     blasBackend,
+    cpuModel,
+    cores,
+    cpuFreqMhz,
+    numaNodes,
+    openmpThreads,
     kernel: "MLK-V 3.5 Fast",
     licensed: !demo,
     demo,

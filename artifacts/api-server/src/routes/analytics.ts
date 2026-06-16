@@ -58,18 +58,8 @@ function clampString(value: unknown, max: number): string | null {
   return trimmed.slice(0, max);
 }
 
-function requireAdmin(req: Request, res: Response): boolean {
-  const key = process.env.ADMIN_KEY?.trim() ?? "";
-  if (!key) {
-    res.status(503).json({ error: "Admin key not configured." });
-    return false;
-  }
-  if (req.headers["x-admin-key"] !== key) {
-    res.status(403).json({ error: "Invalid admin key." });
-    return false;
-  }
-  return true;
-}
+// Admin guard imported from shared lib (accepts httpOnly cookie or x-admin-key header).
+import { requireAdmin } from "../lib/adminAuth";
 
 // Normalize a recurring price to a monthly amount (in cents).
 function monthlyCentsFor(price: Stripe.Price, quantity: number): number {

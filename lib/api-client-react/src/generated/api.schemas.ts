@@ -64,6 +64,7 @@ export type MlkLicenseStatusTier = typeof MlkLicenseStatusTier[keyof typeof MlkL
 
 export const MlkLicenseStatusTier = {
   none: 'none',
+  dev: 'dev',
   poc: 'poc',
   enterprise: 'enterprise',
   buyout: 'buyout',
@@ -98,6 +99,11 @@ export interface MlkBenchmarkResult {
   mmapLocked: boolean;
   numaAware: boolean;
   blasBackend: string;
+  cpuModel?: string;
+  cores?: number;
+  cpuFreqMhz?: number;
+  numaNodes?: number;
+  openmpThreads?: number;
   kernel: string;
   licensed: boolean;
   demo: boolean;

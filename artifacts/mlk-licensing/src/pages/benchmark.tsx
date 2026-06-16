@@ -4,6 +4,60 @@ import { useRunMlkBenchmark, useGetMlkLicenseStatus, getGetMlkLicenseStatusQuery
 import { Terminal as TerminalIcon, Play, Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+const METRIC_GUIDE: { term: string; desc: string }[] = [
+  {
+    term: "Matrix Size (N²)",
+    desc: "The kernel multiplies two N×N matrices of 64-bit numbers (a DGEMM). Each run performs 2·N³ floating-point operations — a 4096² run is ~137 billion ops — so larger N stresses cache and memory bandwidth much harder.",
+  },
+  {
+    term: "Avg GFLOPS",
+    desc: "Sustained throughput: billions of floating-point operations per second, averaged across every timed iteration. This is the headline 'how fast is my hardware' number.",
+  },
+  {
+    term: "Peak GFLOPS",
+    desc: "Your single fastest iteration — the hardware's ceiling when nothing else is competing for the cores.",
+  },
+  {
+    term: "Min GFLOPS",
+    desc: "Your slowest iteration. The gap between Min and Peak shows how much OS noise, thermal throttling, or memory contention is costing you.",
+  },
+  {
+    term: "Std Dev GFLOPS",
+    desc: "How tightly the iterations cluster. A low value means deterministic, repeatable performance — exactly what the kernel's CPU affinity and memory-locking are designed to deliver.",
+  },
+  {
+    term: "Avg Time",
+    desc: "Average wall-clock seconds for one full matrix multiply. Lower is better; it is simply 2·N³ divided by your GFLOPS.",
+  },
+];
+
+const OPTIMIZATIONS: { name: string; desc: string }[] = [
+  {
+    name: "CPU affinity",
+    desc: "The benchmark process is pinned to the detected set of cores with sched_setaffinity, so the scheduler keeps the work on those cores instead of migrating it mid-run and cooling the caches.",
+  },
+  {
+    name: "NUMA-aware memory binding",
+    desc: "When the host exposes more than one NUMA node (and libnuma is present), memory is bound to the local node so the CPU never pays the latency penalty of reaching across sockets. A single-node host reports SINGLE NODE.",
+  },
+  {
+    name: "Locked memory pages (mmap + mlock)",
+    desc: "A large buffer is pinned in physical RAM so the OS can never swap it to disk, eliminating page-fault stalls during the timed loop.",
+  },
+  {
+    name: "Vectorized FP64 GEMM (BLAS)",
+    desc: "The multiply runs through OpenBLAS's hand-tuned SIMD GEMM kernels, which dispatch to the widest vector unit your CPU advertises (AVX-512 processes 8 doubles per instruction) to saturate the floating-point units. The detected ISA is shown in the Environment panel.",
+  },
+  {
+    name: "Warm-up pass",
+    desc: "One untimed multiply runs first to fill caches and spin up the BLAS thread pool, so the measured iterations reflect true steady-state speed instead of cold-start overhead.",
+  },
+  {
+    name: "Thread-count tuning",
+    desc: "OpenMP / OpenBLAS / MKL thread counts are set to match the detected core count — no oversubscription, no idle cores.",
+  },
+];
+
 export default function Benchmark() {
   const { data: licenseStatus } = useGetMlkLicenseStatus({ query: { queryKey: getGetMlkLicenseStatusQueryKey() } });
   const { mutate: runBenchmark, isPending } = useRunMlkBenchmark();
@@ -26,18 +80,18 @@ export default function Benchmark() {
     // Simulate terminal delay
     setTimeout(() => {
       if (isDemo) {
-        setOutput(prev => [...prev, "WARN: No active license found. Running in DEMO mode (max matrix: 1024)."]);
+        setOutput(prev => [...prev, "WARN: No active license found. Running in DEMO mode (512×512, 3 iterations)."]);
       } else {
-        setOutput(prev => [...prev, "OK: License verified. Unlocking full execution pipeline."]);
+        setOutput(prev => [...prev, "OK: Full execution unlocked. Detecting hardware + applying kernel optimizations."]);
       }
       
       setTimeout(() => {
-        setOutput(prev => [...prev, "Allocating pinned memory...", "Executing GEMM loops..."]);
+        setOutput(prev => [...prev, "Setting CPU affinity...", "Locking memory pages (mmap)...", "Running warm-up pass...", "Executing FP64 DGEMM loops..."]);
         
         runBenchmark({
           data: {
-            matrixSize: isDemo ? 1024 : 8192,
-            iterations: isDemo ? 3 : 10
+            matrixSize: isDemo ? 512 : 4096,
+            iterations: isDemo ? 3 : 8
           }
         }, {
           onSuccess: (data) => {
@@ -85,7 +139,7 @@ export default function Benchmark() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle className="uppercase font-bold tracking-wide">Demo Mode Active</AlertTitle>
             <AlertDescription className="font-mono text-sm">
-              You are running the unauthenticated version. Matrix size is clamped to 1024x1024 and NUMA optimizations are disabled. <a href="/activate" className="underline font-bold">Activate a license</a> for full 8192x8192 execution.
+              You are running the unauthenticated version. Matrix size is clamped to 512×512 with 3 iterations. <a href="/activate" className="underline font-bold">Activate a license</a> for full 4096×4096 execution with all kernel optimizations.
             </AlertDescription>
           </Alert>
         )}
@@ -163,24 +217,68 @@ export default function Benchmark() {
             <div className="border bg-card p-6">
               <h3 className="uppercase font-bold text-sm text-muted-foreground mb-4 font-mono border-b pb-2">Environment</h3>
               <ul className="space-y-3 font-mono text-xs">
-                <li className="flex justify-between">
-                  <span className="text-muted-foreground">CPU</span>
-                  <span className="font-bold text-right">AMD EPYC 9V33</span>
+                <li className="flex justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">CPU</span>
+                  <span className="font-bold text-right">{result?.cpuModel ?? "Run benchmark to detect"}</span>
                 </li>
-                <li className="flex justify-between">
-                  <span className="text-muted-foreground">GPU</span>
-                  <span className="font-bold text-right">NVIDIA A100 80GB</span>
+                <li className="flex justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">Cores</span>
+                  <span className="font-bold text-right">{result?.cores ? `${result.cores} logical` : "—"}</span>
                 </li>
-                <li className="flex justify-between">
-                  <span className="text-muted-foreground">OS</span>
-                  <span className="font-bold text-right">Ubuntu 22.04 LTS</span>
+                <li className="flex justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">Clock</span>
+                  <span className="font-bold text-right">{result?.cpuFreqMhz ? `${(result.cpuFreqMhz / 1000).toFixed(2)} GHz` : "—"}</span>
                 </li>
-                <li className="flex justify-between">
-                  <span className="text-muted-foreground">NUMA</span>
-                  <span className="font-bold text-right">{result?.numaAware ? 'ENABLED' : 'DISABLED'}</span>
+                <li className="flex justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">Compute</span>
+                  <span className="font-bold text-right">CPU · FP64 DGEMM</span>
+                </li>
+                <li className="flex justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">BLAS</span>
+                  <span className="font-bold text-right">{result?.blasBackend ?? "OpenBLAS / AVX-512"}</span>
+                </li>
+                <li className="flex justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">NUMA</span>
+                  <span className="font-bold text-right">{result ? (result.numaAware ? `ENABLED (${result.numaNodes} node${result.numaNodes === 1 ? "" : "s"})` : "SINGLE NODE") : "—"}</span>
+                </li>
+                <li className="flex justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">Memory</span>
+                  <span className="font-bold text-right">{result ? (result.mmapLocked ? "PAGES LOCKED" : "HEAP") : "—"}</span>
                 </li>
               </ul>
+              <p className="mt-4 text-[10px] font-mono text-muted-foreground leading-relaxed border-t pt-3">
+                Specs are read live from the host running the kernel — no GPU is used; this is a pure FP64 CPU benchmark.
+              </p>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-10 border bg-card p-6 md:p-8">
+          <h2 className="uppercase font-bold text-lg mb-1">Understanding Your Results</h2>
+          <p className="text-sm text-muted-foreground font-mono mb-6">What every number in the metrics panel actually measures.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+            {METRIC_GUIDE.map((m) => (
+              <div key={m.term} className="border-l-2 border-accent pl-4">
+                <div className="font-mono font-bold text-sm uppercase tracking-wide">{m.term}</div>
+                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{m.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 border bg-card p-6 md:p-8">
+          <h2 className="uppercase font-bold text-lg mb-1">How MLK V3.5 Optimizes Your Hardware</h2>
+          <p className="text-sm text-muted-foreground font-mono mb-6">The exact techniques the kernel applies on every run to squeeze peak throughput from the CPU.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+            {OPTIMIZATIONS.map((o, i) => (
+              <div key={o.name} className="flex gap-4">
+                <div className="font-mono font-bold text-accent text-sm shrink-0 w-6">{String(i + 1).padStart(2, "0")}</div>
+                <div>
+                  <div className="font-mono font-bold text-sm">{o.name}</div>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{o.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
