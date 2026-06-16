@@ -16,9 +16,20 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { db, beatsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
+import { unlink } from "fs/promises";
+import crypto from "crypto";
 
 const beatsRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "/tmp",
+    filename: (_req, file, cb) => {
+      const ext = file.originalname.split('.').pop() ?? "bin";
+      cb(null, `gk_beats_${crypto.randomUUID()}.${ext}`);
+    },
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
 
 function getAdminKey(): string {
   return process.env.ADMIN_KEY?.trim() ?? "";

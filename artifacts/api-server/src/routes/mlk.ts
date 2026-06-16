@@ -185,12 +185,14 @@ function runBenchmarkProcess(matrixSize: number, iterations: number, licenseKey:
     // Large matrices (8192) cost ~16s/iter on this hardware; allow headroom over the demo case.
     const proc = spawn("python3", [scriptPath], { env, timeout: 240_000 });
 
-    let stdout = "";
-    let stderr = "";
-    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    proc.stdout.on("data", (d: Buffer) => { stdoutChunks.push(d); });
+    proc.stderr.on("data", (d: Buffer) => { stderrChunks.push(d); });
 
     proc.on("close", (code) => {
+      const stdout = Buffer.concat(stdoutChunks).toString();
+      const stderr = Buffer.concat(stderrChunks).toString();
       if (code !== 0) {
         reject(new Error(`Benchmark process exited ${code}: ${stderr.slice(0, 500)}`));
         return;

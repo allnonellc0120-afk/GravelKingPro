@@ -158,25 +158,21 @@ export const MLK_PROTOCOL = "GravelKing_MLK_v3";
 export const MLK_KERNEL   = "MLK_v3";
 export const MLK_STACK    = `${MLK_PROTOCOL}+${MLK_KERNEL}`;
 
-/** Run an ffmpeg audio filter on a buffer and return a pcm_s16le WAV. */
+/** Run an ffmpeg audio filter on a file and return a pcm_s16le WAV. */
 async function ffmpegFilterToWav(
-  inputBuf: Buffer,
-  ext: string,
+  filePath: string,
   filter: string,
   channels: number,
 ): Promise<Buffer> {
   const id      = randomUUID();
-  const inPath  = `/tmp/mlk_in_${id}.${ext}`;
   const outPath = `/tmp/mlk_out_${id}.wav`;
-  await writeFile(inPath, inputBuf);
   try {
-    const args = ["-y", "-i", inPath];
+    const args = ["-y", "-i", filePath];
     if (filter) args.push("-af", filter);
     args.push("-ac", String(channels), "-acodec", "pcm_s16le", outPath);
     await execFileAsync("ffmpeg", args, { maxBuffer: 200 * 1024 * 1024, timeout: 120_000 });
     return await readFile(outPath);
   } finally {
-    await unlink(inPath).catch(() => {});
     await unlink(outPath).catch(() => {});
   }
 }
@@ -187,7 +183,7 @@ async function ffmpegFilterToWav(
  * presence band. Output is post-processed through the Morris Law Kernel v3.
  */
 export async function mlkVocalRemoval(
-  inputBuf:   Buffer,
+  filePath:   string,
   ext:        string,
   channels:   number,
   multiplier: number = 0.75,
@@ -195,7 +191,7 @@ export async function mlkVocalRemoval(
   const filter = channels >= 2
     ? "pan=stereo|c0=c0-c1|c1=c1-c0"
     : "equalizer=f=2500:t=q:w=2:g=-9";
-  const rawBuf          = await ffmpegFilterToWav(inputBuf, ext, filter, channels >= 2 ? 2 : 1);
+  const rawBuf          = await ffmpegFilterToWav(filePath, filter, channels >= 2 ? 2 : 1);
   const { buf, parity } = applyMLKv3(rawBuf, multiplier);
   return {
     instrumental: buf,
@@ -212,7 +208,7 @@ export async function mlkVocalRemoval(
  * (vocals, drums, bass, other, instrumental).
  */
 export async function mlkStemSplit(
-  inputBuf:   Buffer,
+  filePath:   string,
   ext:        string,
   channels:   number,
   multiplier: number = 0.75,
@@ -234,7 +230,7 @@ export async function mlkStemSplit(
 
   await Promise.all(
     specs.map(async (s) => {
-      const rawBuf          = await ffmpegFilterToWav(inputBuf, ext, s.filter, s.ch);
+      const rawBuf          = await ffmpegFilterToWav(filePath, s.filter, s.ch);
       const { buf, parity } = applyMLKv3(rawBuf, multiplier);
       if (parity !== "MLK_V3_VALIDATED") kernelParity = parity;
       zipInput[`GKP_${s.name}.wav`] = new Uint8Array(buf);
