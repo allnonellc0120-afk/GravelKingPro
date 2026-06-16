@@ -30,7 +30,17 @@ stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
         };
       })
     );
-    res.json({ data: result });
+    const response: {
+      data: typeof result;
+      warning?: string;
+    } = { data: result };
+
+    if (result.length === 0) {
+      response.warning =
+        'No active Stripe products found. Run: pnpm --filter @workspace/scripts run seed-products';
+    }
+
+    res.json(response);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: message });
