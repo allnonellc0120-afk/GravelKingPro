@@ -14,7 +14,8 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
   const links = [
     { href: "/", label: "Dashboard" },
     { href: "/studio", label: "Studio" },
-    { href: "/mix", label: "Mix Studio" },
+    { href: "/voice-removal", label: "Voice Removal" },
+    { href: "/mastering", label: "Mastering" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
   ];

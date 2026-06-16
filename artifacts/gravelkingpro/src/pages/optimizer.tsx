@@ -441,7 +441,7 @@ export default function Optimizer() {
   );
 }
 
-function TerminalOutput({ logs, logsEndRef }: { logs: string[]; logsEndRef: React.RefObject<HTMLDivElement> }) {
+function TerminalOutput({ logs, logsEndRef }: { logs: string[]; logsEndRef: React.RefObject<HTMLDivElement | null> }) {
   return (
     <div className="bg-black/60 rounded-lg p-3 font-mono text-xs text-emerald-400 space-y-0.5 max-h-48 overflow-y-auto">
       {logs.length === 0 && <span className="text-muted-foreground">Waiting...</span>}
