@@ -267,6 +267,7 @@ audioRouter.post(
         const used = usageUser[usageField] ?? 0;
         const limit = FREE_LIMITS[usageField];
         if (used >= limit) {
+          await unlink(filePath).catch(() => {});
           res.status(402).json({
             success: false,
             code: "LIMIT_REACHED",
@@ -283,6 +284,7 @@ audioRouter.post(
         }
         const usedTotal = usageUser.totalDownloads ?? 0;
         if (usedTotal >= FREE_LIMITS.totalDownloads) {
+          await unlink(filePath).catch(() => {});
           res.status(402).json({
             success: false,
             code: "LIMIT_REACHED",
@@ -427,6 +429,8 @@ audioRouter.post(
           res.setHeader("X-GK-Free-Remaining", String(freeRemaining));
         }
 
+        await unlink(filePath).catch(() => {});
+
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_stems.zip"`);
         res.setHeader("X-GK-Mode", "stem_split");
@@ -448,6 +452,7 @@ audioRouter.post(
 
     // ── Studio-only gate for standard mode ─────────────────────────────────────
     if (!await hasStudio(req)) {
+      await unlink(filePath).catch(() => {});
       res.status(403).json({
         success: false,
         error: "GravelKing Standard processing requires a GravelKing Studio subscription.",
