@@ -10,7 +10,8 @@
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
-- [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless not ffmpeg; read real build logs via listDeploymentBuilds/getDeploymentBuild
+- [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless; deploy bundles gitignored .cache/.local — delete .cache/uv before publish; read real logs via listDeploymentBuilds
+- [Expo deploy node_modules](expo-deploy-node-modules.md) — deploy bundles against working-tree node_modules; committed-but-unmaterialized dep → Metro "Unable to resolve module"; fix via pnpm install + expo export check
 - [Deployment builds each artifact separately](deploy-typecheck-all.md) — no repo-wide build; each artifact builds via its own artifact.toml; mockup-sandbox excluded; read real logs via listDeploymentBuilds
 - [Studio audio dev verification](studio-audio-dev-verification.md) — seed users.subscription_tier+sessions, auth via Bearer <sid>; stripe.* mirror empty in dev; remote offline (mock it, no tsx); clean process_runs (FK) too
 - [Center-cancel parity fixtures](studio-audio-dev-verification.md) — L==R stereo cancels to silence → false MLK_V3_VIOLATION; use true-stereo (distinct L/R) fixtures
