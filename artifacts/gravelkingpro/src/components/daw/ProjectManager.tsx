@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { FolderOpen, Save, Trash2, X, Check, Loader2 } from "lucide-react";
+import { FolderOpen, Save, Trash2, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,16 +37,19 @@ export function ProjectManager({ hasUnsavedTracks, onSave, onLoad }: Props) {
   const [openOpen,    setOpenOpen]    = useState(false);
   const [projectName, setProjectName] = useState("");
   const [saving,      setSaving]      = useState(false);
-  const [loading,     setLoading]     = useState(false);
+  const [listLoading, setListLoading] = useState(false);
   const [projects,    setProjects]    = useState<ProjectMeta[]>([]);
   const [deletingId,  setDeletingId]  = useState<string | null>(null);
   const [loadingId,   setLoadingId]   = useState<string | null>(null);
 
   const refreshList = useCallback(async () => {
+    setListLoading(true);
     try {
       setProjects(await listProjects());
     } catch {
       setProjects([]);
+    } finally {
+      setListLoading(false);
     }
   }, []);
 
@@ -71,8 +74,8 @@ export function ProjectManager({ hasUnsavedTracks, onSave, onLoad }: Props) {
   };
 
   const handleLoad = async (meta: ProjectMeta) => {
+    if (loadingId) return;
     setLoadingId(meta.id);
-    setLoading(true);
     try {
       const { loadProject } = await import("@/lib/daw/projectStorage");
       const project = await loadProject(meta.id);
@@ -83,13 +86,13 @@ export function ProjectManager({ hasUnsavedTracks, onSave, onLoad }: Props) {
     } catch (e: any) {
       toast({ title: "Load failed", description: e.message, variant: "destructive" });
     } finally {
-      setLoading(false);
       setLoadingId(null);
     }
   };
 
   const handleDelete = async (meta: ProjectMeta, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (deletingId) return;
     setDeletingId(meta.id);
     try {
       await deleteProject(meta.id);
@@ -137,7 +140,7 @@ export function ProjectManager({ hasUnsavedTracks, onSave, onLoad }: Props) {
               autoFocus
             />
             <p className="text-[11px] text-zinc-500">
-              Saves all tracks, plugin chains, volume/pan, and BPM to your browser's local storage. Audio data is preserved as WAV.
+              Saves all tracks, plugin chains, volume/pan, and BPM to your browser. Audio data is preserved as WAV so you can pick up exactly where you left off.
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setSaveOpen(false)} className="text-zinc-400">
@@ -163,7 +166,7 @@ export function ProjectManager({ hasUnsavedTracks, onSave, onLoad }: Props) {
           <DialogHeader>
             <DialogTitle className="text-base">Open Project</DialogTitle>
           </DialogHeader>
-          {loading && !loadingId ? (
+          {listLoading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
             </div>
@@ -187,14 +190,14 @@ export function ProjectManager({ hasUnsavedTracks, onSave, onLoad }: Props) {
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     {loadingId === p.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
                     ) : (
                       <FolderOpen className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400 transition-colors" />
                     )}
                     <button
                       onClick={e => handleDelete(p, e)}
-                      disabled={deletingId === p.id}
-                      className="p-1 rounded hover:bg-zinc-600 text-zinc-500 hover:text-red-400 transition-colors"
+                      disabled={deletingId === p.id || loadingId !== null}
+                      className="p-1 rounded hover:bg-zinc-600 text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-30"
                       title="Delete project"
                     >
                       {deletingId === p.id
