@@ -7,8 +7,9 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
 import Report from "@/pages/report";
-import Studio from "@/pages/studio";
-import MixStudio from "@/pages/mix-studio";
+import Studio from "@/pages/mix-studio";
+import VoiceRemoval from "@/pages/voice-removal";
+import Mastering from "@/pages/mastering";
 import KernelDashboard from "@/pages/kernel";
 import Contact from "@/pages/contact";
 import DownloadPage from "@/pages/download";
@@ -25,7 +26,9 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/studio" component={Studio} />
-      <Route path="/mix" component={MixStudio} />
+      <Route path="/mix" component={Studio} />
+      <Route path="/voice-removal" component={VoiceRemoval} />
+      <Route path="/mastering" component={Mastering} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/report" component={Report} />
       <Route path="/kernel" component={KernelDashboard} />

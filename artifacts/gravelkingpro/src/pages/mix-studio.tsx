@@ -15,6 +15,7 @@ import { ProjectManager } from "@/components/daw/ProjectManager";
 import { RecordControls } from "@/components/daw/RecordControls";
 
 export default function MixStudio() {
+  const { isPro } = useAppState();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropId = useId();
@@ -78,7 +79,18 @@ export default function MixStudio() {
     addFiles(e.dataTransfer.files);
   }, [addFiles]);
 
-  if (!isPro) return <ProGate />;
+  if (!isPro) return (
+    <Layout>
+      <div className="max-w-lg mx-auto text-center space-y-4 py-20">
+        <div className="text-5xl">🎛️</div>
+        <h1 className="text-2xl font-bold">GravelKing Studio</h1>
+        <p className="text-muted-foreground text-sm">The full DAW — multi-track recording, stems, plugins, and mixing — is available on GravelKing Pro.</p>
+        <a href="/pricing" className="inline-block mt-2">
+          <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro</button>
+        </a>
+      </div>
+    </Layout>
+  );
 
   return (
     <Layout noPadding>
