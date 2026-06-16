@@ -4,7 +4,7 @@ import { useAppState, type SubscriptionTier } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, ArrowRight } from "lucide-react";
+import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, ArrowRight, PartyPopper } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -40,12 +40,33 @@ const STUDIO_FEATURES = [
   { label: "Priority support", highlight: "48-hour response guarantee" },
 ];
 
+type SuccessInfo = { planId: PlanId; planName: string; ctaLabel: string; ctaHref: string } | null;
+
+const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref: string }> = {
+  weekly: {
+    planName: "GravelKing Weekly",
+    ctaLabel: "Remove your first vocals",
+    ctaHref: "/voice-removal",
+  },
+  monthly: {
+    planName: "GravelKing Pro Plus",
+    ctaLabel: "Launch the Hardware Optimizer",
+    ctaHref: "/optimizer",
+  },
+  node_auditor: {
+    planName: "Node Auditor",
+    ctaLabel: "Open the Kernel dashboard",
+    ctaHref: "/kernel",
+  },
+};
+
 export default function Pricing() {
   const { tier, activePromo, redeemPromo, revokePromo, isLoadingSubscription, refreshSubscription } = useAppState();
   const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<SuccessInfo>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [location] = useLocation();
 
@@ -54,23 +75,24 @@ export default function Pricing() {
     const checkout = params.get("checkout");
 
     if (checkout === "success") {
-      const plan = params.get("plan");
-      refreshSubscription().then(() => {
-        if (plan === "monthly") {
-          toast({
-            title: "Pro Plus activated!",
-            description: "Launching the MLK V3.5 Hardware Optimizer for your device...",
-          });
-          window.history.replaceState({}, "", "/optimizer");
-          window.location.href = "/optimizer";
-          return;
-        }
-        toast({
-          title: "Subscription activated!",
-          description: "All features are now unlocked. Welcome aboard.",
-        });
-        window.history.replaceState({}, "", "/pricing");
-      }).catch(() => {});
+      const planParam = params.get("plan") as PlanId | null;
+      window.history.replaceState({}, "", "/pricing");
+      refreshSubscription().then(({ tier: freshTier }) => {
+        // Prefer the authoritative tier from the subscription status API.
+        // Fall back to the URL param (passed by the backend in success_url)
+        // in the rare case the webhook hasn't synced yet.
+        const resolvedId: PlanId =
+          freshTier && freshTier in PLAN_SUCCESS
+            ? (freshTier as PlanId)
+            : planParam && planParam in PLAN_SUCCESS
+              ? planParam
+              : "monthly";
+        setSuccessInfo({ planId: resolvedId, ...PLAN_SUCCESS[resolvedId] });
+      }).catch(() => {
+        const fallbackId: PlanId =
+          planParam && planParam in PLAN_SUCCESS ? planParam : "monthly";
+        setSuccessInfo({ planId: fallbackId, ...PLAN_SUCCESS[fallbackId] });
+      });
     } else if (checkout === "cancelled") {
       toast({ title: "Checkout cancelled", description: "No charge was made.", variant: "destructive" });
       window.history.replaceState({}, "", "/pricing");
@@ -129,6 +151,64 @@ export default function Pricing() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto py-12 px-4">
+
+        {/* Subscription success banner */}
+        <AnimatePresence>
+          {successInfo && (
+            <motion.div
+              key="success-banner"
+              initial={{ opacity: 0, y: -16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="mb-10 relative overflow-hidden border border-emerald-500/40 bg-emerald-500/[0.06] rounded-xl px-6 py-6 sm:px-8 sm:py-7"
+              data-testid="success-banner"
+            >
+              {/* Subtle glow */}
+              <div className="absolute inset-0 pointer-events-none rounded-xl ring-1 ring-emerald-500/20" />
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                {/* Icon */}
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                  <PartyPopper className="w-6 h-6 text-emerald-400" />
+                </div>
+
+                {/* Text */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-bold text-emerald-300 leading-snug">
+                    You're subscribed!
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    <span className="font-medium text-foreground">{successInfo.planName}</span> is now active — all features are unlocked and ready to use.
+                  </p>
+                </div>
+
+                {/* CTA */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <Button
+                    asChild
+                    className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold"
+                    data-testid="success-banner-cta"
+                  >
+                    <a href={successInfo.ctaHref}>
+                      {successInfo.ctaLabel}
+                      <ArrowRight className="w-4 h-4 ml-1.5" />
+                    </a>
+                  </Button>
+                  <button
+                    onClick={() => setSuccessInfo(null)}
+                    aria-label="Dismiss"
+                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    data-testid="success-banner-dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Sales headline — Fortune 500 proven pattern: problem → agitation → solution */}
         <div className="text-center mb-10">
           <motion.h1

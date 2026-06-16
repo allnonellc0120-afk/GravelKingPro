@@ -40,7 +40,7 @@ stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
 // Create Stripe Checkout Session — session-cookie based, no auth required
 stripeRouter.post('/checkout', async (req: Request, res: Response) => {
   try {
-    const { priceId } = req.body as { priceId?: string };
+    const { priceId, plan } = req.body as { priceId?: string; plan?: string };
 
     if (!priceId) {
       res.status(400).json({ error: 'priceId is required' });
@@ -74,7 +74,7 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${baseUrl}/pricing?checkout=success`,
+      success_url: `${baseUrl}/pricing?checkout=success${plan ? `&plan=${encodeURIComponent(plan)}` : ''}`,
       cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
       ...(isMonthly && { subscription_data: { trial_period_days: 3 } }),
     };

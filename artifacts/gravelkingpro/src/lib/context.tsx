@@ -31,7 +31,7 @@ interface AppState {
   plan: string | null;
   isLoadingSubscription: boolean;
   setTier: (tier: SubscriptionTier) => void;
-  refreshSubscription: () => Promise<void>;
+  refreshSubscription: () => Promise<{ tier: SubscriptionTier; plan: string | null }>;
   results: Results;
   setResults: (results: Results) => void;
   hasRun: boolean;
@@ -82,20 +82,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshSubscription = useCallback(async () => {
+  const refreshSubscription = useCallback(async (): Promise<{ tier: SubscriptionTier; plan: string | null }> => {
     try {
       setIsLoadingSubscription(true);
       const resp = await fetch("/api/subscription/status", { credentials: "include" });
       if (resp.ok) {
         const data = await resp.json() as { isPro: boolean; plan: string | null };
         setPlan(data.plan);
-        setUserTier(normalizePlan(data.plan));
+        const t = normalizePlan(data.plan);
+        setUserTier(t);
+        return { tier: t, plan: data.plan };
       }
     } catch {
       // Network error — leave tier as-is
     } finally {
       setIsLoadingSubscription(false);
     }
+    return { tier: null, plan: null };
   }, []);
 
   useEffect(() => {
