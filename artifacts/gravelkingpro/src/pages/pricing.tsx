@@ -4,7 +4,7 @@ import { useAppState, type SubscriptionTier } from "@/lib/context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, ArrowRight, PartyPopper } from "lucide-react";
+import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, ArrowRight, PartyPopper, Terminal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -67,8 +67,21 @@ export default function Pricing() {
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo>(null);
+  const [unseeded, setUnseeded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [location] = useLocation();
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    fetch("/api/stripe/products", { credentials: "include" })
+      .then((r) => r.json())
+      .then((body: { data?: unknown[]; warning?: string }) => {
+        if (body.warning ?? (Array.isArray(body.data) && body.data.length === 0)) {
+          setUnseeded(true);
+        }
+      })
+      .catch(() => { /* ignore — banner is dev-only best-effort */ });
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -151,6 +164,22 @@ export default function Pricing() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto py-12 px-4">
+
+        {/* Dev-only: Stripe products not seeded */}
+        {import.meta.env.DEV && unseeded && (
+          <div className="mb-8 flex items-start gap-3 border border-yellow-500/50 bg-yellow-500/[0.06] rounded-lg px-5 py-4" data-testid="unseeded-banner">
+            <Terminal className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-yellow-300">Stripe products not seeded</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                No active products were found in Stripe. Checkout buttons will not work until you seed the products.
+              </p>
+              <p className="mt-2 text-xs font-mono bg-black/30 border border-border/30 rounded px-3 py-1.5 text-yellow-200 inline-block select-all">
+                pnpm --filter @workspace/scripts run seed-products
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Subscription success banner */}
         <AnimatePresence>
