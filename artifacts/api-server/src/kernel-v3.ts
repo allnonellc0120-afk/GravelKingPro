@@ -14,63 +14,67 @@ export interface MLKv3Stats {
  * Extends gravelking_opt with 3-band parallel processing.
  */
 export function mlk_v3(
-  input: number[],
+  input: Float32Array,
   multiplier: number = 0.75,
   sliceSize: number = 2
-): { processed: number[]; stats: MLKv3Stats } {
+): { processed: Float32Array; stats: MLKv3Stats } {
   const N = input.length;
-  if (N === 0) return { processed: [], stats: { bands: 3, originalRMS: 0, outputRMS: 0, gainChange: 1, parity: "MLK_V3_VALIDATED" } };
+  if (N === 0) return { processed: new Float32Array(0), stats: { bands: 3, originalRMS: 0, outputRMS: 0, gainChange: 1, parity: "MLK_V3_VALIDATED" } };
 
   // ── Stage 1: Band extraction via simple FIR approximation ──────────────
-  const W_LOW = 16;   // low-band smoothing window
-  const W_MID = 4;    // mid-band smoothing window
+  const W_LOW = 16;
+  const W_MID = 4;
 
-  const lowBand: number[] = new Array(N);
+  const lowBand = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     let sum = 0, cnt = 0;
-    for (let j = Math.max(0, i - W_LOW); j <= Math.min(N - 1, i + W_LOW); j++) {
-      sum += input[j]; cnt++;
-    }
+    const lo = Math.max(0, i - W_LOW);
+    const hi = Math.min(N - 1, i + W_LOW);
+    for (let j = lo; j <= hi; j++) { sum += input[j]; cnt++; }
     lowBand[i] = sum / cnt;
   }
 
-  const highBand = input.map((s, i) => s - lowBand[i]);
+  const highBand = new Float32Array(N);
+  for (let i = 0; i < N; i++) highBand[i] = input[i] - lowBand[i];
 
-  const midBand: number[] = new Array(N);
+  const midBand = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     let sum = 0, cnt = 0;
-    for (let j = Math.max(0, i - W_MID); j <= Math.min(N - 1, i + W_MID); j++) {
-      sum += highBand[j]; cnt++;
-    }
+    const lo = Math.max(0, i - W_MID);
+    const hi = Math.min(N - 1, i + W_MID);
+    for (let j = lo; j <= hi; j++) { sum += highBand[j]; cnt++; }
     midBand[i] = sum / cnt;
   }
 
-  const detailBand = highBand.map((s, i) => s - midBand[i]);
+  const detailBand = new Float32Array(N);
+  for (let i = 0; i < N; i++) detailBand[i] = highBand[i] - midBand[i];
 
   // ── Stage 2: Per-band gravelking_opt carving ───────────────────────────
-  const lowMult   = Math.min(2.0, multiplier * 1.15);  // boost bass slightly
+  const lowMult   = Math.min(2.0, multiplier * 1.15);
   const midMult   = multiplier;
-  const highMult  = Math.max(0.1, multiplier * 0.80);  // gentle on highs
+  const highMult  = Math.max(0.1, multiplier * 0.80);
 
   const pLow    = gravelking_opt(lowBand,    lowMult,  sliceSize).processed;
   const pMid    = gravelking_opt(midBand,    midMult,  sliceSize).processed;
   const pDetail = gravelking_opt(detailBand, highMult, sliceSize).processed;
 
   // ── Stage 3: Phase-coherent recombination ─────────────────────────────
-  const combined = pLow.map((s, i) => s + (pMid[i] ?? 0) + (pDetail[i] ?? 0));
+  const combined = new Float32Array(N);
+  for (let i = 0; i < N; i++) combined[i] = pLow[i] + pMid[i] + pDetail[i];
 
   // ── Stage 4: Adaptive peak normalization (prevent clipping) ──────────
-  const peak = combined.reduce((m, v) => Math.max(m, Math.abs(v)), 1e-10);
+  let peak = 1e-10;
+  for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(combined[i]));
   const TARGET_PEAK = 0.92;
   const gain = peak > TARGET_PEAK ? TARGET_PEAK / peak : 1.0;
-  const processed = combined.map(s => s * gain);
+  const processed = new Float32Array(N);
+  for (let i = 0; i < N; i++) processed[i] = combined[i] * gain;
 
   // ── Stats ──────────────────────────────────────────────────────────────
-  const rmsOf = (arr: number[]) =>
-    Math.sqrt(arr.reduce((s, x) => s + x * x, 0) / (arr.length || 1));
-
-  const originalRMS = rmsOf(input);
-  const outputRMS   = rmsOf(processed);
+  let originalSum = 0, outputSum = 0;
+  for (let i = 0; i < N; i++) { originalSum += input[i] * input[i]; outputSum += processed[i] * processed[i]; }
+  const originalRMS = Math.sqrt(originalSum / N);
+  const outputRMS   = Math.sqrt(outputSum / N);
   const gainChange  = outputRMS / (originalRMS || 1e-10);
   const parity: MLKv3Stats["parity"] =
     isFinite(gainChange) && gainChange > 0 ? "MLK_V3_VALIDATED" : "MLK_V3_VIOLATION";
@@ -78,18 +82,19 @@ export function mlk_v3(
   return { processed, stats: { bands: 3, originalRMS, outputRMS, gainChange, parity } };
 }
 
-/** Convert a Node.js Buffer (pcm_s16le) to a float32 sample array */
-export function bufferToFloat32(buf: Buffer): number[] {
-  const out: number[] = [];
-  for (let i = 0; i + 1 < buf.length; i += 2) {
-    const s16 = buf.readInt16LE(i);
-    out.push(s16 / 32768);
+/** Convert a Node.js Buffer (pcm_s16le) to a Float32Array */
+export function bufferToFloat32(buf: Buffer): Float32Array {
+  const n = Math.floor(buf.length / 2);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const s16 = buf.readInt16LE(i * 2);
+    out[i] = s16 / 32768;
   }
   return out;
 }
 
-/** Convert a float32 sample array back to a pcm_s16le Buffer */
-export function float32ToBuffer(samples: number[]): Buffer {
+/** Convert a Float32Array back to a pcm_s16le Buffer */
+export function float32ToBuffer(samples: Float32Array): Buffer {
   const buf = Buffer.allocUnsafe(samples.length * 2);
   for (let i = 0; i < samples.length; i++) {
     const clamped = Math.max(-1, Math.min(1, samples[i]));

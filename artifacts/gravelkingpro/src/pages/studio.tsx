@@ -217,7 +217,9 @@ export default function Studio() {
   }, [plugins]);
 
   const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("audio/") && !file.type.startsWith("video/")) {
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    const isAudio = file.type.startsWith("audio/") || file.type.startsWith("video/") || ["mp3", "wav", "flac", "m4a", "aac", "ogg", "mov", "mp4"].includes(ext);
+    if (!isAudio) {
       toast({ title: "Invalid file", description: "Please upload an audio or video file (MP3, WAV, MP4, MOV, etc.)", variant: "destructive" });
       return;
     }
@@ -256,8 +258,20 @@ export default function Studio() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleProcess = async () => {
@@ -700,7 +714,8 @@ export default function Studio() {
             state === "idle" ? "border-border/50 hover:border-amber-500/40 bg-card/20" : "border-amber-500/30 bg-card/40"
           }`}
           onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
           onClick={() => state === "idle" && fileInputRef.current?.click()}
           data-testid="dropzone-audio"
         >
@@ -710,7 +725,11 @@ export default function Studio() {
               type="file"
               accept="audio/*,video/*"
               className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+                e.target.value = "";
+              }}
             />
             {state === "idle" && (
               <>

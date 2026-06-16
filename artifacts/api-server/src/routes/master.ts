@@ -15,7 +15,20 @@ import { applyMLKv3 } from "../kernel-v3";
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
 
 const execFileAsync = promisify(execFile);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "/tmp",
+    filename: (_req, file, cb) => {
+      cb(null, `gk_master_${randomUUID()}.${sanitizeExt(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+// Clean up uploaded file after processing
+async function cleanupUpload(path: string | undefined) {
+  if (path) await unlink(path).catch(() => {});
+}
 const masterRouter = Router();
 
 const masterRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
@@ -137,16 +150,12 @@ masterRouter.post(
       isSample = usedMaster >= FREE_LIMITS.freeMasterDownloads;
     }
 
-    const id = randomUUID();
-    const ext = sanitizeExt(req.file.originalname);
-    const inPath = `/tmp/gk_master_in_${id}.${ext}`;
-    const outPath = `/tmp/gk_master_out_${id}.wav`;
+    const filePath = req.file.path;
+    const outPath = `/tmp/gk_master_out_${randomUUID()}.wav`;
 
     try {
-      await writeFile(inPath, req.file.buffer);
-
-      // Duration guard (probe from the already-written file to avoid a second write)
-      const duration = await probeFileDuration(inPath);
+      // Duration guard
+      const duration = await probeFileDuration(filePath);
       if (duration > MAX_AUDIO_DURATION_S) {
         res.status(422).json({
           success: false,
@@ -158,7 +167,7 @@ masterRouter.post(
       const filterChain = denoise ? `${DENOISE_FILTER},${preset.filter}` : preset.filter;
       const ffmpegArgs = [
         "-y",
-        "-i", inPath,
+        "-i", filePath,
         ...(isSample ? ["-t", "30"] : []),
         "-af", filterChain,
         "-acodec", "pcm_s16le",
@@ -204,7 +213,7 @@ masterRouter.post(
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });
     } finally {
       await Promise.all([
-        unlink(inPath).catch(() => {}),
+        unlink(filePath).catch(() => {}),
         unlink(outPath).catch(() => {}),
       ]);
     }

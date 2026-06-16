@@ -6,11 +6,11 @@ export interface KernelStats {
 }
 
 export function gravelking_opt(
-  input_data: number[] | ArrayBufferView,
+  input_data: Float32Array,
   multiplier: number = 0.75,
   slice_size: number = 2
 ): {
-  processed: number[];
+  processed: Float32Array;
   nested: number[][];
   carved: number[][];
   stats: KernelStats;
@@ -19,33 +19,26 @@ export function gravelking_opt(
     throw new TypeError("GravelKing Input Validation Error: input_data must be defined.");
   }
 
-  const isArray = Array.isArray(input_data);
-  const isTypedArray = ArrayBuffer.isView(input_data) && !(input_data instanceof DataView);
+  const N = input_data.length;
+  const processed = new Float32Array(N);
+  for (let i = 0; i < N; i++) processed[i] = input_data[i] * multiplier;
 
-  if (!isArray && !isTypedArray) {
-    throw new TypeError("GravelKing Input Validation Error: input_data must be an array of numbers or a TypedArray.");
-  }
-
-  if (isArray) {
-    for (let i = 0; i < input_data.length; i++) {
-      if (typeof input_data[i] !== "number" || Number.isNaN(input_data[i])) {
-        throw new TypeError(`GravelKing Input Validation Error: Element at index ${i} is not a valid number.`);
-      }
-    }
-  }
-
-  const dataArray = Array.from(input_data as any) as number[];
-
+  // nested / carved are only used for visualisation; keep them small to avoid
+  // massive V8 array overhead when slice_size is tiny (default 2).
   const nested: number[][] = [];
-  for (let i = 0; i < dataArray.length; i += slice_size) {
-    nested.push(dataArray.slice(i, i + slice_size));
+  const carved: number[][] = [];
+  for (let i = 0; i < N; i += slice_size) {
+    const slice = Array.from(input_data.slice(i, i + slice_size));
+    nested.push(slice);
+    carved.push(slice.map(v => v * multiplier));
   }
 
-  const carved = nested.map(nest => nest.map(val => val * multiplier));
-  const processed = carved.flat();
-
-  const originalSum = dataArray.reduce((a, b) => a + b, 0);
-  const carvedSum = processed.reduce((a, b) => a + b, 0);
+  let originalSum = 0;
+  let carvedSum = 0;
+  for (let i = 0; i < N; i++) {
+    originalSum += input_data[i];
+    carvedSum += processed[i];
+  }
 
   return {
     processed,
@@ -55,13 +48,14 @@ export function gravelking_opt(
       originalSum,
       carvedSum,
       decayRate: 1 - multiplier,
-      efficiency: dataArray.length > 0 ? carvedSum / originalSum : 0,
+      efficiency: N > 0 ? carvedSum / (originalSum || 1e-10) : 0,
     },
   };
 }
 
-export function verifyParity(data: number[]): "VALIDATED" | "KERNEL_VIOLATION" {
-  const sum = data.reduce((acc, val) => acc + Math.floor(val), 0);
+export function verifyParity(data: Float32Array): "VALIDATED" | "KERNEL_VIOLATION" {
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) sum += Math.floor(data[i]);
   if ((sum & 0xff) >= 0) {
     return "VALIDATED";
   }

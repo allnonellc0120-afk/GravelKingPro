@@ -15,12 +15,20 @@ import {
 } from "../gkp-separator";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
-import { probeAudioDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
+import { probeAudioDuration, probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio, hasUnlimitedSplits, resolveTier } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS, type UsageField } from "../lib/usage";
 
 const execFileAsync = promisify(execFile);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "/tmp",
+    filename: (_req, file, cb) => {
+      cb(null, `gk_audio_${randomUUID()}.${sanitizeExt(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 },
+});
 const audioRouter = Router();
 
 const audioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
@@ -29,14 +37,11 @@ const audioConcurrency = concurrencyLimit(3);
 type ProcessMode = "standard" | "voice_remove" | "stem_split";
 
 // ── Audio helpers ─────────────────────────────────────────────────────────────
-async function getAudioInfo(inputBuf: Buffer, ext: string): Promise<{ sampleRate: number; channels: number }> {
-  const id = randomUUID();
-  const inPath = `/tmp/gk_probe_${id}.${ext}`;
-  await writeFile(inPath, inputBuf);
+async function getAudioInfo(filePath: string): Promise<{ sampleRate: number; channels: number }> {
   let sampleRate = 44100;
   let channels = 2;
   try {
-    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", inPath], { timeout: 10_000 });
+    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", filePath], { timeout: 10_000 });
     const info = JSON.parse(stdout);
     const stream = info.streams?.find((s: any) => s.codec_type === "audio");
     if (stream) {
@@ -44,45 +49,7 @@ async function getAudioInfo(inputBuf: Buffer, ext: string): Promise<{ sampleRate
       channels = parseInt(stream.channels) || 2;
     }
   } catch { /* use defaults */ }
-  await unlink(inPath).catch(() => {});
   return { sampleRate, channels };
-}
-
-async function decodeToFloat32(inputBuf: Buffer, ext: string): Promise<{ samples: Float32Array; sampleRate: number }> {
-  const id = randomUUID();
-  const inPath = `/tmp/gk_in_${id}.${ext}`;
-  const outPath = `/tmp/gk_pcm_${id}.raw`;
-
-  await writeFile(inPath, inputBuf);
-
-  let sampleRate = 44100;
-  try {
-    const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", inPath], { timeout: 10_000 });
-    const info = JSON.parse(stdout);
-    const stream = info.streams?.find((s: any) => s.codec_type === "audio");
-    if (stream) sampleRate = parseInt(stream.sample_rate) || 44100;
-  } catch { /* use defaults */ }
-
-  await execFileAsync("ffmpeg", ["-y", "-i", inPath, "-f", "f32le", "-ac", "1", "-ar", String(sampleRate), "-acodec", "pcm_f32le", outPath], { timeout: 120_000 });
-  const rawBuf = await readFile(outPath);
-  const samples = new Float32Array(rawBuf.buffer, rawBuf.byteOffset, rawBuf.byteLength / 4);
-
-  await unlink(inPath).catch(() => {});
-  await unlink(outPath).catch(() => {});
-  return { samples: new Float32Array(samples), sampleRate };
-}
-
-async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<Buffer> {
-  const id = randomUUID();
-  const inPath = `/tmp/gk_processed_${id}.raw`;
-  const outPath = `/tmp/gk_out_${id}.wav`;
-
-  await writeFile(inPath, Buffer.from(samples.buffer));
-  await execFileAsync("ffmpeg", ["-y", "-f", "f32le", "-ar", String(sampleRate), "-ac", "1", "-i", inPath, "-acodec", "pcm_s16le", outPath], { timeout: 120_000 });
-  const wavBuf = await readFile(outPath);
-  await unlink(inPath).catch(() => {});
-  await unlink(outPath).catch(() => {});
-  return wavBuf;
 }
 
 /**
@@ -90,15 +57,12 @@ async function encodeToWav(samples: Float32Array, sampleRate: number): Promise<B
  * Streams entirely on disk; handles any file size without OOM.
  */
 async function processWithMLKv3Ffmpeg(
-  inputBuf: Buffer,
+  filePath: string,
   ext: string,
   multiplier: number,
 ): Promise<{ wavBuffer: Buffer; parity: string; efficiency: string; decayRate: string; sampleCount: number }> {
   const id = randomUUID();
-  const inPath = `/tmp/gk_mlk_in_${id}.${ext}`;
   const outPath = `/tmp/gk_mlk_out_${id}.wav`;
-
-  await writeFile(inPath, inputBuf);
 
   // Per-band multipliers match mlk_v3 JS implementation:
   //   low:  multiplier * 1.15  (capped at 2.0)
@@ -121,7 +85,7 @@ async function processWithMLKv3Ffmpeg(
 
   try {
     await execFileAsync("ffmpeg", [
-      "-y", "-i", inPath,
+      "-y", "-i", filePath,
       "-filter_complex", filter,
       "-ac", "2",
       "-acodec", "pcm_s16le",
@@ -136,46 +100,53 @@ async function processWithMLKv3Ffmpeg(
 
     return { wavBuffer, parity, efficiency, decayRate, sampleCount };
   } finally {
-    await unlink(inPath).catch(() => {});
     await unlink(outPath).catch(() => {});
   }
 }
 
 /** Apply rubberband tempo/pitch shift as a post-processing step. */
-async function applyTempoAndPitch(inputBuf: Buffer, tempo: number, semitones: number): Promise<Buffer> {
-  if (Math.abs(tempo - 1.0) < 0.01 && Math.abs(semitones) < 0.1) return inputBuf;
+async function applyTempoAndPitch(filePathOrBuf: string | Buffer, tempo: number, semitones: number): Promise<Buffer> {
+  if (Math.abs(tempo - 1.0) < 0.01 && Math.abs(semitones) < 0.1) {
+    if (typeof filePathOrBuf === "string") return readFile(filePathOrBuf);
+    return filePathOrBuf;
+  }
   const pitchRatio = Math.pow(2, semitones / 12);
   const filter = `rubberband=tempo=${tempo.toFixed(3)}:pitch=${pitchRatio.toFixed(4)}`;
-  return processWithFilter(inputBuf, "wav", filter, 2);
+  if (typeof filePathOrBuf === "string") return processWithFilter(filePathOrBuf, filter, 2);
+  const id = randomUUID();
+  const inPath = `/tmp/gk_tap_in_${id}.wav`;
+  await writeFile(inPath, filePathOrBuf);
+  try {
+    return await processWithFilter(inPath, filter, 2);
+  } finally {
+    await unlink(inPath).catch(() => {});
+  }
 }
 
 /** Apply an ffmpeg audio filter directly to a file and return a WAV buffer. */
 async function processWithFilter(
-  inputBuf: Buffer,
-  ext: string,
+  filePath: string,
   filter: string,
   outputChannels: number = 2
 ): Promise<Buffer> {
   const id = randomUUID();
-  const inPath = `/tmp/gk_flt_in_${id}.${ext}`;
   const outPath = `/tmp/gk_flt_out_${id}.wav`;
-
-  await writeFile(inPath, inputBuf);
-  await execFileAsync("ffmpeg", [
-    "-y", "-i", inPath,
-    "-af", filter,
-    "-ac", String(outputChannels),
-    "-acodec", "pcm_s16le",
-    outPath,
-  ], { timeout: 120_000 });
-  const wavBuf = await readFile(outPath);
-  await unlink(inPath).catch(() => {});
-  await unlink(outPath).catch(() => {});
-  return wavBuf;
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y", "-i", filePath,
+      "-af", filter,
+      "-ac", String(outputChannels),
+      "-acodec", "pcm_s16le",
+      outPath,
+    ], { timeout: 120_000 });
+    return await readFile(outPath);
+  } finally {
+    await unlink(outPath).catch(() => {});
+  }
 }
 
 /** Split audio into frequency-band stems and return a ZIP buffer. */
-async function buildStemsZip(inputBuf: Buffer, ext: string, channels: number): Promise<Buffer> {
+async function buildStemsZip(filePath: string, channels: number): Promise<Buffer> {
   const stems: Array<{ name: string; filter: string; ch: number }> = [
     { name: "bass.wav",        filter: "lowpass=f=250",                      ch: channels },
     { name: "midrange.wav",    filter: "highpass=f=250,lowpass=f=4000",       ch: channels },
@@ -188,7 +159,7 @@ async function buildStemsZip(inputBuf: Buffer, ext: string, channels: number): P
 
   const wavFiles = await Promise.all(
     stems.map(async (s) => {
-      const buf = await processWithFilter(inputBuf, ext, s.filter, s.ch);
+      const buf = await processWithFilter(filePath, s.filter, s.ch);
       return { name: s.name, buf };
     })
   );
@@ -260,6 +231,7 @@ audioRouter.post(
       return;
     }
 
+    const filePath = req.file.path;
     const ext = sanitizeExt(req.file.originalname);
     const multiplier = parseFloat((req.body.multiplier as string) ?? "0.75");
     const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
@@ -268,8 +240,9 @@ audioRouter.post(
     const semitones = Math.min(12, Math.max(-12, parseFloat((req.body.semitones as string) ?? "0")));
 
     // ── Duration guard ──────────────────────────────────────────────────────────
-    const duration = await probeAudioDuration(req.file.buffer, ext);
+    const duration = await probeFileDuration(filePath);
     if (duration > MAX_AUDIO_DURATION_S) {
+      await unlink(filePath).catch(() => {});
       res.status(422).json({
         success: false,
         error: `Audio exceeds the maximum allowed duration of ${Math.floor(MAX_AUDIO_DURATION_S / 60)} minutes.`,
@@ -334,13 +307,16 @@ audioRouter.post(
         // raw audio there could return a non-separated mix. We separate locally
         // and carve the instrumental with the MLK v3 kernel — fast, in-process,
         // and always completes (no neural net to stall at "88%").
-        const { channels } = await getAudioInfo(req.file.buffer, ext);
-        const mlk = await mlkVocalRemoval(req.file.buffer, ext, channels, multiplier);
+        const { channels } = await getAudioInfo(filePath);
+        const mlk = await mlkVocalRemoval(filePath, ext, channels, multiplier);
         const instrumentalBuf = mlk.instrumental;
         const kernelParity = mlk.kernelParity;
         const routing = "local";
         const stack = mlk.stack;
         let wavBuffer = await applyTempoAndPitch(instrumentalBuf, tempo, semitones);
+
+        // Cleanup uploaded file after processing
+        await unlink(filePath).catch(() => {});
 
         const event: TelemetryEvent = {
           routing,
@@ -410,6 +386,7 @@ audioRouter.post(
         }
         return;
       } catch (err: any) {
+        await unlink(filePath).catch(() => {});
         res.status(500).json({ success: false, error: err.message });
         return;
       }
@@ -419,8 +396,8 @@ audioRouter.post(
     if (mode === "stem_split") {
       try {
         // Fast in-process MLK v3 band/spatial split — completes in seconds.
-        const { channels } = await getAudioInfo(req.file.buffer, ext);
-        const mlkResult = await mlkStemSplit(req.file.buffer, ext, channels, multiplier);
+        const { channels } = await getAudioInfo(filePath);
+        const mlkResult = await mlkStemSplit(filePath, ext, channels, multiplier);
 
         const event: TelemetryEvent = {
           routing: "local",
@@ -463,6 +440,7 @@ audioRouter.post(
         res.send(mlkResult.zipBuffer);
         return;
       } catch (err: any) {
+        await unlink(filePath).catch(() => {});
         res.status(500).json({ success: false, error: err.message });
         return;
       }
@@ -481,7 +459,10 @@ audioRouter.post(
     // ── Standard mode: MLK v3 via ffmpeg (local only, no external routing) ────
     try {
       const { wavBuffer, parity, efficiency, decayRate, sampleCount } =
-        await processWithMLKv3Ffmpeg(req.file.buffer, ext, multiplier);
+        await processWithMLKv3Ffmpeg(filePath, ext, multiplier);
+
+      // Cleanup uploaded file after processing
+      await unlink(filePath).catch(() => {});
 
       const event: TelemetryEvent = {
         routing: "local",
@@ -515,6 +496,7 @@ audioRouter.post(
       res.setHeader("X-GK-Kernel", "MLK_v3");
       res.send(wavBuffer);
     } catch (err: any) {
+      await unlink(filePath).catch(() => {});
       res.status(500).json({ success: false, error: err.message });
     }
   }
