@@ -5,7 +5,8 @@ import { promisify } from "util";
 import { writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
-import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
+import { telemetryBus, type TelemetryEvent, type RemoteAlertEvent } from "../lib/telemetry";
+import { isValidWav } from "../kernel-v3";
 import { db, processRunsTable } from "@workspace/db";
 import {
   mlkVocalRemoval,
@@ -109,13 +110,14 @@ async function processWithMLKv3Ffmpeg(
   const highMult = Math.max(0.1, multiplier * 0.80).toFixed(4);
 
   // 3-band split → per-band volume → recombine → normalize
+  // dynaudnorm is chained with , (not ;) so it receives the amix output directly.
+  // Using ; would give dynaudnorm no labeled input and ffmpeg rejects the graph.
   const filter = [
     `asplit=3[low][mid][high]`,
     `[low]lowpass=f=250,volume=${lowMult}[l]`,
     `[mid]highpass=f=250,lowpass=f=4000,volume=${midMult}[m]`,
     `[high]highpass=f=4000,volume=${highMult}[h]`,
-    `[l][m][h]amix=inputs=3:normalize=0`,
-    `dynaudnorm=p=0.9:m=10:s=5`,
+    `[l][m][h]amix=inputs=3:normalize=0,dynaudnorm=p=0.9:m=10:s=5`,
   ].join(";");
 
   try {
@@ -198,6 +200,78 @@ async function buildStemsZip(inputBuf: Buffer, ext: string, channels: number): P
   }
 
   return Buffer.from(zipSync(zipInput));
+}
+
+// ── Remote kernel helper ──────────────────────────────────────────────────────
+/**
+ * Attempt to forward a standard-mode audio processing request to the remote
+ * kernel at REMOTE_KERNEL_URL. Returns the raw WAV buffer on success, or null
+ * on any failure (network error, non-ok status, wrong content-type, invalid
+ * WAV). Every failure path emits a `remote_alert` event on telemetryBus so the
+ * observability layer can track regression in each rejection category.
+ */
+async function tryRemoteKernel(
+  fileBuf: Buffer,
+  originalname: string,
+  multiplier: number,
+  remoteUrl: string,
+): Promise<{ buf: Buffer; remoteHeaders: Headers } | null> {
+  function emitAlert(reason: RemoteAlertEvent["reason"], detail?: string): void {
+    const event: RemoteAlertEvent = {
+      reason,
+      remoteUrl,
+      detail,
+      timestamp: new Date().toISOString(),
+    };
+    telemetryBus.emit("remote_alert", event);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+
+  let remoteRes: globalThis.Response;
+  try {
+    const fd = new FormData();
+    fd.append("mode", "standard");
+    fd.append("multiplier", String(multiplier));
+    fd.append(
+      "audio",
+      new Blob(
+        [fileBuf.buffer.slice(fileBuf.byteOffset, fileBuf.byteOffset + fileBuf.byteLength) as ArrayBuffer],
+        { type: "audio/wav" },
+      ),
+      originalname,
+    );
+    remoteRes = await fetch(`${remoteUrl}/process-audio`, {
+      method: "POST",
+      body: fd,
+      signal: controller.signal,
+    });
+  } catch (err: unknown) {
+    emitAlert("request_failed", String(err));
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!remoteRes.ok) {
+    emitAlert("non_ok_status", `HTTP ${remoteRes.status}`);
+    return null;
+  }
+
+  const ct = remoteRes.headers.get("content-type") ?? "";
+  if (!ct.startsWith("audio/")) {
+    emitAlert("wrong_content_type", ct);
+    return null;
+  }
+
+  const buf = Buffer.from(await remoteRes.arrayBuffer());
+  if (!isValidWav(buf)) {
+    emitAlert("invalid_wav", `${buf.length} bytes`);
+    return null;
+  }
+
+  return { buf, remoteHeaders: remoteRes.headers };
 }
 
 // ── Telemetry SSE endpoint ────────────────────────────────────────────────────
@@ -477,8 +551,44 @@ audioRouter.post(
       return;
     }
 
-    // ── Standard mode: MLK v3 via ffmpeg (streaming, no in-process RAM spike) ──
+    // ── Standard mode: try remote kernel first, fall back to local MLK v3 ────
     try {
+      const remoteUrl = process.env.REMOTE_KERNEL_URL;
+      if (remoteUrl) {
+        const remote = await tryRemoteKernel(
+          req.file.buffer,
+          req.file.originalname,
+          multiplier,
+          remoteUrl,
+        );
+        if (remote) {
+          // Remote succeeded — propagate X-GK-* headers and return its output.
+          const parity = remote.remoteHeaders.get("x-gk-parity") ?? "VALIDATED_REMOTE";
+          const event: TelemetryEvent = {
+            routing: "remote",
+            parity,
+            efficiency: remote.remoteHeaders.get("x-gk-efficiency") ?? "1.0000",
+            decayRate: remote.remoteHeaders.get("x-gk-decay-rate") ?? "0.0000",
+            sampleCount: String(Math.floor((remote.buf.length - 44) / 2)),
+            timestamp: new Date().toISOString(),
+            remoteUrl,
+          };
+          telemetryBus.emit("run", event);
+
+          res.setHeader("Content-Type", "audio/wav");
+          res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
+          res.setHeader("X-GK-Routing", "remote");
+          res.setHeader("X-GK-Kernel", "MLK_v3");
+          remote.remoteHeaders.forEach((v, k) => {
+            if (k.toLowerCase().startsWith("x-gk-")) res.setHeader(k, v);
+          });
+          res.send(remote.buf);
+          return;
+        }
+        // Remote rejected — fall through to local.
+      }
+
+      // ── Local fallback: MLK v3 via ffmpeg (streaming, no in-process RAM spike) ──
       const { wavBuffer, parity, efficiency, decayRate, sampleCount } =
         await processWithMLKv3Ffmpeg(req.file.buffer, ext, multiplier);
 

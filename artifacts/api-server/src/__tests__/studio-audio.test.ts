@@ -8,7 +8,10 @@
  *   - studio-mix combined-duration guard             → HTTP 422
  *   - both endpoints with no session                 → 403 STUDIO_REQUIRED
  *   - remote-branch contract (controllable mock)     → remote routing + MLK_v3 + decodable WAV
- *   - remote returns non-WAV "audio/*"               → falls back to local, still MLK_v3 + decodable
+ *   - remote returns invalid WAV bytes (audio/wav)   → local fallback + remote_alert(invalid_wav)
+ *   - remote returns HTTP 5xx                        → local fallback + remote_alert(non_ok_status)
+ *   - remote returns wrong content-type              → local fallback + remote_alert(wrong_content_type)
+ *   - remote is unreachable (network error)          → local fallback + remote_alert(request_failed)
  *
  * The remote real kernel is offline in dev, so the remote branch is exercised against
  * an in-process mock by toggling REMOTE_KERNEL_URL at runtime (getRemoteUrl reads
@@ -24,6 +27,8 @@ import type { AddressInfo } from "node:net";
 
 import app from "../app";
 import { isValidWav } from "../kernel-v3";
+import { telemetryBus } from "../lib/telemetry";
+import type { RemoteAlertEvent } from "../lib/telemetry";
 import { db, usersTable, sessionsTable, processRunsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -105,6 +110,24 @@ function buildForm(fields: Record<string, string>, files: Array<{ field: string;
   return fd;
 }
 
+/**
+ * Wait for the next `remote_alert` event on the telemetry bus.
+ * Rejects if the event doesn't fire within `timeoutMs`.
+ */
+function nextRemoteAlert(timeoutMs = 10_000): Promise<RemoteAlertEvent> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      telemetryBus.off("remote_alert", onAlert);
+      reject(new Error(`remote_alert event not received within ${timeoutMs}ms`));
+    }, timeoutMs);
+    const onAlert = (ev: RemoteAlertEvent) => {
+      clearTimeout(timer);
+      resolve(ev);
+    };
+    telemetryBus.once("remote_alert", onAlert);
+  });
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main(): Promise<void> {
   // Take full control of remote routing in-process (real remote is offline in dev).
@@ -115,11 +138,22 @@ async function main(): Promise<void> {
   const sid = randomBytes(32).toString("hex");
 
   // Mock remote kernel — behavior switched via a mutable flag.
-  let remoteMode: "valid" | "invalid" = "valid";
+  type RemoteMode = "valid" | "invalid" | "http_error" | "wrong_content_type";
+  let remoteMode: RemoteMode = "valid";
   let remoteWav: Buffer = Buffer.alloc(0);
   const mockRemote = http.createServer((req, res) => {
     req.resume();
     req.on("end", () => {
+      if (remoteMode === "http_error") {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "service unavailable" }));
+        return;
+      }
+      if (remoteMode === "wrong_content_type") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ result: "not audio" }));
+        return;
+      }
       if (remoteMode === "invalid") {
         res.writeHead(200, { "Content-Type": "audio/wav" });
         res.end(Buffer.from("this is definitely not a wav payload"));
@@ -258,12 +292,13 @@ async function main(): Promise<void> {
       }
     }
 
-    // ── 6. Remote returns non-WAV "audio/*" → local fallback ───────────────────
-    console.log("\n[6] Remote returns non-WAV audio → falls back to local MLK_v3");
+    // ── 6. Remote returns invalid WAV bytes (audio/wav content-type) ──────────
+    console.log("\n[6] Remote returns non-WAV audio → falls back to local MLK_v3 + remote_alert(invalid_wav)");
     {
       remoteMode = "invalid";
       process.env.REMOTE_KERNEL_URL = mockUrl;
       try {
+        const alertP = nextRemoteAlert();
         const res = await fetch(`${base}/api/kernel/process-audio`, {
           method: "POST",
           headers: auth,
@@ -271,11 +306,114 @@ async function main(): Promise<void> {
             { field: "audio", name: "in.wav", type: "audio/wav", buf: stereoWav },
           ]),
         });
-        check("remote-fallback: HTTP 200", res.status === 200, `got ${res.status}`);
-        check("remote-fallback: routed local", res.headers.get("x-gk-routing") === "local", String(res.headers.get("x-gk-routing")));
-        check("remote-fallback: X-GK-Kernel = MLK_v3", res.headers.get("x-gk-kernel") === "MLK_v3", String(res.headers.get("x-gk-kernel")));
+        check("remote-invalid-wav: HTTP 200", res.status === 200, `got ${res.status}`);
+        check("remote-invalid-wav: routed local", res.headers.get("x-gk-routing") === "local", String(res.headers.get("x-gk-routing")));
+        check("remote-invalid-wav: X-GK-Kernel = MLK_v3", res.headers.get("x-gk-kernel") === "MLK_v3", String(res.headers.get("x-gk-kernel")));
         const buf = Buffer.from(await res.arrayBuffer());
-        await assertDecodableWav("remote-fallback", buf);
+        await assertDecodableWav("remote-invalid-wav", buf);
+
+        const alert = await alertP;
+        check("remote-invalid-wav: remote_alert fired", !!alert, JSON.stringify(alert));
+        check("remote-invalid-wav: alert.reason = invalid_wav", alert.reason === "invalid_wav", `got "${alert.reason}"`);
+        check("remote-invalid-wav: alert.remoteUrl set", alert.remoteUrl === mockUrl, `got "${alert.remoteUrl}"`);
+      } finally {
+        delete process.env.REMOTE_KERNEL_URL;
+      }
+    }
+
+    // ── 7. Remote returns HTTP 5xx → local fallback + remote_alert(non_ok_status) ─
+    console.log("\n[7] Remote returns HTTP 5xx → falls back to local MLK_v3 + remote_alert(non_ok_status)");
+    {
+      remoteMode = "http_error";
+      process.env.REMOTE_KERNEL_URL = mockUrl;
+      try {
+        const alertP = nextRemoteAlert();
+        const res = await fetch(`${base}/api/kernel/process-audio`, {
+          method: "POST",
+          headers: auth,
+          body: buildForm({ mode: "standard" }, [
+            { field: "audio", name: "in.wav", type: "audio/wav", buf: stereoWav },
+          ]),
+        });
+        check("remote-5xx: HTTP 200", res.status === 200, `got ${res.status}`);
+        check("remote-5xx: routed local", res.headers.get("x-gk-routing") === "local", String(res.headers.get("x-gk-routing")));
+        check("remote-5xx: X-GK-Kernel = MLK_v3", res.headers.get("x-gk-kernel") === "MLK_v3", String(res.headers.get("x-gk-kernel")));
+        const buf = Buffer.from(await res.arrayBuffer());
+        await assertDecodableWav("remote-5xx", buf);
+
+        const alert = await alertP;
+        check("remote-5xx: remote_alert fired", !!alert, JSON.stringify(alert));
+        check("remote-5xx: alert.reason = non_ok_status", alert.reason === "non_ok_status", `got "${alert.reason}"`);
+        check("remote-5xx: alert.detail contains HTTP 503", (alert.detail ?? "").includes("503"), `detail="${alert.detail}"`);
+      } finally {
+        delete process.env.REMOTE_KERNEL_URL;
+      }
+    }
+
+    // ── 8. Remote returns wrong content-type (200 OK, application/json) ────────
+    console.log("\n[8] Remote returns wrong content-type → local fallback + remote_alert(wrong_content_type)");
+    {
+      remoteMode = "wrong_content_type";
+      process.env.REMOTE_KERNEL_URL = mockUrl;
+      try {
+        const alertP = nextRemoteAlert();
+        const res = await fetch(`${base}/api/kernel/process-audio`, {
+          method: "POST",
+          headers: auth,
+          body: buildForm({ mode: "standard" }, [
+            { field: "audio", name: "in.wav", type: "audio/wav", buf: stereoWav },
+          ]),
+        });
+        check("remote-wrong-ct: HTTP 200", res.status === 200, `got ${res.status}`);
+        check("remote-wrong-ct: routed local", res.headers.get("x-gk-routing") === "local", String(res.headers.get("x-gk-routing")));
+        check("remote-wrong-ct: X-GK-Kernel = MLK_v3", res.headers.get("x-gk-kernel") === "MLK_v3", String(res.headers.get("x-gk-kernel")));
+        const buf = Buffer.from(await res.arrayBuffer());
+        await assertDecodableWav("remote-wrong-ct", buf);
+
+        const alert = await alertP;
+        check("remote-wrong-ct: remote_alert fired", !!alert, JSON.stringify(alert));
+        check("remote-wrong-ct: alert.reason = wrong_content_type", alert.reason === "wrong_content_type", `got "${alert.reason}"`);
+        check("remote-wrong-ct: alert.detail contains content-type", (alert.detail ?? "").includes("application/json"), `detail="${alert.detail}"`);
+      } finally {
+        delete process.env.REMOTE_KERNEL_URL;
+      }
+    }
+
+    // ── 9. Remote is unreachable (request_failed / network error) ──────────────
+    // Port 1 on loopback produces an immediate ECONNREFUSED — a clean proxy for
+    // a dead host without any actual network traffic or sleep.
+    console.log("\n[9] Remote is unreachable → local fallback + remote_alert(request_failed)");
+    {
+      // Find a port that's guaranteed to refuse by binding then closing a server
+      // so the OS reclaims the port — simpler than depending on port 1 being closed.
+      const deadPort = await new Promise<number>((resolve) => {
+        const probe = http.createServer();
+        probe.listen(0, "127.0.0.1", () => {
+          const p = (probe.address() as AddressInfo).port;
+          probe.close(() => resolve(p));
+        });
+      });
+      const deadUrl = `http://127.0.0.1:${deadPort}`;
+
+      process.env.REMOTE_KERNEL_URL = deadUrl;
+      try {
+        const alertP = nextRemoteAlert();
+        const res = await fetch(`${base}/api/kernel/process-audio`, {
+          method: "POST",
+          headers: auth,
+          body: buildForm({ mode: "standard" }, [
+            { field: "audio", name: "in.wav", type: "audio/wav", buf: stereoWav },
+          ]),
+        });
+        check("remote-unreachable: HTTP 200", res.status === 200, `got ${res.status}`);
+        check("remote-unreachable: routed local", res.headers.get("x-gk-routing") === "local", String(res.headers.get("x-gk-routing")));
+        check("remote-unreachable: X-GK-Kernel = MLK_v3", res.headers.get("x-gk-kernel") === "MLK_v3", String(res.headers.get("x-gk-kernel")));
+        const buf = Buffer.from(await res.arrayBuffer());
+        await assertDecodableWav("remote-unreachable", buf);
+
+        const alert = await alertP;
+        check("remote-unreachable: remote_alert fired", !!alert, JSON.stringify(alert));
+        check("remote-unreachable: alert.reason = request_failed", alert.reason === "request_failed", `got "${alert.reason}"`);
       } finally {
         delete process.env.REMOTE_KERNEL_URL;
       }
