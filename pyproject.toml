@@ -7,5 +7,4 @@ dependencies = [
     "numpy>=2.0",
     "scipy>=1.10",
     "psutil>=5.9",
-    "audio-separator>=0.12",
 ]
