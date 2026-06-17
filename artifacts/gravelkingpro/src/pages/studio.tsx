@@ -85,7 +85,7 @@ const STEM_LABELS: Record<string, { label: string; color: string; description: s
 const STEM_ORDER = ["GKP_vocals.wav", "GKP_drums.wav", "GKP_bass.wav", "GKP_other.wav", "GKP_instrumental.wav"];
 
 type UsageRemaining = { voice_remove: number; stem_split: number; master: number };
-type PaywallInfo = { feature: ProcessMode; limit: number; used: number; message: string };
+type PaywallInfo = { feature: ProcessMode; limit: number; used: number; message: string; code?: string };
 
 export default function Studio() {
   const { isPro, hasSplits } = useAppState();
@@ -135,12 +135,17 @@ export default function Studio() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isSampleResult, setIsSampleResult] = useState(false);
   const [playingStem, setPlayingStem] = useState<string | null>(null);
+  const [isPlayingMix, setIsPlayingMix] = useState(false);
   const [abMode, setAbMode] = useState<"original" | "processed">("original");
   const [showPlugins, setShowPlugins] = useState(false);
   const [plugins, setPlugins] = useState<PluginState>(DEFAULT_PLUGIN_STATE);
+  // Per-stem session controls: mute suppresses a stem from playback; solo isolates it
+  const [mutedStems, setMutedStems] = useState<Set<string>>(new Set());
+  const [soloedStem, setSoloedStem] = useState<string | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const stemSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadedFileRef = useRef<File | null>(null);
   const decodedBufferRef = useRef<AudioBuffer | null>(null);
@@ -290,6 +295,11 @@ export default function Studio() {
     scrubberRef.current?.setPosition(0);
     if (processedUrl) { URL.revokeObjectURL(processedUrl); setProcessedUrl(null); }
     setStemBlobs([]);
+    setMutedStems(new Set());
+    setSoloedStem(null);
+    setIsPlayingMix(false);
+    for (const src of stemSourcesRef.current) { try { src.stop(); } catch { /* ok */ } }
+    stemSourcesRef.current = [];
     setWaveformAfter([]);
     setStats(null);
 
@@ -362,6 +372,9 @@ export default function Studio() {
       formData.append("mode", mode);
       formData.append("tempo", String(tempo[0]));
       formData.append("semitones", String(semitones[0]));
+      // Studio path: tell the server this request comes from the Studio session.
+      // The server skips the free-trial counter and enforces a Pro subscription gate.
+      formData.append("source", "studio");
 
       const response = await fetch("/api/kernel/process-audio", {
         method: "POST",
@@ -374,12 +387,13 @@ export default function Studio() {
 
       if (response.status === 402) {
         const err = await response.json().catch(() => null);
-        if (err?.code === "LIMIT_REACHED") {
+        if (err?.code === "LIMIT_REACHED" || err?.code === "UPGRADE_REQUIRED") {
           setPaywall({
             feature: (err.feature as ProcessMode) ?? mode,
             limit: err.limit ?? 0,
             used: err.used ?? 0,
             message: err.error ?? "",
+            code: err.code,
           });
           setState("ready");
           return;
@@ -473,8 +487,45 @@ export default function Studio() {
   const stopAllAudio = () => {
     cancelAnimationFrame(rafRef.current);
     try { sourceRef.current?.stop(); } catch { /* already stopped */ }
+    for (const src of stemSourcesRef.current) { try { src.stop(); } catch { /* ok */ } }
+    stemSourcesRef.current = [];
     setIsPlaying(false);
     setPlayingStem(null);
+    setIsPlayingMix(false);
+  };
+
+  /** Play all active (non-muted / correctly-soloed) stems simultaneously. */
+  const handlePlayMix = async () => {
+    if (stemBlobs.length === 0) return;
+    if (isPlayingMix) { stopAllAudio(); return; }
+    stopAllAudio();
+    const ctx = getAudioContext();
+    const activeStemNames = soloedStem !== null
+      ? [soloedStem]
+      : stemBlobs.filter(s => !mutedStems.has(s.name)).map(s => s.name);
+    const activeBlobs = stemBlobs.filter(s => activeStemNames.includes(s.name));
+    if (activeBlobs.length === 0) return;
+    const sources: AudioBufferSourceNode[] = [];
+    for (const { blob } of activeBlobs) {
+      const ab = await blob.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(ab);
+      const src = ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(ctx.destination);
+      src.start();
+      sources.push(src);
+    }
+    stemSourcesRef.current = sources;
+    setIsPlayingMix(true);
+    // Stop mix state when the longest stem ends
+    const maxDuration = Math.max(...activeBlobs.map(s => {
+      const len = s.blob.size;
+      return len / (44100 * 2 * 2);
+    }));
+    setTimeout(() => {
+      stemSourcesRef.current = [];
+      setIsPlayingMix(false);
+    }, (maxDuration + 1) * 1000);
   };
 
   const startScrubberLoop = (ctx: AudioContext, decoded: AudioBuffer) => {
@@ -626,9 +677,14 @@ export default function Studio() {
     setStemBlobs([]);
     setStats(null);
     setFileName("");
+    setMutedStems(new Set());
+    setSoloedStem(null);
     loadedFileRef.current = null;
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (isPlaying) { sourceRef.current?.stop(); setIsPlaying(false); }
+    for (const src of stemSourcesRef.current) { try { src.stop(); } catch { /* ok */ } }
+    stemSourcesRef.current = [];
+    setIsPlayingMix(false);
   };
 
   const selectedMode = MODES.find(m => m.value === mode)!;
@@ -848,7 +904,7 @@ export default function Studio() {
                   {mode === "stem_split" && (
                     <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-secondary/40 rounded-md p-2.5">
                       <Scissors className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-400" />
-                      Returns 5 stems: vocals, drums, bass, other, and a full instrumental.
+                      Returns stems: bass, midrange, highs, and instrumental. Studio path — requires a Studio (monthly) subscription.
                     </div>
                   )}
                   {mode === "voice_remove" && !hasSplits && (
@@ -1083,17 +1139,39 @@ export default function Studio() {
                   </div>
                 )}
 
-                {/* Stem split done */}
+                {/* Stem split done — session track rows */}
                 {state === "done" && mode === "stem_split" && stemBlobs.length > 0 && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2.5">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Session Tracks</p>
+                      <button
+                        onClick={() => void handlePlayMix()}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-colors border ${
+                          isPlayingMix
+                            ? "bg-amber-500 border-amber-500 text-black"
+                            : "border-border/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {isPlayingMix
+                          ? <><Square className="w-3 h-3 fill-current" /> Stop Mix</>
+                          : <><Play className="w-3 h-3" /> Play Mix</>}
+                      </button>
+                    </div>
                     {stemBlobs
                       .slice()
                       .sort((a, b) => STEM_ORDER.indexOf(a.name) - STEM_ORDER.indexOf(b.name))
                       .map(({ name, blob }) => {
                         const meta = STEM_LABELS[name] ?? { label: name, color: "text-foreground", description: "" };
                         const stemPlaying = playingStem === name;
+                        const isMuted = mutedStems.has(name);
+                        const isSoloed = soloedStem === name;
+                        const dimmed = soloedStem !== null && !isSoloed;
                         return (
-                          <div key={name} className="flex items-center gap-2 p-2.5 rounded-lg bg-secondary/50 border border-border/40">
+                          <div key={name} className={`flex items-center gap-2 p-2.5 rounded-lg border transition-opacity ${
+                            dimmed ? "opacity-40 bg-secondary/30 border-border/20" : "bg-secondary/50 border-border/40"
+                          }`}>
+                            {/* Play/stop individual stem */}
                             <button
                               onClick={() => handlePlayStem(name, blob)}
                               className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-colors border ${
@@ -1106,12 +1184,44 @@ export default function Studio() {
                                 ? <Square className="w-3 h-3 fill-current" />
                                 : <Play className="w-3 h-3" />}
                             </button>
+                            {/* Track label */}
                             <div className="flex-1 min-w-0">
                               <span className={`text-sm font-semibold ${meta.color}`}>{meta.label}</span>
                               <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{meta.description}</p>
                             </div>
-                            <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={() => handleDownloadStem(name, blob)}>
-                              <Download className="w-3.5 h-3.5 mr-1.5" />WAV
+                            {/* Solo button */}
+                            <button
+                              title={isSoloed ? "Un-solo" : "Solo this track"}
+                              onClick={() => {
+                                stopAllAudio();
+                                setSoloedStem(prev => prev === name ? null : name);
+                              }}
+                              className={`w-7 h-7 rounded text-[10px] font-bold shrink-0 transition-colors border ${
+                                isSoloed
+                                  ? "bg-yellow-400 border-yellow-400 text-black"
+                                  : "border-border/50 text-muted-foreground hover:text-foreground hover:border-yellow-400"
+                              }`}
+                            >S</button>
+                            {/* Mute button */}
+                            <button
+                              title={isMuted ? "Unmute" : "Mute this track"}
+                              onClick={() => {
+                                stopAllAudio();
+                                setMutedStems(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(name)) next.delete(name); else next.add(name);
+                                  return next;
+                                });
+                              }}
+                              className={`w-7 h-7 rounded text-[10px] font-bold shrink-0 transition-colors border ${
+                                isMuted
+                                  ? "bg-zinc-600 border-zinc-500 text-white"
+                                  : "border-border/50 text-muted-foreground hover:text-foreground hover:border-zinc-500"
+                              }`}
+                            >M</button>
+                            {/* Download WAV */}
+                            <Button size="sm" variant="outline" className="h-7 text-xs shrink-0 px-2" onClick={() => handleDownloadStem(name, blob)}>
+                              <Download className="w-3 h-3 mr-1" />WAV
                             </Button>
                           </div>
                         );
@@ -1317,7 +1427,9 @@ export default function Studio() {
                     <Lock className="w-6 h-6 text-amber-400" />
                   </div>
                   <h3 className="text-base font-bold text-white">
-                    {paywall.feature === "voice_remove" ? "Free voice removals used"
+                    {paywall.code === "UPGRADE_REQUIRED"
+                      ? "Studio subscription required"
+                      : paywall.feature === "voice_remove" ? "Free voice removals used"
                       : paywall.feature === "stem_split" ? "Free stem split used"
                       : "Free master used"}
                   </h3>
