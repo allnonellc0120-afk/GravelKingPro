@@ -451,6 +451,9 @@ importers:
       expo-document-picker:
         specifier: ~14.0.8
         version: 14.0.8(expo@54.0.35)
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.3
     devDependencies:
       '@babel/core':
         specifier: ^7.25.2
