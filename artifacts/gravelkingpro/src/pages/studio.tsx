@@ -108,10 +108,15 @@ export default function Studio() {
   useEffect(() => { void refreshUsage(); }, [refreshUsage]);
 
   const [state, setState] = useState<ProcessState>("idle");
+
   const [progress, setProgress] = useState(0);
   const [multiplier, setMultiplier] = useState([0.75]);
   const [sliceSize, setSliceSize] = useState("2");
-  const [mode, setMode] = useState<ProcessMode>("master");
+  const [mode, setMode] = useState<ProcessMode>(() => {
+    const saved = localStorage.getItem("gkp_studio_tool") as ProcessMode | null;
+    const valid: ProcessMode[] = ["standard", "voice_remove", "stem_split", "master"];
+    return saved && valid.includes(saved) ? saved : "stem_split";
+  });
   const [masterPreset, setMasterPreset] = useState<MasterPresetId>("baseline");
   const [denoiseOn, setDenoiseOn] = useState(false);
   const [tempo, setTempo] = useState([1.0]);
@@ -251,6 +256,9 @@ export default function Studio() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
+
+  // Persist selected tool across page loads
+  useEffect(() => { localStorage.setItem("gkp_studio_tool", mode); }, [mode]);
 
   // Cleanup object URLs on unmount
   useEffect(() => {
