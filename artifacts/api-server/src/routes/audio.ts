@@ -236,6 +236,7 @@ audioRouter.post(
     const multiplier = parseFloat((req.body.multiplier as string) ?? "0.75");
     const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
     const mode: ProcessMode = (req.body.mode as ProcessMode) ?? "standard";
+    const source = (req.body.source as string) ?? "";
     const tempo = Math.min(2.5, Math.max(0.25, parseFloat((req.body.tempo as string) ?? "1.0")));
     const semitones = Math.min(12, Math.max(-12, parseFloat((req.body.semitones as string) ?? "0")));
 
@@ -254,50 +255,70 @@ audioRouter.post(
     // weekly+ tiers are unlimited; free users get a fixed number of runs each,
     // tracked server-side per user / gk_session. On exhaustion we return a
     // 402 LIMIT_REACHED payload that drives the paywall funnel.
+    //
+    // Studio stem split path: no free trial — requires Pro (monthly+) subscription.
+    // When source === "studio" for stem_split, the free-tier counter is bypassed
+    // entirely and a Pro check is enforced instead.
     let isFreeUse = false;
     let usageField: UsageField | null = null;
     let usageUserId: string | null = null;
     let freeRemaining = 0;
     if (mode === "voice_remove" || mode === "stem_split") {
-      const unlimited = await hasUnlimitedSplits(req);
-      if (!unlimited) {
-        usageField = mode === "voice_remove" ? "freeVoiceRemovals" : "freeStemSplits";
-        const usageUser = await getUsageUser(req, res);
-        usageUserId = usageUser.id;
-        const used = usageUser[usageField] ?? 0;
-        const limit = FREE_LIMITS[usageField];
-        if (used >= limit) {
+      if (mode === "stem_split" && source === "studio") {
+        // Studio path: Pro subscription required — no free trial allowance
+        if (!await hasStudio(req)) {
           await unlink(filePath).catch(() => {});
           res.status(402).json({
             success: false,
-            code: "LIMIT_REACHED",
-            feature: mode,
-            limit,
-            used,
-            error:
-              mode === "voice_remove"
-                ? `You've used all ${limit} free voice removals. Subscribe to GravelKing Weekly for unlimited access.`
-                : `You've used your free stem split. Subscribe to GravelKing Weekly for unlimited access.`,
+            code: "UPGRADE_REQUIRED",
+            feature: "stem_split",
+            error: "Stem Splitting in Studio requires a GravelKing Studio (monthly) subscription.",
             fallback: { action: "subscribe", url: "/pricing" },
           });
           return;
         }
-        const usedTotal = usageUser.totalDownloads ?? 0;
-        if (usedTotal >= FREE_LIMITS.totalDownloads) {
-          await unlink(filePath).catch(() => {});
-          res.status(402).json({
-            success: false,
-            code: "LIMIT_REACHED",
-            feature: mode,
-            limit: FREE_LIMITS.totalDownloads,
-            used: usedTotal,
-            error: "You've used your free download. Subscribe to GravelKing Weekly for unlimited access.",
-            fallback: { action: "subscribe", url: "/pricing" },
-          });
-          return;
+        // Pro confirmed — proceed with no usage accounting
+      } else {
+        const unlimited = await hasUnlimitedSplits(req);
+        if (!unlimited) {
+          usageField = mode === "voice_remove" ? "freeVoiceRemovals" : "freeStemSplits";
+          const usageUser = await getUsageUser(req, res);
+          usageUserId = usageUser.id;
+          const used = usageUser[usageField] ?? 0;
+          const limit = FREE_LIMITS[usageField];
+          if (used >= limit) {
+            await unlink(filePath).catch(() => {});
+            res.status(402).json({
+              success: false,
+              code: "LIMIT_REACHED",
+              feature: mode,
+              limit,
+              used,
+              error:
+                mode === "voice_remove"
+                  ? `You've used all ${limit} free voice removals. Subscribe to GravelKing Weekly for unlimited access.`
+                  : `You've used your free stem split. Subscribe to GravelKing Weekly for unlimited access.`,
+              fallback: { action: "subscribe", url: "/pricing" },
+            });
+            return;
+          }
+          const usedTotal = usageUser.totalDownloads ?? 0;
+          if (usedTotal >= FREE_LIMITS.totalDownloads) {
+            await unlink(filePath).catch(() => {});
+            res.status(402).json({
+              success: false,
+              code: "LIMIT_REACHED",
+              feature: mode,
+              limit: FREE_LIMITS.totalDownloads,
+              used: usedTotal,
+              error: "You've used your free download. Subscribe to GravelKing Weekly for unlimited access.",
+              fallback: { action: "subscribe", url: "/pricing" },
+            });
+            return;
+          }
+          isFreeUse = true;
+          freeRemaining = limit - used - 1;
         }
-        isFreeUse = true;
-        freeRemaining = limit - used - 1;
       }
     }
 

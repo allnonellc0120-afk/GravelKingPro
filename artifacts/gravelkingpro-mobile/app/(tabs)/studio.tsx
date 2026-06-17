@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -36,7 +36,7 @@ const TOOLS: Tool[] = [
     icon: "scissors",
     desc: "Neural separator splits your track into bass, drums, vocals, and other stems using the GravelKing MLK v3 kernel.",
     color: "#10b981",
-    note: "Supports MP3, WAV, FLAC · Returns ZIP of stems",
+    note: "Pro required · MP3, WAV, FLAC · Returns individual stem tracks",
     resultLabel: "stems.zip",
   },
   {
@@ -68,6 +68,20 @@ const TOOLS: Tool[] = [
   },
 ];
 
+const STEM_META: Record<string, { label: string; color: string; desc: string }> = {
+  "bass.wav":         { label: "Bass",         color: "#f97316", desc: "Bass guitar & sub-bass" },
+  "midrange.wav":     { label: "Midrange",      color: "#38bdf8", desc: "Synths, guitars & everything else" },
+  "highs.wav":        { label: "Highs",         color: "#a78bfa", desc: "Air, cymbals & high-freq detail" },
+  "instrumental.wav": { label: "Instrumental",  color: "#e879f9", desc: "Full mix with vocals removed" },
+  "GKP_vocals.wav":   { label: "Vocals",        color: "#f472b6", desc: "Isolated lead & backing vocals" },
+  "GKP_drums.wav":    { label: "Drums",         color: "#fbbf24", desc: "Kick, snare, hats & percussion" },
+  "GKP_bass.wav":     { label: "Bass",          color: "#f97316", desc: "Bass guitar & sub-bass" },
+  "GKP_other.wav":    { label: "Other",         color: "#38bdf8", desc: "Synths, guitars & everything else" },
+  "GKP_instrumental.wav": { label: "Instrumental", color: "#e879f9", desc: "Full mix with vocals removed" },
+};
+
+type StemItem = { name: string; label: string; color: string; desc: string; url: string };
+
 type Stage = "idle" | "picking" | "uploading" | "done" | "error";
 
 function buildFormData(
@@ -82,6 +96,9 @@ function buildFormData(
   } as unknown as Blob);
   if (tool.id !== "master") {
     fd.append("mode", tool.id);
+  }
+  if (tool.id === "stem_split") {
+    fd.append("source", "studio");
   }
   return fd;
 }
@@ -101,14 +118,81 @@ export default function StudioScreen() {
   const [uploadStatus, setUploadStatus] = useState<string>("Uploading…");
   const [fileName, setFileName] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [stemItems, setStemItems] = useState<StemItem[]>([]);
+  const [playingStem, setPlayingStem] = useState<string | null>(null);
+  const [isPlayingMix, setIsPlayingMix] = useState(false);
+  const [mutedStems, setMutedStems] = useState<Set<string>>(new Set());
+  const [soloedStem, setSoloedStem] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [upgradeNeeded, setUpgradeNeeded] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
 
+  const audioRef = useRef<any>(null);
+  const mixAudiosRef = useRef<any[]>([]);
+  /** Last successfully uploaded asset — survives tool switches for session pre-fill. */
+  const lastAssetRef = useRef<{ uri: string; name: string; mimeType?: string } | null>(null);
+
   const s = styles(colors);
 
-  // Shared upload + response pipeline used by both the mic recorder and the
-  // file pickers. `asset` is whatever produced the audio.
+  function stopCurrentStem() {
+    if (audioRef.current) {
+      try { audioRef.current.pause(); } catch { /* ignore */ }
+      audioRef.current = null;
+    }
+    for (const a of mixAudiosRef.current) { try { a.pause(); } catch { /* ok */ } }
+    mixAudiosRef.current = [];
+    setPlayingStem(null);
+    setIsPlayingMix(false);
+  }
+
+  function playMix() {
+    if (!isWeb) return; // native: controls are visual-only; play individually
+    if (isPlayingMix) { stopCurrentStem(); return; }
+    stopCurrentStem();
+    const activeStemNames = soloedStem !== null
+      ? [soloedStem]
+      : stemItems.filter(s => !mutedStems.has(s.name)).map(s => s.name);
+    const active = stemItems.filter(s => activeStemNames.includes(s.name));
+    if (active.length === 0) return;
+    const audios: any[] = [];
+    for (const stem of active) {
+      try {
+        const a = new (window as any).Audio(stem.url);
+        a.play().catch(() => {});
+        audios.push(a);
+      } catch { /* skip */ }
+    }
+    mixAudiosRef.current = audios;
+    setIsPlayingMix(true);
+    if (audios[0]) {
+      audios[0].onended = () => {
+        mixAudiosRef.current = [];
+        setIsPlayingMix(false);
+      };
+    }
+  }
+
+  function playStem(name: string, url: string) {
+    if (Platform.OS !== "web") {
+      Linking.openURL(url);
+      return;
+    }
+    if (playingStem === name) {
+      stopCurrentStem();
+      return;
+    }
+    stopCurrentStem();
+    try {
+      const audio = new (window as any).Audio(url);
+      audioRef.current = audio;
+      audio.play().catch(() => {});
+      audio.onended = () => setPlayingStem(null);
+      setPlayingStem(name);
+    } catch {
+      Linking.openURL(url);
+    }
+  }
+
   async function processAsset(asset: {
     uri: string;
     name: string;
@@ -116,7 +200,12 @@ export default function StudioScreen() {
   }) {
     setErrorMsg(null);
     setResultUrl(null);
+    setStemItems([]);
     setUpgradeNeeded(false);
+    setMutedStems(new Set());
+    setSoloedStem(null);
+    setIsPlayingMix(false);
+    stopCurrentStem();
     setFileName(asset.name);
     setUploadStatus("Uploading…");
     setStage("uploading");
@@ -125,7 +214,6 @@ export default function StudioScreen() {
       const formData = buildFormData(selectedTool, asset);
       const endpoint = endpointForTool(selectedTool.id);
 
-      // Switch label once the body is sent and we're waiting for the server
       const uploadDoneTimer = setTimeout(() => {
         setUploadStatus("Processing with MLK v3…");
       }, 4000);
@@ -142,7 +230,12 @@ export default function StudioScreen() {
 
       if (res.status === 402) {
         const err = await res.json().catch(() => ({ error: "Upgrade required" }));
-        setErrorMsg(err.error ?? "You've reached the free tier limit.");
+        const isUpgradeRequired = err.code === "UPGRADE_REQUIRED";
+        setErrorMsg(
+          isUpgradeRequired
+            ? "Stem Splitting in Studio requires a GravelKing Studio (monthly) subscription."
+            : (err.error ?? "You've reached the free tier limit.")
+        );
         setUpgradeNeeded(true);
         setStage("error");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -154,8 +247,36 @@ export default function StudioScreen() {
         throw new Error(err.error ?? `Server error ${res.status}`);
       }
 
+      const contentType = res.headers.get("content-type") ?? "";
+
+      if (selectedTool.id === "stem_split" && contentType.includes("zip")) {
+        const blob = await res.blob();
+        const { unzip } = await import("fflate");
+        const arrayBuf = await blob.arrayBuffer();
+
+        await new Promise<void>((resolve, reject) => {
+          unzip(new Uint8Array(arrayBuf), (err, files) => {
+            if (err) { reject(err); return; }
+            const items: StemItem[] = Object.entries(files).map(([name, data]) => {
+              const stemBlob = new Blob([data as BlobPart], { type: "audio/wav" });
+              const url = URL.createObjectURL(stemBlob);
+              const meta = STEM_META[name] ?? { label: name, color: "#94a3b8", desc: "" };
+              return { name, url, ...meta };
+            });
+            setStemItems(items);
+            resolve();
+          });
+        });
+
+        lastAssetRef.current = asset;
+        setStage("done");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        return;
+      }
+
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      lastAssetRef.current = asset;
       setResultUrl(url);
       setStage("done");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -176,6 +297,7 @@ export default function StudioScreen() {
     setStage("picking");
     setErrorMsg(null);
     setResultUrl(null);
+    setStemItems([]);
     setUpgradeNeeded(false);
 
     try {
@@ -207,6 +329,7 @@ export default function StudioScreen() {
     setStage("picking");
     setErrorMsg(null);
     setResultUrl(null);
+    setStemItems([]);
     setUpgradeNeeded(false);
 
     try {
@@ -243,9 +366,14 @@ export default function StudioScreen() {
   }
 
   function reset() {
+    stopCurrentStem();
     setStage("idle");
     setFileName(null);
     setResultUrl(null);
+    setStemItems([]);
+    setMutedStems(new Set());
+    setSoloedStem(null);
+    setIsPlayingMix(false);
     setErrorMsg(null);
     setUpgradeNeeded(false);
     setIsRecording(false);
@@ -253,6 +381,7 @@ export default function StudioScreen() {
   }
 
   const isBusy = stage === "uploading" || stage === "picking";
+  const isStemDone = stage === "done" && selectedTool.id === "stem_split" && stemItems.length > 0;
 
   return (
     <ScrollView
@@ -345,6 +474,140 @@ export default function StudioScreen() {
             GNS kernel running — this may take 30–90 seconds
           </Text>
         </View>
+      ) : isStemDone ? (
+        <View style={[s.stateCard, { backgroundColor: colors.card, borderColor: "#10b981" }]}>
+          <Feather name="check-circle" size={32} color="#10b981" />
+          <Text style={[s.stateTitle, { color: colors.foreground }]}>Session Tracks</Text>
+          <Text style={[s.stateSub, { color: colors.mutedForeground }]}>{fileName}</Text>
+
+          {/* Play Mix header (web only) */}
+          {isWeb && (
+            <Pressable
+              onPress={playMix}
+              style={({ pressed }) => [
+                s.playMixBtn,
+                {
+                  backgroundColor: isPlayingMix ? "#10b981" : `${colors.card}`,
+                  borderColor: "#10b981",
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name={isPlayingMix ? "square" : "play"}
+                size={13}
+                color={isPlayingMix ? "#000" : "#10b981"}
+              />
+              <Text style={[s.playMixBtnText, { color: isPlayingMix ? "#000" : "#10b981" }]}>
+                {isPlayingMix ? "Stop Mix" : "Play Mix"}
+              </Text>
+            </Pressable>
+          )}
+
+          <View style={s.stemList}>
+            {stemItems.map((stem) => {
+              const isPlaying = playingStem === stem.name;
+              const isMuted = mutedStems.has(stem.name);
+              const isSoloed = soloedStem === stem.name;
+              const dimmed = soloedStem !== null && !isSoloed;
+              return (
+                <View
+                  key={stem.name}
+                  style={[
+                    s.stemRow,
+                    {
+                      backgroundColor: `${stem.color}10`,
+                      borderColor: isPlaying ? stem.color : `${stem.color}40`,
+                      opacity: dimmed ? 0.35 : 1,
+                    },
+                  ]}
+                >
+                  <View style={[s.stemColorDot, { backgroundColor: stem.color }]} />
+                  <View style={s.stemInfo}>
+                    <Text style={[s.stemLabel, { color: stem.color }]}>{stem.label}</Text>
+                    <Text style={[s.stemDesc, { color: colors.mutedForeground }]}>{stem.desc}</Text>
+                  </View>
+                  {/* Solo */}
+                  <Pressable
+                    onPress={() => {
+                      stopCurrentStem();
+                      setSoloedStem(prev => prev === stem.name ? null : stem.name);
+                    }}
+                    style={({ pressed }) => [
+                      s.smBtn,
+                      {
+                        backgroundColor: isSoloed ? "#facc15" : "transparent",
+                        borderColor: isSoloed ? "#facc15" : `${stem.color}60`,
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={[s.smBtnText, { color: isSoloed ? "#000" : colors.mutedForeground }]}>S</Text>
+                  </Pressable>
+                  {/* Mute */}
+                  <Pressable
+                    onPress={() => {
+                      stopCurrentStem();
+                      setMutedStems(prev => {
+                        const next = new Set(prev);
+                        if (next.has(stem.name)) next.delete(stem.name); else next.add(stem.name);
+                        return next;
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      s.smBtn,
+                      {
+                        backgroundColor: isMuted ? "#52525b" : "transparent",
+                        borderColor: isMuted ? "#71717a" : `${stem.color}60`,
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={[s.smBtnText, { color: isMuted ? "#fff" : colors.mutedForeground }]}>M</Text>
+                  </Pressable>
+                  {/* Play individual stem */}
+                  <Pressable
+                    onPress={() => playStem(stem.name, stem.url)}
+                    style={({ pressed }) => [
+                      s.stemIconBtn,
+                      {
+                        backgroundColor: isPlaying ? stem.color : `${stem.color}20`,
+                        borderColor: stem.color,
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <Feather
+                      name={isPlaying ? "square" : "play"}
+                      size={13}
+                      color={isPlaying ? "#000" : stem.color}
+                    />
+                  </Pressable>
+                  {/* Download */}
+                  <Pressable
+                    onPress={() => Linking.openURL(stem.url)}
+                    style={({ pressed }) => [
+                      s.stemIconBtn,
+                      {
+                        backgroundColor: `${stem.color}15`,
+                        borderColor: `${stem.color}50`,
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <Feather name="download" size={13} color={stem.color} />
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+
+          <Pressable onPress={reset} style={s.resetLink}>
+            <Text style={[s.resetLinkText, { color: colors.mutedForeground }]}>
+              Process another file
+            </Text>
+          </Pressable>
+        </View>
       ) : stage === "done" && resultUrl ? (
         <View style={[s.stateCard, { backgroundColor: colors.card, borderColor: "#10b981" }]}>
           <Feather name="check-circle" size={32} color="#10b981" />
@@ -386,7 +649,9 @@ export default function StudioScreen() {
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>{errorMsg}</Text>
           {upgradeNeeded ? (
             <Text style={[s.upgradeHint, { color: colors.mutedForeground }]}>
-              Go to the Upgrade tab to subscribe and get unlimited access.
+              {selectedTool.id === "stem_split"
+                ? "Stem Splitting in Studio requires a Studio (monthly) subscription. Go to the Upgrade tab to subscribe."
+                : "Go to the Upgrade tab to subscribe and get unlimited access."}
             </Text>
           ) : null}
           <Pressable
@@ -397,12 +662,34 @@ export default function StudioScreen() {
           </Pressable>
         </View>
       ) : !isRecording ? (
-        <View
-          style={[
-            s.dropZone,
-            { borderColor: isBusy ? colors.primary : colors.border },
-          ]}
-        >
+        <View>
+          {/* Session pre-fill: offer to reuse the last uploaded track */}
+          {selectedTool.id === "stem_split" && lastAssetRef.current && (
+            <Pressable
+              onPress={() => {
+                if (lastAssetRef.current) void processAsset(lastAssetRef.current);
+              }}
+              style={({ pressed }) => [
+                s.sessionPrefill,
+                {
+                  backgroundColor: `#10b98115`,
+                  borderColor: "#10b981",
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <Feather name="refresh-cw" size={14} color="#10b981" />
+              <Text style={[s.sessionPrefillText, { color: "#10b981" }]} numberOfLines={1}>
+                Re-split session track: {lastAssetRef.current.name}
+              </Text>
+            </Pressable>
+          )}
+          <View
+            style={[
+              s.dropZone,
+              { borderColor: isBusy ? colors.primary : colors.border },
+            ]}
+          >
           <Feather name="upload-cloud" size={32} color={colors.mutedForeground} />
           <Text style={[s.dropZoneTitle, { color: colors.foreground }]}>
             Upload Audio File
@@ -450,6 +737,7 @@ export default function StudioScreen() {
               </Text>
             </Pressable>
           </View>
+        </View>
         </View>
       ) : null}
 
@@ -580,4 +868,59 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       padding: 12,
     },
     warningText: { fontSize: 11, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 16 },
+    stemList: { width: "100%", gap: 8 },
+    stemRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      padding: 12,
+      borderWidth: 1,
+      borderRadius: 8,
+    },
+    stemColorDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+    stemInfo: { flex: 1 },
+    stemLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+    stemDesc: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 1 },
+    stemIconBtn: {
+      width: 32,
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderRadius: 6,
+    },
+    smBtn: {
+      width: 26,
+      height: 26,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderRadius: 5,
+    },
+    smBtnText: { fontSize: 10, fontFamily: "Inter_700Bold" },
+    playMixBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderRadius: 6,
+      alignSelf: "center",
+    },
+    playMixBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+    sessionPrefill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      padding: 10,
+      borderWidth: 1,
+      borderRadius: 6,
+      marginBottom: 10,
+    },
+    sessionPrefillText: {
+      fontSize: 12,
+      fontFamily: "Inter_500Medium",
+      flex: 1,
+    },
   });

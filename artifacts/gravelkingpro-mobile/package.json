@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "expo-av": "^16.0.8",
-    "expo-document-picker": "~14.0.8"
+    "expo-document-picker": "~14.0.8",
+    "fflate": "^0.8.2"
   }
 }
