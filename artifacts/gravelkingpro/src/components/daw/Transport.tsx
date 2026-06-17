@@ -105,6 +105,17 @@ export function Transport({
             const pctNew = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             onSeek(pctNew);
           }}
+          onTouchStart={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const touch = e.touches[0];
+            onSeek(Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width)));
+          }}
+          onTouchMove={(e) => {
+            e.preventDefault();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const touch = e.touches[0];
+            onSeek(Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width)));
+          }}
         >
           <div className="absolute left-0 top-0 h-full rounded-full bg-amber-500 transition-none" style={{ width: `${pct * 100}%` }} />
           <div
@@ -144,10 +155,10 @@ export function Transport({
       </div>
 
       {/* Master Volume */}
-      <div className="flex items-center gap-2 shrink-0 w-28">
+      <div className="flex items-center gap-2 shrink-0 w-20 sm:w-28">
         <Volume2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <Slider value={[masterVolume * 100]} onValueChange={([v]) => onVolumeChange(v / 100)} min={0} max={100} step={1} className="w-full" />
-        <span className="text-[10px] font-mono text-muted-foreground w-7 text-right">{Math.round(masterVolume * 100)}</span>
+        <span className="hidden sm:block text-[10px] font-mono text-muted-foreground w-7 text-right">{Math.round(masterVolume * 100)}</span>
       </div>
     </div>
   );

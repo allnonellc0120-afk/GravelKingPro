@@ -115,15 +115,15 @@ export default function MixStudio() {
         />
 
         {/* Page header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/20 shrink-0 bg-black/30">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border/20 shrink-0 bg-black/30 gap-2">
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
             <h1 className="text-base font-bold tracking-tight">Mix Studio</h1>
-            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">Studio</Badge>
+            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] shrink-0">Studio</Badge>
             <span className="text-[11px] text-muted-foreground hidden sm:block">
               {daw.tracks.length}/8 tracks
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <ProjectManager
               hasUnsavedTracks={daw.tracks.length > 0}
               onSave={daw.getProjectSnapshot}
@@ -138,17 +138,19 @@ export default function MixStudio() {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 border border-amber-500/25 rounded px-2.5 py-1 hover:border-amber-400/40 transition-colors"
+              className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 border border-amber-500/25 rounded px-2 py-1 hover:border-amber-400/40 transition-colors"
             >
-              <Upload className="w-3 h-3" /> Add Tracks
+              <Upload className="w-3 h-3 shrink-0" />
+              <span className="hidden sm:inline">Add Tracks</span>
             </button>
             <Button
               onClick={daw.exportMix}
               disabled={daw.tracks.length === 0}
               size="sm"
-              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-1.5 h-7 text-xs"
+              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-1 h-7 text-xs px-2 sm:px-3"
             >
-              <Download className="w-3 h-3" /> Export WAV
+              <Download className="w-3 h-3 shrink-0" />
+              <span className="hidden sm:inline">Export WAV</span>
             </Button>
           </div>
         </div>
@@ -210,7 +212,7 @@ export default function MixStudio() {
               </div>
               <div>
                 <h2 className="text-xl font-bold mb-1">No tracks yet</h2>
-                <p className="text-sm text-muted-foreground">Drop up to 8 audio files to start mixing</p>
+                <p className="text-sm text-muted-foreground">Tap or drop up to 8 audio files to start mixing</p>
               </div>
               <Button
                 onClick={() => fileInputRef.current?.click()}
@@ -264,7 +266,7 @@ export default function MixStudio() {
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-dashed border-border/20 text-muted-foreground hover:text-white hover:border-amber-500/30 transition-colors text-sm"
                 >
-                  <Upload className="w-4 h-4" /> Drop or click to add another track
+                  <Upload className="w-4 h-4" /> Tap or drop to add another track
                 </button>
               )}
             </>
