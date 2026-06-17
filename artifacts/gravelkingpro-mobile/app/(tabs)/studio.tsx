@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
+import { DragDropContentView, type DropAsset } from "expo-drag-drop-content-view";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import React, { useRef, useState } from "react";
@@ -126,6 +127,7 @@ export default function StudioScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [upgradeNeeded, setUpgradeNeeded] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const audioRef = useRef<any>(null);
   const mixAudiosRef = useRef<any[]>([]);
@@ -363,6 +365,23 @@ export default function StudioScreen() {
       setStage("error");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
+  }
+
+  async function handleDroppedAssets(assets: DropAsset[]) {
+    const first = assets.find(
+      (a) => a.type?.startsWith("audio/") || a.type?.startsWith("video/"),
+    ) ?? assets[0];
+    if (!first) return;
+
+    setIsDragOver(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const ext = first.type ? first.type.split("/")[1] ?? "mp3" : "mp3";
+    const name = first.fileName ?? `audio-${Date.now()}.${ext}`;
+    const uri = first.uri ?? first.base64 ?? "";
+    if (!uri) return;
+
+    await processAsset({ uri, name, mimeType: first.type ?? "audio/mpeg" });
   }
 
   function reset() {
@@ -684,60 +703,87 @@ export default function StudioScreen() {
               </Text>
             </Pressable>
           )}
-          <View
+          <DragDropContentView
+            onDrop={({ assets }) => { void handleDroppedAssets(assets); }}
+            onEnter={() => setIsDragOver(true)}
+            onExit={() => setIsDragOver(false)}
             style={[
               s.dropZone,
-              { borderColor: isBusy ? colors.primary : colors.border },
+              {
+                borderColor: isDragOver
+                  ? selectedTool.color
+                  : isBusy ? colors.primary : colors.border,
+                backgroundColor: isDragOver
+                  ? `${selectedTool.color}18`
+                  : undefined,
+              },
             ]}
           >
-          <Feather name="upload-cloud" size={32} color={colors.mutedForeground} />
-          <Text style={[s.dropZoneTitle, { color: colors.foreground }]}>
-            Upload Audio File
-          </Text>
-          <Text style={[s.dropZoneSub, { color: colors.mutedForeground }]}>
-            MP3 · WAV · FLAC · M4A
-          </Text>
-
-          <View style={s.dropZoneBtns}>
-            <Pressable
-              onPress={handlePickFromFiles}
-              disabled={isBusy}
-              style={({ pressed }) => [
-                s.dropBtn,
-                {
-                  backgroundColor: colors.secondary,
-                  borderColor: colors.border,
-                  opacity: isBusy || pressed ? 0.6 : 1,
-                  flex: 1,
-                },
-              ]}
-            >
-              <Feather name="folder" size={15} color={colors.foreground} />
-              <Text style={[s.dropBtnText, { color: colors.foreground }]}>
-                {stage === "picking" ? "Selecting…" : "Files App"}
+          {isDragOver ? (
+            <>
+              <Feather name="download-cloud" size={36} color={selectedTool.color} />
+              <Text style={[s.dropZoneTitle, { color: selectedTool.color }]}>
+                Drop to upload
               </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={handlePickFromPhotos}
-              disabled={isBusy}
-              style={({ pressed }) => [
-                s.dropBtn,
-                {
-                  backgroundColor: colors.secondary,
-                  borderColor: colors.border,
-                  opacity: isBusy || pressed ? 0.6 : 1,
-                  flex: 1,
-                },
-              ]}
-            >
-              <Feather name="image" size={15} color={colors.foreground} />
-              <Text style={[s.dropBtnText, { color: colors.foreground }]}>
-                Photos / Videos
+              <Text style={[s.dropZoneSub, { color: selectedTool.color, opacity: 0.7 }]}>
+                Release to start processing
               </Text>
-            </Pressable>
-          </View>
-        </View>
+            </>
+          ) : (
+            <>
+              <Feather name="upload-cloud" size={32} color={colors.mutedForeground} />
+              <Text style={[s.dropZoneTitle, { color: colors.foreground }]}>
+                Upload Audio File
+              </Text>
+              <Text style={[s.dropZoneSub, { color: colors.mutedForeground }]}>
+                MP3 · WAV · FLAC · M4A
+              </Text>
+              <Text style={[s.dropHint, { color: colors.mutedForeground }]}>
+                or drag a file here from Files
+              </Text>
+
+              <View style={s.dropZoneBtns}>
+                <Pressable
+                  onPress={handlePickFromFiles}
+                  disabled={isBusy}
+                  style={({ pressed }) => [
+                    s.dropBtn,
+                    {
+                      backgroundColor: colors.secondary,
+                      borderColor: colors.border,
+                      opacity: isBusy || pressed ? 0.6 : 1,
+                      flex: 1,
+                    },
+                  ]}
+                >
+                  <Feather name="folder" size={15} color={colors.foreground} />
+                  <Text style={[s.dropBtnText, { color: colors.foreground }]}>
+                    {stage === "picking" ? "Selecting…" : "Files App"}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handlePickFromPhotos}
+                  disabled={isBusy}
+                  style={({ pressed }) => [
+                    s.dropBtn,
+                    {
+                      backgroundColor: colors.secondary,
+                      borderColor: colors.border,
+                      opacity: isBusy || pressed ? 0.6 : 1,
+                      flex: 1,
+                    },
+                  ]}
+                >
+                  <Feather name="image" size={15} color={colors.foreground} />
+                  <Text style={[s.dropBtnText, { color: colors.foreground }]}>
+                    Photos / Videos
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+          </DragDropContentView>
         </View>
       ) : null}
 
@@ -818,6 +864,12 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       fontFamily: "Inter_400Regular",
       letterSpacing: 0.5,
       marginBottom: 8,
+    },
+    dropHint: {
+      fontSize: 10,
+      fontFamily: "Inter_400Regular",
+      opacity: 0.5,
+      marginBottom: 4,
     },
     dropZoneBtns: {
       flexDirection: "row",

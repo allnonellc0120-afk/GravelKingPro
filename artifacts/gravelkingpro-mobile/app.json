@@ -14,7 +14,7 @@
       "backgroundColor": "#09090b"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": true
     },
     "android": {},
     "web": {
