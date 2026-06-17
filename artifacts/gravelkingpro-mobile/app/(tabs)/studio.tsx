@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -97,6 +98,7 @@ export default function StudioScreen() {
 
   const [selectedTool, setSelectedTool] = useState<Tool>(TOOLS[0]);
   const [stage, setStage] = useState<Stage>("idle");
+  const [uploadStatus, setUploadStatus] = useState<string>("Uploading…");
   const [fileName, setFileName] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export default function StudioScreen() {
   const s = styles(colors);
 
   // Shared upload + response pipeline used by both the mic recorder and the
-  // (secondary) file picker. `asset` is whatever produced the audio.
+  // file pickers. `asset` is whatever produced the audio.
   async function processAsset(asset: {
     uri: string;
     name: string;
@@ -116,16 +118,27 @@ export default function StudioScreen() {
     setResultUrl(null);
     setUpgradeNeeded(false);
     setFileName(asset.name);
+    setUploadStatus("Uploading…");
     setStage("uploading");
 
     try {
       const formData = buildFormData(selectedTool, asset);
       const endpoint = endpointForTool(selectedTool.id);
 
-      const res = await apiFetch(endpoint, {
-        method: "POST",
-        body: formData,
-      });
+      // Switch label once the body is sent and we're waiting for the server
+      const uploadDoneTimer = setTimeout(() => {
+        setUploadStatus("Processing with MLK v3…");
+      }, 4000);
+
+      let res: Response;
+      try {
+        res = await apiFetch(endpoint, {
+          method: "POST",
+          body: formData,
+        });
+      } finally {
+        clearTimeout(uploadDoneTimer);
+      }
 
       if (res.status === 402) {
         const err = await res.json().catch(() => ({ error: "Upgrade required" }));
@@ -158,7 +171,7 @@ export default function StudioScreen() {
     await processAsset(file);
   }
 
-  async function handlePick() {
+  async function handlePickFromFiles() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setStage("picking");
     setErrorMsg(null);
@@ -189,6 +202,46 @@ export default function StudioScreen() {
     }
   }
 
+  async function handlePickFromPhotos() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setStage("picking");
+    setErrorMsg(null);
+    setResultUrl(null);
+    setUpgradeNeeded(false);
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setErrorMsg("Photo Library access denied. Allow it in device settings.");
+        setStage("error");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "videos",
+        allowsEditing: false,
+        allowsMultipleSelection: false,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        setStage("idle");
+        return;
+      }
+
+      const picked = result.assets[0];
+      const uri = picked.uri;
+      const ext = uri.split(".").pop()?.toLowerCase() ?? "mp4";
+      const name = `recording-${Date.now()}.${ext}`;
+      const mimeType = ext === "mov" ? "video/quicktime" : ext === "mp4" ? "video/mp4" : "video/mp4";
+
+      await processAsset({ uri, name, mimeType });
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "Something went wrong");
+      setStage("error");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  }
+
   function reset() {
     setStage("idle");
     setFileName(null);
@@ -196,7 +249,10 @@ export default function StudioScreen() {
     setErrorMsg(null);
     setUpgradeNeeded(false);
     setIsRecording(false);
+    setUploadStatus("Uploading…");
   }
+
+  const isBusy = stage === "uploading" || stage === "picking";
 
   return (
     <ScrollView
@@ -271,7 +327,7 @@ export default function StudioScreen() {
       <MicRecorder
         key={selectedTool.id}
         accentColor={selectedTool.color}
-        disabled={stage === "uploading" || stage === "picking"}
+        disabled={isBusy}
         onRecordingChange={setIsRecording}
         onRecorded={(file) => {
           void handleRecorded(file);
@@ -283,7 +339,7 @@ export default function StudioScreen() {
           style={[s.stateCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[s.stateTitle, { color: colors.foreground }]}>Processing…</Text>
+          <Text style={[s.stateTitle, { color: colors.foreground }]}>{uploadStatus}</Text>
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>{fileName}</Text>
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>
             GNS kernel running — this may take 30–90 seconds
@@ -341,19 +397,60 @@ export default function StudioScreen() {
           </Pressable>
         </View>
       ) : !isRecording ? (
-        <Pressable
-          onPress={handlePick}
-          disabled={stage === "picking"}
-          style={({ pressed }) => [
-            s.pickLink,
-            { opacity: pressed || stage === "picking" ? 0.6 : 1 },
+        <View
+          style={[
+            s.dropZone,
+            { borderColor: isBusy ? colors.primary : colors.border },
           ]}
         >
-          <Feather name="folder" size={15} color={colors.mutedForeground} />
-          <Text style={[s.pickLinkText, { color: colors.mutedForeground }]}>
-            {stage === "picking" ? "Selecting file…" : "Or pick an audio file"}
+          <Feather name="upload-cloud" size={32} color={colors.mutedForeground} />
+          <Text style={[s.dropZoneTitle, { color: colors.foreground }]}>
+            Upload Audio File
           </Text>
-        </Pressable>
+          <Text style={[s.dropZoneSub, { color: colors.mutedForeground }]}>
+            MP3 · WAV · FLAC · M4A
+          </Text>
+
+          <View style={s.dropZoneBtns}>
+            <Pressable
+              onPress={handlePickFromFiles}
+              disabled={isBusy}
+              style={({ pressed }) => [
+                s.dropBtn,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: colors.border,
+                  opacity: isBusy || pressed ? 0.6 : 1,
+                  flex: 1,
+                },
+              ]}
+            >
+              <Feather name="folder" size={15} color={colors.foreground} />
+              <Text style={[s.dropBtnText, { color: colors.foreground }]}>
+                {stage === "picking" ? "Selecting…" : "Files App"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handlePickFromPhotos}
+              disabled={isBusy}
+              style={({ pressed }) => [
+                s.dropBtn,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: colors.border,
+                  opacity: isBusy || pressed ? 0.6 : 1,
+                  flex: 1,
+                },
+              ]}
+            >
+              <Feather name="image" size={15} color={colors.foreground} />
+              <Text style={[s.dropBtnText, { color: colors.foreground }]}>
+                Photos / Videos
+              </Text>
+            </Pressable>
+          </View>
+        </View>
       ) : null}
 
       {!API_BASE && (
@@ -413,15 +510,42 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       borderTopWidth: 1,
       letterSpacing: 0.3,
     },
-    pickLink: {
+    dropZone: {
+      borderWidth: 1,
+      borderStyle: "dashed",
+      padding: 28,
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 24,
+      minHeight: 160,
+      justifyContent: "center",
+    },
+    dropZoneTitle: {
+      fontSize: 15,
+      fontFamily: "Inter_600SemiBold",
+      marginTop: 4,
+    },
+    dropZoneSub: {
+      fontSize: 11,
+      fontFamily: "Inter_400Regular",
+      letterSpacing: 0.5,
+      marginBottom: 8,
+    },
+    dropZoneBtns: {
+      flexDirection: "row",
+      gap: 10,
+      width: "100%",
+      marginTop: 4,
+    },
+    dropBtn: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
-      paddingVertical: 14,
-      marginBottom: 24,
+      gap: 7,
+      paddingVertical: 12,
+      borderWidth: 1,
     },
-    pickLinkText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+    dropBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },
     stateCard: {
       borderWidth: 1,
       padding: 28,
