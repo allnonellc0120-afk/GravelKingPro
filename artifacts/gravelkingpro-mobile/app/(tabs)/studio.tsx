@@ -1,9 +1,10 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { DragDropContentView, type DropAsset } from "expo-drag-drop-content-view";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -115,6 +116,15 @@ export default function StudioScreen() {
   const isWeb = Platform.OS === "web";
 
   const [selectedTool, setSelectedTool] = useState<Tool>(TOOLS[0]);
+
+  useEffect(() => {
+    AsyncStorage.getItem("studio_last_tool").then((id) => {
+      if (!id) return;
+      const found = TOOLS.find((t) => t.id === id);
+      if (found) setSelectedTool(found);
+    }).catch(() => {});
+  }, []);
+
   const [stage, setStage] = useState<Stage>("idle");
   const [uploadStatus, setUploadStatus] = useState<string>("Uploading…");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -425,6 +435,7 @@ export default function StudioScreen() {
               key={tool.id}
               onPress={() => {
                 setSelectedTool(tool);
+                AsyncStorage.setItem("studio_last_tool", tool.id).catch(() => {});
                 reset();
                 Haptics.selectionAsync();
               }}
