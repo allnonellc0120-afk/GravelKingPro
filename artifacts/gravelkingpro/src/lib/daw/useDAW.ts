@@ -402,6 +402,20 @@ export function useDAW() {
     if (isPlayingRef.current) buildAndStart(secs);
   }, [buildAndStart]);
 
+  const skipBack = useCallback((amount: number = 5) => {
+    const next = Math.max(0, offsetRef.current - amount);
+    offsetRef.current = next;
+    setPosition(next);
+    if (isPlayingRef.current) buildAndStart(next);
+  }, [buildAndStart]);
+
+  const skipForward = useCallback((amount: number = 5) => {
+    const next = offsetRef.current + amount;
+    offsetRef.current = next;
+    setPosition(next);
+    if (isPlayingRef.current) buildAndStart(next);
+  }, [buildAndStart]);
+
   // ── master volume (live) ──
   const setMasterVolume = useCallback((v: number) => {
     setMasterVolumeState(v);
@@ -885,7 +899,7 @@ export function useDAW() {
     isRecording, startRecording, stopRecording, listInputDevices,
     getTrackAnalyser,
     addTrack, removeTrack,
-    play, pause, stop, seek,
+    play, pause, stop, seek, skipBack, skipForward,
     setMasterVolume, setLoop,
     setTrackVolume, setTrackPan, toggleMute, toggleSolo,
     setTrackStartOffset,

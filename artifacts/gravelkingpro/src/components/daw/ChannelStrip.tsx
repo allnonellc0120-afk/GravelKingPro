@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ChevronDown, ChevronUp, RotateCcw, Scissors, Trash2 } from "lucide-react";
 import { TrackState, PluginType, Region } from "@/lib/daw/types";
 import { Waveform } from "./Waveform";
@@ -52,6 +52,9 @@ export function ChannelStrip({
   onSetRegion, onApplyTrim, onApplyDelete, onResetEdit, onSetStartOffset,
 }: ChannelStripProps) {
   const [showPlugins, setShowPlugins] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = useRef<number>(0);
 
   const getAnalyser = useCallback(
     () => (getTrackAnalyser ? getTrackAnalyser(track.id) : null),
@@ -77,10 +80,34 @@ export function ChannelStrip({
     return Math.round(secs / beatDur) * beatDur;
   };
 
+  const handleTouchStart = () => {
+    touchStartRef.current = Date.now();
+    longPressRef.current = setTimeout(() => {
+      setShowMenu(true);
+    }, 600);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
+
+  const handleTap = () => {
+    const elapsed = Date.now() - touchStartRef.current;
+    if (elapsed < 600) {
+      setShowMenu(true);
+    }
+  };
+
   return (
     <div
-      className="rounded-xl border overflow-hidden"
+      className="rounded-xl border overflow-hidden relative"
       style={{ borderColor: `${track.color}25` }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onClick={handleTap}
     >
       {/* Header row */}
       <div className="flex items-center gap-2 px-3 py-2" style={{ background: `${track.color}0d` }}>
@@ -278,6 +305,60 @@ export function ChannelStrip({
         </span>
         {showPlugins ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
       </button>
+
+      {/* Touch context menu overlay */}
+      {showMenu && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowMenu(false)}
+        >
+          <div className="bg-[#0b0f17] border border-border/30 rounded-2xl p-4 w-full max-w-xs space-y-2 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-3">
+              <div className="text-sm font-bold text-white/90">{track.name}</div>
+              <div className="text-[10px] text-muted-foreground">{track.duration.toFixed(1)}s</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { onApplyTrim(track.id); setShowMenu(false); }}
+                disabled={!track.region}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors"
+              >
+                <Scissors className="w-5 h-5 text-amber-400" />
+                <span className="text-[10px]">Trim</span>
+              </button>
+              <button
+                onClick={() => { onApplyDelete(track.id); setShowMenu(false); }}
+                disabled={!track.region}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors"
+              >
+                <Trash2 className="w-5 h-5 text-red-400" />
+                <span className="text-[10px]">Delete</span>
+              </button>
+              <button
+                onClick={() => { onResetEdit(track.id); setShowMenu(false); }}
+                disabled={!track.edited}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors"
+              >
+                <RotateCcw className="w-5 h-5 text-sky-400" />
+                <span className="text-[10px]">Reset</span>
+              </button>
+              <button
+                onClick={() => { onRemove(track.id); setShowMenu(false); }}
+                className="flex flex-col items-center gap-1 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                <Trash2 className="w-5 h-5 text-red-400" />
+                <span className="text-[10px]">Remove</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowMenu(false)}
+              className="w-full py-2 rounded-xl text-[10px] text-muted-foreground hover:text-white hover:bg-white/5 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Plugin rack body */}
       {showPlugins && (
