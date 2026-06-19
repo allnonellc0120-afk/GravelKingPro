@@ -104,9 +104,29 @@ async function processWithMLKv3Ffmpeg(
   }
 }
 
-/** Apply rubberband tempo/pitch shift as a post-processing step. */
+let _rubberbandAvailable: boolean | null = null;
+function rubberbandAvailable(): boolean {
+  if (_rubberbandAvailable !== null) return _rubberbandAvailable;
+  try {
+    const { execFileSync } = require("child_process");
+    const filters = execFileSync("ffmpeg", ["-filters"], { encoding: "utf8", stdio: "pipe" });
+    _rubberbandAvailable = filters.includes("rubberband");
+  } catch {
+    _rubberbandAvailable = false;
+  }
+  return _rubberbandAvailable!;
+}
+
+/** Apply rubberband tempo/pitch shift as a post-processing step.
+ *  Falls back to passthrough when rubberband is not available in ffmpeg.
+ */
 async function applyTempoAndPitch(filePathOrBuf: string | Buffer, tempo: number, semitones: number): Promise<Buffer> {
   if (Math.abs(tempo - 1.0) < 0.01 && Math.abs(semitones) < 0.1) {
+    if (typeof filePathOrBuf === "string") return readFile(filePathOrBuf);
+    return filePathOrBuf;
+  }
+  // rubberband filter is not available in this ffmpeg build — skip gracefully
+  if (!rubberbandAvailable()) {
     if (typeof filePathOrBuf === "string") return readFile(filePathOrBuf);
     return filePathOrBuf;
   }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
-import { Upload, Download, Music, ZoomIn, ZoomOut } from "lucide-react";
+import { Upload, Download, Music, ZoomIn, ZoomOut, Mic, Disc3 } from "lucide-react";
 import { useDAW } from "@/lib/daw/useDAW";
 import { Transport } from "@/components/daw/Transport";
 import { ChannelStrip } from "@/components/daw/ChannelStrip";
@@ -13,14 +13,23 @@ import { MasterBus } from "@/components/daw/MasterBus";
 import { TimelineRuler } from "@/components/daw/TimelineRuler";
 import { ProjectManager } from "@/components/daw/ProjectManager";
 import { RecordControls } from "@/components/daw/RecordControls";
+import { StudioTabs, type StudioTab } from "@/components/daw/StudioTabs";
+import { DrumPad } from "@/components/daw/DrumPad";
+
+const DEV_BYPASS_KEY = "gk:dev:studio";
 
 export default function MixStudio() {
   const { isPro } = useAppState();
+  const [devBypass, setDevBypass] = useState(() => {
+    try { return localStorage.getItem(DEV_BYPASS_KEY) === "1"; } catch { return false; }
+  });
+  const canUseStudio = isPro || devBypass;
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropId = useId();
   const daw = useDAW();
 
+  const [activeTab, setActiveTab] = useState<StudioTab>("mixer");
   const [waveZoom, setWaveZoom] = useState(1);
   const [waveScroll, setWaveScroll] = useState(0);
 
@@ -79,7 +88,7 @@ export default function MixStudio() {
     addFiles(e.dataTransfer.files);
   }, [addFiles]);
 
-  if (!isPro) return (
+  if (!canUseStudio) return (
     <Layout>
       <div className="max-w-lg mx-auto text-center space-y-4 py-20">
         <div className="text-5xl">🎛️</div>
@@ -88,40 +97,28 @@ export default function MixStudio() {
         <a href="/pricing" className="inline-block mt-2">
           <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro</button>
         </a>
+        <button
+          onClick={() => {
+            localStorage.setItem(DEV_BYPASS_KEY, "1");
+            setDevBypass(true);
+          }}
+          className="block mx-auto text-[10px] text-muted-foreground underline opacity-50 hover:opacity-100"
+        >
+          Dev bypass
+        </button>
       </div>
     </Layout>
   );
 
   return (
     <Layout noPadding>
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0 pb-[72px] sm:pb-[84px]">
 
-        {/* Transport bar */}
-        <Transport
-          isPlaying={daw.isPlaying}
-          position={daw.position}
-          duration={daw.maxDuration}
-          masterVolume={daw.masterVolume}
-          loop={daw.loop}
-          bpm={daw.bpm}
-          onPlay={daw.play}
-          onPause={daw.pause}
-          onStop={daw.stop}
-          onSeek={(pct) => daw.seek(pct * daw.maxDuration)}
-          onVolumeChange={daw.setMasterVolume}
-          onLoopToggle={() => daw.setLoop(!daw.loop)}
-          onBpmChange={daw.setBpm}
-          trackCount={daw.tracks.length}
-        />
-
-        {/* Page header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-border/20 shrink-0 bg-black/30 gap-2">
+        {/* Top header bar */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border/20 shrink-0 bg-black/30 gap-2 z-30">
           <div className="flex items-center gap-2 min-w-0 shrink-0">
             <h1 className="text-base font-bold tracking-tight">Mix Studio</h1>
             <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] shrink-0">Studio</Badge>
-            <span className="text-[11px] text-muted-foreground hidden sm:block">
-              {daw.tracks.length}/8 tracks
-            </span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <ProjectManager
@@ -129,19 +126,12 @@ export default function MixStudio() {
               onSave={daw.getProjectSnapshot}
               onLoad={daw.restoreProject}
             />
-            <RecordControls
-              isRecording={daw.isRecording}
-              disabled={!daw.isRecording && daw.tracks.length >= 8}
-              listInputDevices={daw.listInputDevices}
-              onStart={daw.startRecording}
-              onStop={daw.stopRecording}
-            />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 border border-amber-500/25 rounded px-2 py-1 hover:border-amber-400/40 transition-colors"
             >
               <Upload className="w-3 h-3 shrink-0" />
-              <span className="hidden sm:inline">Add Tracks</span>
+              <span className="hidden sm:inline">Add</span>
             </button>
             <Button
               onClick={daw.exportMix}
@@ -150,7 +140,7 @@ export default function MixStudio() {
               className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-1 h-7 text-xs px-2 sm:px-3"
             >
               <Download className="w-3 h-3 shrink-0" />
-              <span className="hidden sm:inline">Export WAV</span>
+              <span className="hidden sm:inline">Export</span>
             </Button>
           </div>
         </div>
@@ -165,127 +155,202 @@ export default function MixStudio() {
           onChange={e => addFiles(e.target.files)}
         />
 
-        {/* Timeline ruler + global zoom controls */}
-        {daw.tracks.length > 0 && (
-          <div className="flex items-stretch shrink-0">
-            {/* Zoom controls pinned to the left — same width as the track left panel */}
-            <div className="w-[88px] shrink-0 flex items-center justify-center gap-0.5 bg-black/40 border-b border-r border-border/20">
-              <button
-                onClick={handleZoomOut}
-                disabled={waveZoom <= 1}
-                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
-                title="Zoom out (all tracks)"
-              >
-                <ZoomOut className="w-3 h-3" />
-              </button>
-              <span className="text-[9px] font-mono text-muted-foreground w-6 text-center">{waveZoom}x</span>
-              <button
-                onClick={handleZoomIn}
-                disabled={waveZoom >= 16}
-                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30 transition-colors"
-                title="Zoom in (all tracks)"
-              >
-                <ZoomIn className="w-3 h-3" />
-              </button>
+        {/* ── Tab: Mixer ── */}
+        {activeTab === "mixer" && (
+          <>
+            {/* Timeline ruler */}
+            {daw.tracks.length > 0 && (
+              <div className="flex items-stretch shrink-0">
+                <div className="w-[88px] shrink-0 flex items-center justify-center gap-0.5 bg-black/40 border-b border-r border-border/20">
+                  <button onClick={handleZoomOut} disabled={waveZoom <= 1} className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30">
+                    <ZoomOut className="w-3 h-3" />
+                  </button>
+                  <span className="text-[9px] font-mono text-muted-foreground w-6 text-center">{waveZoom}x</span>
+                  <button onClick={handleZoomIn} disabled={waveZoom >= 16} className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-white disabled:opacity-30">
+                    <ZoomIn className="w-3 h-3" />
+                  </button>
+                </div>
+                <TimelineRuler
+                  duration={daw.maxDuration}
+                  position={daw.position}
+                  bpm={daw.bpm}
+                  zoom={waveZoom}
+                  scrollOffset={waveScroll}
+                />
+              </div>
+            )}
+
+            {/* Track list */}
+            <div
+              id={dropId}
+              className="flex-1 overflow-y-auto min-h-0 px-3 py-3 space-y-2"
+              onDragOver={e => e.preventDefault()}
+              onDrop={handleDrop}
+            >
+              {daw.tracks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                  <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                    <Music className="w-7 h-7 text-amber-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold mb-1">No tracks yet</h2>
+                    <p className="text-sm text-muted-foreground">Tap or drop up to 8 audio files to start mixing</p>
+                  </div>
+                  <Button onClick={() => fileInputRef.current?.click()} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2">
+                    <Upload className="w-4 h-4" /> Add Tracks
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {daw.tracks.map(track => {
+                    const snapEdges = daw.tracks
+                      .filter(t => t.id !== track.id && t.duration > 0)
+                      .map(t => ({ start: t.startOffset, end: t.startOffset + t.duration }));
+                    return (
+                      <ChannelStrip
+                        key={track.id}
+                        track={track}
+                        position={daw.position}
+                        bpm={daw.bpm}
+                        totalDuration={daw.maxDuration}
+                        isPlaying={daw.isPlaying}
+                        zoom={waveZoom}
+                        scrollOffset={waveScroll}
+                        snapEdges={snapEdges}
+                        onZoomIn={handleZoomIn}
+                        onZoomOut={handleZoomOut}
+                        onScroll={handleScroll}
+                        getTrackAnalyser={daw.getTrackAnalyser}
+                        onSeek={daw.seek}
+                        onRemove={daw.removeTrack}
+                        onVolumeChange={daw.setTrackVolume}
+                        onPanChange={daw.setTrackPan}
+                        onToggleMute={daw.toggleMute}
+                        onToggleSolo={daw.toggleSolo}
+                        onAddPlugin={daw.addPlugin}
+                        onRemovePlugin={daw.removePlugin}
+                        onTogglePlugin={daw.togglePlugin}
+                        onUpdatePlugin={daw.updatePlugin}
+                        onReorderPlugin={daw.reorderPlugin}
+                        onSetRegion={daw.setRegion}
+                        onApplyTrim={daw.applyTrim}
+                        onApplyDelete={daw.applyDelete}
+                        onResetEdit={daw.resetEdit}
+                        onSetStartOffset={daw.setTrackStartOffset}
+                      />
+                    );
+                  })}
+                  {daw.tracks.length < 8 && (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-dashed border-border/20 text-muted-foreground hover:text-white hover:border-amber-500/30 transition-colors text-sm"
+                    >
+                      <Upload className="w-4 h-4" /> Tap or drop to add another track
+                    </button>
+                  )}
+                </>
+              )}
             </div>
-            <TimelineRuler
-              duration={daw.maxDuration}
-              position={daw.position}
-              bpm={daw.bpm}
-              zoom={waveZoom}
-              scrollOffset={waveScroll}
+
+            {/* Master bus */}
+            <MasterBus
+              plugins={daw.masterPlugins}
+              analyserRef={daw.masterAnalRef}
+              isPlaying={daw.isPlaying}
+              onUpdatePlugin={daw.updateMasterPlugin}
+              onTogglePlugin={id => {
+                daw.setMasterPlugins(prev =>
+                  prev.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p)
+                );
+              }}
             />
+          </>
+        )}
+
+        {/* ── Tab: Drum Pads ── */}
+        {activeTab === "drums" && (
+          <DrumPad
+            onAddTrack={daw.addTrack}
+            disabled={daw.tracks.length >= 8}
+            trackCount={daw.tracks.length}
+          />
+        )}
+
+        {/* ── Tab: Recorder ── */}
+        {activeTab === "recorder" && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
+            <div className="w-24 h-24 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+              <Mic className="w-10 h-10 text-red-400" />
+            </div>
+            <div className="text-center max-w-sm">
+              <h2 className="text-xl font-bold mb-1">Voice Recorder</h2>
+              <p className="text-sm text-muted-foreground">Record live vocals or instruments as a new track</p>
+            </div>
+            <RecordControls
+              isRecording={daw.isRecording}
+              disabled={!daw.isRecording && daw.tracks.length >= 8}
+              listInputDevices={daw.listInputDevices}
+              onStart={daw.startRecording}
+              onStop={daw.stopRecording}
+            />
+            <div className="text-[10px] text-muted-foreground">
+              Tracks: {daw.tracks.length}/8
+            </div>
           </div>
         )}
 
-        {/* Track list — scrollable */}
-        <div
-          id={dropId}
-          className="flex-1 overflow-y-auto min-h-0 px-3 py-3 space-y-2"
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDrop}
-        >
-          {daw.tracks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-              <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <Music className="w-7 h-7 text-amber-500" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold mb-1">No tracks yet</h2>
-                <p className="text-sm text-muted-foreground">Tap or drop up to 8 audio files to start mixing</p>
-              </div>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2"
-              >
-                <Upload className="w-4 h-4" /> Add Tracks
-              </Button>
+        {/* ── Tab: Plugins ── */}
+        {activeTab === "plugins" && (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/10">
+              <h2 className="text-lg font-bold">Master Plugins</h2>
             </div>
-          ) : (
-            <>
-              {daw.tracks.map(track => {
-                const snapEdges = daw.tracks
-                  .filter(t => t.id !== track.id && t.duration > 0)
-                  .map(t => ({ start: t.startOffset, end: t.startOffset + t.duration }));
-                return (
-                  <ChannelStrip
-                    key={track.id}
-                    track={track}
-                    position={daw.position}
-                    bpm={daw.bpm}
-                    totalDuration={daw.maxDuration}
-                    isPlaying={daw.isPlaying}
-                    zoom={waveZoom}
-                    scrollOffset={waveScroll}
-                    snapEdges={snapEdges}
-                    onZoomIn={handleZoomIn}
-                    onZoomOut={handleZoomOut}
-                    onScroll={handleScroll}
-                    getTrackAnalyser={daw.getTrackAnalyser}
-                    onSeek={daw.seek}
-                    onRemove={daw.removeTrack}
-                    onVolumeChange={daw.setTrackVolume}
-                    onPanChange={daw.setTrackPan}
-                    onToggleMute={daw.toggleMute}
-                    onToggleSolo={daw.toggleSolo}
-                    onAddPlugin={daw.addPlugin}
-                    onRemovePlugin={daw.removePlugin}
-                    onTogglePlugin={daw.togglePlugin}
-                    onUpdatePlugin={daw.updatePlugin}
-                    onReorderPlugin={daw.reorderPlugin}
-                    onSetRegion={daw.setRegion}
-                    onApplyTrim={daw.applyTrim}
-                    onApplyDelete={daw.applyDelete}
-                    onResetEdit={daw.resetEdit}
-                    onSetStartOffset={daw.setTrackStartOffset}
-                  />
-                );
-              })}
-              {daw.tracks.length < 8 && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-dashed border-border/20 text-muted-foreground hover:text-white hover:border-amber-500/30 transition-colors text-sm"
-                >
-                  <Upload className="w-4 h-4" /> Tap or drop to add another track
-                </button>
-              )}
-            </>
-          )}
-        </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <MasterBus
+                plugins={daw.masterPlugins}
+                analyserRef={daw.masterAnalRef}
+                isPlaying={daw.isPlaying}
+                onUpdatePlugin={daw.updateMasterPlugin}
+                onTogglePlugin={id => {
+                  daw.setMasterPlugins(prev =>
+                    prev.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p)
+                  );
+                }}
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Master bus */}
-        <MasterBus
-          plugins={daw.masterPlugins}
-          analyserRef={daw.masterAnalRef}
-          isPlaying={daw.isPlaying}
-          onUpdatePlugin={daw.updateMasterPlugin}
-          onTogglePlugin={id => {
-            daw.setMasterPlugins(prev =>
-              prev.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p)
-            );
-          }}
-        />
       </div>
+
+      {/* Bottom tab bar */}
+      <StudioTabs
+        active={activeTab}
+        onChange={setActiveTab}
+        trackCount={daw.tracks.length}
+        canAddTrack={daw.tracks.length < 8}
+      />
+
+      {/* Bottom Transport — fixed */}
+      <Transport
+        isPlaying={daw.isPlaying}
+        position={daw.position}
+        duration={daw.maxDuration}
+        masterVolume={daw.masterVolume}
+        loop={daw.loop}
+        bpm={daw.bpm}
+        onPlay={daw.play}
+        onPause={daw.pause}
+        onStop={daw.stop}
+        onSeek={(pct) => daw.seek(pct * daw.maxDuration)}
+        onVolumeChange={daw.setMasterVolume}
+        onLoopToggle={() => daw.setLoop(!daw.loop)}
+        onBpmChange={daw.setBpm}
+        trackCount={daw.tracks.length}
+        onSkipBack={() => daw.skipBack(5)}
+        onSkipForward={() => daw.skipForward(5)}
+        barPosition="bottom"
+      />
     </Layout>
   );
 }

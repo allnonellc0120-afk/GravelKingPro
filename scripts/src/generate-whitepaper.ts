@@ -75,7 +75,7 @@ async function createWhitePaper() {
     y -= paraGap;
   }
 
-  function drawStatBox(page: any, label: string, rawVal: string, mlkVal: string, improvement: string) {
+  function drawStatBox(page: any, label: string, rawVal: string, mlkVal: string, improvement: string, _note: string) {
     if (y < 180) { page = addPage(); }
     const boxH = 90;
     const boxW = textW;
