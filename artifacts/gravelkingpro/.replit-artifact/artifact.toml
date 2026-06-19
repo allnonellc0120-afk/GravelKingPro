@@ -23,6 +23,26 @@ publicDir = "artifacts/gravelkingpro/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
+from = "/pricing"
+to = "/pricing.html"
+
+[[services.production.rewrites]]
+from = "/voice-removal"
+to = "/voice-removal.html"
+
+[[services.production.rewrites]]
+from = "/mastering"
+to = "/mastering.html"
+
+[[services.production.rewrites]]
+from = "/download"
+to = "/download.html"
+
+[[services.production.rewrites]]
+from = "/contact"
+to = "/contact.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 
