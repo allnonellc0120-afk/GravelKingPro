@@ -1,13 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import { DragDropContentView, type DropAsset } from "expo-drag-drop-content-view";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -17,9 +15,20 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  DropZone,
+  DRAG_DROP_AVAILABLE,
+  type DropAsset,
+} from "@/components/DropZone";
 import { MicRecorder, type RecordedFile } from "@/components/MicRecorder";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch, API_BASE } from "@/lib/api";
+import {
+  bytesToPlayableUri,
+  downloadOrShare,
+  playUri,
+  type AudioPlayer,
+} from "@/lib/audioOutput";
 
 type Tool = {
   id: string;
@@ -139,7 +148,7 @@ export default function StudioScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const audioRef = useRef<any>(null);
+  const audioRef = useRef<AudioPlayer | null>(null);
   const mixAudiosRef = useRef<any[]>([]);
   /** Last successfully uploaded asset — survives tool switches for session pre-fill. */
   const lastAssetRef = useRef<{ uri: string; name: string; mimeType?: string } | null>(null);
@@ -148,7 +157,7 @@ export default function StudioScreen() {
 
   function stopCurrentStem() {
     if (audioRef.current) {
-      try { audioRef.current.pause(); } catch { /* ignore */ }
+      try { audioRef.current.stop(); } catch { /* ignore */ }
       audioRef.current = null;
     }
     for (const a of mixAudiosRef.current) { try { a.pause(); } catch { /* ok */ } }
@@ -184,24 +193,18 @@ export default function StudioScreen() {
     }
   }
 
-  function playStem(name: string, url: string) {
-    if (Platform.OS !== "web") {
-      Linking.openURL(url);
-      return;
-    }
+  async function playStem(name: string, url: string) {
     if (playingStem === name) {
       stopCurrentStem();
       return;
     }
     stopCurrentStem();
     try {
-      const audio = new (window as any).Audio(url);
-      audioRef.current = audio;
-      audio.play().catch(() => {});
-      audio.onended = () => setPlayingStem(null);
+      const player = await playUri(url, () => setPlayingStem(null));
+      audioRef.current = player;
       setPlayingStem(name);
     } catch {
-      Linking.openURL(url);
+      void downloadOrShare(url);
     }
   }
 
@@ -262,23 +265,23 @@ export default function StudioScreen() {
       const contentType = res.headers.get("content-type") ?? "";
 
       if (selectedTool.id === "stem_split" && contentType.includes("zip")) {
-        const blob = await res.blob();
         const { unzip } = await import("fflate");
-        const arrayBuf = await blob.arrayBuffer();
+        const arrayBuf = await res.arrayBuffer();
 
-        await new Promise<void>((resolve, reject) => {
-          unzip(new Uint8Array(arrayBuf), (err, files) => {
+        const files = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
+          unzip(new Uint8Array(arrayBuf), (err, unzipped) => {
             if (err) { reject(err); return; }
-            const items: StemItem[] = Object.entries(files).map(([name, data]) => {
-              const stemBlob = new Blob([data as BlobPart], { type: "audio/wav" });
-              const url = URL.createObjectURL(stemBlob);
-              const meta = STEM_META[name] ?? { label: name, color: "#94a3b8", desc: "" };
-              return { name, url, ...meta };
-            });
-            setStemItems(items);
-            resolve();
+            resolve(unzipped);
           });
         });
+
+        const items: StemItem[] = [];
+        for (const [name, data] of Object.entries(files)) {
+          const uri = await bytesToPlayableUri(data, name, "audio/wav");
+          const meta = STEM_META[name] ?? { label: name, color: "#94a3b8", desc: "" };
+          items.push({ name, url: uri, ...meta });
+        }
+        setStemItems(items);
 
         lastAssetRef.current = asset;
         setStage("done");
@@ -286,8 +289,12 @@ export default function StudioScreen() {
         return;
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const arrayBuf = await res.arrayBuffer();
+      const url = await bytesToPlayableUri(
+        new Uint8Array(arrayBuf),
+        selectedTool.resultLabel,
+        contentType || "audio/wav",
+      );
       lastAssetRef.current = asset;
       setResultUrl(url);
       setStage("done");
@@ -615,7 +622,7 @@ export default function StudioScreen() {
                   </Pressable>
                   {/* Download */}
                   <Pressable
-                    onPress={() => Linking.openURL(stem.url)}
+                    onPress={() => void downloadOrShare(stem.url)}
                     style={({ pressed }) => [
                       s.stemIconBtn,
                       {
@@ -644,7 +651,7 @@ export default function StudioScreen() {
           <Text style={[s.stateTitle, { color: colors.foreground }]}>Done!</Text>
           <Text style={[s.stateSub, { color: colors.mutedForeground }]}>{fileName}</Text>
           <Pressable
-            onPress={() => Linking.openURL(resultUrl)}
+            onPress={() => void downloadOrShare(resultUrl)}
             style={({ pressed }) => [
               s.downloadBtn,
               { backgroundColor: "#10b981", opacity: pressed ? 0.75 : 1 },
@@ -714,7 +721,7 @@ export default function StudioScreen() {
               </Text>
             </Pressable>
           )}
-          <DragDropContentView
+          <DropZone
             onDrop={({ assets }) => { void handleDroppedAssets(assets); }}
             onEnter={() => setIsDragOver(true)}
             onExit={() => setIsDragOver(false)}
@@ -749,9 +756,11 @@ export default function StudioScreen() {
               <Text style={[s.dropZoneSub, { color: colors.mutedForeground }]}>
                 MP3 · WAV · FLAC · M4A
               </Text>
-              <Text style={[s.dropHint, { color: colors.mutedForeground }]}>
-                or drag a file here from Files
-              </Text>
+              {DRAG_DROP_AVAILABLE && (
+                <Text style={[s.dropHint, { color: colors.mutedForeground }]}>
+                  or drag a file here from Files
+                </Text>
+              )}
 
               <View style={s.dropZoneBtns}>
                 <Pressable
@@ -794,7 +803,7 @@ export default function StudioScreen() {
               </View>
             </>
           )}
-          </DragDropContentView>
+          </DropZone>
         </View>
       ) : null}
 

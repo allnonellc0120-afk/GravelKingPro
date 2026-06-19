@@ -59,6 +59,8 @@
     "expo-av": "^16.0.8",
     "expo-document-picker": "~14.0.8",
     "expo-drag-drop-content-view": "^0.9.1",
+    "expo-file-system": "~19.0.23",
+    "expo-sharing": "~14.0.8",
     "fflate": "^0.8.2"
   }
 }
