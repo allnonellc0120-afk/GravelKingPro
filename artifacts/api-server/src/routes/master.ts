@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import { writeFile, readFile, unlink } from "fs/promises";
+import { unlink } from "fs/promises";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID } from "crypto";
@@ -9,7 +9,7 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
-import { applyMLKv3 } from "../kernel-v3";
+import { applyMLKv3Fast } from "../kernel-v3";
 
 /** Optional denoise stage folded into mastering (applied before the preset). */
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
@@ -177,8 +177,6 @@ masterRouter.post(
 
       await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 120_000 });
 
-      const wavBuffer = await readFile(outPath);
-
       // Count the free user's first full download against their allowance.
       if (!isSample && usageUserId) {
         if (usedTotalDownloads >= FREE_LIMITS.totalDownloads) {
@@ -198,7 +196,9 @@ masterRouter.post(
       }
 
       // Carve the mastered output through the MLK v3 kernel before returning it.
-      const { buf: carvedBuffer, parity } = applyMLKv3(wavBuffer);
+      // Runs entirely in ffmpeg (streaming on disk) so it completes in ~realtime
+      // and never allocates the multi-GB JS arrays the in-process kernel needed.
+      const { buf: carvedBuffer, parity } = await applyMLKv3Fast(outPath);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_master_${presetName}.wav"`);

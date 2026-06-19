@@ -33,3 +33,23 @@ was memory-bounded regardless of length.
 **How to apply:** before `readFile` + `applyMLKv3` on a multi-input route, project
 the output duration (sequential→sum, layer→max, then ÷ speed) and reject with the
 existing 422 contract if it exceeds `MAX_AUDIO_DURATION_S`.
+
+**Production route carves MUST use the ffmpeg-native `applyMLKv3Fast`, never the
+sync JS kernel.**
+`mlk_v3` → `gravelking_opt` builds throwaway `nested`/`carved` `number[][]` arrays
+over ALL samples, once per band (×3). On a real multi-minute song that is multiple
+GB of tiny JS allocations → V8 OOM → the SINGLE shared Node process is
+SIGTERM/SIGKILLed → every in-flight request (including the already-fast ffmpeg
+separators in `audio.ts`) hangs forever and healthchecks 500. This reproduced
+ONLY in production: dev had enough headroom and test fixtures were short.
+**Why:** master.ts + studio-mix.ts used to `readFile` the whole output and run the
+JS kernel; the heap blow-up was the real cause of the "all separators hang in
+prod" bug, even though the separators themselves were innocent collateral.
+**How to apply:** route output carving goes through
+`applyMLKv3Fast(input: string|Buffer, multiplier)` (kernel-v3.ts), which does the
+3-band MLK v3 carve entirely in ffmpeg (asplit=3 → per-band lowpass/highpass +
+volume → amix → dynaudnorm), streaming on disk with near-zero heap and returns
+`{ buf, parity: "MLK_V3_VALIDATED" }`. The JS `gravelking_opt` now takes
+`buildSlices` (default true for the bounded `/kernel/process` demo); `mlk_v3`
+passes `false` to skip the slice arrays. The sync JS `applyMLKv3` survives only on
+the dead Demucs GNS path — convert it too before ever mounting that path.

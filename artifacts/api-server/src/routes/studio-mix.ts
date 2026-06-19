@@ -2,13 +2,13 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { readFile, unlink } from "fs/promises";
+import { unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio } from "../lib/entitlement";
-import { applyMLKv3 } from "../kernel-v3";
+import { applyMLKv3Fast } from "../kernel-v3";
 
 const execFileAsync = promisify(execFile);
 
@@ -192,8 +192,9 @@ studioRouter.post(
       await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 120_000 });
 
       // Carve the combined mix through the MLK v3 kernel before returning it.
-      const mixedWav = await readFile(outputPath);
-      const { buf: carvedWav, parity } = applyMLKv3(mixedWav);
+      // Runs entirely in ffmpeg (streaming on disk) so it completes in ~realtime
+      // and never allocates the multi-GB JS arrays the in-process kernel needed.
+      const { buf: carvedWav, parity } = await applyMLKv3Fast(outputPath);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_mix.wav"`);

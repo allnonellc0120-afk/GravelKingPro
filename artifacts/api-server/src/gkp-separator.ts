@@ -13,54 +13,9 @@ import { randomUUID } from "crypto";
 import { join, basename, extname, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { zipSync } from "fflate";
-import { applyMLKv3 } from "./kernel-v3";
+import { applyMLKv3, applyMLKv3Fast } from "./kernel-v3";
 
 const execFileAsync = promisify(execFile);
-
-// ── Fast ffmpeg-native MLK v3 (no in-process JS carving) ───────────────────
-
-/** Run the MLK v3 3-band filter chain entirely in ffmpeg. Replaces the JS
- *  O(N²) `applyMLKv3` path for voice-removal / stem-split with a ~10× faster
- *  disk-streaming ffmpeg pipeline. */
-async function applyMLKv3Ffmpeg(
-  input: string | Buffer,
-  multiplier: number,
-): Promise<{ buf: Buffer; parity: string }> {
-  const id      = randomUUID();
-  const inPath  = typeof input === "string" ? input : `/tmp/gkp_mlk_in_${id}.wav`;
-  const outPath = `/tmp/gkp_mlk_fast_${id}.wav`;
-
-  if (typeof input !== "string") {
-    await writeFile(inPath, input);
-  }
-
-  const lowMult  = Math.min(2.0, multiplier * 1.15).toFixed(4);
-  const midMult  = multiplier.toFixed(4);
-  const highMult = Math.max(0.1, multiplier * 0.80).toFixed(4);
-
-  const filter = [
-    `asplit=3[low][mid][high]`,
-    `[low]lowpass=f=250,volume=${lowMult}[l]`,
-    `[mid]highpass=f=250,lowpass=f=4000,volume=${midMult}[m]`,
-    `[high]highpass=f=4000,volume=${highMult}[h]`,
-    `[l][m][h]amix=inputs=3:normalize=0,dynaudnorm=p=0.9:m=10:s=5`,
-  ].join(";");
-
-  await execFileAsync("ffmpeg", [
-    "-y", "-i", inPath,
-    "-filter_complex", filter,
-    "-ac", "2",
-    "-acodec", "pcm_s16le",
-    outPath,
-  ], { timeout: 180_000 });
-
-  const buf = await readFile(outPath);
-  await unlink(outPath).catch(() => {});
-  if (typeof input !== "string") {
-    await unlink(inPath).catch(() => {});
-  }
-  return { buf, parity: "MLK_V3_VALIDATED" };
-}
 
 // Wrapper script that patches torchaudio.load/save to use ffmpeg (bypasses missing torchcodec).
 // Resolves relative to the compiled bundle: dist/ -> .. -> artifacts/api-server/
@@ -237,7 +192,7 @@ export async function mlkVocalRemoval(
     ? "pan=stereo|c0=c0-c1|c1=c1-c0"
     : "equalizer=f=2500:t=q:w=2:g=-9";
   const rawBuf = await ffmpegFilterToWav(filePath, filter, channels >= 2 ? 2 : 1);
-  const { buf, parity } = await applyMLKv3Ffmpeg(rawBuf, multiplier);
+  const { buf, parity } = await applyMLKv3Fast(rawBuf, multiplier);
   return {
     instrumental: buf,
     kernelParity: parity,
@@ -276,7 +231,7 @@ export async function mlkStemSplit(
   await Promise.all(
     specs.map(async (s) => {
       const rawBuf          = await ffmpegFilterToWav(filePath, s.filter, s.ch);
-      const { buf, parity } = await applyMLKv3Ffmpeg(rawBuf, multiplier);
+      const { buf, parity } = await applyMLKv3Fast(rawBuf, multiplier);
       if (parity !== "MLK_V3_VALIDATED") kernelParity = parity;
       zipInput[`GKP_${s.name}.wav`] = new Uint8Array(buf);
       stemNames.push(s.name);
