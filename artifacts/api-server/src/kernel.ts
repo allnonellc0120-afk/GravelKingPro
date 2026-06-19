@@ -8,7 +8,8 @@ export interface KernelStats {
 export function gravelking_opt(
   input_data: Float32Array,
   multiplier: number = 0.75,
-  slice_size: number = 2
+  slice_size: number = 2,
+  buildSlices: boolean = true
 ): {
   processed: Float32Array;
   nested: number[][];
@@ -23,14 +24,18 @@ export function gravelking_opt(
   const processed = new Float32Array(N);
   for (let i = 0; i < N; i++) processed[i] = input_data[i] * multiplier;
 
-  // nested / carved are only used for visualisation; keep them small to avoid
-  // massive V8 array overhead when slice_size is tiny (default 2).
+  // nested / carved are only consumed by the /kernel/process demo endpoint for
+  // visualisation. On the audio hot path (mlk_v3) they are never read, yet they
+  // allocate millions of tiny arrays per band — enough to OOM-kill the process
+  // on a full-length track — so those callers pass buildSlices=false to skip them.
   const nested: number[][] = [];
   const carved: number[][] = [];
-  for (let i = 0; i < N; i += slice_size) {
-    const slice = Array.from(input_data.slice(i, i + slice_size));
-    nested.push(slice);
-    carved.push(slice.map(v => v * multiplier));
+  if (buildSlices) {
+    for (let i = 0; i < N; i += slice_size) {
+      const slice = Array.from(input_data.slice(i, i + slice_size));
+      nested.push(slice);
+      carved.push(slice.map(v => v * multiplier));
+    }
   }
 
   let originalSum = 0;
