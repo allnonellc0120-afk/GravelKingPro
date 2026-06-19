@@ -18,6 +18,7 @@ import AdminAnalytics from "@/pages/admin-analytics";
 import AdminWaitlist from "@/pages/admin-waitlist";
 import Optimizer from "@/pages/optimizer";
 import { PageTracker } from "@/lib/useAnalytics";
+import { RouteSeo } from "@/lib/seo";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ function App() {
       <TooltipProvider>
         <AppProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <RouteSeo />
             <PageTracker />
             <Router />
           </WouterRouter>

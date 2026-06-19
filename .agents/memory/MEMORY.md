@@ -21,6 +21,7 @@
 - [Prod DB schema migrates on Publish](deploy-prod-db-schema.md) — Publish auto-diffs dev→prod schema & applies it; never manually migrate prod (prod is read-only); to ship a schema change, re-publish
 - [stripe-replit-sync esbuild external](stripe-esbuild-external.md) — stripe + stripe-replit-sync must stay external in build.mjs or migrations silently skip (wrong __dirname)
 - [MLK benchmark honesty + dev gating](mlk-benchmark-honesty.md) — benchmark must show only real detected hardware (CPU-only, no GPU; mmap_locked from real mlockall); dev open-usage gate must be fail-closed (NODE_ENV === "development")
+- [Static SPA per-route SEO](static-spa-seo-prerender.md) — Vite SPA SEO: comment-marker head block + post-build prerender per route + EXACT artifact.toml rewrites before the /* fallback; client head mgr only complements
 - [Expo native modules in Expo Go](expo-native-module-expo-go.md) — third-party native views render "Unimplemented component" in Expo Go; guard before rendering
 - [Mobile audio result handling](mobile-audio-result-handling.md) — native can't use object URLs / Linking blob:; write bytes to expo-file-system cache, play via expo-av, share via expo-sharing
 - [DAW DSP accuracy](daw-dsp-accuracy.md) — EQ/plugins are RBJ-correct except Gate (it's a downward compressor, not a real gate; needs AudioWorklet); stem split is band-split+center-cancel, heavy midrange bleed, not true separation
