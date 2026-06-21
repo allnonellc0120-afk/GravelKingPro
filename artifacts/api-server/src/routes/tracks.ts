@@ -7,6 +7,33 @@ import { getUncachableStripeClient } from "../stripeClient";
 import { storage } from "../storage";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const execFileAsync = promisify(execFile);
+
+const MAX_PREVIEW_SECONDS = 30;
+
+/** Returns duration in seconds for an in-memory audio buffer, using ffprobe. */
+async function getAudioDurationSeconds(buffer: Buffer, ext: string): Promise<number> {
+  const tmpPath = join(tmpdir(), `gkp-preview-${randomUUID()}${ext}`);
+  try {
+    writeFileSync(tmpPath, buffer);
+    const { stdout } = await execFileAsync("ffprobe", [
+      "-v", "quiet",
+      "-print_format", "json",
+      "-show_format",
+      tmpPath,
+    ]);
+    const parsed = JSON.parse(stdout) as { format?: { duration?: string } };
+    return parseFloat(parsed.format?.duration ?? "0");
+  } finally {
+    try { unlinkSync(tmpPath); } catch { /* ignore */ }
+  }
+}
 
 const router = Router();
 
@@ -204,6 +231,18 @@ router.post(
 
     if (!title || !artistName || !audioFull || !audioPreview || !coverArt) {
       res.status(400).json({ error: "Missing required fields or files (audio_full, audio_preview, cover_art)" });
+      return;
+    }
+
+    // Enforce preview ≤30 s server-side using ffprobe so this cannot be bypassed via the API.
+    const previewDuration = await getAudioDurationSeconds(
+      audioPreview.buffer,
+      extOf(audioPreview.originalname) || ".bin",
+    );
+    if (previewDuration > MAX_PREVIEW_SECONDS) {
+      res.status(400).json({
+        error: `Preview clip must be ${MAX_PREVIEW_SECONDS} seconds or less (yours is ${Math.round(previewDuration)}s).`,
+      });
       return;
     }
 
