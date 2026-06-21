@@ -300,7 +300,6 @@ export default function MixStudio() {
         {activeTab === "drums" && (
           <DrumPad
             onAddTrack={daw.addTrack}
-            disabled={daw.tracks.length >= 8}
             trackCount={daw.tracks.length}
           />
         )}
