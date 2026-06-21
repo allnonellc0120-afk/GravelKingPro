@@ -165,14 +165,23 @@ export default function MixStudio() {
           </div>
         </div>
 
-        {/* Hidden file input */}
+        {/*
+          iOS Safari requires:
+          1. Explicit extensions (not audio/* wildcard)
+          2. The input must NOT be display:none (hidden class) —
+             it must be visually hidden but still in the DOM so
+             .click() works from a user gesture.
+        */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="audio/*,video/*"
+          accept=".wav,.mp3,.m4a,.aac,.flac,.ogg,.oga,.weba,.aiff,.au,.snd,.wma"
           multiple
-          className="hidden"
-          onChange={e => addFiles(e.target.files)}
+          style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
+          onChange={e => {
+            addFiles(e.target.files);
+            if (e.target) e.target.value = "";
+          }}
         />
 
         {/* ── Tab: Mixer ── */}
