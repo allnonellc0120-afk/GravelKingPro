@@ -45,6 +45,24 @@
       "title": "Contact GravelKing Productions — All N One LLC",
       "description": "Questions about licensing, partnerships, the GravelKing kernel, or custom integration work? Get in touch with All N One LLC directly.",
       "ogType": "website"
+    },
+    {
+      "path": "/label",
+      "title": "GravelKing Label — Browse Tracks | GravelKing Productions",
+      "description": "Discover tracks from GravelKing Productions label artists. Purchase, preview, and download high-quality audio.",
+      "ogType": "website"
+    },
+    {
+      "path": "/library",
+      "title": "My Library — GravelKing Productions",
+      "description": "Your purchased tracks from GravelKing Productions label. Stream and download anytime.",
+      "ogType": "website"
+    },
+    {
+      "path": "/submit",
+      "title": "Submit Track — GravelKing Productions",
+      "description": "Submit your track to the GravelKing Productions label. Get reviewed and published.",
+      "ogType": "website"
     }
   ]
 }
