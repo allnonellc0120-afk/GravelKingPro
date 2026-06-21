@@ -1,9 +1,10 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { db, purchasedTracksTable } from '@workspace/db';
 import { sql } from 'drizzle-orm';
+import type { Request } from 'express';
 
 export class WebhookHandlers {
-  static async processWebhook(payload: Buffer, signature: string): Promise<void> {
+  static async processWebhook(payload: Buffer, signature: string, req?: Request): Promise<void> {
     if (!Buffer.isBuffer(payload)) {
       throw new Error(
         'STRIPE WEBHOOK ERROR: Payload must be a Buffer. ' +
@@ -30,18 +31,18 @@ export class WebhookHandlers {
         if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           const meta = session.metadata ?? {};
+          // Specified metadata contract: track_id and user_id (snake_case).
           if (
-            meta.type === 'track' &&
-            meta.trackId &&
-            meta.userId &&
+            meta.track_id &&
+            meta.user_id &&
             (session.payment_status === 'paid' || session.status === 'complete')
           ) {
             // Idempotent insert — duplicate webhook deliveries are safe.
             await db
               .insert(purchasedTracksTable)
               .values({
-                userId: meta.userId,
-                trackId: meta.trackId,
+                userId: meta.user_id,
+                trackId: meta.track_id,
                 stripeCheckoutSessionId: session.id,
               })
               .onConflictDoNothing();
@@ -52,8 +53,11 @@ export class WebhookHandlers {
           }
         }
       }
-    } catch {
-      // Never block stripe-replit-sync processing if our track handler fails.
+    } catch (err) {
+      // Log so the error is observable, but never block stripe-replit-sync processing
+      // if our track handler fails.
+      const log = req?.log ?? { error: console.error };
+      log.error({ err }, 'Track purchase webhook handler failed');
     }
 
     const sync = await getStripeSync();

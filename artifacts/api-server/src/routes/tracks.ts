@@ -279,6 +279,12 @@ router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
     return;
   }
 
+  // Only tracks approved by admins can be sold via checkout.
+  if (track.status !== "accepted") {
+    res.status(403).json({ error: "Track not yet available for purchase" });
+    return;
+  }
+
   const stripe = await getUncachableStripeClient();
 
   let priceId = track.stripePriceId;
@@ -309,7 +315,7 @@ router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
     mode: "payment",
     success_url: `${origin}/library?cs={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/label/${encodeURIComponent(track.artistName)}`,
-    metadata: { trackId: track.id, userId: user.id, type: "track" },
+    metadata: { track_id: track.id, user_id: user.id, type: "track" },
   });
 
   // Persist gk_session so purchases are attributable to this browser session.
@@ -342,8 +348,8 @@ router.post("/tracks/confirm-purchase", async (req: Request, res: Response) => {
     const meta = session.metadata ?? {};
     if (
       meta.type !== "track" ||
-      !meta.trackId ||
-      !meta.userId ||
+      !meta.track_id ||
+      !meta.user_id ||
       !(session.payment_status === "paid" || session.status === "complete")
     ) {
       res.status(400).json({ error: "Session is not a completed track purchase" });
@@ -353,8 +359,8 @@ router.post("/tracks/confirm-purchase", async (req: Request, res: Response) => {
     await db
       .insert(purchasedTracksTable)
       .values({
-        userId: meta.userId,
-        trackId: meta.trackId,
+        userId: meta.user_id,
+        trackId: meta.track_id,
         stripeCheckoutSessionId: session.id,
       })
       .onConflictDoNothing();
@@ -377,6 +383,11 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
   const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, trackId));
   if (!track) {
     res.status(404).json({ error: "Track not found" });
+    return;
+  }
+
+  if (track.status !== "accepted") {
+    res.status(403).json({ error: "Track not yet available for download" });
     return;
   }
 
