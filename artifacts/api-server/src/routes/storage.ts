@@ -42,13 +42,25 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
 /**
  * GET /storage/public-objects/*
  *
- * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
- * These are unconditionally public — no authentication or ACL checks.
+ * Serve public assets (cover art, preview clips) from PUBLIC_OBJECT_SEARCH_PATHS.
+ *
+ * Explicitly blocks any path that begins with "private/" or contains path-traversal
+ * sequences, so full paid audio stored under private/ can never be reached here
+ * regardless of how PUBLIC_OBJECT_SEARCH_PATHS is configured.
+ * Full audio is delivered only through the gated /api/tracks/:id/download endpoint.
  */
 router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
   try {
     const raw = req.params.filePath;
     const filePath = Array.isArray(raw) ? raw.join("/") : raw;
+
+    // Deny private/ prefix and path-traversal — defence-in-depth so this route
+    // can never serve paid audio even if bucket search paths are configured broadly.
+    if (filePath.startsWith("private/") || filePath.includes("..")) {
+      res.status(403).json({ error: "Not authorized" });
+      return;
+    }
+
     const file = await objectStorageService.searchPublicObject(filePath);
     if (!file) {
       res.status(404).json({ error: "File not found" });
