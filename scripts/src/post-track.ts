@@ -47,6 +47,14 @@ const TRACKS = [
     coverFile: "tgk-superman-cover.jpg",
     price: 9.99,
   },
+  {
+    title: "I Wanna Recognize Me",
+    artistName: "Hope Of The Free World",
+    fullFile: "hope-recognize-full.wav",
+    previewFile: "hope-recognize-preview.wav",
+    coverFile: "hope-recognize-cover.jpg",
+    price: 9.99,
+  },
 ];
 
 async function main() {
