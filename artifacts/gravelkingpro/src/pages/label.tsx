@@ -115,7 +115,7 @@ export default function LabelPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Disc3 className="w-6 h-6 text-amber-500" />
-              Gravel King Productions Label
+              Gravelking Productions Label
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">Independent artists · $9.99 per track</p>
           </div>

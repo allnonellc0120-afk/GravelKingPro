@@ -10,6 +10,26 @@ import { randomUUID } from "node:crypto";
 
 const router = Router();
 
+/**
+ * Columns safe to return to public callers — deliberately excludes audioFullKey.
+ * audioFullKey must never appear in unauthenticated API responses; it is only
+ * read server-side inside the gated /api/tracks/:id/download handler.
+ */
+const publicTrackCols = {
+  id: tracksTable.id,
+  title: tracksTable.title,
+  artistName: tracksTable.artistName,
+  audioPreviewKey: tracksTable.audioPreviewKey,
+  coverArtKey: tracksTable.coverArtKey,
+  price: tracksTable.price,
+  status: tracksTable.status,
+  stripeProductId: tracksTable.stripeProductId,
+  stripePriceId: tracksTable.stripePriceId,
+  submittedByUserId: tracksTable.submittedByUserId,
+  createdAt: tracksTable.createdAt,
+  updatedAt: tracksTable.updatedAt,
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 150 * 1024 * 1024 },
@@ -36,11 +56,11 @@ async function resolveSessionUser(req: Request): Promise<{ sessionId: string; us
   return { sessionId, userId: user.id };
 }
 
-/** GET /api/tracks — list all accepted tracks, newest first */
+/** GET /api/tracks — list all accepted tracks, newest first. audioFullKey excluded. */
 router.get("/tracks", async (_req: Request, res: Response) => {
   try {
     const rows = await db
-      .select()
+      .select(publicTrackCols)
       .from(tracksTable)
       .where(eq(tracksTable.status, "accepted"))
       .orderBy(desc(tracksTable.createdAt));
@@ -50,12 +70,12 @@ router.get("/tracks", async (_req: Request, res: Response) => {
   }
 });
 
-/** GET /api/tracks/artist/:artist — list accepted tracks by artist, newest first */
+/** GET /api/tracks/artist/:artist — list accepted tracks by artist, newest first. audioFullKey excluded. */
 router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
   const artist = req.params.artist as string;
   try {
     const rows = await db
-      .select()
+      .select(publicTrackCols)
       .from(tracksTable)
       .where(and(
         eq(tracksTable.artistName, artist),
@@ -138,7 +158,7 @@ router.get("/library", async (req: Request, res: Response) => {
     }
 
     const tracks = await db
-      .select()
+      .select(publicTrackCols)
       .from(tracksTable)
       .where(inArray(tracksTable.id, trackIds));
 
@@ -203,7 +223,9 @@ router.post(
 
     try {
       const id = randomUUID();
-      const audioFullKey = `tracks/${id}/audio_full${extOf(audioFull.originalname)}`;
+      // Full audio is stored under private/ so it is never reachable via the
+      // public-objects route regardless of PUBLIC_OBJECT_SEARCH_PATHS config.
+      const audioFullKey = `private/tracks/${id}/audio_full${extOf(audioFull.originalname)}`;
       const audioPreviewKey = `tracks/${id}/audio_preview${extOf(audioPreview.originalname)}`;
       const coverArtKey = `tracks/${id}/cover_art${extOf(coverArt.originalname)}`;
 
