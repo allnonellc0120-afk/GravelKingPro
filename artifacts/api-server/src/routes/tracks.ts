@@ -4,8 +4,20 @@ import { eq, and, inArray } from "drizzle-orm";
 import { resolveTier } from "../lib/entitlement";
 import { objectStorageClient } from "../lib/objectStorage";
 import { getUncachableStripeClient } from "../stripeClient";
+import { storage } from "../storage";
 
 const router = Router();
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Derive gk_session-based userId. Returns null if no session cookie present. */
+async function resolveSessionUser(req: Request): Promise<{ sessionId: string; userId: string } | null> {
+  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+  if (!sessionId) return null;
+  const user = await storage.getUserBySession(sessionId);
+  if (!user) return null;
+  return { sessionId, userId: user.id };
+}
 
 /** GET /api/tracks — list all accepted tracks for storefront */
 router.get("/tracks", async (_req: Request, res: Response) => {
@@ -39,44 +51,52 @@ router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
   }
 });
 
-/** GET /api/library — tracks the user has purchased */
+/** GET /api/library — tracks the user has purchased (gk_session-scoped) */
 router.get("/library", async (req: Request, res: Response) => {
-  const userId = req.isAuthenticated() ? req.user.id : null;
-  if (!userId) {
-    res.status(401).json({ error: "Sign in to view your library" });
+  const session = await resolveSessionUser(req);
+  if (!session) {
+    res.json({ tracks: [] });
     return;
   }
+
   try {
     const purchased = await db
       .select()
       .from(purchasedTracksTable)
-      .where(eq(purchasedTracksTable.userId, userId));
+      .where(eq(purchasedTracksTable.userId, session.userId));
+
     const trackIds = purchased.map(r => r.trackId);
     if (trackIds.length === 0) {
       res.json({ tracks: [] });
       return;
     }
+
     const tracks = await db
       .select()
       .from(tracksTable)
       .where(inArray(tracksTable.id, trackIds));
+
     res.json({ tracks });
   } catch (_err) {
     res.status(500).json({ error: "Failed to load library" });
   }
 });
 
-/** POST /api/tracks/submit — submit a track (requires paid tier, 1/day) */
+/**
+ * POST /api/tracks/submit — submit a track.
+ * Requires Pro or higher subscription (gk_session-scoped, no OIDC login wall).
+ * Rate-limited to once per 7 days.
+ */
 router.post("/tracks/submit", async (req: Request, res: Response) => {
-  const userId = req.isAuthenticated() ? req.user.id : null;
-  if (!userId) {
-    res.status(401).json({ error: "Sign in to submit tracks" });
+  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+  if (!sessionId) {
+    res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
     return;
   }
 
   const tier = await resolveTier(req);
   if (tier === "free") {
-    res.status(403).json({ error: "Paid subscription required to submit tracks" });
+    res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
     return;
   }
 
@@ -93,12 +113,13 @@ router.post("/tracks/submit", async (req: Request, res: Response) => {
     return;
   }
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  const user = await storage.getOrCreateUser(sessionId);
   const now = new Date();
-  const last = user?.lastSubmissionDate;
-  if (last && (now.getTime() - new Date(last).getTime()) < 24 * 60 * 60 * 1000) {
-    const hoursLeft = Math.ceil((24 * 60 * 60 * 1000 - (now.getTime() - new Date(last).getTime())) / (60 * 60 * 1000));
-    res.status(429).json({ error: `Track submissions are limited to once per 24 hours. Try again in ${hoursLeft} hour(s).` });
+  const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
+  const last = dbUser?.lastSubmissionDate;
+  if (last && (now.getTime() - new Date(last).getTime()) < SEVEN_DAYS_MS) {
+    const daysLeft = Math.ceil((SEVEN_DAYS_MS - (now.getTime() - new Date(last).getTime())) / (24 * 60 * 60 * 1000));
+    res.status(429).json({ error: `Track submissions are limited to once per 7 days. Try again in ${daysLeft} day(s).` });
     return;
   }
 
@@ -112,7 +133,7 @@ router.post("/tracks/submit", async (req: Request, res: Response) => {
         audioPreviewKey,
         coverArtKey,
         status: "pending",
-        submittedByUserId: userId,
+        submittedByUserId: user.id,
         price: 9.99,
       })
       .returning();
@@ -120,7 +141,7 @@ router.post("/tracks/submit", async (req: Request, res: Response) => {
     await db
       .update(usersTable)
       .set({ lastSubmissionDate: now })
-      .where(eq(usersTable.id, userId));
+      .where(eq(usersTable.id, user.id));
 
     res.json({ track });
   } catch (_err) {
@@ -128,13 +149,14 @@ router.post("/tracks/submit", async (req: Request, res: Response) => {
   }
 });
 
-/** POST /api/tracks/:id/checkout — Stripe one-time checkout for a track */
+/**
+ * POST /api/tracks/:id/checkout — Stripe one-time checkout for a track.
+ * Identity is gk_session-scoped; no OIDC login required.
+ * Origin for success/cancel URLs is derived from REPLIT_DOMAINS (never from request headers).
+ */
 router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
-  const userId = req.isAuthenticated() ? req.user.id : null;
-  if (!userId) {
-    res.status(401).json({ error: "Sign in to purchase tracks" });
-    return;
-  }
+  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+  const user = await storage.getOrCreateUser(sessionId ?? require("node:crypto").randomUUID());
 
   const trackId = req.params.id as string;
   const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, trackId));
@@ -163,23 +185,77 @@ router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
       .where(eq(tracksTable.id, trackId));
   }
 
-  const origin = `${req.headers["x-forwarded-proto"] ?? "https"}://${req.headers["x-forwarded-host"] ?? req.headers["host"] ?? "localhost"}`;
+  // Derive origin from server-side config only — never from req.headers.origin or
+  // x-forwarded-* which an attacker-controlled page could spoof.
+  const domain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim() ?? "localhost:80";
+  const origin = `https://${domain}`;
+
   const session = await stripe.checkout.sessions.create({
     line_items: [{ price: priceId, quantity: 1 }],
     mode: "payment",
-    success_url: `${origin}/library`,
+    success_url: `${origin}/library?cs={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/label/${encodeURIComponent(track.artistName)}`,
-    metadata: { trackId: track.id, userId, type: "track" },
+    metadata: { trackId: track.id, userId: user.id, type: "track" },
+  });
+
+  // Persist gk_session so purchases are attributable to this browser session.
+  res.cookie("gk_session", user.sessionId ?? user.id, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    path: "/",
   });
 
   res.json({ url: session.url });
 });
 
+/**
+ * POST /api/tracks/confirm-purchase — called by frontend on checkout success redirect.
+ * Verifies the Stripe checkout session server-side and records the purchase idempotently.
+ * This is a belt-and-suspenders complement to the webhook handler.
+ */
+router.post("/tracks/confirm-purchase", async (req: Request, res: Response) => {
+  const { checkoutSessionId } = req.body as { checkoutSessionId?: string };
+  if (!checkoutSessionId) {
+    res.status(400).json({ error: "checkoutSessionId required" });
+    return;
+  }
+
+  try {
+    const stripe = await getUncachableStripeClient();
+    const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
+
+    const meta = session.metadata ?? {};
+    if (
+      meta.type !== "track" ||
+      !meta.trackId ||
+      !meta.userId ||
+      !(session.payment_status === "paid" || session.status === "complete")
+    ) {
+      res.status(400).json({ error: "Session is not a completed track purchase" });
+      return;
+    }
+
+    await db
+      .insert(purchasedTracksTable)
+      .values({
+        userId: meta.userId,
+        trackId: meta.trackId,
+        stripeCheckoutSessionId: session.id,
+      })
+      .onConflictDoNothing();
+
+    res.json({ ok: true });
+  } catch (_err) {
+    res.status(500).json({ error: "Could not confirm purchase" });
+  }
+});
+
 /** GET /api/tracks/:id/download — stream purchased track directly to the user's device */
 router.get("/tracks/:id/download", async (req: Request, res: Response) => {
-  const userId = req.isAuthenticated() ? req.user.id : null;
-  if (!userId) {
-    res.status(401).json({ error: "Sign in to download tracks" });
+  const session = await resolveSessionUser(req);
+  if (!session) {
+    res.status(401).json({ error: "No session — purchase the track first" });
     return;
   }
 
@@ -194,7 +270,7 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
     .select()
     .from(purchasedTracksTable)
     .where(and(
-      eq(purchasedTracksTable.userId, userId),
+      eq(purchasedTracksTable.userId, session.userId),
       eq(purchasedTracksTable.trackId, trackId),
     ));
 

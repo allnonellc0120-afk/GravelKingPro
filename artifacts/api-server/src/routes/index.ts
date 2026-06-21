@@ -13,6 +13,7 @@ import waitlistRouter from "./waitlist";
 import analyticsRouter from "./analytics";
 import mlkRouter from "./mlk";
 import tracksRouter from "./tracks";
+import storageRouter from "./storage";
 import adminAuthRouter from "./adminAuth";
 
 const router: IRouter = Router();
@@ -32,5 +33,6 @@ router.use(waitlistRouter);
 router.use(analyticsRouter);
 router.use(mlkRouter);
 router.use(tracksRouter);
+router.use(storageRouter);
 
 export default router;
