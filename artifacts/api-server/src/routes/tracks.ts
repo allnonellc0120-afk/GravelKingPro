@@ -1,14 +1,31 @@
 import { Router, type Request, type Response } from "express";
 import { db, tracksTable, purchasedTracksTable, usersTable } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { resolveTier } from "../lib/entitlement";
 import { objectStorageClient } from "../lib/objectStorage";
 import { getUncachableStripeClient } from "../stripeClient";
 import { storage } from "../storage";
+import multer from "multer";
+import { randomUUID } from "node:crypto";
 
 const router = Router();
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 150 * 1024 * 1024 },
+});
+
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function extOf(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  return dot >= 0 ? filename.slice(dot) : "";
+}
+
+async function saveFileToBucket(buffer: Buffer, key: string, contentType: string): Promise<void> {
+  const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
+  await objectStorageClient.bucket(bucketId).file(key).save(buffer, { contentType });
+}
 
 /** Derive gk_session-based userId. Returns null if no session cookie present. */
 async function resolveSessionUser(req: Request): Promise<{ sessionId: string; userId: string } | null> {
@@ -19,21 +36,21 @@ async function resolveSessionUser(req: Request): Promise<{ sessionId: string; us
   return { sessionId, userId: user.id };
 }
 
-/** GET /api/tracks — list all accepted tracks for storefront */
+/** GET /api/tracks — list all accepted tracks, newest first */
 router.get("/tracks", async (_req: Request, res: Response) => {
   try {
     const rows = await db
       .select()
       .from(tracksTable)
       .where(eq(tracksTable.status, "accepted"))
-      .orderBy(tracksTable.createdAt);
+      .orderBy(desc(tracksTable.createdAt));
     res.json({ tracks: rows });
   } catch (_err) {
     res.status(500).json({ error: "Failed to list tracks" });
   }
 });
 
-/** GET /api/tracks/artist/:artist — list tracks by artist name */
+/** GET /api/tracks/artist/:artist — list accepted tracks by artist, newest first */
 router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
   const artist = req.params.artist as string;
   try {
@@ -44,14 +61,14 @@ router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
         eq(tracksTable.artistName, artist),
         eq(tracksTable.status, "accepted"),
       ))
-      .orderBy(tracksTable.createdAt);
+      .orderBy(desc(tracksTable.createdAt));
     res.json({ tracks: rows });
   } catch (_err) {
     res.status(500).json({ error: "Failed to list tracks" });
   }
 });
 
-/** GET /api/library — tracks the user has purchased (gk_session-scoped) */
+/** GET /api/library — tracks the user has purchased (gk_session-scoped, no auth wall) */
 router.get("/library", async (req: Request, res: Response) => {
   const session = await resolveSessionUser(req);
   if (!session) {
@@ -83,71 +100,97 @@ router.get("/library", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/tracks/submit — submit a track.
- * Requires Pro or higher subscription (gk_session-scoped, no OIDC login wall).
- * Rate-limited to once per 7 days.
+ * POST /api/tracks/submit — submit a track via multipart file upload.
+ * Requires any paid subscription tier (weekly, monthly, node_auditor).
+ * Rate-limited to once per 7 days — except node_auditor which is unlimited.
  */
-router.post("/tracks/submit", async (req: Request, res: Response) => {
-  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
-  if (!sessionId) {
-    res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
-    return;
+router.post(
+  "/tracks/submit",
+  upload.fields([
+    { name: "audio_full", maxCount: 1 },
+    { name: "audio_preview", maxCount: 1 },
+    { name: "cover_art", maxCount: 1 },
+  ]),
+  async (req: Request, res: Response) => {
+    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+    if (!sessionId) {
+      res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
+      return;
+    }
+
+    const tier = await resolveTier(req);
+    if (tier === "free") {
+      res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
+      return;
+    }
+
+    const body = req.body as Record<string, string>;
+    const title = body.title?.trim();
+    const artistName = body.artistName?.trim();
+
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const audioFull = files?.audio_full?.[0];
+    const audioPreview = files?.audio_preview?.[0];
+    const coverArt = files?.cover_art?.[0];
+
+    if (!title || !artistName || !audioFull || !audioPreview || !coverArt) {
+      res.status(400).json({ error: "Missing required fields or files (audio_full, audio_preview, cover_art)" });
+      return;
+    }
+
+    const user = await storage.getOrCreateUser(sessionId);
+    const now = new Date();
+
+    // node_auditor has unlimited submissions; all other paid tiers are rate-limited to once per 7 days
+    if (tier !== "node_auditor") {
+      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
+      const last = dbUser?.lastSubmissionDate;
+      if (last && (now.getTime() - new Date(last).getTime()) < SEVEN_DAYS_MS) {
+        const daysLeft = Math.ceil((SEVEN_DAYS_MS - (now.getTime() - new Date(last).getTime())) / (24 * 60 * 60 * 1000));
+        res.status(429).json({ error: `Track submissions are limited to once per 7 days. Try again in ${daysLeft} day(s).` });
+        return;
+      }
+    }
+
+    try {
+      const id = randomUUID();
+      const audioFullKey = `tracks/${id}/audio_full${extOf(audioFull.originalname)}`;
+      const audioPreviewKey = `tracks/${id}/audio_preview${extOf(audioPreview.originalname)}`;
+      const coverArtKey = `tracks/${id}/cover_art${extOf(coverArt.originalname)}`;
+
+      await Promise.all([
+        saveFileToBucket(audioFull.buffer, audioFullKey, audioFull.mimetype),
+        saveFileToBucket(audioPreview.buffer, audioPreviewKey, audioPreview.mimetype),
+        saveFileToBucket(coverArt.buffer, coverArtKey, coverArt.mimetype),
+      ]);
+
+      const [track] = await db
+        .insert(tracksTable)
+        .values({
+          title,
+          artistName,
+          audioFullKey,
+          audioPreviewKey,
+          coverArtKey,
+          status: "pending",
+          submittedByUserId: user.id,
+          price: 9.99,
+        })
+        .returning();
+
+      if (tier !== "node_auditor") {
+        await db
+          .update(usersTable)
+          .set({ lastSubmissionDate: now })
+          .where(eq(usersTable.id, user.id));
+      }
+
+      res.json({ track });
+    } catch (_err) {
+      res.status(500).json({ error: "Failed to submit track" });
+    }
   }
-
-  const tier = await resolveTier(req);
-  if (tier === "free") {
-    res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
-    return;
-  }
-
-  const { title, artistName, audioFullKey, audioPreviewKey, coverArtKey } = req.body as {
-    title?: string;
-    artistName?: string;
-    audioFullKey?: string;
-    audioPreviewKey?: string;
-    coverArtKey?: string;
-  };
-
-  if (!title?.trim() || !artistName?.trim() || !audioFullKey?.trim() || !audioPreviewKey?.trim() || !coverArtKey?.trim()) {
-    res.status(400).json({ error: "Missing required fields" });
-    return;
-  }
-
-  const user = await storage.getOrCreateUser(sessionId);
-  const now = new Date();
-  const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
-  const last = dbUser?.lastSubmissionDate;
-  if (last && (now.getTime() - new Date(last).getTime()) < SEVEN_DAYS_MS) {
-    const daysLeft = Math.ceil((SEVEN_DAYS_MS - (now.getTime() - new Date(last).getTime())) / (24 * 60 * 60 * 1000));
-    res.status(429).json({ error: `Track submissions are limited to once per 7 days. Try again in ${daysLeft} day(s).` });
-    return;
-  }
-
-  try {
-    const [track] = await db
-      .insert(tracksTable)
-      .values({
-        title: title.trim(),
-        artistName: artistName.trim(),
-        audioFullKey,
-        audioPreviewKey,
-        coverArtKey,
-        status: "pending",
-        submittedByUserId: user.id,
-        price: 9.99,
-      })
-      .returning();
-
-    await db
-      .update(usersTable)
-      .set({ lastSubmissionDate: now })
-      .where(eq(usersTable.id, user.id));
-
-    res.json({ track });
-  } catch (_err) {
-    res.status(500).json({ error: "Failed to submit track" });
-  }
-});
+);
 
 /**
  * POST /api/tracks/:id/checkout — Stripe one-time checkout for a track.
@@ -155,8 +198,8 @@ router.post("/tracks/submit", async (req: Request, res: Response) => {
  * Origin for success/cancel URLs is derived from REPLIT_DOMAINS (never from request headers).
  */
 router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
-  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
-  const user = await storage.getOrCreateUser(sessionId ?? require("node:crypto").randomUUID());
+  const sessionId = (req.cookies as Record<string, string>)?.gk_session ?? randomUUID();
+  const user = await storage.getOrCreateUser(sessionId);
 
   const trackId = req.params.id as string;
   const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, trackId));
@@ -212,7 +255,7 @@ router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
 /**
  * POST /api/tracks/confirm-purchase — called by frontend on checkout success redirect.
  * Verifies the Stripe checkout session server-side and records the purchase idempotently.
- * This is a belt-and-suspenders complement to the webhook handler.
+ * Complements the webhook handler for cases where the webhook fires before the redirect.
  */
 router.post("/tracks/confirm-purchase", async (req: Request, res: Response) => {
   const { checkoutSessionId } = req.body as { checkoutSessionId?: string };
@@ -301,15 +344,34 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
     .pipe(res);
 });
 
-/** GET /api/admin/tracks — admin: list all tracks (moderation) */
+/** GET /api/admin/tracks — admin: list all tracks for moderation */
 router.get("/admin/tracks", async (req: Request, res: Response) => {
   const { requireAdmin } = await import("../lib/adminAuth");
   if (!requireAdmin(req, res)) return;
   try {
-    const rows = await db.select().from(tracksTable).orderBy(tracksTable.createdAt);
+    const rows = await db
+      .select()
+      .from(tracksTable)
+      .orderBy(desc(tracksTable.createdAt));
     res.json({ tracks: rows });
   } catch (_err) {
     res.status(500).json({ error: "Failed to list tracks" });
+  }
+});
+
+/** GET /api/admin/tracks/pending — admin: list only pending tracks */
+router.get("/admin/tracks/pending", async (req: Request, res: Response) => {
+  const { requireAdmin } = await import("../lib/adminAuth");
+  if (!requireAdmin(req, res)) return;
+  try {
+    const rows = await db
+      .select()
+      .from(tracksTable)
+      .where(eq(tracksTable.status, "pending"))
+      .orderBy(desc(tracksTable.createdAt));
+    res.json({ tracks: rows });
+  } catch (_err) {
+    res.status(500).json({ error: "Failed to list pending tracks" });
   }
 });
 

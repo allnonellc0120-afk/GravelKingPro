@@ -9,6 +9,7 @@
     "seed-products": "tsx ./src/seed-products.ts",
     "generate-whitepaper": "tsx ./src/generate-whitepaper.ts",
     "generate-pitchdeck": "tsx ./src/generate-pitchdeck.ts",
+    "seed-tracks": "tsx ./src/seed-tracks.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
@@ -16,6 +17,8 @@
     "tsx": "catalog:"
   },
   "dependencies": {
+    "@workspace/db": "workspace:*",
+    "drizzle-orm": "catalog:",
     "stripe": "^22.2.0",
     "stripe-replit-sync": "^1.0.0",
     "pdf-lib": "^1.17.1",
