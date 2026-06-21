@@ -16,7 +16,12 @@ import DownloadPage from "@/pages/download";
 import Account from "@/pages/account";
 import AdminAnalytics from "@/pages/admin-analytics";
 import AdminWaitlist from "@/pages/admin-waitlist";
+import AdminTracks from "@/pages/admin-tracks";
 import Optimizer from "@/pages/optimizer";
+import LabelPage from "@/pages/label";
+import LabelArtistPage from "@/pages/label-artist";
+import LibraryPage from "@/pages/library";
+import SubmitTrackPage from "@/pages/submit-track";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
 
@@ -38,7 +43,12 @@ function Router() {
       <Route path="/account" component={Account} />
       <Route path="/admin" component={AdminAnalytics} />
       <Route path="/admin/waitlist" component={AdminWaitlist} />
+      <Route path="/admin/tracks" component={AdminTracks} />
       <Route path="/optimizer" component={Optimizer} />
+      <Route path="/label" component={LabelPage} />
+      <Route path="/label/:artist" component={LabelArtistPage} />
+      <Route path="/library" component={LibraryPage} />
+      <Route path="/submit" component={SubmitTrackPage} />
       <Route component={NotFound} />
     </Switch>
   );
