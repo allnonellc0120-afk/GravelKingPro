@@ -120,8 +120,8 @@ export function DrumPad({ onAddTrack, trackCount }: DrumPadProps) {
     const sr = ctx.sampleRate;
     const [ch0, ch1] = renderDrum(pad.type, pad.freq, pad.dur, sr);
     const buf = ctx.createBuffer(2, ch0.length, sr);
-    buf.copyToChannel(ch0, 0);
-    buf.copyToChannel(ch1, 1);
+    buf.copyToChannel(new Float32Array(ch0), 0);
+    buf.copyToChannel(new Float32Array(ch1), 1);
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(gain);
