@@ -170,7 +170,7 @@ export default function SubmitTrackPage() {
                   className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-secondary file:text-secondary-foreground hover:file:bg-secondary/80 cursor-pointer"
                   onChange={e => setAudioPreviewFile(e.target.files?.[0] ?? null)}
                 />
-                <p className="text-xs text-muted-foreground">Short preview clip (30–60 seconds)</p>
+                <p className="text-xs text-muted-foreground">Short preview clip (30 seconds max)</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Cover Art</label>

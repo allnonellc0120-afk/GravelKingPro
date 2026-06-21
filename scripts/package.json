@@ -10,6 +10,7 @@
     "generate-whitepaper": "tsx ./src/generate-whitepaper.ts",
     "generate-pitchdeck": "tsx ./src/generate-pitchdeck.ts",
     "seed-tracks": "tsx ./src/seed-tracks.ts",
+    "post-track": "tsx ./src/post-track.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
