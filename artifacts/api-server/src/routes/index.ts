@@ -12,6 +12,7 @@ import beatsRouter from "./beats";
 import waitlistRouter from "./waitlist";
 import analyticsRouter from "./analytics";
 import mlkRouter from "./mlk";
+import tracksRouter from "./tracks";
 import adminAuthRouter from "./adminAuth";
 
 const router: IRouter = Router();
@@ -30,5 +31,6 @@ router.use(beatsRouter);
 router.use(waitlistRouter);
 router.use(analyticsRouter);
 router.use(mlkRouter);
+router.use(tracksRouter);
 
 export default router;

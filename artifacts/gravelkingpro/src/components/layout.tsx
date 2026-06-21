@@ -16,6 +16,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
     { href: "/studio", label: "Studio" },
     { href: "/voice-removal", label: "Voice Removal" },
     { href: "/mastering", label: "Mastering" },
+    { href: "/label", label: "Label" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
   ];
@@ -169,6 +170,8 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
         <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} GravelKing Productions · All N One LLC</span>
           <div className="flex items-center gap-4">
+            <Link href="/label" className="hover:text-amber-500 transition-colors">Label</Link>
+            <Link href="/library" className="hover:text-amber-500 transition-colors">Library</Link>
             <Link href="/contact" className="hover:text-amber-500 transition-colors">Contact</Link>
             <Link href="/download" className="hover:text-amber-500 transition-colors">Download</Link>
             <Link href="/pricing" className="hover:text-amber-500 transition-colors">Pricing</Link>

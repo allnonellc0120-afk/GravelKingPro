@@ -399,7 +399,7 @@ audioRouter.post(
           try {
             await execFileAsync("ffmpeg", [
               "-y", "-i", mp3InPath, "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100", mp3OutPath,
-            ], { maxBuffer: 50 * 1024 * 1024, timeout: 30_000 });
+            ], { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 });
             const mp3Buf = await readFile(mp3OutPath);
             res.setHeader("Content-Type", "audio/mpeg");
             res.setHeader("Content-Disposition", `attachment; filename="gravelking_instrumental.mp3"`);

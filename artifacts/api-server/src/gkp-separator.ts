@@ -206,6 +206,11 @@ export async function mlkVocalRemoval(
  * MLK v3 Stem Split — frequency-band + spatial separation, each band carved by
  * the Morris Law Kernel v3. Produces the 5 stems the studio UI expects
  * (vocals, drums, bass, other, instrumental).
+ *
+ * Uses a SINGLE multi-output ffmpeg call for band splitting so all 5 stems
+ * are produced in ONE process, then runs MLK v3 carving SEQUENTIALLY (never
+ * more than one ffmpeg at a time) — eliminating the 10-concurrent-process
+ * spike that OOM-killed the container on real-world songs.
  */
 export async function mlkStemSplit(
   filePath:   string,
@@ -213,39 +218,80 @@ export async function mlkStemSplit(
   channels:   number,
   multiplier: number = 0.75,
 ): Promise<GNSResult> {
+  const id       = randomUUID();
   const isStereo = channels >= 2;
-  const specs: Array<{ name: string; filter: string; ch: number }> = [
-    { name: "vocals", filter: isStereo
-        ? "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=180,lowpass=f=5000"
-        : "highpass=f=180,lowpass=f=5000", ch: 1 },
-    { name: "drums",  filter: "highpass=f=200,lowpass=f=2500", ch: channels },
-    { name: "bass",   filter: "lowpass=f=250",                 ch: channels },
-    { name: "other",  filter: "highpass=f=2500",               ch: channels },
-    { name: "instrumental", filter: isStereo ? "pan=stereo|c0=c0-c1|c1=c1-c0" : "", ch: isStereo ? 2 : channels },
+
+  // Temp paths for the 5 band-split stems
+  const stemDefs = [
+    { name: "vocals",        outPath: `/tmp/gkp_stem_${id}_vocals.wav` },
+    { name: "drums",         outPath: `/tmp/gkp_stem_${id}_drums.wav`  },
+    { name: "bass",          outPath: `/tmp/gkp_stem_${id}_bass.wav`   },
+    { name: "other",         outPath: `/tmp/gkp_stem_${id}_other.wav`  },
+    { name: "instrumental",  outPath: `/tmp/gkp_stem_${id}_inst.wav`   },
   ];
 
-  const zipInput: Record<string, Uint8Array> = {};
-  let kernelParity = "MLK_V3_VALIDATED";
-  const stemNames: string[] = [];
+  // ── Stage 1: ONE ffmpeg call → 5 band-split stems ───────────────────────
+  // filter_complex splits the input 5 ways, applies each band filter, and
+  // writes 5 separate output files. This replaces 5 separate ffmpeg calls.
+  const vocalFilter  = isStereo
+    ? "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=180,lowpass=f=5000"
+    : "highpass=f=180,lowpass=f=5000";
+  const instrFilter  = isStereo ? "pan=stereo|c0=c0-c1|c1=c1-c0" : "aecho=0.8:0.88:6:0.4";
+  const drumsCh      = String(channels);
+  const bassCh       = String(channels);
+  const otherCh      = String(channels);
+  const vocalCh      = "1";
+  const instrCh      = isStereo ? "2" : String(channels);
 
-  await Promise.all(
-    specs.map(async (s) => {
-      const rawBuf          = await ffmpegFilterToWav(filePath, s.filter, s.ch);
+  // Build filter_complex: asplit=5 → named branches → each filter applied
+  const filterComplex = [
+    `asplit=5[sv][sd][sb][so][si]`,
+    `[sv]${vocalFilter}[vocals]`,
+    `[sd]highpass=f=200,lowpass=f=2500[drums]`,
+    `[sb]lowpass=f=250[bass]`,
+    `[so]highpass=f=2500[other]`,
+    `[si]${instrFilter}[instrumental]`,
+  ].join(";");
+
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y", "-i", filePath,
+      "-filter_complex", filterComplex,
+      "-map", "[vocals]",       "-ac", vocalCh, "-acodec", "pcm_s16le", stemDefs[0].outPath,
+      "-map", "[drums]",        "-ac", drumsCh, "-acodec", "pcm_s16le", stemDefs[1].outPath,
+      "-map", "[bass]",         "-ac", bassCh,  "-acodec", "pcm_s16le", stemDefs[2].outPath,
+      "-map", "[other]",        "-ac", otherCh, "-acodec", "pcm_s16le", stemDefs[3].outPath,
+      "-map", "[instrumental]", "-ac", instrCh, "-acodec", "pcm_s16le", stemDefs[4].outPath,
+    ], { maxBuffer: 200 * 1024 * 1024, timeout: 300_000 });
+
+    // ── Stage 2: MLK v3 carving — SEQUENTIAL (never more than 1 ffmpeg at once) ─
+    const zipInput: Record<string, Uint8Array> = {};
+    let kernelParity = "MLK_V3_VALIDATED";
+    const stemNames: string[] = [];
+
+    for (const stem of stemDefs) {
+      const rawBuf = await readFile(stem.outPath);
+      await unlink(stem.outPath).catch(() => {});
       const { buf, parity } = await applyMLKv3Fast(rawBuf, multiplier);
       if (parity !== "MLK_V3_VALIDATED") kernelParity = parity;
-      zipInput[`GKP_${s.name}.wav`] = new Uint8Array(buf);
-      stemNames.push(s.name);
-    }),
-  );
+      zipInput[`GKP_${stem.name}.wav`] = new Uint8Array(buf);
+      stemNames.push(stem.name);
+    }
 
-  return {
-    zipBuffer:    Buffer.from(zipSync(zipInput)),
-    protocol:     MLK_PROTOCOL,
-    model:        MLK_KERNEL,
-    stems:        stemNames,
-    kernelParity,
-    stack:        MLK_STACK,
-  };
+    return {
+      zipBuffer:    Buffer.from(zipSync(zipInput)),
+      protocol:     MLK_PROTOCOL,
+      model:        MLK_KERNEL,
+      stems:        stemNames,
+      kernelParity,
+      stack:        MLK_STACK,
+    };
+  } finally {
+    // Clean up any temp files that didn't get cleaned up in the loop
+    for (const stem of stemDefs) {
+      await unlink(stem.outPath).catch(() => {});
+    }
+  }
 }
 
 // ── GNS Voice Removal ────────────────────────────────────────────────────────
