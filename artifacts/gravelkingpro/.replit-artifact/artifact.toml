@@ -43,6 +43,22 @@ from = "/contact"
 to = "/contact.html"
 
 [[services.production.rewrites]]
+from = "/label"
+to = "/label.html"
+
+[[services.production.rewrites]]
+from = "/label/*"
+to = "/label.html"
+
+[[services.production.rewrites]]
+from = "/library"
+to = "/library.html"
+
+[[services.production.rewrites]]
+from = "/submit"
+to = "/submit.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 
