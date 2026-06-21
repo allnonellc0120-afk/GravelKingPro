@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
+    "@google-cloud/storage": "^7.21.0",
     "drizzle-orm": "catalog:",
     "stripe": "^22.2.0",
     "stripe-replit-sync": "^1.0.0",

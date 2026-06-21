@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { isAdminAuthenticated } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -8,11 +9,15 @@ const objectStorageService = new ObjectStorageService();
 /**
  * POST /storage/uploads/request-url
  *
- * Request a presigned URL for file upload.
- * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned presigned URL.
+ * Request a presigned URL for direct file upload.
+ * Restricted to admin-authenticated requests to prevent anonymous storage abuse.
  */
 router.post("/storage/uploads/request-url", async (req: Request, res: Response) => {
+  if (!isAdminAuthenticated(req)) {
+    res.status(403).json({ error: "Not authorized" });
+    return;
+  }
+
   const body = req.body as { name?: unknown; size?: unknown; contentType?: unknown };
   const { name, size, contentType } = body;
   if (

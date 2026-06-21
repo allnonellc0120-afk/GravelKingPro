@@ -1,4 +1,5 @@
-import { pgEnum, pgTable, text, timestamp, varchar, real, uuid } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, varchar, real, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { usersTable } from "./auth";
 
 export const trackStatusEnum = pgEnum("track_status", ["pending", "accepted", "rejected"]);
 
@@ -18,13 +19,23 @@ export const tracksTable = pgTable("tracks", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const purchasedTracksTable = pgTable("purchased_tracks", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: varchar("user_id", { length: 255 }).notNull(),
-  trackId: uuid("track_id").notNull(),
-  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
-  purchasedAt: timestamp("purchased_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const purchasedTracksTable = pgTable(
+  "purchased_tracks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 255 })
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    trackId: uuid("track_id")
+      .notNull()
+      .references(() => tracksTable.id, { onDelete: "cascade" }),
+    stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+    purchasedAt: timestamp("purchased_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("purchased_tracks_user_track_uniq").on(table.userId, table.trackId),
+  ],
+);
 
 export type Track = typeof tracksTable.$inferSelect;
 export type InsertTrack = typeof tracksTable.$inferInsert;
