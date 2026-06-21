@@ -1,0 +1,80 @@
+{
+  "project_name": "Gravel King Productions Label & Storefront Feature",
+  "system_directive": "You are an expert full-stack developer. Execute the following specification sequentially. Write clean, performance-optimized code to minimize server compute cycles. Do not add undocumented features or speculative code. Build exactly what is written below.",
+  "label_metadata": {
+    "company_name": "Gravel King Productions",
+    "business_model": "Independent launchpad and digital marketplace selling high-fidelity full vocal tracks for $9.99 with a 50/50 artist royalty split.",
+    "founder_history": "Founded by a visionary audio engineer, developer, and vocalist. Developed the proprietary Morris Law Kernel to pioneer zero-latency mobile DSP and 14-track neural stem isolation on mobile devices."
+  },
+  "database_schema_modifications": {
+    "track_model_fields": {
+      "id": "Primary Key",
+      "title": "String, Required",
+      "artist_name": "String, Required",
+      "audio_full_url": "String (URL to full track file), Required",
+      "audio_preview_url": "String (URL to 30-second preview file), Required",
+      "cover_art_url": "String (URL to image), Required",
+      "price": "Float/Decimal, Default: 9.99",
+      "status": "Enum [PENDING, ACCEPTED, REJECTED], Default: PENDING",
+      "stripe_product_id": "String, Nullable"
+    },
+    "user_extensions": {
+      "subscription_tier": "Enum [FREE, PRO_WEEKLY, NODE_AUDITOR], Default: FREE",
+      "last_submission_date": "Timestamp, Nullable",
+      "purchased_tracks": "Many-to-Many relationship mapping Users to IDs of ACCEPTED Tracks"
+    }
+  },
+  "implementation_phases": [
+    {
+      "phase_number": 1,
+      "phase_title": "Database Setup & Initial Seed Profiles",
+      "tasks": [
+        "Apply the Track schema modifications to the database models.",
+        "Seed the database with the first two flagship artist profiles: the Founder and Hope LaBorde.",
+        "Directly inject their initial audio files, 30-second preview clips, and cover art assets as status: ACCEPTED."
+      ]
+    },
+    {
+      "phase_number": 2,
+      "phase_title": "Tier-Gated Submission Logic",
+      "tasks": [
+        "Create a frontend 'Submit Your Track' multi-part form requiring track title, full audio file, a 30-second preview clip file, and cover art artwork.",
+        "Implement backend verification middleware on the submission endpoint to gate by subscription tier:",
+        "If tier is FREE: Reject submission. Return text: 'Track submission to Gravel King Productions is an exclusive benefit for Pro and Node Auditor members. Upgrade to submit.'",
+        "If tier is PRO_WEEKLY ($9.99/week): Limit user to exactly one (1) track submission every 7 days. Enforce via a database lookup on 'last_submission_date'.",
+        "If tier is NODE_AUDITOR: Allow unlimited track submissions with zero timestamp enforcement."
+      ]
+    },
+    {
+      "phase_number": 3,
+      "phase_title": "Storefront UI & Media Player Integration",
+      "tasks": [
+        "Build the public Label Storefront interface grouping all tracks by the respective Artist Name.",
+        "For each artist section, display a maximum of their Top 3 newest or highest-performing ACCEPTED tracks.",
+        "If an artist has more than 3 tracks, render a clean text button: 'View All Tracks by [Artist Name]' routing users to a sub-page displaying that artist's full catalog.",
+        "Next to every track title, embed a lightweight HTML5 audio preview button (Play/Pause icon) linked directly to the track's 'audio_preview_url' to let users preview the music locally on the client side without downloading the full asset.",
+        "Next to the preview button, render a prominent 'Buy Now - $9.99' call-to-action button."
+      ]
+    },
+    {
+      "phase_number": 4,
+      "phase_title": "Stripe Session Checkout & Download Access",
+      "tasks": [
+        "Configure the 'Buy Now' button to initiate a secure Stripe Checkout Session for a one-time charge of $9.99 targeting the selected track ID.",
+        "Construct a backend webhook endpoint handling the Stripe event: 'checkout.session.completed'.",
+        "Upon receiving a verified Stripe webhook completion event, update the database to append the track ID into the authenticated user's 'purchased_tracks' relationship model.",
+        "Construct a 'My Library' private route where authenticated users can see their purchased track items and click a button to download the unthrottled, full-fidelity 'audio_full_url' file asset."
+      ]
+    },
+    {
+      "phase_number": 5,
+      "phase_title": "Admin Moderation Dashboard",
+      "tasks": [
+        "Secure a private administration route accessible exclusively by the main admin account.",
+        "Render a lightweight grid list displaying all tracks currently flagged as status: PENDING.",
+        "Add an 'Approve' action button that changes the status field to ACCEPTED, which instantly renders the track live on the public storefront catalog.",
+        "Add a 'Reject' action button that shifts the status field to REJECTED."
+      ]
+    }
+  ]
+}
