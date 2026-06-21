@@ -16,6 +16,13 @@ import { RecordControls } from "@/components/daw/RecordControls";
 import { StudioTabs, type StudioTab } from "@/components/daw/StudioTabs";
 import { DrumPad } from "@/components/daw/DrumPad";
 
+const AUDIO_EXTS = new Set(["wav", "mp3", "m4a", "aac", "flac", "ogg", "oga", "weba", "aiff", "au", "snd", "wma"]);
+
+function isAudioLike(file: File) {
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return file.type.startsWith("audio/") || file.type.startsWith("video/") || AUDIO_EXTS.has(ext);
+}
+
 const DEV_BYPASS_KEY = "gk:dev:studio";
 
 export default function MixStudio() {
@@ -63,7 +70,7 @@ export default function MixStudio() {
     });
   }, []);
 
-  const addFiles = useCallback(async (incoming: FileList | null) => {
+  const addFiles = useCallback(async (incoming: FileList | File[] | null) => {
     if (!incoming) return;
     const files = Array.from(incoming).filter(f => {
       const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
@@ -71,8 +78,8 @@ export default function MixStudio() {
         toast({ title: "MIDI not supported", description: "Convert to WAV or MP3 first.", variant: "destructive" });
         return false;
       }
-      if (!f.type.startsWith("audio/") && !f.type.startsWith("video/")) {
-        toast({ title: "Not an audio/video file", description: f.name, variant: "destructive" });
+      if (!isAudioLike(f)) {
+        toast({ title: "Not an audio file", description: f.name, variant: "destructive" });
         return false;
       }
       return true;
@@ -83,9 +90,22 @@ export default function MixStudio() {
     }
   }, [daw, toast]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
-    addFiles(e.dataTransfer.files);
+    // iOS Safari sends files via DataTransferItemList, not dataTransfer.files
+    const items = Array.from(e.dataTransfer.items);
+    if (items.length > 0 && items[0].kind === "file") {
+      const files: File[] = [];
+      for (const item of items) {
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      await addFiles(files);
+    } else {
+      await addFiles(e.dataTransfer.files);
+    }
   }, [addFiles]);
 
   if (!canUseStudio) return (
