@@ -45,6 +45,10 @@ export class WebhookHandlers {
                 stripeCheckoutSessionId: session.id,
               })
               .onConflictDoNothing();
+
+            // Track purchases are fully handled here.
+            // Do NOT forward to stripe-replit-sync (which mirrors subscription data).
+            return;
           }
         }
       }

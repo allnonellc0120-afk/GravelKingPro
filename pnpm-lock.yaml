@@ -1102,6 +1102,9 @@ importers:
 
   scripts:
     dependencies:
+      '@google-cloud/storage':
+        specifier: ^7.21.0
+        version: 7.21.0
       '@workspace/db':
         specifier: workspace:*
         version: link:../lib/db
@@ -11678,7 +11681,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.3
+      hasown: 2.0.4
       math-intrinsics: 1.1.0
 
   get-nonce@1.0.1: {}

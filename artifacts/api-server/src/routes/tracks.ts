@@ -68,6 +68,55 @@ router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/tracks/submit-eligibility
+ *
+ * Returns the session user's eligibility to submit a track. Must be defined
+ * before /tracks/:id routes to avoid param capture.
+ *
+ * Response shape:
+ *  { eligible: true,  tier }
+ *  { eligible: false, tier: "free",            reason: "free_tier" }
+ *  { eligible: false, tier: "weekly"|"monthly", reason: "cooldown",
+ *    cooldownDaysLeft: number, nextSubmissionDate: string }
+ */
+router.get("/tracks/submit-eligibility", async (req: Request, res: Response) => {
+  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+  if (!sessionId) {
+    res.json({ eligible: false, tier: "free", reason: "free_tier" });
+    return;
+  }
+
+  const tier = await resolveTier(req);
+  if (tier === "free") {
+    res.json({ eligible: false, tier: "free", reason: "free_tier" });
+    return;
+  }
+
+  // node_auditor — unlimited, never on cooldown
+  if (tier === "node_auditor") {
+    res.json({ eligible: true, tier: "node_auditor" });
+    return;
+  }
+
+  // weekly / monthly — check 7-day cooldown
+  const user = await storage.getUserBySession(sessionId);
+  if (user) {
+    const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
+    const last = dbUser?.lastSubmissionDate;
+    const now = new Date();
+    if (last && now.getTime() - new Date(last).getTime() < SEVEN_DAYS_MS) {
+      const msRemaining = SEVEN_DAYS_MS - (now.getTime() - new Date(last).getTime());
+      const daysLeft = Math.ceil(msRemaining / (24 * 60 * 60 * 1000));
+      const nextDate = new Date(new Date(last).getTime() + SEVEN_DAYS_MS).toISOString();
+      res.json({ eligible: false, tier, reason: "cooldown", cooldownDaysLeft: daysLeft, nextSubmissionDate: nextDate });
+      return;
+    }
+  }
+
+  res.json({ eligible: true, tier });
+});
+
 /** GET /api/library — tracks the user has purchased (gk_session-scoped, no auth wall) */
 router.get("/library", async (req: Request, res: Response) => {
   const session = await resolveSessionUser(req);
