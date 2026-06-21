@@ -540,4 +540,49 @@ router.post("/admin/tracks/:id/reject", async (req: Request, res: Response) => {
   }
 });
 
+/** POST /api/admin/tracks/seed — admin-only: seed label tracks into production DB */
+router.post("/admin/tracks/seed", async (req: Request, res: Response) => {
+  const { requireAdmin } = await import("../lib/adminAuth");
+  if (!requireAdmin(req, res)) return;
+
+  const seedData = [
+    {
+      title: "You Used to Think I Was Superman",
+      artistName: "TGK, The Gravelking",
+      audioFullKey: "private/releases/tgk-the-gravelking/you-used-to-think-i-was-superman-full.wav",
+      audioPreviewKey: "releases/tgk-the-gravelking/you-used-to-think-i-was-superman-preview.wav",
+      coverArtKey: "releases/tgk-the-gravelking/you-used-to-think-i-was-superman-cover.jpg",
+      price: 9.99,
+      status: "accepted" as const,
+    },
+    {
+      title: "I Wanna Recognize Me",
+      artistName: "Hope Of The Free World",
+      audioFullKey: "private/releases/hope-of-the-free-world/i-wanna-recognize-me-full.wav",
+      audioPreviewKey: "releases/hope-of-the-free-world/i-wanna-recognize-me-preview.wav",
+      coverArtKey: "releases/hope-of-the-free-world/i-wanna-recognize-me-cover.jpg",
+      price: 9.99,
+      status: "accepted" as const,
+    },
+  ];
+
+  const inserted: string[] = [];
+  const skipped: string[] = [];
+
+  for (const t of seedData) {
+    const existing = await db
+      .select({ id: tracksTable.id })
+      .from(tracksTable)
+      .where(and(eq(tracksTable.title, t.title), eq(tracksTable.artistName, t.artistName)));
+    if (existing.length > 0) {
+      skipped.push(t.title);
+      continue;
+    }
+    await db.insert(tracksTable).values(t);
+    inserted.push(t.title);
+  }
+
+  res.json({ inserted, skipped, count: inserted.length });
+});
+
 export default router;
