@@ -37,7 +37,7 @@ app.post(
     const sig = Array.isArray(signature) ? signature[0] : signature;
 
     try {
-      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      await WebhookHandlers.processWebhook(req.body as Buffer, sig, req);
       res.status(200).json({ received: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
