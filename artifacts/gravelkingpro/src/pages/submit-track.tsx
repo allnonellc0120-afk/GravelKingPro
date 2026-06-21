@@ -90,7 +90,7 @@ export default function SubmitTrackPage() {
           <Upload className="w-6 h-6 text-amber-500" />
           <h1 className="text-2xl font-bold">Submit a Track</h1>
         </div>
-        <p className="text-sm text-muted-foreground">Submit your track for the Gravel King Productions label. Requires a Pro subscription. Admins will review and approve before it goes live.</p>
+        <p className="text-sm text-muted-foreground">Submit your track for the Gravelking Productions label. Requires a Pro subscription. Admins will review and approve before it goes live.</p>
 
         {/* Load-time eligibility gate */}
         {eligibilityLoading && (

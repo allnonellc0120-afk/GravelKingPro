@@ -169,7 +169,8 @@ async function main() {
     const artistSlug = t.artistName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const prefix = `demo/${artistSlug}/${slug}`;
 
-    const audioFullKey = `${prefix}-full.wav`;
+    // Full audio stored under private/ so it cannot be reached via public-objects route
+    const audioFullKey = `private/${prefix}-full.wav`;
     const audioPreviewKey = `${prefix}-preview.wav`;
     const coverArtKey = `${prefix}-cover.png`;
 
