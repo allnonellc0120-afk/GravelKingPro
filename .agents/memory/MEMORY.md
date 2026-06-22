@@ -9,6 +9,7 @@
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
+- [Object storage public prefix](object-storage-public-prefix.md) — public-objects route prepends PUBLIC_OBJECT_SEARCH_PATHS; bucket-root writes 404; fix by copying to <bucket>/public/<key> (shared bucket, no republish)
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
 - [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless; deploy bundles gitignored .cache/.local — delete .cache/uv before publish; read real logs via listDeploymentBuilds
@@ -18,7 +19,7 @@
 - [Center-cancel parity fixtures](studio-audio-dev-verification.md) — L==R stereo cancels to silence → false MLK_V3_VIOLATION; use true-stereo (distinct L/R) fixtures
 - [video-js scaffold tsconfig](video-js-scaffold-tsconfig.md) — new video artifacts miss the DOM lib override; tsc fails on window/document until you add lib: [esnext, dom, dom.iterable]
 - [Promo video conventions](promo-video-conventions.md) — promo "voice 0dB/instruments -2dB" is a Scene5 DAW visual, not an audio re-encode; scenes must track real product (no removed bloat)
-- [Prod DB schema migrates on Publish](deploy-prod-db-schema.md) — Publish auto-diffs dev→prod schema & applies it; never manually migrate prod (prod is read-only); to ship a schema change, re-publish
+- [Prod DB schema migrates on Publish](deploy-prod-db-schema.md) — Publish migrates schema (not rows) dev→prod; prod read-only; re-publish for schema; seed data via deployed admin POST + x-admin-key
 - [stripe-replit-sync esbuild external](stripe-esbuild-external.md) — stripe + stripe-replit-sync must stay external in build.mjs or migrations silently skip (wrong __dirname)
 - [MLK benchmark honesty + dev gating](mlk-benchmark-honesty.md) — benchmark must show only real detected hardware (CPU-only, no GPU; mmap_locked from real mlockall); dev open-usage gate must be fail-closed (NODE_ENV === "development")
 - [Static SPA per-route SEO](static-spa-seo-prerender.md) — Vite SPA SEO: comment-marker head block + post-build prerender per route + EXACT artifact.toml rewrites before the /* fallback; client head mgr only complements

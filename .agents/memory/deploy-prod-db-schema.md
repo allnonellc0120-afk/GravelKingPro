@@ -22,3 +22,19 @@ prompt for renames/destructive alters). NEVER run DDL against prod, write a
 migrate-prod script, add db:push to a deploy/build command, or add startup-time
 `CREATE TABLE IF NOT EXISTS` to self-heal prod. If prod is missing a table/
 column, the fix is always: re-publish.
+
+# Schema migrates, but DATA does not — seed prod via a deployed write endpoint
+
+Publish carries the **schema** dev→prod, but **not the rows**. Prod starts with
+empty tables. `executeSql({ environment: "production" })` is SELECT-only, so you
+cannot INSERT seed data directly.
+
+**Why:** Prod is read-only to the agent; the only thing with write access to the
+prod DB is the deployed app itself.
+
+**How to apply:** Ship an admin-gated POST endpoint (auth via `x-admin-key`
+header matching the `ADMIN_KEY` secret — same value in dev and prod), publish it,
+then call it once with curl: `curl -X POST <prod>/api/admin/.../seed -H
+"x-admin-key: $ADMIN_KEY"` (reference the secret from the shell env; never print
+it). Test gotcha: a POST-only route returns 404 to a **GET** — always test
+route existence with the correct method before concluding "old code is running".
