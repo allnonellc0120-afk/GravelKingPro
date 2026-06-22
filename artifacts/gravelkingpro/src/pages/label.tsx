@@ -1,23 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TrackCard, type LabelTrack } from "@/components/track-card";
 import { useAppState } from "@/lib/context";
 import { useToast } from "@/hooks/use-toast";
-import { Disc3, Music, ShoppingCart, Play, Pause, User, Loader2, ChevronRight } from "lucide-react";
-
-interface Track {
-  id: string;
-  title: string;
-  artistName: string;
-  audioPreviewKey: string;
-  coverArtKey: string;
-  price: number;
-}
+import { Disc3, Music, User, Loader2, ChevronRight } from "lucide-react";
 
 function useTracks() {
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [tracks, setTracks] = useState<LabelTrack[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetch("/api/tracks")
@@ -46,57 +37,6 @@ function useBuy() {
   return { buy, buying };
 }
 
-function TrackCard({ t, buying, onBuy }: { t: Track; buying: string | null; onBuy: (id: string) => void }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-
-  const togglePreview = () => {
-    const el = audioRef.current;
-    if (!el) return;
-    if (playing) {
-      el.pause();
-      setPlaying(false);
-    } else {
-      el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-    }
-  };
-
-  return (
-    <Card className="border-border/40 bg-card/40 overflow-hidden group">
-      <div className="relative aspect-square bg-secondary/20 overflow-hidden">
-        <img
-          src={`/api/storage/public-objects/${t.coverArtKey}`}
-          alt={t.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <Button size="sm" variant="secondary" className="gap-1" onClick={togglePreview}>
-            {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-            {playing ? "Stop" : "Preview"}
-          </Button>
-        </div>
-        <audio
-          ref={audioRef}
-          src={`/api/storage/public-objects/${t.audioPreviewKey}`}
-          onEnded={() => setPlaying(false)}
-          preload="none"
-        />
-      </div>
-      <CardContent className="pt-4 pb-3">
-        <div className="font-semibold text-sm truncate">{t.title}</div>
-        <div className="text-xs text-muted-foreground truncate">{t.artistName}</div>
-        <div className="flex items-center justify-between mt-3">
-          <span className="text-sm font-bold text-amber-500">${t.price.toFixed(2)}</span>
-          <Button size="sm" className="gap-1" disabled={buying === t.id} onClick={() => onBuy(t.id)}>
-            {buying === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShoppingCart className="w-3 h-3" />}
-            Buy
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function LabelPage() {
   const { tracks, loading } = useTracks();
   const { buy, buying } = useBuy();
@@ -106,7 +46,7 @@ export default function LabelPage() {
     acc[t.artistName] = acc[t.artistName] || [];
     acc[t.artistName].push(t);
     return acc;
-  }, {} as Record<string, Track[]>);
+  }, {} as Record<string, LabelTrack[]>);
 
   return (
     <Layout>

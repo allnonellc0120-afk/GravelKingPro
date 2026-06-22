@@ -42,6 +42,12 @@ uri = "file://artifacts/gravelkingpro-promo/public/images/gk_hammer_logo.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "gUfxNpcL0crOt_KmTmpVy"
+uri = "file://attached_assets/generated_images/hope-i-wanna-recognize-me-cover.png"
+type = "image"
+title = "hope recognize me cover"
+
 [[outputs]]
 id = "whvKht8bnIVNiskggSZrV"
 uri = "file://GravelKingPro_Product_Overview.md"
