@@ -9,7 +9,7 @@
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
-- [Object storage public prefix](object-storage-public-prefix.md) — public-objects route prepends PUBLIC_OBJECT_SEARCH_PATHS; bucket-root writes 404; fix by copying to <bucket>/public/<key> (shared bucket, no republish)
+- [Object storage public prefix](object-storage-public-prefix.md) — public assets must live UNDER the PUBLIC_OBJECT_SEARCH_PATHS prefix, not bucket root, or the serve route 404s
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
 - [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless; deploy bundles gitignored .cache/.local — delete .cache/uv before publish; read real logs via listDeploymentBuilds
