@@ -16,6 +16,7 @@ import tracksRouter from "./tracks";
 import storageRouter from "./storage";
 import adminAuthRouter from "./adminAuth";
 import activateRouter from "./activate";
+import convertRouter from "./convert";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(mlkRouter);
 router.use(tracksRouter);
 router.use(storageRouter);
 router.use(activateRouter);
+router.use(convertRouter);
 
 export default router;

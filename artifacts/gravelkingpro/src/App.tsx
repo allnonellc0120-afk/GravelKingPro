@@ -22,6 +22,7 @@ import LabelPage from "@/pages/label";
 import LabelArtistPage from "@/pages/label-artist";
 import LibraryPage from "@/pages/library";
 import SubmitTrackPage from "@/pages/submit-track";
+import ConvertPage from "@/pages/convert";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
 
@@ -49,6 +50,7 @@ function Router() {
       <Route path="/label/:artist" component={LabelArtistPage} />
       <Route path="/library" component={LibraryPage} />
       <Route path="/submit" component={SubmitTrackPage} />
+      <Route path="/convert" component={ConvertPage} />
       <Route component={NotFound} />
     </Switch>
   );
