@@ -25,6 +25,8 @@
 - [UVR neural vocal separation](uvr-neural-separation.md) — audio-separator[cpu] installs torch anyway (~2GB); UVR model downloads to ~/.cache/audio-separator on first prod request; must clean before publish
 - [Stripe webhook invoice.upcoming fix](stripe-webhook-invoice-upcoming.md) — invoice.upcoming events have null ID; catch err.code=23502+table=invoices+column=id in processWebhook and return early (don't rethrow) so Stripe gets 200 and stops retrying
 - [Subscription DB fallback to Stripe API](subscription-stripe-api-fallback.md) — storage.ts getUserSubscriptionStatus: if stripe.subscriptions mirror empty, dynamic-import stripeClient and list active/trialing subscriptions directly; prevents wrongly-free on webhook delay
+- [Lifetime access grant](lifetime-access.md) — set is_pro=true + subscription_tier='node_auditor' on users row; getUserSubscriptionStatus checks these first before Stripe; works with no stripe_customer_id
+- [Gmail integration](gmail-integration.md) — google-mail connector added via @replit/connectors-sdk; send via POST /gmail/v1/users/me/messages/send with base64url RFC-2822 raw body; only 2 users have emails on file (session-based system)
 - [Static SPA per-route SEO](static-spa-seo-prerender.md) — Vite SPA SEO: comment-marker head block + post-build prerender per route + EXACT artifact.toml rewrites before the /* fallback; client head mgr only complements
 - [Expo native modules in Expo Go](expo-native-module-expo-go.md) — third-party native views render "Unimplemented component" in Expo Go; guard before rendering
 - [Mobile audio result handling](mobile-audio-result-handling.md) — native can't use object URLs / Linking blob:; write bytes to expo-file-system cache, play via expo-av, share via expo-sharing
