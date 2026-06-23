@@ -129,8 +129,8 @@ export default function VoiceRemoval() {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            AI-powered vocal separation — strips the lead vocal and returns the full instrumental.
-            Audio and video files supported.
+            Instant vocal removal — extracts the instrumental by cancelling center-panned vocals.
+            Works best on stereo tracks. Audio and video files supported.
           </p>
         </div>
 
@@ -179,8 +179,8 @@ export default function VoiceRemoval() {
                     {state === "uploading"
                       ? "Uploading…"
                       : isVideo
-                        ? "Extracting audio from video, then separating vocals…"
-                        : "Separating vocals with GravelKing AI…"}
+                        ? "Extracting audio from video, then removing vocals…"
+                        : "Removing vocals…"}
                   </div>
                   <div className="text-xs font-medium text-purple-400">{fileName}</div>
                   <Progress value={progress} className="h-1.5" />
@@ -264,7 +264,7 @@ export default function VoiceRemoval() {
         {/* Info */}
         <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground">
           {[
-            { label: "GravelKing AI", desc: "Neural vocal separation" },
+            { label: "Instant", desc: "Results in seconds" },
             { label: "100% on-server", desc: "File stays private" },
             { label: "Any format", desc: "Audio & video" },
           ].map((i) => (
