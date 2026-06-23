@@ -58,14 +58,20 @@ export default function SubmitTrackPage() {
         credentials: "include",
         body: fd,
       });
-      const data = await r.json() as { error?: string };
+      const data = await r.json() as { error?: string; track?: { status?: string } };
       if (r.ok) {
-        toast({ title: "Track submitted!", description: "Your track is pending admin approval." });
+        const live = data.track?.status === "accepted";
+        toast({
+          title: live ? "Published live!" : "Track submitted!",
+          description: live ? "Your track is now in the label store." : "Your track is pending admin approval.",
+        });
         setTitle(""); setArtistName(""); setAudioFullFile(null); setAudioPreviewFile(null); setCoverArtFile(null);
         if (audioFullRef.current) audioFullRef.current.value = "";
         if (audioPreviewRef.current) audioPreviewRef.current.value = "";
         if (coverArtRef.current) coverArtRef.current.value = "";
-        setEligibility(prev => prev ? { ...prev, eligible: false, reason: "cooldown", cooldownDaysLeft: 7 } : prev);
+        if (!live) {
+          setEligibility(prev => prev ? { ...prev, eligible: false, reason: "cooldown", cooldownDaysLeft: 7 } : prev);
+        }
       } else if (r.status === 429) {
         toast({ title: "Cooldown active", description: data.error, variant: "destructive" });
       } else if (r.status === 403) {

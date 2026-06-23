@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AdminGate, useAdminAuth } from "@/components/admin-gate";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
-import { Music, CheckCircle, XCircle, Loader2, RefreshCw, User, Clock, Disc3 } from "lucide-react";
+import { Music, CheckCircle, XCircle, Loader2, RefreshCw, User, Clock, Disc3, Upload } from "lucide-react";
 
 interface Track {
   id: string;
@@ -29,6 +30,98 @@ function TrackStatus({ status }: { status: string }) {
     <Badge variant="outline" className={`gap-1 ${s.color}`}>
       {s.icon} {status}
     </Badge>
+  );
+}
+
+const FILE_INPUT_CLASS =
+  "block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-secondary file:text-secondary-foreground hover:file:bg-secondary/80 cursor-pointer";
+
+/** Admin-only direct upload — publishes a track straight to the label store, no moderation. */
+function DirectUpload({ onUploaded }: { onUploaded: () => void }) {
+  const { logout } = useAdminAuth();
+  const { toast } = useToast();
+  const [title, setTitle] = useState("");
+  const [artistName, setArtistName] = useState("");
+  const [audioFull, setAudioFull] = useState<File | null>(null);
+  const [audioPreview, setAudioPreview] = useState<File | null>(null);
+  const [coverArt, setCoverArt] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fullRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
+
+  const upload = async () => {
+    if (!title.trim() || !artistName.trim() || !audioFull || !audioPreview || !coverArt) {
+      toast({ title: "Missing fields", description: "Fill all fields and attach all three files.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("title", title.trim());
+      fd.append("artistName", artistName.trim());
+      fd.append("audio_full", audioFull);
+      fd.append("audio_preview", audioPreview);
+      fd.append("cover_art", coverArt);
+      const r = await fetch("/api/tracks/submit", { method: "POST", credentials: "include", body: fd });
+      if (r.status === 401 || r.status === 403) {
+        toast({ title: "Admin session expired", description: "Unlock the dashboard again to upload.", variant: "destructive" });
+        logout();
+        return;
+      }
+      const data = (await r.json()) as { error?: string; track?: { status?: string } };
+      if (!r.ok) throw new Error(data.error || `Failed (${r.status})`);
+      const live = data.track?.status === "accepted";
+      toast({
+        title: live ? "Published live" : "Saved as pending",
+        description: live
+          ? `"${title.trim()}" is now in the label store.`
+          : "Track saved but not auto-published — your admin session may have lapsed.",
+      });
+      setTitle(""); setArtistName(""); setAudioFull(null); setAudioPreview(null); setCoverArt(null);
+      if (fullRef.current) fullRef.current.value = "";
+      if (previewRef.current) previewRef.current.value = "";
+      if (coverRef.current) coverRef.current.value = "";
+      onUploaded();
+    } catch (e) {
+      toast({ title: "Upload failed", description: e instanceof Error ? e.message : "Try again.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Card className="border-emerald-500/30 bg-emerald-500/5">
+      <CardContent className="pt-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Upload className="w-5 h-5 text-emerald-500" />
+          <div>
+            <h2 className="text-base font-semibold">Direct Upload — Publishes Live Instantly</h2>
+            <p className="text-xs text-muted-foreground">Dev privilege: your uploads skip moderation and appear in the store immediately.</p>
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Input placeholder="Track title" value={title} onChange={e => setTitle(e.target.value)} />
+          <Input placeholder="Artist name" value={artistName} onChange={e => setArtistName(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Full audio (private — sold to buyers)</label>
+          <input ref={fullRef} type="file" accept="audio/*" className={FILE_INPUT_CLASS} onChange={e => setAudioFull(e.target.files?.[0] ?? null)} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Preview clip (public — 30s max)</label>
+          <input ref={previewRef} type="file" accept="audio/*" className={FILE_INPUT_CLASS} onChange={e => setAudioPreview(e.target.files?.[0] ?? null)} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Cover art</label>
+          <input ref={coverRef} type="file" accept="image/*" className={FILE_INPUT_CLASS} onChange={e => setCoverArt(e.target.files?.[0] ?? null)} />
+        </div>
+        <Button className="w-full gap-1 bg-emerald-500 hover:bg-emerald-600 text-black" disabled={uploading} onClick={() => void upload()}>
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          Publish to Label
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -108,6 +201,8 @@ function TracksDashboard() {
             </Button>
           </div>
         </div>
+
+        <DirectUpload onUploaded={() => void load()} />
 
         <div className="grid grid-cols-3 gap-3">
           <Card className="border-border/40 bg-card/40">

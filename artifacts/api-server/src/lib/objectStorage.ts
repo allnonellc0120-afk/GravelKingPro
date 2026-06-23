@@ -204,6 +204,21 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  /**
+   * Save a public asset (cover art, preview clip) so it is reachable via
+   * searchPublicObject. The DB stores the key relative (e.g. "tracks/<id>/cover.png");
+   * the object is physically written under the first configured public search path,
+   * using the exact same path construction searchPublicObject reads with, so the
+   * two can never drift. Writing to the bucket root instead (as a plain
+   * bucket.file(key).save would) leaves the asset unreachable by the public route.
+   */
+  async savePublicObject(key: string, buffer: Buffer, contentType: string): Promise<void> {
+    const searchPath = this.getPublicObjectSearchPaths()[0];
+    const fullPath = `${searchPath}/${key}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    await objectStorageClient.bucket(bucketName).file(objectName).save(buffer, { contentType });
+  }
 }
 
 function parseObjectPath(path: string): {

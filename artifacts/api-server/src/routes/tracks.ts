@@ -2,7 +2,8 @@ import { Router, type Request, type Response } from "express";
 import { db, tracksTable, purchasedTracksTable, usersTable } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { resolveTier } from "../lib/entitlement";
-import { objectStorageClient } from "../lib/objectStorage";
+import { objectStorageClient, ObjectStorageService } from "../lib/objectStorage";
+import { sanitizeExt } from "../lib/audioGuards";
 import { getUncachableStripeClient } from "../stripeClient";
 import { storage } from "../storage";
 import multer from "multer";
@@ -36,6 +37,7 @@ async function getAudioDurationSeconds(buffer: Buffer, ext: string): Promise<num
 }
 
 const router = Router();
+const objectStorageService = new ObjectStorageService();
 
 /**
  * Columns safe to return to public callers — deliberately excludes audioFullKey.
@@ -63,11 +65,6 @@ const upload = multer({
 });
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
-function extOf(filename: string): string {
-  const dot = filename.lastIndexOf(".");
-  return dot >= 0 ? filename.slice(dot) : "";
-}
 
 async function saveFileToBucket(buffer: Buffer, key: string, contentType: string): Promise<void> {
   const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
@@ -128,6 +125,14 @@ router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
  *    cooldownDaysLeft: number, nextSubmissionDate: string }
  */
 router.get("/tracks/submit-eligibility", async (req: Request, res: Response) => {
+  // Dev privilege: an admin-authenticated request can always submit, and its
+  // submissions go live instantly (see POST /tracks/submit).
+  const { isAdminAuthenticated } = await import("../lib/adminAuth");
+  if (isAdminAuthenticated(req)) {
+    res.json({ eligible: true, tier: "admin" });
+    return;
+  }
+
   const sessionId = (req.cookies as Record<string, string>)?.gk_session;
   if (!sessionId) {
     res.json({ eligible: false, tier: "free", reason: "free_tier" });
@@ -208,16 +213,24 @@ router.post(
     { name: "cover_art", maxCount: 1 },
   ]),
   async (req: Request, res: Response) => {
-    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
-    if (!sessionId) {
-      res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
-      return;
-    }
+    // Dev privileges: an admin-authenticated request (gk_admin cookie or
+    // x-admin-key header, both derived from ADMIN_KEY) bypasses the paid-tier
+    // gate, the 7-day cooldown, and moderation — the track goes live instantly.
+    const { isAdminAuthenticated } = await import("../lib/adminAuth");
+    const isAdmin = isAdminAuthenticated(req);
 
-    const tier = await resolveTier(req);
-    if (tier === "free") {
-      res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
-      return;
+    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+    let tier = "admin";
+    if (!isAdmin) {
+      if (!sessionId) {
+        res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
+        return;
+      }
+      tier = await resolveTier(req);
+      if (tier === "free") {
+        res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
+        return;
+      }
     }
 
     const body = req.body as Record<string, string>;
@@ -237,7 +250,7 @@ router.post(
     // Enforce preview ≤30 s server-side using ffprobe so this cannot be bypassed via the API.
     const previewDuration = await getAudioDurationSeconds(
       audioPreview.buffer,
-      extOf(audioPreview.originalname) || ".bin",
+      `.${sanitizeExt(audioPreview.originalname)}`,
     );
     if (previewDuration > MAX_PREVIEW_SECONDS) {
       res.status(400).json({
@@ -246,11 +259,19 @@ router.post(
       return;
     }
 
-    const user = await storage.getOrCreateUser(sessionId);
     const now = new Date();
 
-    // node_auditor has unlimited submissions; all other paid tiers are rate-limited to once per 7 days
-    if (tier !== "node_auditor") {
+    // Resolve the submitting user from gk_session when present. Admin uploads
+    // may carry no gk_session at all, in which case the track is attributed to "admin".
+    let user: Awaited<ReturnType<typeof storage.getOrCreateUser>> | null = null;
+    if (sessionId) {
+      user = await storage.getOrCreateUser(sessionId);
+    }
+    const submittedByUserId = user?.id ?? "admin";
+
+    // node_auditor has unlimited submissions; weekly/monthly tiers are rate-limited
+    // to once per 7 days. Admins and node_auditor are exempt.
+    if (!isAdmin && tier !== "node_auditor" && user) {
       const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
       const last = dbUser?.lastSubmissionDate;
       if (last && (now.getTime() - new Date(last).getTime()) < SEVEN_DAYS_MS) {
@@ -264,14 +285,17 @@ router.post(
       const id = randomUUID();
       // Full audio is stored under private/ so it is never reachable via the
       // public-objects route regardless of PUBLIC_OBJECT_SEARCH_PATHS config.
-      const audioFullKey = `private/tracks/${id}/audio_full${extOf(audioFull.originalname)}`;
-      const audioPreviewKey = `tracks/${id}/audio_preview${extOf(audioPreview.originalname)}`;
-      const coverArtKey = `tracks/${id}/cover_art${extOf(coverArt.originalname)}`;
+      const audioFullKey = `private/tracks/${id}/audio_full.${sanitizeExt(audioFull.originalname)}`;
+      const audioPreviewKey = `tracks/${id}/audio_preview.${sanitizeExt(audioPreview.originalname)}`;
+      const coverArtKey = `tracks/${id}/cover_art.${sanitizeExt(coverArt.originalname)}`;
 
       await Promise.all([
+        // Full (paid) audio: bucket root under private/ — read directly by the gated download route.
         saveFileToBucket(audioFull.buffer, audioFullKey, audioFull.mimetype),
-        saveFileToBucket(audioPreview.buffer, audioPreviewKey, audioPreview.mimetype),
-        saveFileToBucket(coverArt.buffer, coverArtKey, coverArt.mimetype),
+        // Preview + cover are PUBLIC assets: they must be written under the public
+        // search path so the /storage/public-objects route (searchPublicObject) finds them.
+        objectStorageService.savePublicObject(audioPreviewKey, audioPreview.buffer, audioPreview.mimetype),
+        objectStorageService.savePublicObject(coverArtKey, coverArt.buffer, coverArt.mimetype),
       ]);
 
       const [track] = await db
@@ -282,13 +306,15 @@ router.post(
           audioFullKey,
           audioPreviewKey,
           coverArtKey,
-          status: "pending",
-          submittedByUserId: user.id,
+          // Dev uploads go live immediately; everyone else waits for moderation.
+          status: isAdmin ? "accepted" : "pending",
+          submittedByUserId,
           price: 9.99,
         })
         .returning();
 
-      if (tier !== "node_auditor") {
+      // Only consume a 7-day submission slot for rate-limited tiers.
+      if (!isAdmin && tier !== "node_auditor" && user) {
         await db
           .update(usersTable)
           .set({ lastSubmissionDate: now })
