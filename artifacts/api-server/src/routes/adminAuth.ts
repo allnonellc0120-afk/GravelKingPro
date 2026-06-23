@@ -6,7 +6,7 @@ import {
   requireAdmin,
 } from "../lib/adminAuth";
 import { db, usersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const adminAuthRouter = Router();
 
@@ -74,34 +74,50 @@ adminAuthRouter.post("/admin/grant-access", async (req: Request, res: Response) 
   }
 
   try {
-    const rowId = id ?? undefined;
+    const returning = {
+      id: usersTable.id,
+      email: usersTable.email,
+      subscriptionTier: usersTable.subscriptionTier,
+      isPro: usersTable.isPro,
+    } as const;
+
+    // Prefer updating an existing row (by id, then by email) over inserting.
+    let existingId: string | null = null;
+    if (id) {
+      const [r] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, id));
+      existingId = r?.id ?? null;
+    }
+    if (!existingId && email) {
+      const [r] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email));
+      existingId = r?.id ?? null;
+    }
+
+    if (existingId) {
+      const updates: Record<string, unknown> = { isPro: true, subscriptionTier: tier };
+      if (email) updates.email = email;
+      if (firstName) updates.firstName = firstName;
+      const [row] = await db
+        .update(usersTable)
+        .set(updates)
+        .where(eq(usersTable.id, existingId))
+        .returning(returning);
+      res.json({ ok: true, user: row, action: "updated" });
+      return;
+    }
+
+    // No existing row — insert fresh.
     const [row] = await db
       .insert(usersTable)
       .values({
-        ...(rowId ? { id: rowId } : {}),
+        ...(id ? { id } : {}),
         email: email ?? null,
-        firstName,
+        firstName: firstName ?? null,
         isPro: true,
         subscriptionTier: tier,
       })
-      .onConflictDoUpdate({
-        target: usersTable.id,
-        set: {
-          isPro: true,
-          subscriptionTier: tier,
-          email: email ? sql`excluded.email` : sql`users.email`,
-          firstName: firstName ? sql`excluded.first_name` : sql`users.first_name`,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({
-        id: usersTable.id,
-        email: usersTable.email,
-        subscriptionTier: usersTable.subscriptionTier,
-        isPro: usersTable.isPro,
-      });
+      .returning(returning);
 
-    res.json({ ok: true, user: row });
+    res.json({ ok: true, user: row, action: "inserted" });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
   }
