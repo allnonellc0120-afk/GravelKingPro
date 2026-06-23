@@ -26,3 +26,12 @@ bucket shared across dev and prod, so copy `<bucket>/<key>` →
 `<bucket>/public/<key>` (GCS `file.copy`) and both environments resolve
 immediately. Diagnose by listing the bucket and comparing the object's real name
 to `searchPath + "/" + key`.
+
+**Canonical helper (api-server):** use `ObjectStorageService.savePublicObject(key,
+buf, ct)` — it builds `${getPublicObjectSearchPaths()[0]}/${key}` with the SAME
+construction `searchPublicObject` reads, so the write/read paths can't drift.
+Don't hand-roll `bucket.file(key).save()` for public assets (that writes to
+bucket root and 404s). Track upload keys are hardened with `sanitizeExt`
+(lowercase, alnum-only, `bin` fallback). NOTE: `scripts/src/seed-tracks.ts` still
+hand-rolls bucket-root writes for its `demo/...` covers — same latent bug; only
+curated `releases/...` assets (placed under the public prefix manually) resolve.
