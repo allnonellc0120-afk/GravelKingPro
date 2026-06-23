@@ -252,8 +252,34 @@ audioRouter.post(
       return;
     }
 
-    const filePath = req.file.path;
+    let filePath = req.file.path;
     const ext = sanitizeExt(req.file.originalname);
+
+    // If the upload is a video container, extract the audio stream to WAV first.
+    // This prevents the UVR Python runner from hanging on MP4/MOV/etc files
+    // (it only speaks audio formats). ffmpeg handles video extraction in seconds.
+    const VIDEO_CONTAINER_EXTS = new Set(["mp4","mov","m4v","avi","mkv","webm","wmv","flv"]);
+    if (VIDEO_CONTAINER_EXTS.has(ext.toLowerCase())) {
+      const wavId = randomUUID();
+      const wavPath = `/tmp/gk_vid2aud_${wavId}.wav`;
+      try {
+        await execFileAsync("ffmpeg", [
+          "-y", "-i", filePath, "-vn",
+          "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2",
+          wavPath,
+        ], { timeout: 120_000 });
+        await unlink(filePath).catch(() => {});
+        filePath = wavPath;
+      } catch {
+        await unlink(filePath).catch(() => {});
+        res.status(422).json({
+          success: false,
+          error: "Could not extract audio from the video file. Try converting it to MP3 or WAV using the Convert tool first.",
+        });
+        return;
+      }
+    }
+
     const multiplier = parseFloat((req.body.multiplier as string) ?? "0.75");
     const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
     const mode: ProcessMode = (req.body.mode as ProcessMode) ?? "standard";

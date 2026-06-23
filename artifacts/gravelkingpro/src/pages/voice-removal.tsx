@@ -4,13 +4,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Download, Upload, Mic2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Download, Upload, Mic2, CheckCircle2, AlertCircle, FileVideo } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { Link } from "wouter";
 
 type State = "idle" | "uploading" | "processing" | "done" | "error";
+
+const VIDEO_EXTS = ["mp4", "mov", "m4v", "avi", "mkv", "webm", "wmv", "flv"];
+function isVideoFile(name: string) {
+  return VIDEO_EXTS.some((e) => name.toLowerCase().endsWith(`.${e}`));
+}
 
 export default function VoiceRemoval() {
   const { hasSplits } = useAppState();
@@ -24,9 +29,11 @@ export default function VoiceRemoval() {
   const [resultFormat, setResultFormat] = useState<"wav" | "mp3">("wav");
   const [remaining, setRemaining] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [isVideo, setIsVideo] = useState(false);
 
   const processFile = useCallback(async (file: File) => {
     setFileName(file.name);
+    setIsVideo(isVideoFile(file.name));
     setState("uploading");
     setProgress(10);
     setResultUrl(null);
@@ -103,6 +110,7 @@ export default function VoiceRemoval() {
     setFileName("");
     setResultUrl(null);
     setErrorMsg("");
+    setIsVideo(false);
   };
 
   const busy = state === "uploading" || state === "processing";
@@ -121,8 +129,8 @@ export default function VoiceRemoval() {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            Removes lead vocals using center-channel cancellation — extracts the full instrumental track.
-            Stereo files recommended.
+            AI-powered vocal separation — strips the lead vocal and returns the full instrumental.
+            Audio and video files supported.
           </p>
         </div>
 
@@ -141,14 +149,22 @@ export default function VoiceRemoval() {
                 </div>
                 <div className="text-center">
                   <p className="font-medium">Drop your track here</p>
-                  <p className="text-xs text-muted-foreground mt-1">MP3, WAV, FLAC, M4A · up to 100 MB</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    MP3, WAV, FLAC, M4A, MP4, MOV · up to 100 MB
+                  </p>
                 </div>
                 <Button variant="outline" className="border-purple-500/40 text-purple-400 hover:bg-purple-500/10" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                   Choose File
                 </Button>
               </CardContent>
             </Card>
-            <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => handleFile(e.target.files)} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*,video/*,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files)}
+            />
           </motion.div>
         )}
 
@@ -158,12 +174,17 @@ export default function VoiceRemoval() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <Card className="border-purple-500/20 bg-purple-500/5">
                 <CardContent className="py-10 space-y-4 text-center">
-                  <div className="text-sm text-muted-foreground">
-                    {state === "uploading" ? "Uploading…" : "Removing vocals with MLK v3…"}
+                  <div className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                    {isVideo && <FileVideo className="w-4 h-4 text-purple-400" />}
+                    {state === "uploading"
+                      ? "Uploading…"
+                      : isVideo
+                        ? "Extracting audio from video, then separating vocals…"
+                        : "Separating vocals with GravelKing AI…"}
                   </div>
                   <div className="text-xs font-medium text-purple-400">{fileName}</div>
                   <Progress value={progress} className="h-1.5" />
-                  <p className="text-xs text-muted-foreground">Processing locally — your audio never leaves the server.</p>
+                  <p className="text-xs text-muted-foreground">Processing on server — your file never leaves.</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -243,9 +264,9 @@ export default function VoiceRemoval() {
         {/* Info */}
         <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground">
           {[
-            { label: "Center-channel cancel", desc: "MLK v3 separation" },
-            { label: "100% local", desc: "Runs on your server" },
-            { label: "Stereo output", desc: "Full instrumental" },
+            { label: "GravelKing AI", desc: "Neural vocal separation" },
+            { label: "100% on-server", desc: "File stays private" },
+            { label: "Any format", desc: "Audio & video" },
           ].map((i) => (
             <div key={i.label} className="p-3 rounded-lg border border-border/20 bg-card/30 space-y-1">
               <p className="font-medium text-foreground/80">{i.label}</p>
