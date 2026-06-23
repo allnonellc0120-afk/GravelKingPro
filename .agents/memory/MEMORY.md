@@ -5,14 +5,14 @@
 - [getUserMedia exact deviceId fallback](getusermedia-exact-fallback.md) — exact deviceId throws OverconstrainedError if device gone; retry without constraint to fall back to default
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
-- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove/stem_split use fast in-process MLK v3 (Demucs dead-pathed); never assume 44-byte WAV header on ffmpeg output
+- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove uses UVR MDX-Net neural (ONNX, gkp_uvr_runner.py) with MLK v3 DSP fallback; stem_split stays MLK v3; never assume 44-byte WAV header on ffmpeg output
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Object storage public prefix](object-storage-public-prefix.md) — public assets must live UNDER the PUBLIC_OBJECT_SEARCH_PATHS prefix, not bucket root, or the serve route 404s
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
-- [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless; deploy bundles gitignored .cache/.local — delete .cache/uv before publish; read real logs via listDeploymentBuilds
+- [Deployment image 8 GiB limit](deploy-image-size.md) — publish fails at packaging if image >8 GiB; use ffmpeg-headless; deploy bundles gitignored .cache/.local — delete .cache/uv AND ~/.cache/audio-separator before publish; read real logs via listDeploymentBuilds
 - [Expo deploy node_modules](expo-deploy-node-modules.md) — deploy bundles against working-tree node_modules; committed-but-unmaterialized dep → Metro "Unable to resolve module"; fix via pnpm install + expo export check
 - [Deployment builds each artifact separately](deploy-typecheck-all.md) — no repo-wide build; each artifact builds via its own artifact.toml; mockup-sandbox excluded; read real logs via listDeploymentBuilds
 - [Studio audio dev verification](studio-audio-dev-verification.md) — seed users.subscription_tier+sessions, auth via Bearer <sid>; stripe.* mirror empty in dev; remote offline (mock it, no tsx); clean process_runs (FK) too
@@ -22,6 +22,9 @@
 - [Prod DB schema migrates on Publish](deploy-prod-db-schema.md) — Publish migrates schema (not rows) dev→prod; prod read-only; re-publish for schema; seed data via deployed admin POST + x-admin-key
 - [stripe-replit-sync esbuild external](stripe-esbuild-external.md) — stripe + stripe-replit-sync must stay external in build.mjs or migrations silently skip (wrong __dirname)
 - [MLK benchmark honesty + dev gating](mlk-benchmark-honesty.md) — benchmark must show only real detected hardware (CPU-only, no GPU; mmap_locked from real mlockall); dev open-usage gate must be fail-closed (NODE_ENV === "development")
+- [UVR neural vocal separation](uvr-neural-separation.md) — audio-separator[cpu] installs torch anyway (~2GB); UVR model downloads to ~/.cache/audio-separator on first prod request; must clean before publish
+- [Stripe webhook invoice.upcoming fix](stripe-webhook-invoice-upcoming.md) — invoice.upcoming events have null ID; catch err.code=23502+table=invoices+column=id in processWebhook and return early (don't rethrow) so Stripe gets 200 and stops retrying
+- [Subscription DB fallback to Stripe API](subscription-stripe-api-fallback.md) — storage.ts getUserSubscriptionStatus: if stripe.subscriptions mirror empty, dynamic-import stripeClient and list active/trialing subscriptions directly; prevents wrongly-free on webhook delay
 - [Static SPA per-route SEO](static-spa-seo-prerender.md) — Vite SPA SEO: comment-marker head block + post-build prerender per route + EXACT artifact.toml rewrites before the /* fallback; client head mgr only complements
 - [Expo native modules in Expo Go](expo-native-module-expo-go.md) — third-party native views render "Unimplemented component" in Expo Go; guard before rendering
 - [Mobile audio result handling](mobile-audio-result-handling.md) — native can't use object URLs / Linking blob:; write bytes to expo-file-system cache, play via expo-av, share via expo-sharing
