@@ -2,6 +2,8 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { storage } from '../storage';
+import { db, usersTable } from '@workspace/db';
+import { eq } from 'drizzle-orm';
 import { getUncachableStripeClient } from '../stripeClient';
 import { recordAnalyticsEvent } from '../analytics';
 import type Stripe from 'stripe';
@@ -118,8 +120,23 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
 // Get subscription status for the current session cookie
 stripeRouter.get('/subscription/status', async (req: Request, res: Response) => {
   try {
-    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+    // 1. OIDC-authenticated user (Replit Sign-in) — check their DB row directly.
+    //    This path is used when the user is signed in via Replit OAuth; they
+    //    won't have a gk_session cookie, so the cookie path below never fires.
+    if (req.isAuthenticated()) {
+      const [dbUser] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user.id));
+      if (dbUser) {
+        const status = await storage.getUserSubscriptionStatus(dbUser);
+        res.json(status);
+        return;
+      }
+    }
 
+    // 2. Anonymous gk_session cookie (Stripe checkout path).
+    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
     if (!sessionId) {
       res.json({ isPro: false, plan: null });
       return;
