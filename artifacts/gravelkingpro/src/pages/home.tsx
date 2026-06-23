@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useSearch } from "wouter";
 import { Layout } from "@/components/layout";
 import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -195,6 +195,26 @@ function NotifyBanner() {
 export default function Home() {
   const { isPro } = useAppState();
   const { isAuthenticated, login } = useAuth();
+  const { toast } = useToast();
+  const search = useSearch();
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get("activated") === "1") {
+      toast({
+        title: "Lifetime access activated!",
+        description: "Your Node Auditor plan is now live on this device. All tools are unlocked.",
+      });
+      window.history.replaceState({}, "", "/");
+    } else if (params.get("activated") === "invalid") {
+      toast({
+        title: "Activation link invalid",
+        description: "This link has already been used or is not valid. Contact support.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
 
   return (
     <Layout>

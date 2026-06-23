@@ -15,6 +15,7 @@ import mlkRouter from "./mlk";
 import tracksRouter from "./tracks";
 import storageRouter from "./storage";
 import adminAuthRouter from "./adminAuth";
+import activateRouter from "./activate";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(analyticsRouter);
 router.use(mlkRouter);
 router.use(tracksRouter);
 router.use(storageRouter);
+router.use(activateRouter);
 
 export default router;
