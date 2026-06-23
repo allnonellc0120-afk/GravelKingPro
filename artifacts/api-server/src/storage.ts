@@ -62,6 +62,35 @@ export class Storage {
     );
 
     if (result.rows.length === 0) {
+      // DB mirror may be stale (webhook delivery failures can delay mirroring).
+      // Fall back to a live Stripe API check before returning "no subscription".
+      try {
+        const { getUncachableStripeClient } = await import('./stripeClient');
+        const stripe = await getUncachableStripeClient();
+        for (const status of ['active', 'trialing'] as const) {
+          const list = await stripe.subscriptions.list({
+            customer: user.stripeCustomerId,
+            status,
+            limit: 1,
+            expand: ['data.items.data.price.product'],
+          });
+          if (list.data.length > 0) {
+            const sub  = list.data[0];
+            const item = sub.items.data[0];
+            const price    = item?.price as any;
+            const tierMeta = (price?.product as any)?.metadata?.tier ?? null;
+            const interval = price?.recurring?.interval ?? null;
+            const amount   = price?.unit_amount ?? null;
+            const tier     = deriveTier(tierMeta, interval, amount);
+            const plan =
+              tier === 'node_auditor' ? 'Node Auditor'
+              : tier === 'monthly'    ? 'Studio'
+              : tier === 'weekly'     ? 'Weekly'
+              : null;
+            return { isPro: tier !== 'free', plan, tier };
+          }
+        }
+      } catch { /* Stripe unreachable — fall through to free */ }
       return { isPro: false, plan: null, tier: null };
     }
 

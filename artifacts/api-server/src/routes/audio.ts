@@ -8,6 +8,7 @@ import { zipSync } from "fflate";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 import { db, processRunsTable } from "@workspace/db";
 import {
+  uvrVocalRemoval,
   mlkVocalRemoval,
   mlkStemSplit,
   MLK_PROTOCOL,
@@ -342,16 +343,15 @@ audioRouter.post(
       }
     }
 
-    // ── Voice removal — Morris Law Kernel v3 (fast local separation) ─────────
+    // ── Voice removal — UVR MDX-Net neural (falls back to MLK v3 DSP) ──────────
     if (mode === "voice_remove") {
       try {
-        // Center-channel separation is an inherently local ffmpeg operation: the
-        // remote generic kernel endpoint has no separation contract, so routing
-        // raw audio there could return a non-separated mix. We separate locally
-        // and carve the instrumental with the MLK v3 kernel — fast, in-process,
-        // and always completes (no neural net to stall at "88%").
-        const { channels } = await getAudioInfo(filePath);
-        const mlk = await mlkVocalRemoval(filePath, ext, channels, multiplier);
+        // Primary: UVR-MDX-NET-Inst_HQ_3 neural separation via ONNX (no GPU).
+        // Falls back to MLK v3 center-channel DSP if the model is unavailable.
+        const mlk = await uvrVocalRemoval(filePath, ext, multiplier).catch(async () => {
+          const { channels } = await getAudioInfo(filePath);
+          return mlkVocalRemoval(filePath, ext, channels, multiplier);
+        });
         const instrumentalBuf = mlk.instrumental;
         const kernelParity = mlk.kernelParity;
         const routing = "local";
@@ -421,9 +421,9 @@ audioRouter.post(
           res.setHeader("X-GK-Efficiency", "1.0000");
           res.setHeader("X-GK-Decay-Rate", "0.0000");
           res.setHeader("X-GK-Sample-Count", String(wavBuffer.length / 2));
-          res.setHeader("X-GK-Separator", "MLK_v3");
-          res.setHeader("X-GK-Model", MLK_KERNEL);
-          res.setHeader("X-GK-Protocol", MLK_PROTOCOL);
+          res.setHeader("X-GK-Separator", mlk.model);
+          res.setHeader("X-GK-Model", mlk.model);
+          res.setHeader("X-GK-Protocol", mlk.protocol);
           res.setHeader("X-GK-Stack", stack);
           res.send(wavBuffer);
         }

@@ -21,6 +21,7 @@ const execFileAsync = promisify(execFile);
 // Resolves relative to the compiled bundle: dist/ -> .. -> artifacts/api-server/
 const _here = dirname(fileURLToPath(import.meta.url));
 const DEMUCS_RUNNER = resolve(_here, "..", "gkp_demucs_runner.py");
+const UVR_RUNNER    = resolve(_here, "..", "gkp_uvr_runner.py");
 
 export const GNS_PROTOCOL  = "GravelKing_Neural_Separator_v1";
 export const GNS_MODEL     = "htdemucs";
@@ -158,6 +159,14 @@ export const MLK_PROTOCOL = "GravelKing_MLK_v3";
 export const MLK_KERNEL   = "MLK_v3";
 export const MLK_STACK    = `${MLK_PROTOCOL}+${MLK_KERNEL}`;
 
+// ── UVR MDX-Net Neural Separator (ONNX — fast, high quality) ─────────────────
+// UVR-MDX-NET-Inst_HQ_3: trained on large music datasets, outputs true neural
+// vocal/instrumental separation. Runs via ONNX runtime — no GPU required.
+export const UVR_PROTOCOL = "GravelKing_UVR_MDXNet";
+export const UVR_MODEL    = "UVR-MDX-NET-Inst_HQ_3";
+export const UVR_STACK    = `${UVR_PROTOCOL}+MLK_v3`;
+const UVR_TIMEOUT         = 600_000; // 10 min ceiling for full-length tracks
+
 /** Run an ffmpeg audio filter on a file and return a pcm_s16le WAV. */
 async function ffmpegFilterToWav(
   filePath: string,
@@ -200,6 +209,55 @@ export async function mlkVocalRemoval(
     model:        MLK_KERNEL,
     stack:        MLK_STACK,
   };
+}
+
+/**
+ * UVR Vocal Removal — neural separation via UVR-MDX-NET-Inst_HQ_3 (ONNX).
+ * Downloads the model on first use (~100 MB) then caches it.
+ * Throws on failure so callers can fall back to mlkVocalRemoval.
+ */
+export async function uvrVocalRemoval(
+  filePath:   string,
+  ext:        string,
+  multiplier: number = 0.75,
+): Promise<GNSVocalResult> {
+  const id        = randomUUID();
+  const outputDir = `/tmp/gkp_uvr_vr_${id}`;
+
+  await mkdir(outputDir, { recursive: true });
+
+  try {
+    const { stdout } = await execFileAsync("python3", [
+      UVR_RUNNER,
+      "--mode",  "voice_remove",
+      "--input", filePath,
+      "--out",   outputDir,
+    ], { maxBuffer: 500 * 1024 * 1024, timeout: UVR_TIMEOUT });
+
+    const lines  = stdout.trim().split("\n").filter(Boolean);
+    const parsed = JSON.parse(lines[lines.length - 1]) as {
+      instrumental?: string;
+      model?:        string;
+      error?:        string;
+    };
+
+    if (parsed.error)         throw new Error(parsed.error);
+    if (!parsed.instrumental) throw new Error("UVR runner produced no instrumental file");
+
+    const rawBuf = await readFile(parsed.instrumental);
+    const s16Buf = await normalizeToS16le(rawBuf);
+    const { buf, parity } = applyMLKv3(s16Buf, multiplier);
+
+    return {
+      instrumental: buf,
+      kernelParity: parity,
+      protocol:     UVR_PROTOCOL,
+      model:        UVR_MODEL,
+      stack:        UVR_STACK,
+    };
+  } finally {
+    await rm(outputDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 /**

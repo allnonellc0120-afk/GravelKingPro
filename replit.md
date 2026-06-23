@@ -46,7 +46,7 @@ A gravel-optimisation benchmarking tool with real Stripe subscription payments.
 - Run `seed-products` AFTER connecting Stripe — products must exist in Stripe before the pricing page can start a checkout.
 - `stripe` and `stripe-replit-sync` packages live at the workspace root (not in api-server package.json) — pnpm hoisting makes them accessible.
 - `stripe` and `stripe-replit-sync` are marked `external` in `build.mjs` so esbuild doesn't bundle them. They must stay external: `stripe-replit-sync` resolves migration SQL files via `__dirname` at runtime; if bundled, `__dirname` points to our `dist/` folder and migrations silently skip, leaving the stripe schema empty.
-- **Before publishing**: (1) run `pnpm install` so the working-tree `node_modules` is fully materialized — the deploy bundles the Expo app against working-tree `node_modules`, so a committed-but-unmaterialized dep fails Metro with "Unable to resolve module"; (2) delete regenerable Python caches with `rm -rf .cache/uv .cache/torch .cache/pip` — the deploy image bundles gitignored dirs, and the `uv` cache can grow to ~5 GB and push the image past the 8 GiB limit even with `ffmpeg-headless`.
+- **Before publishing**: (1) run `pnpm install` so the working-tree `node_modules` is fully materialized — the deploy bundles the Expo app against working-tree `node_modules`, so a committed-but-unmaterialized dep fails Metro with "Unable to resolve module"; (2) delete regenerable Python caches with `rm -rf .cache/uv .cache/torch .cache/pip ~/.cache/audio-separator` — the deploy image bundles gitignored dirs, and the `uv` cache can grow to ~5 GB and the audio-separator model cache adds ~200 MB; both push the image past the 8 GiB limit.
 
 ## Pointers
 

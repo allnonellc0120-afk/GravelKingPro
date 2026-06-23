@@ -61,6 +61,17 @@ export class WebhookHandlers {
     }
 
     const sync = await getStripeSync();
-    await sync.processWebhook(payload, signature);
+    try {
+      await sync.processWebhook(payload, signature);
+    } catch (err: any) {
+      // stripe-replit-sync cannot insert invoice.upcoming events: Stripe sends
+      // them with a temporary null ID that violates the invoices NOT NULL
+      // constraint. These are pre-billing notices only — skipping is safe and
+      // stops Stripe from retrying endlessly (which floods logs with 400s).
+      if (err?.code === "23502" && err?.table === "invoices" && err?.column === "id") {
+        return;
+      }
+      throw err;
+    }
   }
 }
