@@ -8,7 +8,6 @@ import { zipSync } from "fflate";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
 import { db, processRunsTable } from "@workspace/db";
 import {
-  uvrVocalRemoval,
   mlkVocalRemoval,
   mlkStemSplit,
   MLK_PROTOCOL,
@@ -369,15 +368,22 @@ audioRouter.post(
       }
     }
 
-    // ── Voice removal — UVR MDX-Net neural (falls back to MLK v3 DSP) ──────────
+    // ── Voice removal — instant MLK v3 DSP (free tier; real AI is a paid path) ─
     if (mode === "voice_remove") {
       try {
-        // Primary: UVR-MDX-NET-Inst_HQ_3 neural separation via ONNX (no GPU).
-        // Falls back to MLK v3 center-channel DSP if the model is unavailable.
-        const mlk = await uvrVocalRemoval(filePath, ext, multiplier).catch(async () => {
-          const { channels } = await getAudioInfo(filePath);
-          return mlkVocalRemoval(filePath, ext, channels, multiplier);
-        });
+        // Free tier: instant DSP vocal removal (center-channel extraction).
+        // This is deliberately NOT neural AI separation. Real neural separation
+        // (UVR/Demucs) needs a GPU — CPU inference runs ~7x realtime, so a full
+        // song would take 20+ minutes and tie up a worker, and silently failing
+        // back to this path is what made production look broken. Routing
+        // straight to DSP keeps this fast (~5s) and honest. Studio-grade AI
+        // separation is planned as a paid cloud option (separate code path).
+        const { channels } = await getAudioInfo(filePath);
+        const mlk = await mlkVocalRemoval(filePath, ext, channels, multiplier);
+        req.log.info(
+          { separator: "MLK_v3_DSP", ext, channels },
+          "voice_remove processed via instant DSP center extraction",
+        );
         const instrumentalBuf = mlk.instrumental;
         const kernelParity = mlk.kernelParity;
         const routing = "local";

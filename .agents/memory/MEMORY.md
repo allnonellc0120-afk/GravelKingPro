@@ -5,7 +5,8 @@
 - [getUserMedia exact deviceId fallback](getusermedia-exact-fallback.md) — exact deviceId throws OverconstrainedError if device gone; retry without constraint to fall back to default
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
-- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove uses UVR MDX-Net neural (ONNX, gkp_uvr_runner.py) with MLK v3 DSP fallback; stem_split stays MLK v3; never assume 44-byte WAV header on ffmpeg output
+- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove + stem_split both run instant in-process MLK v3 DSP; never assume 44-byte WAV header on ffmpeg output
+- [Voice removal CPU neural not viable](voice-removal-cpu-neural.md) — CPU neural ~7x realtime + torch cu130 too big → prod silently faked success; voice_remove now routes direct to honest DSP, real AI deferred to paid cloud GPU
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
