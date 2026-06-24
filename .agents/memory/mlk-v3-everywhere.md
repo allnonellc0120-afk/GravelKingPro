@@ -53,3 +53,21 @@ volume → amix → dynaudnorm), streaming on disk with near-zero heap and retur
 `buildSlices` (default true for the bounded `/kernel/process` demo); `mlk_v3`
 passes `false` to skip the slice arrays. The sync JS `applyMLKv3` survives only on
 the dead Demucs GNS path — convert it too before ever mounting that path.
+
+**Stem split = one independent ffmpeg process PER stem (parallel), MLK baked into
+each stem's own filter graph.**
+`mlkStemSplit` renders each of the 5 stems (vocals, drums, bass, other,
+instrumental) in its own `ffmpeg` call: `[0:a]<extraction>[x];[x]<mlkChain>` where
+mlkChain is the inline asplit=3→per-band gain→amix→dynaudnorm carve (NOT
+`applyMLKv3Fast`, NOT the JS kernel). Runs via `Promise.allSettled` so a failure
+isolates to ONE stem; the thrown error names every failed stem + the first ffmpeg
+error.
+**Why:** user explicitly wanted per-stem processes so they can tell WHICH stem
+failed; a single combined-ffmpeg call produced all stems but gave no per-stem
+attribution. Each ffmpeg streams source→disk so only the final zip is in heap
+(preserves the OOM fix).
+**How to apply:** ffmpeg filter labels (`[l][m][h][out]` etc.) are scoped per
+process, so reusing the same labels across the 5 stem processes is safe — do NOT
+reintroduce per-stem label prefixes. Keep extraction filters and channel counts
+(vocals mono; instrumental stereo via `pan=stereo|c0=c0-c1|c1=c1-c0`, mono via
+aecho) intact.

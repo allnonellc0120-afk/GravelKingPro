@@ -262,14 +262,20 @@ export async function uvrVocalRemoval(
 
 /**
  * MLK v3 Stem Split — frequency-band + spatial separation with MLK v3 kernel
- * baked directly into the split filter_complex. Produces the 5 stems the
+ * baked directly into each stem's extraction filter. Produces the 5 stems the
  * studio UI expects (vocals, drums, bass, other, instrumental).
  *
- * Uses a SINGLE ffmpeg call for both band splitting AND MLK v3 carving —
- * replacing the previous 6-ffmpeg approach (1 split + 5 sequential MLK
- * passes) that took 5-8 minutes and peaked at ~580 MB RAM for a 3-minute song.
- * The combined call completes in ~1-2 minutes and never loads large WAV
- * buffers into Node.js RAM during processing.
+ * Each stem is rendered by its OWN independent ffmpeg process (band extraction
+ * + MLK v3 carving inline, in a single ffmpeg call per stem). The processes run
+ * in parallel, so the job stays fast, but because each stem is isolated:
+ *   - a failure is attributed to exactly ONE stem (we report which one), and
+ *   - one stem failing no longer aborts the others.
+ *
+ * Every per-stem ffmpeg streams straight from the source file to disk, so no
+ * large WAV buffers ever accumulate in Node.js RAM during processing — only the
+ * final zip is held in memory. This replaced the old 6-sequential-ffmpeg
+ * approach (1 split + 5 MLK passes) that took 5-8 minutes and peaked at
+ * ~580 MB RAM for a 3-minute song.
  */
 export async function mlkStemSplit(
   filePath:   string,
@@ -286,64 +292,71 @@ export async function mlkStemSplit(
   const midMult  = multiplier.toFixed(4);
   const highMult = Math.max(0.1, multiplier * 0.80).toFixed(4);
 
-  // Generate the 5-filter MLK v3 subgraph for one named stream.
-  // p = short prefix (e.g. "sv"), inLabel = extracted stream label,
-  // outLabel = final output label (e.g. "vocals").
-  function mlkSub(p: string, inLabel: string, outLabel: string): string {
-    return [
-      `[${inLabel}]asplit=3[${p}l][${p}m][${p}h]`,
-      `[${p}l]lowpass=f=250,volume=${lowMult}[${p}ll]`,
-      `[${p}m]highpass=f=250,lowpass=f=4000,volume=${midMult}[${p}mm]`,
-      `[${p}h]highpass=f=4000,volume=${highMult}[${p}hh]`,
-      `[${p}ll][${p}mm][${p}hh]amix=inputs=3:normalize=0,dynaudnorm=p=0.9:m=10:s=5[${outLabel}]`,
-    ].join(";");
-  }
+  // MLK v3 carving chain applied to an already-extracted stream: split into 3
+  // frequency bands → per-band gain → recombine + normalize. Self-contained so
+  // it can live inside any single-stem ffmpeg process (labels are scoped to
+  // that one process, so reuse across stems is safe).
+  const mlkChain = [
+    `asplit=3[l][m][h]`,
+    `[l]lowpass=f=250,volume=${lowMult}[ll]`,
+    `[m]highpass=f=250,lowpass=f=4000,volume=${midMult}[mm]`,
+    `[h]highpass=f=4000,volume=${highMult}[hh]`,
+    `[ll][mm][hh]amix=inputs=3:normalize=0,dynaudnorm=p=0.9:m=10:s=5[out]`,
+  ].join(";");
 
   const vocalExtract = isStereo
     ? "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=180,lowpass=f=5000"
     : "highpass=f=180,lowpass=f=5000";
   const instrExtract = isStereo ? "pan=stereo|c0=c0-c1|c1=c1-c0" : "aecho=0.8:0.88:6:0.4";
 
-  // Combined filter_complex: 5-way split → per-branch extraction → MLK v3 inline.
-  // All labels are short alphanumeric strings (ffmpeg requires this).
-  const filterComplex = [
-    `asplit=5[svin][sdin][sbin][soin][siin]`,
-    `[svin]${vocalExtract}[svx]`,
-    mlkSub("sv", "svx", "vocals"),
-    `[sdin]highpass=f=200,lowpass=f=2500[sdx]`,
-    mlkSub("sd", "sdx", "drums"),
-    `[sbin]lowpass=f=250[sbx]`,
-    mlkSub("sb", "sbx", "bass"),
-    `[soin]highpass=f=2500[sox]`,
-    mlkSub("so", "sox", "other"),
-    `[siin]${instrExtract}[six]`,
-    mlkSub("si", "six", "instrumental"),
-  ].join(";");
-
+  // One entry per stem: extraction filter + output channel count. Each becomes
+  // an independent ffmpeg process so failures isolate to a single stem.
   const stemDefs = [
-    { name: "vocals",       outPath: `${stemDir}/GKP_vocals.wav`,       ch: 1 },
-    { name: "drums",        outPath: `${stemDir}/GKP_drums.wav`,        ch: channels },
-    { name: "bass",         outPath: `${stemDir}/GKP_bass.wav`,         ch: channels },
-    { name: "other",        outPath: `${stemDir}/GKP_other.wav`,        ch: channels },
-    { name: "instrumental", outPath: `${stemDir}/GKP_instrumental.wav`, ch: isStereo ? 2 : channels },
+    { name: "vocals",       extract: vocalExtract,                    ch: 1,                          outPath: `${stemDir}/GKP_vocals.wav`       },
+    { name: "drums",        extract: "highpass=f=200,lowpass=f=2500", ch: channels,                   outPath: `${stemDir}/GKP_drums.wav`        },
+    { name: "bass",         extract: "lowpass=f=250",                 ch: channels,                   outPath: `${stemDir}/GKP_bass.wav`         },
+    { name: "other",        extract: "highpass=f=2500",               ch: channels,                   outPath: `${stemDir}/GKP_other.wav`        },
+    { name: "instrumental", extract: instrExtract,                    ch: isStereo ? 2 : channels,    outPath: `${stemDir}/GKP_instrumental.wav` },
   ];
 
-  try {
-    // One ffmpeg call: band split + MLK v3 applied to all 5 stems simultaneously.
-    // maxBuffer kept small — ffmpeg writes to disk, not to stdout.
-    await execFileAsync("ffmpeg", [
-      "-y", "-i", filePath,
-      "-filter_complex", filterComplex,
-      "-map", "[vocals]",       "-ac", "1",              "-acodec", "pcm_s16le", stemDefs[0].outPath,
-      "-map", "[drums]",        "-ac", String(channels), "-acodec", "pcm_s16le", stemDefs[1].outPath,
-      "-map", "[bass]",         "-ac", String(channels), "-acodec", "pcm_s16le", stemDefs[2].outPath,
-      "-map", "[other]",        "-ac", String(channels), "-acodec", "pcm_s16le", stemDefs[3].outPath,
-      "-map", "[instrumental]", "-ac", isStereo ? "2" : String(channels), "-acodec", "pcm_s16le", stemDefs[4].outPath,
-    ], { maxBuffer: 50 * 1024 * 1024, timeout: 300_000 });
+  // Render a single stem in its own ffmpeg process: [source] → extraction →
+  // MLK v3 → disk. Errors are tagged with the stem name so the caller knows
+  // exactly which stem failed.
+  async function renderStem(stem: typeof stemDefs[number]): Promise<void> {
+    const filterComplex = `[0:a]${stem.extract}[x];[x]${mlkChain}`;
+    try {
+      await execFileAsync("ffmpeg", [
+        "-y", "-i", filePath,
+        "-filter_complex", filterComplex,
+        "-map", "[out]",
+        "-ac", String(stem.ch),
+        "-acodec", "pcm_s16le",
+        stem.outPath,
+      ], { maxBuffer: 50 * 1024 * 1024, timeout: 180_000 });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`stem "${stem.name}" failed: ${detail}`);
+    }
+  }
 
-    // Read processed stems from disk and build zip.
-    // Files are read sequentially to avoid spiking RAM; each entry is freed
-    // once zipSync compresses the whole set.
+  try {
+    // Render every stem as its own parallel ffmpeg process. allSettled so one
+    // stem's failure doesn't cancel the others — we collect ALL failures and
+    // report exactly which stems broke.
+    const results = await Promise.allSettled(stemDefs.map(renderStem));
+    const failures = results
+      .map((r, i) => (r.status === "rejected" ? { stem: stemDefs[i].name, reason: r.reason } : null))
+      .filter((f): f is { stem: string; reason: unknown } => f !== null);
+
+    if (failures.length > 0) {
+      const names = failures.map((f) => f.stem).join(", ");
+      const first = failures[0].reason;
+      const detail = first instanceof Error ? first.message : String(first);
+      throw new Error(`MLK stem split failed for ${failures.length} stem(s): ${names}. First error: ${detail}`);
+    }
+
+    // Read processed stems from disk and build zip. Files are read sequentially
+    // to avoid spiking RAM; each entry is freed once zipSync compresses the set.
     const zipInput: Record<string, Uint8Array> = {};
     const stemNames: string[] = [];
     for (const stem of stemDefs) {
