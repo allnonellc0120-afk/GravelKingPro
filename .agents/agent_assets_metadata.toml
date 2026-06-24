@@ -95,3 +95,9 @@ id = "Kap8xFsaJ_kX--TvbfwwH"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_PitchDeck.pdf"
 type = "pdf"
 title = "GravelKingPro MLK v3 Pitch Deck (PDF)"
+
+[[outputs]]
+id = "jwWuoMhaW3zvW94AARX9Z"
+uri = "file://screenshots/promo-video-intro.jpg"
+type = "image"
+title = "GravelKing Pro — Marketing Video (Intro Scene)"
