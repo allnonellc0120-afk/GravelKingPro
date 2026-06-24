@@ -101,6 +101,13 @@ export default function VoiceRemoval() {
     const a = document.createElement("a");
     a.href = resultUrl;
     a.download = `gravelking_instrumental.${resultFormat}`;
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      // iOS Safari can't save blob URLs via download attr; open in new tab so user can Share → Save
+      window.open(resultUrl, "_blank");
+      return;
+    }
     a.click();
   };
 
@@ -161,7 +168,7 @@ export default function VoiceRemoval() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="audio/*,video/*,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv"
+              accept=".mp3,.wav,.flac,.m4a,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.ogg,.aiff,.aac"
               className="hidden"
               onChange={(e) => handleFile(e.target.files)}
             />
