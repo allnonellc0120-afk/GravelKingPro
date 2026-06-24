@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { TrackState, PluginDef, PluginType, Region, TRACK_COLORS, PLUGIN_DEFAULTS } from "./types";
 import { getWaveformPoints, audioBufferToWav } from "@/lib/audioKernel";
 import { useToast } from "@/hooks/use-toast";
+import { downloadBlob } from "@/lib/download";
 import {
   SavedProject,
   audioBufferToBase64,
@@ -791,14 +792,7 @@ export function useDAW() {
       return;
     }
     const finalBlob = await res.blob();
-    const url = URL.createObjectURL(finalBlob);
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      window.open(url, "_blank");
-    } else {
-      const a = document.createElement("a"); a.href = url; a.download = "gravelking_mix.wav"; a.click();
-      URL.revokeObjectURL(url);
-    }
+    downloadBlob(finalBlob, "gravelking_mix.wav");
     toast({ title: "Export complete", description: "Mix downloaded as WAV." });
   }, [masterPlugins, toast]);
 

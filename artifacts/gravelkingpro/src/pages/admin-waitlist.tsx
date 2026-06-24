@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AdminGate, useAdminAuth } from "@/components/admin-gate";
+import { downloadBlob } from "@/lib/download";
 
 interface WaitlistEntry {
   id: number;
@@ -91,17 +92,7 @@ function WaitlistDashboard() {
       const res = await fetch("/api/waitlist/admin?format=csv", { credentials: "include" });
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      if (isIOS) {
-        window.open(url, "_blank");
-        return;
-      }
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "waitlist.csv";
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "waitlist.csv");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed.");
     } finally {

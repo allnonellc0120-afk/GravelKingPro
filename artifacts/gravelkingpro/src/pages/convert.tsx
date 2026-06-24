@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Download, Upload, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { downloadUrl } from "@/lib/download";
 
 type State = "idle" | "uploading" | "converting" | "done" | "error";
 type Format = "mp3" | "wav" | "flac" | "m4a" | "ogg";
@@ -87,16 +88,7 @@ export default function ConvertPage() {
 
   const download = () => {
     if (!resultUrl) return;
-    const a = document.createElement("a");
-    a.href = resultUrl;
-    a.download = resultName;
-
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      window.open(resultUrl, "_blank");
-      return;
-    }
-    a.click();
+    downloadUrl(resultUrl, resultName);
   };
 
   const reset = () => {
