@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { Link } from "wouter";
 import { getWaveformPoints } from "@/lib/audioKernel";
+import { downloadBlob } from "@/lib/download";
 import { WaveformScrubber, type WaveformScrubberHandle } from "@/components/waveform-scrubber";
 import { StudioPluginRack, DEFAULT_PLUGIN_STATE, type PluginState } from "@/components/studio-plugin-rack";
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
@@ -164,6 +165,18 @@ export default function Studio() {
       audioCtxRef.current = new AudioContext();
     }
     return audioCtxRef.current;
+  };
+
+  /**
+   * iOS Safari (and Chrome's autoplay policy) start an AudioContext "suspended";
+   * it only resumes when resume() is called inside a user gesture. Every Play
+   * handler must await this BEFORE its first long async step so the gesture is
+   * still active — otherwise playback fires but produces no sound.
+   */
+  const ensureAudioRunning = async (ctx: AudioContext): Promise<void> => {
+    if (ctx.state === "suspended") {
+      try { await ctx.resume(); } catch { /* best effort — start() may still unlock */ }
+    }
   };
 
   const createReverbIR = (ctx: AudioContext, sizePct: number): AudioBuffer => {
@@ -508,6 +521,7 @@ export default function Studio() {
     if (isPlayingMix) { stopAllAudio(); return; }
     stopAllAudio();
     const ctx = getAudioContext();
+    await ensureAudioRunning(ctx);
     const activeStemNames = soloedStem !== null
       ? [soloedStem]
       : stemBlobs.filter(s => !mutedStems.has(s.name)).map(s => s.name);
@@ -556,6 +570,7 @@ export default function Studio() {
     if (isPlaying && abMode === "processed" && startOffset === 0) { stopAllAudio(); return; }
     stopAllAudio();
     const ctx = getAudioContext();
+    await ensureAudioRunning(ctx);
     if (!decodedBufferRef.current) {
       const ab = await processedBlob.arrayBuffer();
       decodedBufferRef.current = await ctx.decodeAudioData(ab);
@@ -585,11 +600,12 @@ export default function Studio() {
   };
 
   const handlePlayAb = async (which: "original" | "processed") => {
+    const ctx = getAudioContext();
+    await ensureAudioRunning(ctx);
     const blob = which === "original"
       ? (loadedFileRef.current ? new Blob([await loadedFileRef.current.arrayBuffer()]) : null)
       : processedBlob;
     if (!blob) return;
-    const ctx = getAudioContext();
     const alreadyPlaying = isPlaying && abMode === which;
     stopAllAudio();
     if (alreadyPlaying) return;
@@ -620,6 +636,7 @@ export default function Studio() {
     const ctx = getAudioContext();
     if (playingStem === name) { stopAllAudio(); return; }
     stopAllAudio();
+    await ensureAudioRunning(ctx);
     const ab = await blob.arrayBuffer();
     const decoded = await ctx.decodeAudioData(ab);
     const source = ctx.createBufferSource();
@@ -629,23 +646,6 @@ export default function Studio() {
     source.onended = () => setPlayingStem(null);
     sourceRef.current = source;
     setPlayingStem(name);
-  };
-
-  const downloadBlob = (blob: Blob, name: string) => {
-    const url = URL.createObjectURL(blob);
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      window.open(url, "_blank");
-      return;
-    }
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
   const handleDownload = () => {

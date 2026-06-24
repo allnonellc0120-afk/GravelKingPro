@@ -8,6 +8,7 @@ import { Download, Upload, Wand2, CheckCircle2, AlertCircle } from "lucide-react
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
+import { downloadUrl } from "@/lib/download";
 import { Link } from "wouter";
 
 type State = "idle" | "processing" | "done" | "error";
@@ -109,15 +110,7 @@ export default function Mastering() {
 
   const download = () => {
     if (!resultUrl) return;
-    const a = document.createElement("a");
-    a.href = resultUrl;
-    a.download = `gravelking_mastered_${preset}.wav`;
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      window.open(resultUrl, "_blank");
-      return;
-    }
-    a.click();
+    downloadUrl(resultUrl, `gravelking_mastered_${preset}.wav`);
   };
 
   const reset = () => {

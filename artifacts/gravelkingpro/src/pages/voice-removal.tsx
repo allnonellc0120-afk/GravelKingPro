@@ -8,6 +8,7 @@ import { Download, Upload, Mic2, CheckCircle2, AlertCircle, FileVideo } from "lu
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
+import { downloadUrl } from "@/lib/download";
 import { Link } from "wouter";
 import { EmailCapture } from "@/components/email-capture";
 
@@ -99,17 +100,7 @@ export default function VoiceRemoval() {
 
   const download = () => {
     if (!resultUrl) return;
-    const a = document.createElement("a");
-    a.href = resultUrl;
-    a.download = `gravelking_instrumental.${resultFormat}`;
-
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      // iOS Safari can't save blob URLs via download attr; open in new tab so user can Share → Save
-      window.open(resultUrl, "_blank");
-      return;
-    }
-    a.click();
+    downloadUrl(resultUrl, `gravelking_instrumental.${resultFormat}`);
   };
 
   const reset = () => {

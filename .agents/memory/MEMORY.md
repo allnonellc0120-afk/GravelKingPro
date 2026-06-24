@@ -35,3 +35,4 @@
 - [Expo native modules in Expo Go](expo-native-module-expo-go.md) — third-party native views render "Unimplemented component" in Expo Go; guard before rendering
 - [Mobile audio result handling](mobile-audio-result-handling.md) — native can't use object URLs / Linking blob:; write bytes to expo-file-system cache, play via expo-av, share via expo-sharing
 - [DAW DSP accuracy](daw-dsp-accuracy.md) — EQ/plugins are RBJ-correct except Gate (it's a downward compressor, not a real gate; needs AudioWorklet); stem split is band-split+center-cancel, heavy midrange bleed, not true separation
+- [Web iOS download + playback](web-ios-download-playback.md) — web downloads must use anchor download attr via lib/download.ts (never window.open → opens in 3rd-party app); Web Audio play handlers must await ctx.resume() inside the gesture or iOS plays silently

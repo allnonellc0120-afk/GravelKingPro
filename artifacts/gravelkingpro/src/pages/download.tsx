@@ -9,6 +9,7 @@ import {
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { downloadBlob } from "@/lib/download";
 
 const FREE_LOCAL = [
   "Noise reduction (Denoise)",
@@ -44,17 +45,7 @@ export default function DownloadPage() {
       const response = await fetch("/api/download/package");
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      if (isIOS) {
-        window.open(url, "_blank");
-        return;
-      }
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "GravelKingProductions_Free_Setup.txt";
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "GravelKingProductions_Free_Setup.txt");
       toast({ title: "Download started", description: "Check your downloads folder." });
     } catch {
       toast({ title: "Error", description: "Could not prepare download.", variant: "destructive" });

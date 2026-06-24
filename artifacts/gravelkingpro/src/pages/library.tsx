@@ -3,6 +3,7 @@ import { Layout } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { downloadBlob } from "@/lib/download";
 import { Library, Download, Music, ArrowLeft, Loader2 } from "lucide-react";
 import { Link, useSearch } from "wouter";
 
@@ -73,19 +74,7 @@ export default function LibraryPage() {
       const disposition = r.headers.get("Content-Disposition") ?? "";
       const nameMatch = disposition.match(/filename="([^"]+)"/);
       const filename = nameMatch?.[1] ?? "track.wav";
-      const url = URL.createObjectURL(blob);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      if (isIOS) {
-        window.open(url, "_blank");
-        return;
-      }
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, filename);
     } catch {
       toast({ title: "Error", description: "Could not start download.", variant: "destructive" });
     } finally {
