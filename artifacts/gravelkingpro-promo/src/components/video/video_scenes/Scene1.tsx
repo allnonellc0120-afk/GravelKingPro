@@ -6,54 +6,77 @@ export function Scene1() {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 500),
+      setTimeout(() => setPhase(1), 400),
       setTimeout(() => setPhase(2), 1500),
-      setTimeout(() => setPhase(3), 3500),
+      setTimeout(() => setPhase(3), 2500),
     ];
     return () => timers.forEach(t => clearTimeout(t));
   }, []);
 
   return (
     <motion.div
-      className="absolute inset-0 flex items-center justify-center bg-black"
+      className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.1 }}
-      transition={{ duration: 0.8 }}
+      transition={{ duration: 0.6 }}
     >
       <video
         src={`${import.meta.env.BASE_URL}videos/mpc_pads.mp4`}
-        className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen"
+        className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-screen"
         autoPlay
         muted
         playsInline
       />
+      
+      {/* Light leaks */}
+      <motion.div
+        className="absolute -top-[20%] -right-[20%] w-[60%] h-[60%] bg-amber-500/30 rounded-full blur-[100px] mix-blend-screen"
+        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute -bottom-[10%] -left-[10%] w-[50%] h-[50%] bg-amber-700/20 rounded-full blur-[100px] mix-blend-screen"
+        animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.5, 0.2] }}
+        transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
       <div className="relative z-10 text-center flex flex-col items-center">
-        <motion.h1
-          className="text-[8vw] font-black tracking-tighter text-amber-500 uppercase leading-none shadow-black drop-shadow-2xl"
-          initial={{ y: 50, opacity: 0, scale: 0.9 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+        <motion.div
+          className="overflow-hidden"
+          initial={{ opacity: 1 }}
         >
-          GravelKing Pro
-        </motion.h1>
+          <motion.h1
+            className="text-[8vw] font-black tracking-tighter text-amber-500 uppercase leading-none drop-shadow-2xl"
+            initial={{ y: "100%", rotateX: -40, opacity: 0 }}
+            animate={{ y: 0, rotateX: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          >
+            GravelKing
+          </motion.h1>
+        </motion.div>
+        
+        <motion.div className="overflow-hidden">
+          <motion.h1
+            className="text-[8vw] font-black tracking-tighter text-white uppercase leading-none drop-shadow-2xl"
+            initial={{ y: "100%", rotateX: -40, opacity: 0 }}
+            animate={phase >= 1 ? { y: 0, rotateX: 0, opacity: 1 } : { y: "100%", rotateX: -40, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          >
+            Pro
+          </motion.h1>
+        </motion.div>
+
         <motion.p
-          className="text-[2.5vw] text-white/90 mt-4 font-semibold tracking-widest uppercase drop-shadow-xl"
+          className="text-[2vw] text-amber-200/90 mt-6 font-semibold tracking-[0.3em] uppercase drop-shadow-xl"
           initial={{ y: 20, opacity: 0, filter: 'blur(10px)' }}
-          animate={phase >= 1 ? { y: 0, opacity: 1, filter: 'blur(0px)' } : { y: 20, opacity: 0, filter: 'blur(10px)' }}
+          animate={phase >= 2 ? { y: 0, opacity: 1, filter: 'blur(0px)' } : { y: 20, opacity: 0, filter: 'blur(10px)' }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          The Sound of Next
+          The Studio Is Now Open
         </motion.p>
       </div>
       
-      {/* Wipe transition overlay */}
-      <motion.div 
-        className="absolute inset-0 bg-amber-500 z-50 origin-bottom"
-        initial={{ scaleY: 0 }}
-        animate={phase >= 3 ? { scaleY: 1 } : { scaleY: 0 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      />
     </motion.div>
   );
 }

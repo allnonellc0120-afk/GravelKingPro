@@ -316,8 +316,8 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>3 voice removals</FeatureRow>
-                  <FeatureRow yes>1 stem split (5 stems)</FeatureRow>
+                  <FeatureRow yes>1 voice removal</FeatureRow>
+                  <FeatureRow yes={false}>Stem splits</FeatureRow>
                   <FeatureRow yes>1 full master, then 30 s previews</FeatureRow>
                   <FeatureRow yes={false}>Unlimited processing</FeatureRow>
                   <FeatureRow yes={false}>Live Audio Studio</FeatureRow>

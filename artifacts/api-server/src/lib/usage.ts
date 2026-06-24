@@ -9,9 +9,9 @@ import { storage } from "../storage";
  * Paid tiers (weekly/monthly/node_auditor) are never gated by these counters.
  */
 export const FREE_LIMITS = {
-  freeVoiceRemovals: 3,
-  freeStemSplits: 1,
-  freeMasterDownloads: 1,
+  freeVoiceRemovals: 1,
+  freeStemSplits: 0,
+  freeMasterDownloads: 0,
   totalDownloads: 1,
 } as const;
 

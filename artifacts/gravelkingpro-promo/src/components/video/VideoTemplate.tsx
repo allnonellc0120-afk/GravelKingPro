@@ -7,29 +7,23 @@ import { Scene3 } from './video_scenes/Scene3';
 import { Scene4 } from './video_scenes/Scene4';
 import { Scene5 } from './video_scenes/Scene5';
 import { Scene6 } from './video_scenes/Scene6';
-import { Scene7 } from './video_scenes/Scene7';
-import { Scene8 } from './video_scenes/Scene8';
 
 export const SCENE_DURATIONS = {
-  intro: 16000,
-  reveal: 16000,
-  artist: 15000,
-  features: 16000,
-  screens: 20000,
-  merch: 16000,
-  outro: 20000,
-  hammer: 14000,
+  intro: 4000,
+  stems: 6000,
+  mastering: 5000,
+  daw: 5000,
+  cloud: 5000,
+  outro: 6000,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
   intro: Scene1,
-  reveal: Scene2,
-  artist: Scene3,
-  features: Scene4,
-  screens: Scene5,
-  merch: Scene6,
-  outro: Scene7,
-  hammer: Scene8,
+  stems: Scene2,
+  mastering: Scene3,
+  daw: Scene4,
+  cloud: Scene5,
+  outro: Scene6,
 };
 
 const SCENE_START_SEC: Record<string, number> = (() => {
@@ -103,7 +97,7 @@ export default function VideoTemplate({
         />
       </div>
 
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence mode="sync">
         {SceneComponent && <SceneComponent key={currentSceneKey} />}
       </AnimatePresence>
 

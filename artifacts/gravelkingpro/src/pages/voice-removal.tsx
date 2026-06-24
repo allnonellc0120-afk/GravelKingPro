@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { Link } from "wouter";
+import { EmailCapture } from "@/components/email-capture";
 
 type State = "idle" | "uploading" | "processing" | "done" | "error";
 
@@ -237,9 +238,12 @@ export default function VoiceRemoval() {
                 </a>
 
                 {!hasSplits && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    Free tier outputs MP3. <Link href="/pricing" className="text-purple-400 hover:underline">Upgrade</Link> for WAV + unlimited runs.
-                  </p>
+                  <>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Free tier outputs MP3. <Link href="/pricing" className="text-purple-400 hover:underline">Upgrade</Link> for WAV + unlimited runs.
+                    </p>
+                    <EmailCapture source="voice_removal_result" />
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -258,9 +262,12 @@ export default function VoiceRemoval() {
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={reset} className="border-border/40">Try Again</Button>
                   {errorMsg.toLowerCase().includes("limit") && (
-                    <Link href="/pricing">
-                      <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">Upgrade</Button>
-                    </Link>
+                    <>
+                      <Link href="/pricing">
+                        <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">Upgrade</Button>
+                      </Link>
+                      <EmailCapture source="voice_removal_limit_hit" />
+                    </>
                   )}
                 </div>
               </CardContent>
