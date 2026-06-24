@@ -33,12 +33,45 @@ const gcs = new Storage({
 
 const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
 
-async function uploadBuffer(buffer: Buffer, key: string, contentType: string): Promise<void> {
+/** First configured public search path (e.g. "<bucket>/public"). */
+function getPublicSearchPath(): string {
+  return (process.env.PUBLIC_OBJECT_SEARCH_PATHS ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)[0] ?? "";
+}
+
+/** Split a "<bucket>/<object...>" path into its bucket and object name. */
+function parseObjectPath(path: string): { bucketName: string; objectName: string } {
+  if (!path.startsWith("/")) path = `/${path}`;
+  const parts = path.split("/");
+  return { bucketName: parts[1] ?? "", objectName: parts.slice(2).join("/") };
+}
+
+/** Upload a PRIVATE asset (full audio) to the bucket root under private/. */
+async function uploadPrivateBuffer(buffer: Buffer, key: string, contentType: string): Promise<void> {
   if (!BUCKET_ID) {
     console.warn(`  [warn] DEFAULT_OBJECT_STORAGE_BUCKET_ID not set — skipping GCS upload for ${key}`);
     return;
   }
   await gcs.bucket(BUCKET_ID).file(key).save(buffer, { contentType });
+}
+
+/**
+ * Upload a PUBLIC asset (cover art, preview clip) UNDER the PUBLIC_OBJECT_SEARCH_PATHS
+ * prefix, using the same path construction the api-server serve route reads with
+ * (searchPublicObject / savePublicObject). Writing to the bucket root instead would
+ * leave covers blank and previews unplayable — the serve route prepends the prefix,
+ * so a bucket-root object at `<bucket>/<key>` can never be found at `<bucket>/public/<key>`.
+ */
+async function uploadPublicBuffer(buffer: Buffer, key: string, contentType: string): Promise<void> {
+  const searchPath = getPublicSearchPath();
+  if (!searchPath) {
+    console.warn(`  [warn] PUBLIC_OBJECT_SEARCH_PATHS not set — skipping GCS upload for ${key}`);
+    return;
+  }
+  const { bucketName, objectName } = parseObjectPath(`${searchPath}/${key}`);
+  await gcs.bucket(bucketName).file(objectName).save(buffer, { contentType });
 }
 
 // ── WAV generation ────────────────────────────────────────────────────────────
@@ -149,6 +182,16 @@ const DEMO_TRACKS: DemoTrack[] = [
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Fail fast: without these the uploads silently no-op, leaving "accepted" demo
+  // rows that point at missing cover/preview objects (blank covers, no preview).
+  if (!BUCKET_ID || !getPublicSearchPath()) {
+    console.error(
+      "Seed aborted: DEFAULT_OBJECT_STORAGE_BUCKET_ID and PUBLIC_OBJECT_SEARCH_PATHS " +
+        "must both be set so cover/preview assets can be uploaded.",
+    );
+    process.exit(1);
+  }
+
   let inserted = 0;
   let skipped = 0;
 
@@ -180,9 +223,11 @@ async function main() {
 
     process.stdout.write(`  ↑  Uploading assets for "${t.title}" by ${t.artistName}…`);
     await Promise.all([
-      uploadBuffer(fullWav, audioFullKey, "audio/wav"),
-      uploadBuffer(previewWav, audioPreviewKey, "audio/wav"),
-      uploadBuffer(coverPng, coverArtKey, "image/png"),
+      // Full audio is private — bucket root under private/, read by the gated download route.
+      uploadPrivateBuffer(fullWav, audioFullKey, "audio/wav"),
+      // Preview + cover are public — must live under the public search-path prefix.
+      uploadPublicBuffer(previewWav, audioPreviewKey, "audio/wav"),
+      uploadPublicBuffer(coverPng, coverArtKey, "image/png"),
     ]);
     process.stdout.write(" done\n");
 

@@ -32,6 +32,13 @@ buf, ct)` — it builds `${getPublicObjectSearchPaths()[0]}/${key}` with the SAM
 construction `searchPublicObject` reads, so the write/read paths can't drift.
 Don't hand-roll `bucket.file(key).save()` for public assets (that writes to
 bucket root and 404s). Track upload keys are hardened with `sanitizeExt`
-(lowercase, alnum-only, `bin` fallback). NOTE: `scripts/src/seed-tracks.ts` still
-hand-rolls bucket-root writes for its `demo/...` covers — same latent bug; only
-curated `releases/...` assets (placed under the public prefix manually) resolve.
+(lowercase, alnum-only, `bin` fallback).
+
+**All writers must obey this**, not just the api-server. Both the runtime submit
+handler (`routes/tracks.ts`) and the demo seed script (`scripts/src/seed-tracks.ts`)
+now split private vs public: private full audio → bucket root under `private/`;
+public cover+preview → under the search-path prefix. `seed-tracks.ts` keeps its own
+`uploadPublicBuffer` (it can't import the api-server lib) but mirrors the same path
+construction, and fails fast if the storage env vars are missing (so it can't insert
+`accepted` rows with missing assets). If you add a THIRD writer, mirror this split or
+the bug returns.
