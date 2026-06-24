@@ -7,7 +7,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 
 export function Layout({ children, noPadding }: { children: ReactNode; noPadding?: boolean }) {
   const [location] = useLocation();
-  const { isPro } = useAppState();
+  const { isPro, isDeveloper } = useAppState();
   const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -20,6 +20,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
     { href: "/label", label: "Label" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
+    ...(isDeveloper ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   const displayName = user

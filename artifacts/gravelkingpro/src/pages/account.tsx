@@ -41,6 +41,13 @@ const TIER_META = {
     icon: <ShieldCheck className="w-4 h-4 text-violet-400" />,
     description: "Enterprise benchmarking + dedicated support",
   },
+  developer: {
+    label: "Developer",
+    color: "text-sky-400",
+    border: "border-sky-500/30",
+    icon: <ShieldCheck className="w-4 h-4 text-sky-400" />,
+    description: "Full admin access + all tools",
+  },
 } as const;
 
 const TIER_FEATURES: Record<string, string[]> = {
@@ -48,14 +55,15 @@ const TIER_FEATURES: Record<string, string[]> = {
   weekly:       ["Everything in Starter", "Unlimited voice removal", "Unlimited 5-stem splitting", "All preset masters + denoise", "Download WAV stems"],
   monthly:      ["Everything in Weekly", "Adjustable mastering kernel", "Live DAW + recording", "Waveform + plugin chain", "PDF reports"],
   node_auditor: ["Everything in Studio", "Enterprise benchmarking", "Custom reports", "SLA guarantee", "Dedicated support"],
+  developer:    ["Everything in Node Auditor", "Admin dashboard access", "Analytics & waitlist", "Full admin controls", "Developer tools"],
 };
 
 export default function Account() {
   const { user, isLoading } = useAuth();
-  const { tier, activePromo } = useAppState();
+  const { tier, isDeveloper, activePromo } = useAppState();
   const [portalLoading, setPortalLoading] = useState(false);
 
-  const tierKey = tier ?? "null";
+  const tierKey = (isDeveloper ? "developer" : tier) ?? "null";
   const meta = TIER_META[tierKey as keyof typeof TIER_META] ?? TIER_META["null"];
   const features = TIER_FEATURES[tierKey] ?? TIER_FEATURES["null"];
 

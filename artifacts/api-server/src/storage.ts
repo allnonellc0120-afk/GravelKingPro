@@ -40,7 +40,7 @@ export class Storage {
 
   async getUserSubscriptionStatus(
     user: User,
-  ): Promise<{ isPro: boolean; plan: string | null; tier: string | null }> {
+  ): Promise<{ isPro: boolean; plan: string | null; tier: string | null; isDeveloper?: boolean }> {
     // Lifetime / manually-granted access: honour the tier stored directly on the
     // user row.  Any row with is_pro=true and a subscription_tier set bypasses
     // Stripe entirely — this covers gifted / admin-granted access.
@@ -51,7 +51,7 @@ export class Storage {
         : t === 'monthly'    ? 'Studio'
         : t === 'weekly'     ? 'Weekly'
         : null;
-      return { isPro: true, plan, tier: t };
+      return { isPro: true, plan, tier: t, isDeveloper: user.isDeveloper ?? false };
     }
 
     if (!user.stripeCustomerId) {

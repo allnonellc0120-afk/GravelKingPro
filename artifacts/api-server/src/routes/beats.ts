@@ -146,7 +146,8 @@ beatsRouter.get("/beats/:id/audio", async (req: Request, res: Response) => {
 
 // ── Admin: upload / register a beat ──────────────────────────────────────────
 beatsRouter.post("/beats/upload", upload.none(), async (req: Request, res: Response) => {
-  if (!requireAdmin(req, res)) return;
+  const { requireAdmin } = await import("../lib/adminAuth");
+  if (!await requireAdmin(req, res)) return;
 
   const { title, artist, genre, bpm, description, tags, audio_url, file_name, mime_type } = req.body as Record<string, string>;
   if (!title || !audio_url) {
@@ -171,7 +172,8 @@ beatsRouter.post("/beats/upload", upload.none(), async (req: Request, res: Respo
 
 // ── Admin: set Beat of the Month ─────────────────────────────────────────────
 beatsRouter.patch("/beats/:id/feature", async (req: Request, res: Response) => {
-  if (!requireAdmin(req, res)) return;
+  const { requireAdmin } = await import("../lib/adminAuth");
+  if (!await requireAdmin(req, res)) return;
 
   const id = parseInt(req.params.id as string);
   if (isNaN(id)) { res.status(400).json({ success: false, error: "Invalid id." }); return; }
@@ -193,7 +195,8 @@ beatsRouter.patch("/beats/:id/feature", async (req: Request, res: Response) => {
 
 // ── Admin: deactivate a beat ──────────────────────────────────────────────────
 beatsRouter.delete("/beats/:id", async (req: Request, res: Response) => {
-  if (!requireAdmin(req, res)) return;
+  const { requireAdmin } = await import("../lib/adminAuth");
+  if (!await requireAdmin(req, res)) return;
 
   const id = parseInt(req.params.id as string);
   if (isNaN(id)) { res.status(400).json({ success: false, error: "Invalid id." }); return; }

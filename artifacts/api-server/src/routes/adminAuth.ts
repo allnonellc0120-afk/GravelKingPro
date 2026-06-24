@@ -3,6 +3,7 @@ import {
   setAdminCookie,
   clearAdminCookie,
   isAdminAuthenticated,
+  isDeveloperAuthenticated,
   requireAdmin,
 } from "../lib/adminAuth";
 import { db, usersTable } from "@workspace/db";
@@ -28,13 +29,17 @@ adminAuthRouter.post("/admin/login", (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-/** GET /api/admin/check — return 200 if session is valid, 401 otherwise. */
-adminAuthRouter.get("/admin/check", (req: Request, res: Response) => {
+/** GET /api/admin/check — return 200 if admin session OR developer user is valid. */
+adminAuthRouter.get("/admin/check", async (req: Request, res: Response) => {
   if (isAdminAuthenticated(req)) {
     res.json({ ok: true });
-  } else {
-    res.status(401).json({ ok: false });
+    return;
   }
+  if (await isDeveloperAuthenticated(req)) {
+    res.json({ ok: true });
+    return;
+  }
+  res.status(401).json({ ok: false });
 });
 
 /** POST /api/admin/logout — clear the session cookie. */
@@ -50,19 +55,22 @@ adminAuthRouter.post("/admin/logout", (_req: Request, res: Response) => {
  * Uses ON CONFLICT to update if a row with the given id already exists.
  */
 adminAuthRouter.post("/admin/grant-access", async (req: Request, res: Response) => {
-  if (!requireAdmin(req, res)) return;
+  const { requireAdmin } = await import("../lib/adminAuth");
+  if (!await requireAdmin(req, res)) return;
 
   const body = req.body as {
     id?: string;
     email?: string;
     firstName?: string;
     tier?: string;
+    isDeveloper?: boolean;
   };
 
   const tier = body.tier?.trim();
   const email = body.email?.trim();
   const firstName = body.firstName?.trim() ?? null;
   const id = body.id?.trim();
+  const isDeveloper = body.isDeveloper ?? false;
 
   if (!tier || !["node_auditor", "monthly", "weekly"].includes(tier)) {
     res.status(400).json({ error: "tier must be node_auditor, monthly, or weekly" });
@@ -79,6 +87,7 @@ adminAuthRouter.post("/admin/grant-access", async (req: Request, res: Response) 
       email: usersTable.email,
       subscriptionTier: usersTable.subscriptionTier,
       isPro: usersTable.isPro,
+      isDeveloper: usersTable.isDeveloper,
     } as const;
 
     // Prefer updating an existing row (by id, then by email) over inserting.
@@ -93,7 +102,7 @@ adminAuthRouter.post("/admin/grant-access", async (req: Request, res: Response) 
     }
 
     if (existingId) {
-      const updates: Record<string, unknown> = { isPro: true, subscriptionTier: tier };
+      const updates: Record<string, unknown> = { isPro: true, subscriptionTier: tier, isDeveloper };
       if (email) updates.email = email;
       if (firstName) updates.firstName = firstName;
       const [row] = await db
@@ -114,6 +123,7 @@ adminAuthRouter.post("/admin/grant-access", async (req: Request, res: Response) 
         firstName: firstName ?? null,
         isPro: true,
         subscriptionTier: tier,
+        isDeveloper,
       })
       .returning(returning);
 

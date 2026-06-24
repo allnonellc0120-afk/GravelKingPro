@@ -119,7 +119,7 @@ analyticsRouter.post("/analytics/track", async (req: Request, res: Response) => 
 
 // ── Admin: funnel summary + live revenue snapshot ────────────────────────────
 analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) => {
-  if (!requireAdmin(req, res)) return;
+  if (!await requireAdmin(req, res)) return;
   try {
     const daysRaw = parseInt(String(req.query.days ?? "30"), 10);
     const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 365) : 30;
