@@ -37,7 +37,7 @@ const upload = multer({
 const audioRouter = Router();
 
 const audioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
-const audioConcurrency = concurrencyLimit(3);
+const audioConcurrency = concurrencyLimit(2);
 
 type ProcessMode = "standard" | "voice_remove" | "stem_split";
 
