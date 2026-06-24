@@ -159,13 +159,16 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
 // Open Stripe Billing Portal — session-cookie based
 stripeRouter.post('/stripe/portal', async (req: Request, res: Response) => {
   try {
-    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
-    if (!sessionId) {
-      res.status(401).json({ error: 'No session — subscribe first.' });
-      return;
+    let user: Awaited<ReturnType<typeof storage.getUserBySession>> | null = null;
+
+    if (req.isAuthenticated()) {
+      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
+      if (dbUser) user = dbUser;
+    } else {
+      const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+      if (sessionId) user = await storage.getUserBySession(sessionId);
     }
 
-    const user = await storage.getUserBySession(sessionId);
     if (!user?.stripeCustomerId) {
       res.status(400).json({ error: 'No billing account found. Subscribe first.' });
       return;
