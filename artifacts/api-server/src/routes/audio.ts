@@ -10,8 +10,13 @@ import { db, processRunsTable } from "@workspace/db";
 import {
   mlkVocalRemoval,
   mlkStemSplit,
+  uvrVocalRemoval,
   MLK_PROTOCOL,
   MLK_KERNEL,
+  MLK_STACK,
+  UVR_PROTOCOL,
+  UVR_MODEL,
+  UVR_STACK,
 } from "../gkp-separator";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
@@ -368,26 +373,43 @@ audioRouter.post(
       }
     }
 
-    // ── Voice removal — instant MLK v3 DSP (free tier; real AI is a paid path) ─
+    // ── Voice removal — neural for paid, DSP for free ────────────────────────
     if (mode === "voice_remove") {
       try {
-        // Free tier: instant DSP vocal removal (center-channel extraction).
-        // This is deliberately NOT neural AI separation. Real neural separation
-        // (UVR/Demucs) needs a GPU — CPU inference runs ~7x realtime, so a full
-        // song would take 20+ minutes and tie up a worker, and silently failing
-        // back to this path is what made production look broken. Routing
-        // straight to DSP keeps this fast (~5s) and honest. Studio-grade AI
-        // separation is planned as a paid cloud option (separate code path).
+        const tier = await resolveTier(req);
+        const useNeural = tier === "node_auditor";
         const { channels } = await getAudioInfo(filePath);
-        const mlk = await mlkVocalRemoval(filePath, ext, channels, multiplier);
-        req.log.info(
-          { separator: "MLK_v3_DSP", ext, channels },
-          "voice_remove processed via instant DSP center extraction",
-        );
-        const instrumentalBuf = mlk.instrumental;
-        const kernelParity = mlk.kernelParity;
-        const routing = "local";
-        const stack = mlk.stack;
+
+        let result;
+        const routing: "local" = "local";
+        let stack: string;
+        let model: string;
+        let protocol: string;
+
+        if (useNeural) {
+          // Neural UVR separation for Node Auditor tier — real AI quality.
+          result = await uvrVocalRemoval(filePath, ext, multiplier);
+          req.log.info(
+            { separator: "UVR_MDXNET", ext },
+            "voice_remove processed via neural UVR-MDX-Net for Node Auditor",
+          );
+          stack = UVR_STACK;
+          model = UVR_MODEL;
+          protocol = UVR_PROTOCOL;
+        } else {
+          // Free/weekly/monthly: instant DSP vocal removal (center-channel extraction).
+          result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
+          req.log.info(
+            { separator: "MLK_v3_DSP", ext, channels },
+            "voice_remove processed via instant DSP center extraction",
+          );
+          stack = MLK_STACK;
+          model = MLK_KERNEL;
+          protocol = MLK_PROTOCOL;
+        }
+
+        const instrumentalBuf = result.instrumental;
+        const kernelParity = result.kernelParity;
         let wavBuffer = await applyTempoAndPitch(instrumentalBuf, tempo, semitones);
 
         // Cleanup uploaded file after processing
@@ -453,9 +475,9 @@ audioRouter.post(
           res.setHeader("X-GK-Efficiency", "1.0000");
           res.setHeader("X-GK-Decay-Rate", "0.0000");
           res.setHeader("X-GK-Sample-Count", String(wavBuffer.length / 2));
-          res.setHeader("X-GK-Separator", mlk.model);
-          res.setHeader("X-GK-Model", mlk.model);
-          res.setHeader("X-GK-Protocol", mlk.protocol);
+          res.setHeader("X-GK-Separator", model);
+          res.setHeader("X-GK-Model", model);
+          res.setHeader("X-GK-Protocol", protocol);
           res.setHeader("X-GK-Stack", stack);
           res.send(wavBuffer);
         }
