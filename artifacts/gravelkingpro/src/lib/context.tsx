@@ -48,7 +48,7 @@ const AppContext = createContext<AppState | undefined>(undefined);
 /** Map any stored/legacy plan string into the canonical client tier. */
 function normalizePlan(plan?: string | null): SubscriptionTier {
   if (!plan) return null;
-  const p = plan.toLowerCase().trim();
+  const p = plan.toLowerCase().trim().replace(/\s+/g, "_");
   switch (p) {
     case "weekly":
       return "weekly";
