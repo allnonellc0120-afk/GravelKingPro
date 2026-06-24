@@ -133,6 +133,9 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
         res.json(status);
         return;
       }
+      // OIDC user with no DB row yet — respond with free status
+      res.json({ isPro: false, plan: null });
+      return;
     }
 
     // 2. Anonymous gk_session cookie (Stripe checkout path).

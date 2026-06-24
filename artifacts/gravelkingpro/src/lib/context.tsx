@@ -28,10 +28,12 @@ interface AppState {
   isStudio: boolean;
   /** Backwards-compatible alias for isStudio (Studio-gated features) */
   isPro: boolean;
+  /** isDeveloper flag for admin access */
+  isDeveloper: boolean;
   plan: string | null;
   isLoadingSubscription: boolean;
   setTier: (tier: SubscriptionTier) => void;
-  refreshSubscription: () => Promise<{ tier: SubscriptionTier; plan: string | null }>;
+  refreshSubscription: () => Promise<{ tier: SubscriptionTier; plan: string | null; isDeveloper?: boolean }>;
   results: Results;
   setResults: (results: Results) => void;
   hasRun: boolean;
@@ -70,6 +72,7 @@ function normalizePlan(plan?: string | null): SubscriptionTier {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [userTier, setUserTier] = useState<SubscriptionTier>(null);
   const [plan, setPlan] = useState<string | null>(null);
+  const [isDeveloper, setIsDeveloper] = useState(false);
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
   const [activePromo, setActivePromo] = useState<string | null>(null);
   const [results, setResults] = useState<Results>(null);
@@ -82,23 +85,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshSubscription = useCallback(async (): Promise<{ tier: SubscriptionTier; plan: string | null }> => {
+  const refreshSubscription = useCallback(async (): Promise<{ tier: SubscriptionTier; plan: string | null; isDeveloper?: boolean }> => {
     try {
       setIsLoadingSubscription(true);
       const resp = await fetch("/api/subscription/status", { credentials: "include" });
       if (resp.ok) {
-        const data = await resp.json() as { isPro: boolean; plan: string | null };
+        const data = await resp.json() as { isPro: boolean; plan: string | null; isDeveloper?: boolean };
         setPlan(data.plan);
+        setIsDeveloper(data.isDeveloper ?? false);
         const t = normalizePlan(data.plan);
         setUserTier(t);
-        return { tier: t, plan: data.plan };
+        return { tier: t, plan: data.plan, isDeveloper: data.isDeveloper };
       }
     } catch {
       // Network error — leave tier as-is
     } finally {
       setIsLoadingSubscription(false);
     }
-    return { tier: null, plan: null };
+    return { tier: null, plan: null, isDeveloper: false };
   }, []);
 
   useEffect(() => {
@@ -138,6 +142,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hasSplits,
       isStudio,
       isPro,
+      isDeveloper,
       plan,
       isLoadingSubscription,
       setTier,

@@ -39,7 +39,7 @@ export function clearAdminCookie(res: Response): void {
   });
 }
 
-/** Returns true if the request carries a valid admin session (cookie or header). */
+/** Returns true if the request carries a valid admin session (cookie or header) OR is an OIDC developer. */
 export function isAdminAuthenticated(req: Request): boolean {
   const adminKey = process.env.ADMIN_KEY?.trim() ?? "";
   if (!adminKey) return false;
@@ -64,19 +64,32 @@ export function isAdminAuthenticated(req: Request): boolean {
   return req.headers["x-admin-key"] === adminKey;
 }
 
+/** Returns true if the request is from an OIDC user with isDeveloper=true. */
+export async function isDeveloperAuthenticated(req: Request): Promise<boolean> {
+  if (!req.isAuthenticated()) return false;
+  try {
+    const { db, usersTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    const [u] = await db.select({ isDeveloper: usersTable.isDeveloper }).from(usersTable).where(eq(usersTable.id, req.user.id));
+    return u?.isDeveloper === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Express guard: call at the top of an admin handler.
  * Returns true → proceed. Returns false → response already sent (403/503).
+ * Accepts either admin cookie/header OR developer OIDC users.
  */
-export function requireAdmin(req: Request, res: Response): boolean {
+export async function requireAdmin(req: Request, res: Response): Promise<boolean> {
   const adminKey = process.env.ADMIN_KEY?.trim() ?? "";
   if (!adminKey) {
     res.status(503).json({ error: "Admin key not configured on the server." });
     return false;
   }
-  if (!isAdminAuthenticated(req)) {
-    res.status(403).json({ error: "Not authenticated." });
-    return false;
-  }
-  return true;
+  if (isAdminAuthenticated(req)) return true;
+  if (await isDeveloperAuthenticated(req)) return true;
+  res.status(403).json({ error: "Not authenticated." });
+  return false;
 }

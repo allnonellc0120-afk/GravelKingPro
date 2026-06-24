@@ -6,11 +6,9 @@ import { Resend } from 'resend';
 
 const waitlistRouter = Router();
 
-// Admin guard imported from shared lib (accepts httpOnly cookie or x-admin-key header).
-import { requireAdmin as checkAdminKey } from '../lib/adminAuth';
-
 waitlistRouter.get('/waitlist/admin', async (req: Request, res: Response) => {
-  if (!checkAdminKey(req, res)) return;
+  const { requireAdmin } = await import('../lib/adminAuth');
+  if (!await requireAdmin(req, res)) return;
 
   try {
     const [{ total }] = await db.select({ total: count() }).from(waitlistTable);
@@ -38,7 +36,8 @@ waitlistRouter.get('/waitlist/admin', async (req: Request, res: Response) => {
 });
 
 waitlistRouter.post('/waitlist/admin/announce', async (req: Request, res: Response) => {
-  if (!checkAdminKey(req, res)) return;
+  const { requireAdmin } = await import('../lib/adminAuth');
+  if (!await requireAdmin(req, res)) return;
 
   const resendKey = process.env.RESEND_API_KEY?.trim() ?? '';
   if (!resendKey) {

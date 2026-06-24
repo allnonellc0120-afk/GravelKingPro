@@ -500,7 +500,7 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
 /** GET /api/admin/tracks — admin: list all tracks for moderation */
 router.get("/admin/tracks", async (req: Request, res: Response) => {
   const { requireAdmin } = await import("../lib/adminAuth");
-  if (!requireAdmin(req, res)) return;
+  if (!await requireAdmin(req, res)) return;
   try {
     const rows = await db
       .select()
@@ -515,7 +515,7 @@ router.get("/admin/tracks", async (req: Request, res: Response) => {
 /** GET /api/admin/tracks/pending — admin: list only pending tracks */
 router.get("/admin/tracks/pending", async (req: Request, res: Response) => {
   const { requireAdmin } = await import("../lib/adminAuth");
-  if (!requireAdmin(req, res)) return;
+  if (!await requireAdmin(req, res)) return;
   try {
     const rows = await db
       .select()
@@ -531,7 +531,7 @@ router.get("/admin/tracks/pending", async (req: Request, res: Response) => {
 /** POST /api/admin/tracks/:id/approve — admin approve */
 router.post("/admin/tracks/:id/approve", async (req: Request, res: Response) => {
   const { requireAdmin } = await import("../lib/adminAuth");
-  if (!requireAdmin(req, res)) return;
+  if (!await requireAdmin(req, res)) return;
 
   const trackId = req.params.id as string;
   try {
@@ -553,7 +553,7 @@ router.post("/admin/tracks/:id/approve", async (req: Request, res: Response) => 
 /** POST /api/admin/tracks/:id/reject — admin reject */
 router.post("/admin/tracks/:id/reject", async (req: Request, res: Response) => {
   const { requireAdmin } = await import("../lib/adminAuth");
-  if (!requireAdmin(req, res)) return;
+  if (!await requireAdmin(req, res)) return;
 
   const trackId = req.params.id as string;
   try {
@@ -575,7 +575,7 @@ router.post("/admin/tracks/:id/reject", async (req: Request, res: Response) => {
 /** POST /api/admin/tracks/seed — admin-only: seed label tracks into production DB */
 router.post("/admin/tracks/seed", async (req: Request, res: Response) => {
   const { requireAdmin } = await import("../lib/adminAuth");
-  if (!requireAdmin(req, res)) return;
+  if (!await requireAdmin(req, res)) return;
 
   const seedData = [
     {
