@@ -133,12 +133,6 @@ router.get("/tracks/submit-eligibility", async (req: Request, res: Response) => 
     return;
   }
 
-  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
-  if (!sessionId) {
-    res.json({ eligible: false, tier: "free", reason: "free_tier" });
-    return;
-  }
-
   const tier = await resolveTier(req);
   if (tier === "free") {
     res.json({ eligible: false, tier: "free", reason: "free_tier" });
@@ -152,9 +146,18 @@ router.get("/tracks/submit-eligibility", async (req: Request, res: Response) => 
   }
 
   // weekly / monthly — check 7-day cooldown
-  const user = await storage.getUserBySession(sessionId);
-  if (user) {
-    const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
+  let userId: string | null = null;
+  if (req.isAuthenticated()) {
+    userId = req.user.id;
+  } else {
+    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+    if (sessionId) {
+      const user = await storage.getUserBySession(sessionId);
+      if (user) userId = user.id;
+    }
+  }
+  if (userId) {
+    const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
     const last = dbUser?.lastSubmissionDate;
     const now = new Date();
     if (last && now.getTime() - new Date(last).getTime() < SEVEN_DAYS_MS) {
@@ -219,13 +222,8 @@ router.post(
     const { isAdminAuthenticated } = await import("../lib/adminAuth");
     const isAdmin = isAdminAuthenticated(req);
 
-    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
     let tier = "admin";
     if (!isAdmin) {
-      if (!sessionId) {
-        res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
-        return;
-      }
       tier = await resolveTier(req);
       if (tier === "free") {
         res.status(403).json({ error: "A Pro subscription is required to submit tracks. Subscribe at /pricing." });
@@ -261,13 +259,21 @@ router.post(
 
     const now = new Date();
 
-    // Resolve the submitting user from gk_session when present. Admin uploads
-    // may carry no gk_session at all, in which case the track is attributed to "admin".
+    // Resolve the submitting user. OIDC auth takes priority; fall back to gk_session.
     let user: Awaited<ReturnType<typeof storage.getOrCreateUser>> | null = null;
-    if (sessionId) {
-      user = await storage.getOrCreateUser(sessionId);
+    let userId: string | null = null;
+    if (req.isAuthenticated()) {
+      userId = req.user.id;
+      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+      if (dbUser) user = dbUser;
+    } else {
+      const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+      if (sessionId) {
+        user = await storage.getOrCreateUser(sessionId);
+        userId = user.id;
+      }
     }
-    const submittedByUserId = user?.id ?? "admin";
+    const submittedByUserId = userId ?? "admin";
 
     // node_auditor has unlimited submissions; weekly/monthly tiers are rate-limited
     // to once per 7 days. Admins and node_auditor are exempt.
