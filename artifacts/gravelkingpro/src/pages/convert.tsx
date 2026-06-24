@@ -19,7 +19,7 @@ const FORMATS: { value: Format; label: string; desc: string }[] = [
   { value: "ogg",  label: "OGG",  desc: "Open · web-friendly" },
 ];
 
-const ACCEPTS = "audio/*,video/*,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.mp3,.wav,.flac,.m4a,.ogg,.aiff,.aac";
+const ACCEPTS = ".mp3,.wav,.flac,.m4a,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.ogg,.aiff,.aac";
 
 export default function ConvertPage() {
   const { toast } = useToast();
@@ -90,6 +90,12 @@ export default function ConvertPage() {
     const a = document.createElement("a");
     a.href = resultUrl;
     a.download = resultName;
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.open(resultUrl, "_blank");
+      return;
+    }
     a.click();
   };
 
