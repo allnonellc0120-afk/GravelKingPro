@@ -792,8 +792,13 @@ export function useDAW() {
     }
     const finalBlob = await res.blob();
     const url = URL.createObjectURL(finalBlob);
-    const a = document.createElement("a"); a.href = url; a.download = "gravelking_mix.wav"; a.click();
-    URL.revokeObjectURL(url);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.open(url, "_blank");
+    } else {
+      const a = document.createElement("a"); a.href = url; a.download = "gravelking_mix.wav"; a.click();
+      URL.revokeObjectURL(url);
+    }
     toast({ title: "Export complete", description: "Mix downloaded as WAV." });
   }, [masterPlugins, toast]);
 

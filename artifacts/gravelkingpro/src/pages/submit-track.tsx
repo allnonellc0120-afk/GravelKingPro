@@ -161,7 +161,7 @@ export default function SubmitTrackPage() {
                 <input
                   ref={audioFullRef}
                   type="file"
-                  accept="audio/*"
+                  accept=".mp3,.wav,.flac,.m4a,.ogg,.aiff,.aac"
                   className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-secondary file:text-secondary-foreground hover:file:bg-secondary/80 cursor-pointer"
                   onChange={e => setAudioFullFile(e.target.files?.[0] ?? null)}
                 />
@@ -172,7 +172,7 @@ export default function SubmitTrackPage() {
                 <input
                   ref={audioPreviewRef}
                   type="file"
-                  accept="audio/*"
+                  accept=".mp3,.wav,.flac,.m4a,.ogg,.aiff,.aac"
                   className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-secondary file:text-secondary-foreground hover:file:bg-secondary/80 cursor-pointer"
                   onChange={e => setAudioPreviewFile(e.target.files?.[0] ?? null)}
                 />

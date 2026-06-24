@@ -633,6 +633,11 @@ export default function Studio() {
 
   const downloadBlob = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.open(url, "_blank");
+      return;
+    }
     const a = document.createElement("a");
     a.href = url;
     a.download = name;
@@ -660,15 +665,7 @@ export default function Studio() {
   const handleDownloadAllStems = () => {
     stemBlobs.forEach(({ name, blob }, i) => {
       setTimeout(() => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `GravelKing_${fileName.replace(/\.[^.]+$/, "")}_${name}`;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        downloadBlob(blob, `GravelKing_${fileName.replace(/\.[^.]+$/, "")}_${name}`);
       }, i * 200);
     });
     toast({ title: "All stems downloading", description: `${stemBlobs.length} files` });
@@ -787,7 +784,7 @@ export default function Studio() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="audio/*,video/*"
+              accept=".mp3,.wav,.flac,.m4a,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.ogg,.aiff,.aac"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];

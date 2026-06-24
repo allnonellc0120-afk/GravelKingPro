@@ -74,6 +74,11 @@ export default function LibraryPage() {
       const nameMatch = disposition.match(/filename="([^"]+)"/);
       const filename = nameMatch?.[1] ?? "track.wav";
       const url = URL.createObjectURL(blob);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        window.open(url, "_blank");
+        return;
+      }
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;

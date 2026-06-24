@@ -92,6 +92,11 @@ function WaitlistDashboard() {
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        window.open(url, "_blank");
+        return;
+      }
       const a = document.createElement("a");
       a.href = url;
       a.download = "waitlist.csv";

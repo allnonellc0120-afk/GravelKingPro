@@ -106,11 +106,11 @@ function DirectUpload({ onUploaded }: { onUploaded: () => void }) {
         </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Full audio (private — sold to buyers)</label>
-          <input ref={fullRef} type="file" accept="audio/*" className={FILE_INPUT_CLASS} onChange={e => setAudioFull(e.target.files?.[0] ?? null)} />
+          <input ref={fullRef} type="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aiff,.aac" className={FILE_INPUT_CLASS} onChange={e => setAudioFull(e.target.files?.[0] ?? null)} />
         </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Preview clip (public — 30s max)</label>
-          <input ref={previewRef} type="file" accept="audio/*" className={FILE_INPUT_CLASS} onChange={e => setAudioPreview(e.target.files?.[0] ?? null)} />
+          <input ref={previewRef} type="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aiff,.aac" className={FILE_INPUT_CLASS} onChange={e => setAudioPreview(e.target.files?.[0] ?? null)} />
         </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Cover art</label>
