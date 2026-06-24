@@ -63,7 +63,7 @@ const PLANS = [
     name: "Starter",
     price: "Free",
     color: "border-border/30",
-    features: ["3 free voice removals", "1 free stem split (5 stems)", "1 free full master", "Live vocal monitoring"],
+    features: ["1 free voice removal", "0 stem splits", "1 full master preview", "Live vocal monitoring"],
   },
   {
     name: "GravelKing Weekly",

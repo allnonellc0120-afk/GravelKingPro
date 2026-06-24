@@ -12,9 +12,10 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type Stripe from "stripe";
-import { db, analyticsEventsTable } from "@workspace/db";
+import { db, analyticsEventsTable, emailCaptureTable } from "@workspace/db";
 import { recordAnalyticsEvent } from "../analytics";
 import { getUncachableStripeClient } from "../stripeClient";
+import { createHash } from "crypto";
 
 const analyticsRouter = Router();
 
@@ -241,6 +242,36 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
     req.log?.error({ err }, "analytics summary failed");
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
+  }
+});
+
+// ── Public: email capture after free usage ───────────────────────────────────
+analyticsRouter.post("/capture-email", async (req: Request, res: Response) => {
+  try {
+    const body = req.body as { email?: string; source?: string };
+    const email = clampString(body.email, 255)?.trim().toLowerCase();
+    const source = clampString(body.source, 50) ?? "unknown";
+    if (!email || !email.includes("@")) {
+      res.status(400).json({ ok: false, error: "Valid email required" });
+      return;
+    }
+    const ipHash = createHash("sha256")
+      .update(String(req.headers["x-forwarded-for"] || req.ip || "unknown"))
+      .digest("hex");
+    const referrer = clampString(req.headers.referer, 512);
+    const userAgent = clampString(req.headers["user-agent"], 500);
+
+    await db.insert(emailCaptureTable).values({
+      email,
+      source,
+      referrer,
+      userAgent,
+      ipHash,
+    });
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    req.log?.warn({ err }, "email capture failed");
+    res.status(200).json({ ok: false });
   }
 });
 
