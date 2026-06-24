@@ -45,6 +45,11 @@ export default function DownloadPage() {
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        window.open(url, "_blank");
+        return;
+      }
       const a = document.createElement("a");
       a.href = url;
       a.download = "GravelKingProductions_Free_Setup.txt";

@@ -112,6 +112,11 @@ export default function Mastering() {
     const a = document.createElement("a");
     a.href = resultUrl;
     a.download = `gravelking_mastered_${preset}.wav`;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.open(resultUrl, "_blank");
+      return;
+    }
     a.click();
   };
 
@@ -167,7 +172,7 @@ export default function Mastering() {
                 </Button>
               </CardContent>
             </Card>
-            <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => handleFile(e.target.files)} />
+            <input ref={fileInputRef} type="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aiff,.aac" className="hidden" onChange={(e) => handleFile(e.target.files)} />
           </motion.div>
         ) : null}
 
