@@ -1,0 +1,1376 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 726
+>>
+stream
+0.200025 w
+0 G
+0.06 0.06 0.07 rg
+0. 841.8899999999999864 595.2799999999999727 -312. re
+f
+BT
+/F2 10 Tf
+11.5 TL
+0.788 0.431 0.024 rg
+56. 733.8899999999999864 Td
+(TECHNICAL WHITE PAPER  ·  v1.0) Tj
+ET
+BT
+/F2 36 Tf
+41.3999999999999986 TL
+1. g
+56. 691.8899999999999864 Td
+(GravelKing Pro) Tj
+ET
+0.79 0.43 0.02 rg
+56. 673.8899999999999864 72. -3. re
+f
+BT
+/F1 13.5 Tf
+15.5249999999999986 TL
+0.839 g
+56. 641.8899999999999864 Td
+(A browser-native music-production platform: architecture, audio methodology,) Tj
+ET
+BT
+/F1 13.5 Tf
+15.5249999999999986 TL
+0.839 g
+56. 622.8899999999999864 Td
+(and honest limitations.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.471 g
+56. 547.8899999999999864 Td
+(gravelkingpro.it.com  ·  June 2026) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 8488
+>>
+stream
+0.200025 w
+0 G
+BT
+/F2 8 Tf
+9.1999999999999993 TL
+0.788 0.431 0.024 rg
+56. 799.8899999999999864 Td
+(GRAVELKING PRO) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+468.1599999999999682 799.8899999999999864 Td
+(gravelkingpro.it.com) Tj
+ET
+0.87 g
+56. 791.8899999999999864 483.2799999999999727 -0.8 re
+f
+0.79 0.43 0.02 rg
+56. 750.8899999999999864 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 739.17999999999995 Td
+(Abstract) Tj
+ET
+0.87 g
+56. 727.8799999999999955 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 710.2699999999999818 Td
+(GravelKing Pro is a web-based music-production platform that unifies songwriting, audio separation,) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 695.3600000000000136 Td
+(recording, mixing, mastering, and format conversion in a single application. This paper describes the) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 680.4500000000000455 Td
+(system architecture, the Morris Law Kernel \(MLK v3.5\) audio engine, the methodology behind each tool,) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 665.5399999999999636 Td
+(and — importantly — the honest limitations of the digital-signal-processing techniques used. Our design) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 650.6299999999999955 Td
+(philosophy favors transparent, explainable processing over marketing claims the software cannot keep.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 620.3300000000000409 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 608.6200000000000045 Td
+(1. Introduction) Tj
+ET
+0.87 g
+56. 597.32000000000005 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 579.7100000000000364 Td
+(Independent creators typically assemble a fragmented toolchain: a desktop DAW, a cloud stem-splitter,) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 564.7999999999999545 Td
+(a mastering service, a converter, and a separate release platform. Each adds cost, friction, and) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 549.8899999999999864 Td
+(data-handling risk. GravelKing Pro consolidates these into one browser application backed by a shared) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 534.9800000000000182 Td
+(audio engine, with client-side processing where possible and first-party server processing otherwise.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 504.67999999999995 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 492.9699999999999704 Td
+(2. Design principles) Tj
+ET
+0.87 g
+56. 481.6699999999999591 483.2799999999999727 -0.6 re
+f
+0.79 0.43 0.02 rg
+61.7000000000000028 467.839999999999975 m
+61.7000000000000028 468.7788840747123231 60.9388840747123481 469.5399999999999636 60. 469.5399999999999636 c
+59.0611159252876519 469.5399999999999636 58.2999999999999972 468.7788840747123231 58.2999999999999972 467.839999999999975 c
+58.2999999999999972 466.9011159252876269 59.0611159252876519 466.1399999999999864 60. 466.1399999999999864 c
+60.9388840747123481 466.1399999999999864 61.7000000000000028 466.9011159252876269 61.7000000000000028 467.839999999999975 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 464.0599999999999454 Td
+(Browser-first: the interactive DAW runs entirely client-side using the Web Audio API, avoiding upload) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 449.1499999999999204 Td
+(latency and keeping project audio on the user's machine.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 434.019999999999925 m
+61.7000000000000028 434.9588840747122731 60.9388840747123481 435.7199999999999136 60. 435.7199999999999136 c
+59.0611159252876519 435.7199999999999136 58.2999999999999972 434.9588840747122731 58.2999999999999972 434.019999999999925 c
+58.2999999999999972 433.0811159252875768 59.0611159252876519 432.3199999999999363 60. 432.3199999999999363 c
+60.9388840747123481 432.3199999999999363 61.7000000000000028 433.0811159252875768 61.7000000000000028 434.019999999999925 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 430.2399999999998954 Td
+(First-party processing: server-side tools run on GravelKing infrastructure; user audio is never handed) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 415.3299999999998704 Td
+(to third-party services.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 400.1999999999998749 m
+61.7000000000000028 401.1388840747122231 60.9388840747123481 401.8999999999998636 60. 401.8999999999998636 c
+59.0611159252876519 401.8999999999998636 58.2999999999999972 401.1388840747122231 58.2999999999999972 400.1999999999998749 c
+58.2999999999999972 399.2611159252875268 59.0611159252876519 398.4999999999998863 60. 398.4999999999998863 c
+60.9388840747123481 398.4999999999998863 61.7000000000000028 399.2611159252875268 61.7000000000000028 400.1999999999998749 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 396.4199999999998454 Td
+(Explainable DSP: every tool states what it does and where it is approximate. We do not claim source) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 381.5099999999998204 Td
+(separation or transcription we do not perform.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 366.3799999999998249 m
+61.7000000000000028 367.3188840747121731 60.9388840747123481 368.0799999999998136 60. 368.0799999999998136 c
+59.0611159252876519 368.0799999999998136 58.2999999999999972 367.3188840747121731 58.2999999999999972 366.3799999999998249 c
+58.2999999999999972 365.4411159252874768 59.0611159252876519 364.6799999999998363 60. 364.6799999999998363 c
+60.9388840747123481 364.6799999999998363 61.7000000000000028 365.4411159252874768 61.7000000000000028 366.3799999999998249 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 362.5999999999997954 Td
+(Progressive entitlement: free tiers deliver real value; paid tiers unlock heavier compute and IP) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 347.6899999999997704 Td
+(features.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 320.389999999999759 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 308.6799999999997226 Td
+(3. System architecture) Tj
+ET
+0.87 g
+56. 297.3799999999997681 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 279.7699999999997544 Td
+(The platform is a pnpm monorepo. A Vite + React single-page application delivers the UI; an Express +) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 264.8599999999997863 Td
+(TypeScript API handles processing, subscriptions, and the label/library. PostgreSQL \(via Drizzle ORM\)) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 249.9499999999998181 Td
+(stores application state, and Stripe Checkout manages subscriptions. Audio work is split between the) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 235.0399999999998499 Td
+(browser \(Web Audio for the live DAW\) and the server \(ffmpeg-backed MLK v3 routines for splitting,) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 220.1299999999998818 Td
+(mastering, and conversion\).) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 198.2199999999999136 Td
+(Access to premium features is enforced server-side. Anonymous usage is tracked with a session cookie,) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 183.3099999999999454 Td
+(and authenticated accounts use OpenID Connect; both are mapped to entitlements on the backend so) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 168.3999999999999773 Td
+(client state can never unlock paid compute on its own.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 138.1000000000000227 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 126.3899999999999864 Td
+(4. The Morris Law Kernel \(MLK v3.5\)) Tj
+ET
+0.87 g
+56. 115.0900000000000318 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 97.4800000000000182 Td
+(MLK v3.5 is GravelKing's in-house DSP engine. It provides the carving and filtering primitives shared) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 82.57000000000005 Td
+(across tools — band-splitting, center-channel processing, EQ, dynamics, and loudness shaping. The) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 67.6600000000000819 Td
+(kernel is CPU-oriented and tuned for deterministic, repeatable output rather than GPU acceleration. On) Tj
+ET
+0.87 g
+56. 40. 483.2799999999999727 -0.6 re
+f
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+56. 28. Td
+(GravelKing Pro — gravelkingpro.it.com) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+534.8799999999999955 28. Td
+(1) Tj
+ET
+endstream
+endobj
+7 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 8 0 R
+>>
+endobj
+8 0 obj
+<<
+/Length 4973
+>>
+stream
+0.200025 w
+0 G
+BT
+/F2 8 Tf
+9.1999999999999993 TL
+0.788 0.431 0.024 rg
+56. 799.8899999999999864 Td
+(GRAVELKING PRO) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+468.1599999999999682 799.8899999999999864 Td
+(gravelkingpro.it.com) Tj
+ET
+0.87 g
+56. 791.8899999999999864 483.2799999999999727 -0.8 re
+f
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+56. 759.2799999999999727 Td
+(the server it is invoked through ffmpeg-native routines for throughput; in the browser the same DSP) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+56. 744.3700000000000045 Td
+(concepts are realized through Web Audio nodes.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 722.4600000000000364 Td
+(A benchmark harness exercises the kernel with a 4096×4096 double-precision matrix multiply \(DGEMM\)) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 707.5499999999999545 Td
+(over eight iterations to characterize throughput in GFLOPS. When the server kernel runner is) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 692.6399999999999864 Td
+(unavailable, the benchmark interface presents clearly-labeled demonstration figures rather than failing) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 677.7300000000000182 Td
+(silently.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 647.4300000000000637 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 635.7200000000000273 Td
+(5. Tool suite) Tj
+ET
+0.87 g
+56. 624.4200000000000728 483.2799999999999727 -0.6 re
+f
+BT
+/F2 12.5 Tf
+14.3749999999999982 TL
+0.788 0.431 0.024 rg
+56. 594.1700000000000728 Td
+(5.1 Mixing Studio \(live DAW\)) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 575.0599999999999454 Td
+(A multi-track DAW running on the Web Audio API. Tracks can be recorded or imported; each supports) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 560.1499999999999773 Td
+(volume, pan, and a chain of plugins \(EQ, dynamics, time-based effects\). Mixdown renders a stereo file) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 545.2400000000000091 Td
+(in-browser. Projects can be serialized and restored.) Tj
+ET
+BT
+/F2 12.5 Tf
+14.3749999999999982 TL
+0.788 0.431 0.024 rg
+56. 510.6899999999999409 Td
+(5.2 Vocal Booth) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 491.5799999999999272 Td
+(Combines a teleprompter, a backing-track player, an optional guide-vocal stem, and a recorder. Users) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 476.6699999999999022 Td
+(may split one of their own songs into instrumental + guide vocal for practice. The final mixdown) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 461.7599999999998772 Td
+(deliberately contains only the instrumental and the user's recorded take — never the guide vocal.) Tj
+ET
+BT
+/F2 12.5 Tf
+14.3749999999999982 TL
+0.788 0.431 0.024 rg
+56. 427.2099999999998658 Td
+(5.3 Voice Splitter) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 408.0999999999998522 Td
+(Separates a track into instrumental and vocal by cancelling the center-panned content common to most) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 393.1899999999998272 Td
+(stereo mixes.) Tj
+ET
+BT
+/F2 12.5 Tf
+14.3749999999999982 TL
+0.788 0.431 0.024 rg
+56. 358.6399999999998158 Td
+(5.4 Mastering) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 339.5299999999998022 Td
+(Applies a mastering chain — EQ, compression, loudness normalization, and optional denoise — via) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 324.6199999999997772 Td
+(presets matched to genre.) Tj
+ET
+BT
+/F2 12.5 Tf
+14.3749999999999982 TL
+0.788 0.431 0.024 rg
+56. 290.0699999999998226 Td
+(5.5 Songwriting Studio) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 270.959999999999809 Td
+(Generates complete songs from a prompt using Google's Gemini model. Paid users gain a line-by-line) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 256.0499999999998408 Td
+(editor and an authorship-certification step.) Tj
+ET
+BT
+/F2 12.5 Tf
+14.3749999999999982 TL
+0.788 0.431 0.024 rg
+56. 221.4999999999998863 Td
+(5.6 File Converter) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 202.3899999999998727 Td
+(Transcodes audio and video into MP3, WAV, FLAC, M4A, or OGG using ffmpeg, extracting audio from) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 187.4799999999999045 Td
+(video containers automatically.) Tj
+ET
+BT
+/F2 12.5 Tf
+14.3749999999999982 TL
+0.788 0.431 0.024 rg
+56. 152.92999999999995 Td
+(5.7 Hardware Optimizer) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 133.8199999999999363 Td
+(Detects CPU topology and benchmarks audio-processing throughput, presented alongside the MLK) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 118.9099999999999682 Td
+(optimization sequence.) Tj
+ET
+0.87 g
+56. 40. 483.2799999999999727 -0.6 re
+f
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+56. 28. Td
+(GravelKing Pro — gravelkingpro.it.com) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+534.8799999999999955 28. Td
+(2) Tj
+ET
+endstream
+endobj
+9 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 10 0 R
+>>
+endobj
+10 0 obj
+<<
+/Length 8482
+>>
+stream
+0.200025 w
+0 G
+BT
+/F2 8 Tf
+9.1999999999999993 TL
+0.788 0.431 0.024 rg
+56. 799.8899999999999864 Td
+(GRAVELKING PRO) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+468.1599999999999682 799.8899999999999864 Td
+(gravelkingpro.it.com) Tj
+ET
+0.87 g
+56. 791.8899999999999864 483.2799999999999727 -0.8 re
+f
+0.79 0.43 0.02 rg
+56. 766.8899999999999864 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 755.17999999999995 Td
+(6. Audio methodology and honest limitations) Tj
+ET
+0.87 g
+56. 743.8799999999999955 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 726.2699999999999818 Td
+(We consider transparency about limitations a core feature, not a disclaimer.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 708.1399999999999864 m
+61.7000000000000028 709.0788840747122777 60.9388840747123481 709.8399999999999181 60. 709.8399999999999181 c
+59.0611159252876519 709.8399999999999181 58.2999999999999972 709.0788840747122777 58.2999999999999972 708.1399999999999864 c
+58.2999999999999972 707.2011159252876951 59.0611159252876519 706.4400000000000546 60. 706.4400000000000546 c
+60.9388840747123481 706.4400000000000546 61.7000000000000028 707.2011159252876951 61.7000000000000028 708.1399999999999864 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 704.3600000000000136 Td
+(Vocal separation is approximate. The Voice Splitter and Vocal Booth split rely on center-channel) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 689.4500000000000455 Td
+(cancellation and band-splitting, not trained source separation. Expect midrange bleed; results are) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 674.5399999999999636 Td
+(best on true stereo mixes and degrade on mono or heavily-bussed material.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 659.4099999999999682 m
+61.7000000000000028 660.3488840747123731 60.9388840747123481 661.1100000000000136 60. 661.1100000000000136 c
+59.0611159252876519 661.1100000000000136 58.2999999999999972 660.3488840747123731 58.2999999999999972 659.4099999999999682 c
+58.2999999999999972 658.4711159252876769 59.0611159252876519 657.7100000000000364 60. 657.7100000000000364 c
+60.9388840747123481 657.7100000000000364 61.7000000000000028 658.4711159252876769 61.7000000000000028 659.4099999999999682 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 655.6299999999999955 Td
+(Lyric timing is energy-based. Teleprompter highlighting is derived from signal energy, not speech) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 640.7200000000000273 Td
+(transcription or forced alignment, so line timing is approximate.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 625.5900000000000318 m
+61.7000000000000028 626.5288840747123231 60.9388840747123481 627.2899999999999636 60. 627.2899999999999636 c
+59.0611159252876519 627.2899999999999636 58.2999999999999972 626.5288840747123231 58.2999999999999972 625.5900000000000318 c
+58.2999999999999972 624.6511159252876269 59.0611159252876519 623.8899999999999864 60. 623.8899999999999864 c
+60.9388840747123481 623.8899999999999864 61.7000000000000028 624.6511159252876269 61.7000000000000028 625.5900000000000318 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 621.8099999999999454 Td
+(The Gate plugin behaves as a downward compressor rather than a sample-accurate noise gate; the) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 606.9000000000000909 Td
+(other EQ and dynamics plugins follow standard RBJ biquad formulations.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 591.7699999999999818 m
+61.7000000000000028 592.7088840747123868 60.9388840747123481 593.4700000000000273 60. 593.4700000000000273 c
+59.0611159252876519 593.4700000000000273 58.2999999999999972 592.7088840747123868 58.2999999999999972 591.7699999999999818 c
+58.2999999999999972 590.8311159252876905 59.0611159252876519 590.07000000000005 60. 590.07000000000005 c
+60.9388840747123481 590.07000000000005 61.7000000000000028 590.8311159252876905 61.7000000000000028 591.7699999999999818 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 587.9900000000000091 Td
+(Benchmark figures may be demonstrative. When the server kernel runner is unavailable, the) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 573.0799999999999272 Td
+(optimizer shows labeled demo numbers rather than fabricated live measurements.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 545.7799999999999727 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 534.0699999999999363 Td
+(7. AI songwriting and authorship) Tj
+ET
+0.87 g
+56. 522.7699999999999818 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 505.1599999999999682 Td
+(The Songwriting Studio uses generative AI to draft lyrics and structure. We are explicit that free AI drafts) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 490.2499999999999432 Td
+(carry no intellectual-property rights to the user. Paid users perform meaningful line-by-line editing and) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 475.3399999999999181 Td
+(then certify their human–AI authorship, producing a record of human contribution; finished works can be) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 460.4299999999998931 Td
+(exported to Suno for audio generation. This positions AI as a co-writer with a clear, documented) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 445.5199999999998681 Td
+(human-authorship trail.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 415.2199999999998568 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 403.5099999999998772 Td
+(8. Privacy and data handling) Tj
+ET
+0.87 g
+56. 392.2099999999998658 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 374.5999999999998522 Td
+(The live DAW processes audio entirely in the browser, so project audio need not leave the user's device.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 359.6899999999998272 Td
+(Server-side tools process on GravelKing's own infrastructure and do not forward user audio to third-party) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 344.7799999999998022 Td
+(processors. Subscription and billing data are handled through Stripe; webhooks are signature-verified) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 329.8699999999997772 Td
+(against the raw request body before any state change.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 299.5699999999998226 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 287.8599999999997863 Td
+(9. Performance and hardware optimization) Tj
+ET
+0.87 g
+56. 276.5599999999998317 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 258.9499999999998181 Td
+(The platform targets commodity CPUs. The optimization sequence illustrates the kernel's tuning) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 244.0399999999998499 Td
+(concepts — core affinity and memory locking — while the DGEMM harness provides a throughput) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 229.1299999999998818 Td
+(reference. We intentionally present optimization steps as an illustrative walkthrough rather than) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 214.2199999999999136 Td
+(guaranteed changes to a user's local machine, since server-side processing characteristics differ from a) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 199.3099999999999454 Td
+(client device.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 169.0099999999999909 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 157.2999999999999545 Td
+(10. Subscriptions and access model) Tj
+ET
+0.87 g
+56. 146. 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 128.3899999999999864 Td
+(GravelKing Pro offers a free Starter tier, a weekly plan, a monthly Pro Plus plan, and an enterprise Node) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 113.4800000000000182 Td
+(Auditor plan, each with server-enforced entitlements. Paid plans include free-trial periods and a 30-day) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 98.57000000000005 Td
+(money-back guarantee. Entitlement checks live on the API so that no client-side flag can unlock paid) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 83.6600000000000819 Td
+(compute.) Tj
+ET
+0.87 g
+56. 40. 483.2799999999999727 -0.6 re
+f
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+56. 28. Td
+(GravelKing Pro — gravelkingpro.it.com) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+534.8799999999999955 28. Td
+(3) Tj
+ET
+endstream
+endobj
+11 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 12 0 R
+>>
+endobj
+12 0 obj
+<<
+/Length 3662
+>>
+stream
+0.200025 w
+0 G
+BT
+/F2 8 Tf
+9.1999999999999993 TL
+0.788 0.431 0.024 rg
+56. 799.8899999999999864 Td
+(GRAVELKING PRO) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+468.1599999999999682 799.8899999999999864 Td
+(gravelkingpro.it.com) Tj
+ET
+0.87 g
+56. 791.8899999999999864 483.2799999999999727 -0.8 re
+f
+0.79 0.43 0.02 rg
+56. 766.8899999999999864 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 755.17999999999995 Td
+(11. Roadmap) Tj
+ET
+0.87 g
+56. 743.8799999999999955 483.2799999999999727 -0.6 re
+f
+0.79 0.43 0.02 rg
+61.7000000000000028 730.0499999999999545 m
+61.7000000000000028 730.9888840747123595 60.9388840747123481 731.75 60. 731.75 c
+59.0611159252876519 731.75 58.2999999999999972 730.9888840747123595 58.2999999999999972 730.0499999999999545 c
+58.2999999999999972 729.1111159252876632 59.0611159252876519 728.3500000000000227 60. 728.3500000000000227 c
+60.9388840747123481 728.3500000000000227 61.7000000000000028 729.1111159252876632 61.7000000000000028 730.0499999999999545 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 726.2699999999999818 Td
+(Trained neural source separation for higher-fidelity stems, offered as a premium cloud-GPU path.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 711.1399999999999864 m
+61.7000000000000028 712.0788840747122777 60.9388840747123481 712.8399999999999181 60. 712.8399999999999181 c
+59.0611159252876519 712.8399999999999181 58.2999999999999972 712.0788840747122777 58.2999999999999972 711.1399999999999864 c
+58.2999999999999972 710.2011159252876951 59.0611159252876519 709.4400000000000546 60. 709.4400000000000546 c
+60.9388840747123481 709.4400000000000546 61.7000000000000028 710.2011159252876951 61.7000000000000028 711.1399999999999864 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 707.3600000000000136 Td
+(A sample-accurate true noise gate in the DAW plugin set.) Tj
+ET
+0.79 0.43 0.02 rg
+61.7000000000000028 692.2300000000000182 m
+61.7000000000000028 693.1688840747123095 60.9388840747123481 693.92999999999995 60. 693.92999999999995 c
+59.0611159252876519 693.92999999999995 58.2999999999999972 693.1688840747123095 58.2999999999999972 692.2300000000000182 c
+58.2999999999999972 691.2911159252876132 59.0611159252876519 690.5299999999999727 60. 690.5299999999999727 c
+60.9388840747123481 690.5299999999999727 61.7000000000000028 691.2911159252876132 61.7000000000000028 692.2300000000000182 c
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+72. 688.4500000000000455 Td
+(Expanded authorship-certification exports and label-distribution tooling.) Tj
+ET
+0.79 0.43 0.02 rg
+56. 661.1499999999999773 4. -13. re
+f
+BT
+/F2 15.5 Tf
+17.8249999999999993 TL
+0.102 g
+68. 649.4400000000000546 Td
+(12. Conclusion) Tj
+ET
+0.87 g
+56. 638.1399999999999864 483.2799999999999727 -0.6 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 620.5299999999999727 Td
+(GravelKing Pro demonstrates that a serious, end-to-end music-production workflow can live in the) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 605.6200000000000045 Td
+(browser without sacrificing honesty about its methods. By unifying creation, processing, and release) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 590.7100000000000364 Td
+(behind a shared DSP engine — and by stating plainly where techniques are approximate — the platform) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.188 g
+56. 575.7999999999999545 Td
+(earns trust while lowering the cost and friction of making music.) Tj
+ET
+0.87 g
+56. 40. 483.2799999999999727 -0.6 re
+f
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+56. 28. Td
+(GravelKing Pro — gravelkingpro.it.com) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+534.8799999999999955 28. Td
+(4) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R ]
+/Count 5
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+21 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+22 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+23 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+24 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+25 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+26 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 13 0 R
+/F2 14 0 R
+/F3 15 0 R
+/F4 16 0 R
+/F5 17 0 R
+/F6 18 0 R
+/F7 19 0 R
+/F8 20 0 R
+/F9 21 0 R
+/F10 22 0 R
+/F11 23 0 R
+/F12 24 0 R
+/F13 25 0 R
+/F14 26 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+27 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20260625232908-00'00')
+>>
+endobj
+28 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 29
+0000000000 65535 f 
+0000027295 00000 n 
+0000029142 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000000929 00000 n 
+0000001066 00000 n 
+0000009606 00000 n 
+0000009743 00000 n 
+0000014768 00000 n 
+0000014906 00000 n 
+0000023441 00000 n 
+0000023580 00000 n 
+0000027377 00000 n 
+0000027503 00000 n 
+0000027634 00000 n 
+0000027768 00000 n 
+0000027906 00000 n 
+0000028030 00000 n 
+0000028159 00000 n 
+0000028291 00000 n 
+0000028427 00000 n 
+0000028555 00000 n 
+0000028682 00000 n 
+0000028811 00000 n 
+0000028944 00000 n 
+0000029046 00000 n 
+0000029395 00000 n 
+0000029481 00000 n 
+trailer
+<<
+/Size 29
+/Root 28 0 R
+/Info 27 0 R
+/ID [ <DD78C512C83AB984E80FEFEBC14841B9> <DD78C512C83AB984E80FEFEBC14841B9> ]
+>>
+startxref
+29585
+%%EOF
