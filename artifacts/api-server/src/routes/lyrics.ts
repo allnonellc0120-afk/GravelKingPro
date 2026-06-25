@@ -252,6 +252,55 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
   }
 });
 
+// POST /api/lyrics/regenerate-line — Gemini rewrites a single lyric line in context
+lyricsRouter.post("/api/lyrics/regenerate-line", async (req: Request, res: Response) => {
+  const { line, instruction, sectionLabel, genre, songConcept, prevLine, nextLine } = req.body as {
+    line?: string;
+    instruction?: string;
+    sectionLabel?: string;
+    genre?: string;
+    songConcept?: string;
+    prevLine?: string;
+    nextLine?: string;
+  };
+
+  if (!line || typeof line !== "string") {
+    res.status(400).json({ error: "line is required" });
+    return;
+  }
+
+  const contextBlock = [
+    prevLine ? `Previous line: "${prevLine}"` : "",
+    `This line (to rewrite): "${line}"`,
+    nextLine ? `Next line: "${nextLine}"` : "",
+  ].filter(Boolean).join("\n");
+
+  const prompt = `You are rewriting a single line from a ${genre || "Pop"} song.
+
+Song concept: ${songConcept || "not specified"}
+Section: ${sectionLabel || "unknown"}
+${contextBlock}
+${instruction ? `Writer's instruction: "${instruction}"` : "Rewrite the line to be more vivid, powerful and original while keeping the same meaning and syllable count."}
+
+Rules:
+- Output ONLY the new single line — no quotes, no labels, no explanation
+- Keep the same approximate syllable count as the original line
+- Maintain rhyme compatibility with the surrounding lines
+- Stay in the same emotional tone as the section
+
+New line:`;
+
+  try {
+    const raw = (await geminiGenerate(prompt)).trim();
+    // Strip any stray quotes Gemini sometimes adds
+    const newLine = raw.replace(/^["']|["']$/g, "").trim();
+    res.json({ line: newLine });
+  } catch (err) {
+    req.log.error({ err }, "Gemini line regen failed");
+    res.status(500).json({ error: "Line regeneration failed. Please try again." });
+  }
+});
+
 // POST /api/lyrics/convert-style — Gemini converts free-text style → Suno-compatible tags
 lyricsRouter.post("/api/lyrics/convert-style", async (req: Request, res: Response) => {
   const { styleDescription } = req.body as { styleDescription?: string };

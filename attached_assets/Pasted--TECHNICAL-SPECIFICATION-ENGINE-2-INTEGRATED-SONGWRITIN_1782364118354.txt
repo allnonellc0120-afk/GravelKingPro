@@ -1,0 +1,59 @@
+# TECHNICAL SPECIFICATION: ENGINE 2 - INTEGRATED SONGWRITING & SONG BUILDER STUDIO
+# ATTENTION AGENT: INGEST AND CACHE THIS SPEC. DO NOT OVERWRITE EXISTING REPO FILES BLINDLY.
+
+## 1. DUAL-TIER GENERATION LOGIC (GEMINI API)
+Implement a frontend toggle allowing the user to switch between two distinct generation interfaces:
+
+- **A. Simple Mode (Intuitive Story Prompting):**
+  - Input: A single, large natural-language text field (`"What is your song about?"`).
+  - API Routine: Pass this raw story payload to the Gemini API. Instruct the model to:
+    1. Extract core emotional concepts and themes.
+    2. Generate a cohesive, structured lyric sheet (Intro, Verse, Chorus, Verse, Chorus, Outro).
+    3. Generate an optimized text-based style/instrumental prompt tailored for generative audio platforms (e.g., Suno/Udio).
+    4. Automatically name the track based on the theme.
+
+- **B. Advanced Mode (Timeline Canvas Builder):**
+  - UI Component: A visual, modular row-builder where users map out a precise song timeline.
+  - Controls: Dropdowns and inputs for Global Parameters: BPM, Key, Genre Tags, and Vocal Type.
+  - Timeline Rows: Users can append time-stamped block markers manually or via dropdowns (e.g., `0:00 [Violin Intro]`, `0:45 [Heavy Metal Verse]`, `2:15 [Melancholy Country Blues Chorus]`).
+  - API Routine: Package this structural array and global metadata into the Gemini API payload. Instruct the model to strictly align the cadence, syllable pacing, and emotional delivery of the generated lyrics to match these exact timestamp blocks.
+
+## 2. INTERACTIVE LINE-BY-LINE SURGICAL EDITOR
+To prevent chaotic mobile formatting bugs and accidental overwrites, the lyric sheet must render as dynamic states rather than a single static text block.
+
+- **Surgical Text Toggling:** Render the generated lyrics line-by-line as clean, read-only list elements. Double-tapping or clicking a specific line's "Edit" icon transforms *only that precise index/line* into an active `<input>` field. All other lines remain locked.
+- **Horizontal Contextual Rhyming Tray:** Whenever a line input gains focus, evaluate the final word of the *preceding* line. Hit a rhyming dictionary API or sub-prompt to fetch matching rhyme suggestions. Render these suggestions in a horizontally scrolling utility bar fixed directly above the device keyboard.
+- **Targeted AI Line Refresh (Surgical Remix):** Highlight a specific line -> trigger an overlay prompt field asking: `"What should this line be about?"` (e.g., "Make this line about brown hats"). Fire an isolated API call to Gemini, passing:
+  1. The preceding line (for context).
+  2. The current target line (to be overwritten).
+  3. The subsequent line (for flow).
+  4. The user's new topical input.
+  - Return 3 distinct variations that strictly maintain the original line's syllable count and rhythmic structure.
+
+## 3. PROPRIETARY SYSTEM: GAMIFIED HUMAN AUTHORSHIP LEDGER
+This engine programmatically tracks human creative intervention to meet legal requirements for copyright eligibility, turning the process into a visual user milestone.
+
+- **Levenshtein Edit-Distance Tracking:** Implement a background utility script that continuously monitors the lyric database state. It compares the original raw AI-generated text block against the user's manual modifications.
+- **The Visual Authorship Progress Bar:** Render a prominent visual meter at the top of the studio interface labeled "Copyright Eligibility Goal."
+  - **State Red/Yellow (0% - 19% Variance):** Displays text: *"AI Draft Status (Public Domain Only)"*. Exporting is restricted to draft status.
+  - **State Solid Green (20%+ Variance):** Triggers a micro-animation flashing into solid green. Displays text: **"Copyright Registered Goal Achieved! Human Ownership Locked."** This unlock state is triggered via manual typing or verified targeted line refreshes.
+- **The Forensic Ledger:** Maintain an immutable background JSON ledger tracking every transaction (e.g., `Timestamp: [01:14.20], Line 4: [AI Original String] -> changed to -> [Human Written String]`). This ledger maps the explicit human authorship footprint.
+- **Instrumental Isolation Badge:** Render a permanent, un-erasable disclaimer badge beneath the meter stating: *“Instrumental tracking locked to AI/Public Domain. Lyrics protected.”*
+
+## 4. INTEGRATED AUDIO PREVIEW & REVISION LOOP
+- **Shared Generative Audio Node:** Connect the interface to a generative music API (e.g., Suno or third-party API aggregator) to process backing tracks using the generated style prompt string.
+- **30-Second Constraint:** The API will return a full-length track, but the frontend HTML5 `<audio>` player components must visually and physically hard-cap playback at exactly 30 seconds for previewing.
+- **Natural Language Prompt Refabrication:** Below the player, display a simple feedback box: *"Change the vibe or instruments here..."*. If a user types natural language feedback (e.g., "Take out the electric guitar, make it acoustic"), pass the feedback and the original prompt to Gemini. Gemini rewrites the raw style tags behind the scenes and triggers the audio node for a revised second preview.
+- **Stripe Paywall Trigger:** Track generation counts per session. Allow Generation #1 (Initial) and Generation #2 (First Revision) for free. Requesting a third preview or prompt tweak locks the player and pops up a premium tier subscription modal.
+
+## 5. PERFORMANCE UI & METADATA EXPORT PIPELINE
+- **Bar-by-Bar Teleprompter Timestamps:** The lyric engine must read the user's selected BPM and automatically calculate exact millisecond anchors for every line based on standard 4-bar pacing.
+- **Performance/Karaoke Mode:** When toggled into performance mode, render a clean, auto-scrolling visual playback tracker. The active line lights up/changes color the exact millisecond its timestamp anchor hits, while past lines fade out.
+- **The Universal Exporter Package:** Provide one-click actions to:
+  1. Copy the finalized style prompt payload to the clipboard for external manual pasting.
+  2. Export a universally compatible `.lrc` timed lyric file or text-based MIDI marker map for direct timeline import into external DAWs (e.g., BandLab or StarMaker).
+  3. If `isHumanEdited` is true, auto-generate and populate a ready-to-print U.S. Copyright Office Form PA (Performing Arts) PDF, attaching the database's forensic change ledger to the file metadata.
+
+## CURRENT DIRECTIVE FOR AGENT:
+Do not attempt to execute this entire songwriting module at once. 
+Step 1 is strictly to build/refactor the database schema in Firestore to support these specific states (Simple/Advanced payloads, the Levenshtein change tracking, and the forensic ledger array). Present the updated schema definition to the user and stop for explicit verification before writing frontend or API connection code.
