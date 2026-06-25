@@ -81,32 +81,49 @@ export interface SongDraftData {
   stylePrompt?: string;
   authorshipScore: number;
   isCopyrightEligible: boolean;
+  is_certified?: boolean;
   lineCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export function saveSongDraft(
-  data: Omit<SongDraftData, "draftId" | "createdAt" | "updatedAt">
+  data: Omit<SongDraftData, "draftId" | "createdAt" | "updatedAt">,
+  explicitId?: string,
 ): string {
-  const draftId = randomUUID();
+  const draftId = explicitId ?? randomUUID();
   const db = getDb();
   if (!db) return draftId;
 
   const now = new Date().toISOString();
   const doc: SongDraftData = { ...data, draftId, createdAt: now, updatedAt: now };
-  db.collection("song_drafts").doc(draftId).set(doc).catch(() => {});
+  // merge so re-saving an existing project id never clobbers fields set by revise.
+  db.collection("song_drafts").doc(draftId).set(doc, { merge: true }).catch(() => {});
   return draftId;
+}
+
+export function queryLibraryBySession(sessionId: string): Promise<{ songs: SongDraftData[]; jobs: AudioJobData[] }> {
+  const db = getDb();
+  if (!db) return Promise.resolve({ songs: [], jobs: [] });
+
+  return Promise.all([
+    db.collection("song_drafts").where("sessionId", "==", sessionId).limit(50).get(),
+    db.collection("audio_jobs").where("sessionId", "==", sessionId).limit(50).get(),
+  ]).then(([songsSnap, jobsSnap]) => ({
+    songs: songsSnap.docs.map((d) => d.data() as SongDraftData).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    jobs: jobsSnap.docs.map((d) => d.data() as AudioJobData).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  })).catch(() => ({ songs: [], jobs: [] }));
 }
 
 export function updateSongDraft(
   draftId: string,
-  update: Partial<Pick<SongDraftData, "authorshipScore" | "isCopyrightEligible" | "aiDraft">>
+  update: Partial<Pick<SongDraftData, "authorshipScore" | "isCopyrightEligible" | "aiDraft" | "is_certified">>
 ): void {
   const db = getDb();
   if (!db) return;
+  // upsert via merge: revise may run before/without a prior draft doc for this id.
   db.collection("song_drafts")
     .doc(draftId)
-    .update({ ...update, updatedAt: new Date().toISOString() })
+    .set({ ...update, updatedAt: new Date().toISOString() }, { merge: true })
     .catch(() => {});
 }

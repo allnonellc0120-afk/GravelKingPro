@@ -96,9 +96,9 @@ function getLastWord(text: string): string {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function AuthorshipMeter({ score }: { score: number }) {
-  const eligible = score >= 20;
+  const eligible = score >= 25;
   const isFullHuman = score === 100;
-  const color = eligible ? "bg-emerald-500" : score >= 10 ? "bg-amber-500" : "bg-rose-500";
+  const color = eligible ? "bg-emerald-500" : score >= 12 ? "bg-amber-500" : "bg-rose-500";
 
   return (
     <div className="rounded-xl border border-border/40 bg-card/60 p-4 space-y-2">
@@ -117,7 +117,7 @@ function AuthorshipMeter({ score }: { score: number }) {
           ? "Human Ownership Locked — 100% original."
           : eligible
             ? "Copyright Registered Goal Achieved! Human Ownership Locked."
-            : `AI Draft Status (Public Domain Only) — ${20 - score}% more edits needed.`}
+            : `AI Draft Status (Public Domain Only) — ${Math.max(0, 25 - score)}% more edits needed.`}
       </p>
       {eligible && (
         <p className="text-[10px] text-muted-foreground/60 border-t border-border/30 pt-2">
@@ -695,8 +695,69 @@ export default function SongwritingStudio() {
     setRhymes([]); setRhymeWord("");
   };
 
+  const downloadCertificate = async () => {
+    if (!projectId) {
+      toast({ title: "Save your project first", description: "Save and edit to 25% authorship before certifying.", variant: "destructive" });
+      return;
+    }
+    // Server verifies Pro entitlement + 25% threshold before issuing certificate data.
+    let cert: { title: string; genre: string | null; authorshipScore: number; certifiedAt: string };
+    try {
+      const r = await fetch(`/api/lyrics/certificate/${projectId}`, { credentials: "include" });
+      if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { error?: string };
+        toast({ title: "Certificate unavailable", description: d.error || "Could not verify eligibility.", variant: "destructive" });
+        return;
+      }
+      cert = (await r.json()) as typeof cert;
+    } catch {
+      toast({ title: "Error", description: "Could not reach the certification service.", variant: "destructive" });
+      return;
+    }
+    const songTitle = (cert.title || `${cert.genre ?? genre} Work`).slice(0, 80);
+    const date = new Date(cert.certifiedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>IP Certificate</title>
+<style>
+  @page { size: letter landscape; margin: 0; }
+  body { font-family: Georgia, "Times New Roman", serif; margin: 0; background: #0f0f0f; color: #1a1a1a; }
+  .cert { max-width: 960px; margin: 32px auto; background: #fffdf6; border: 10px double #c9a227; padding: 56px 64px; text-align: center; position: relative; }
+  .seal { font-size: 12px; font-weight: bold; letter-spacing: 4px; text-transform: uppercase; color: #c9a227; }
+  h1 { font-size: 32px; margin: 18px 0 6px; color: #161616; }
+  .badge { display: inline-block; margin: 14px 0; padding: 8px 20px; border: 2px solid #2a7a2a; border-radius: 999px; color: #2a7a2a; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; }
+  .title { font-size: 26px; font-style: italic; margin: 28px 0 6px; }
+  .row { font-size: 14px; color: #444; margin: 6px 0; }
+  .score { font-size: 20px; font-weight: bold; color: #2a7a2a; margin: 22px 0; }
+  .legal { font-size: 12px; color: #555; max-width: 640px; margin: 20px auto 0; line-height: 1.5; }
+  .footer { margin-top: 36px; border-top: 2px solid #c9a227; padding-top: 16px; font-size: 10px; color: #888; }
+  @media print { body { background: #fff; } .cert { margin: 0 auto; } }
+</style></head>
+<body><div class="cert">
+  <div class="seal">Gravel King Productions · Engine 2 IP Pipeline</div>
+  <h1>Certificate of Human–AI Collaborative Authorship</h1>
+  <div class="badge">Certified Human-AI Collaborative Work</div>
+  <div class="title">&ldquo;${songTitle.replace(/</g, "&lt;")}&rdquo;</div>
+  <div class="row">Genre: ${cert.genre ?? genre}</div>
+  <div class="row">Date Certified: ${date}</div>
+  <div class="score">Human Authorship Score: ${cert.authorshipScore}%</div>
+  <div class="legal">This document certifies that the named work contains sufficient human creative
+  expression — through manual line-by-line editing and reconfiguration of AI-generated elements —
+  to support a claim of human authorship under current U.S. Copyright Office guidance. The complete
+  forensic edit ledger is retained on file.</div>
+  <div class="footer">Verified by forensic authorship ledger · Generated ${new Date().toISOString()}</div>
+</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
+</body></html>`;
+    const w = window.open("", "_blank", "width=1000,height=760");
+    if (!w) {
+      toast({ title: "Pop-up blocked", description: "Allow pop-ups to download your certificate.", variant: "destructive" });
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+  };
+
   const hasOutput = lines.length > 0;
-  const isEligible = authorshipScore >= 20;
+  const isEligible = authorshipScore >= 25;
   const effectiveStyle = convertedStyle || styleInput || stylePrompt;
   const generationLimitReached = generationCount >= 2 && !isPro;
 
@@ -866,7 +927,7 @@ export default function SongwritingStudio() {
                 <div>
                   <p className="text-sm font-semibold text-rose-400">AI Draft Status (Public Domain Only)</p>
                   <p className="text-xs text-rose-400/70">
-                    {isPro ? "Edit lines below until your Authorship Meter hits 20% to lock in your IP." : "Upgrade to Pro to edit lines and claim authorship rights."}
+                    {isPro ? "Edit lines below until your Authorship Meter hits 25% to lock in your IP." : "Upgrade to Pro to edit lines and claim authorship rights."}
                   </p>
                 </div>
               </div>
@@ -1007,6 +1068,16 @@ export default function SongwritingStudio() {
                     <p className="text-xs text-center text-muted-foreground">
                       <Clock className="w-3 h-3 inline mr-1" />Forensic revision history is being recorded.
                     </p>
+                  )}
+                  {isEligible ? (
+                    <Button onClick={downloadCertificate} variant="outline" className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold">
+                      <FileText className="w-4 h-4 mr-2" />Download IP Certificate (PDF)
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border/30 text-xs text-muted-foreground">
+                      <Lock className="w-3.5 h-3.5 text-amber-500/70 shrink-0" />
+                      <span>Reach 25% authorship to unlock your Form PA copyright certificate.</span>
+                    </div>
                   )}
                 </div>
               ) : (

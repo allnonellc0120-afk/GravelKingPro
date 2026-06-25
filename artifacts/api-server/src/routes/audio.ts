@@ -376,12 +376,13 @@ audioRouter.post(
 
     // ── Voice removal — neural for paid, DSP for free ────────────────────────
     if (mode === "voice_remove") {
+      let fsJobId: string | undefined;
       try {
         const tier = await resolveTier(req);
         const useNeural = tier === "node_auditor";
         const { channels } = await getAudioInfo(filePath);
 
-        const fsJobId = createAudioJob({
+        fsJobId = createAudioJob({
           fileName: req.file.originalname,
           mode: "voice_remove",
           tier,
@@ -494,6 +495,7 @@ audioRouter.post(
         }
         return;
       } catch (err: any) {
+        if (fsJobId) completeAudioJob(fsJobId, { status: "ERROR", errorMessage: err.message });
         await unlink(filePath).catch(() => {});
         res.status(500).json({ success: false, error: err.message });
         return;
