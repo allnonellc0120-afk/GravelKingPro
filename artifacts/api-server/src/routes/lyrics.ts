@@ -1,7 +1,8 @@
 import { Router } from "express";
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { saveSongDraft, updateSongDraft, queryLibraryBySession } from "../lib/firestore";
 import { hasStudio } from "../lib/entitlement";
+import { rateLimit } from "../lib/rateLimiter";
 import {
   db,
   lyricProjectsTable,
@@ -73,9 +74,33 @@ function parseToLines(raw: string): LineState[] {
 
 const lyricsRouter = Router();
 
+// All AI endpoints below call Gemini (real cost). Bound abuse/DoS the same way
+// the audio/master/studio routes do — UI quotas alone are client-bypassable.
+// Generation is anonymous-reachable, so it gets the tighter window.
+const lyricsGenRateLimit = rateLimit({
+  windowMs: 10 * 60_000,
+  max: 15,
+  message: "Too many lyric generations. Please wait a few minutes.",
+});
+// Live line-editing helpers are chattier; allow more per minute but still bounded.
+const lyricsAiRateLimit = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  message: "Too many edits in a short time. Please slow down.",
+});
+
+// Server-side Pro gate for paid editor features (UI gating alone is bypassable).
+async function requireStudio(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (await hasStudio(req)) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "A Pro (Studio) subscription is required for this feature." });
+}
+
 // ─── POST /api/lyrics/generate ───────────────────────────────────────────────
 // Supports both simple (story prompt) and advanced (timeline canvas) modes.
-lyricsRouter.post("/lyrics/generate", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, res: Response) => {
   const {
     story, genre, bpm, mode,
     key, vocalType, genreTags,
@@ -170,7 +195,7 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 });
 
 // ─── POST /api/lyrics/expand ─────────────────────────────────────────────────
-lyricsRouter.post("/lyrics/expand", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/expand", lyricsAiRateLimit, requireStudio, async (req: Request, res: Response) => {
   const { partialLyrics, genre, bpm, styleContext } = req.body as {
     partialLyrics?: string;
     genre?: string;
@@ -211,8 +236,8 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 });
 
 // ─── POST /api/lyrics/regenerate-line ────────────────────────────────────────
-// Returns 3 distinct variations. Pro only (enforced in UI, not here).
-lyricsRouter.post("/lyrics/regenerate-line", async (req: Request, res: Response) => {
+// Returns 3 distinct variations. Pro only — enforced server-side via requireStudio.
+lyricsRouter.post("/lyrics/regenerate-line", lyricsAiRateLimit, requireStudio, async (req: Request, res: Response) => {
   const { line, instruction, sectionLabel, genre, songConcept, prevLine, nextLine } = req.body as {
     line?: string;
     instruction?: string;
@@ -269,7 +294,7 @@ VARIATION_3: [line here]`;
 
 // ─── POST /api/lyrics/rhymes ─────────────────────────────────────────────────
 // Gemini-powered rhyme suggestions for the rhyming tray.
-lyricsRouter.post("/lyrics/rhymes", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/rhymes", lyricsAiRateLimit, requireStudio, async (req: Request, res: Response) => {
   const { word, genre } = req.body as { word?: string; genre?: string };
   if (!word || word.trim().length < 2) {
     res.status(400).json({ error: "word is required" });
@@ -299,7 +324,7 @@ Rules:
 });
 
 // ─── POST /api/lyrics/convert-style ──────────────────────────────────────────
-lyricsRouter.post("/lyrics/convert-style", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/convert-style", lyricsAiRateLimit, async (req: Request, res: Response) => {
   const { styleDescription } = req.body as { styleDescription?: string };
   if (!styleDescription || styleDescription.trim().length < 3) {
     res.status(400).json({ error: "styleDescription is required" });
