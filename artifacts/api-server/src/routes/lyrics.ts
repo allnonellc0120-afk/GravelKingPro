@@ -98,6 +98,18 @@ async function requireStudio(req: Request, res: Response, next: NextFunction): P
   res.status(403).json({ error: "A Pro (Studio) subscription is required for this feature." });
 }
 
+// Best-effort project ownership for the by-id lyric routes. Blocks only when the
+// caller presents a DIFFERENT gk_session than the one that owns the project, so a
+// logged-in user cannot read/tamper with another session's IP work just by
+// knowing the id. Callers with NO gk_session (e.g. OIDC users, who never receive
+// that cookie) pass through so we never lock someone out of their own project.
+// Residual gap: a caller sending no cookie at all is not blocked — fully closing
+// the IDOR needs an owner userId column + anon session token (tracked follow-up).
+function ownershipMismatch(req: Request, projectSessionId: string | null | undefined): boolean {
+  const caller = (req.cookies as Record<string, string> | undefined)?.["gk_session"];
+  return Boolean(caller) && Boolean(projectSessionId) && caller !== projectSessionId;
+}
+
 // ─── POST /api/lyrics/generate ───────────────────────────────────────────────
 // Supports both simple (story prompt) and advanced (timeline canvas) modes.
 lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, res: Response) => {
@@ -378,6 +390,18 @@ lyricsRouter.post("/lyrics/forensic-entry", async (req: Request, res: Response) 
     return;
   }
 
+  const forensicProject = await db.query.lyricProjectsTable.findFirst({
+    where: eq(lyricProjectsTable.id, projectId),
+  });
+  if (!forensicProject) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (ownershipMismatch(req, forensicProject.sessionId)) {
+    res.status(403).json({ error: "You do not have access to this project." });
+    return;
+  }
+
   await db.insert(lyricForensicLedgerTable).values({
     id: randomUUID(),
     projectId,
@@ -496,6 +520,10 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
+  if (ownershipMismatch(req, project.sessionId)) {
+    res.status(403).json({ error: "You do not have access to this project." });
+    return;
+  }
 
   const score = levenshteinPercent(project.aiDraft, content);
   const eligible = score >= 25;
@@ -565,6 +593,10 @@ lyricsRouter.get("/lyrics/certificate/:projectId", async (req: Request, res: Res
     res.status(404).json({ error: "Project not found" });
     return;
   }
+  if (ownershipMismatch(req, project.sessionId)) {
+    res.status(403).json({ error: "You do not have access to this project." });
+    return;
+  }
   if (!project.isCopyrightEligible || (project.authorshipScore ?? 0) < 25) {
     res.status(403).json({ error: "This work has not reached the 25% human-authorship threshold yet." });
     return;
@@ -587,6 +619,10 @@ lyricsRouter.get("/lyrics/project/:id", async (req: Request, res: Response) => {
   });
   if (!project) {
     res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (ownershipMismatch(req, project.sessionId)) {
+    res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
 
@@ -613,6 +649,18 @@ lyricsRouter.post("/lyrics/timeline-blocks", async (req: Request, res: Response)
 
   if (!projectId || !blocks?.length) {
     res.status(400).json({ error: "projectId and blocks are required" });
+    return;
+  }
+
+  const blocksProject = await db.query.lyricProjectsTable.findFirst({
+    where: eq(lyricProjectsTable.id, projectId),
+  });
+  if (!blocksProject) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (ownershipMismatch(req, blocksProject.sessionId)) {
+    res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
 

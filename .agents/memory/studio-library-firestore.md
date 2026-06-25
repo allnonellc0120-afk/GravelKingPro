@@ -41,3 +41,17 @@ UI-only `isPro` / quota gate is client-bypassable and exposes Gemini spend.
 had zero quota, so direct API calls = unbounded Gemini cost.
 **How to apply:** any *new* lyric/AI endpoint that calls Gemini must get either
 `requireStudio` (if paid) or `rateLimit` (if free) — never ship one bare.
+
+## Rule: by-id lyric routes use best-effort gk_session ownership, not strict
+The by-id routes (`/lyrics/revise`, `/lyrics/forensic-entry`, `/lyrics/timeline-blocks`,
+`GET /lyrics/project/:id`, `GET /lyrics/certificate/:projectId`) call
+`ownershipMismatch(req, project.sessionId)` — block **only** when the caller
+presents a *different* `gk_session` than the project owner's.
+**Why:** ownership can't be made strict here. OIDC-authenticated users never get a
+`gk_session` cookie, and `POST /lyrics/project` stores `sessionId = cookie ??
+randomUUID()` (the random fallback is never returned to the client). Strict
+"cookie must equal owner" would 403 OIDC/cookieless users on their *own* work.
+**Residual gap (known, deferred):** a caller sending no cookie at all is not
+blocked. Fully closing the IDOR needs an owner `userId` column on
+`lyric_projects` + an anon session token returned at create — a schema/session
+change, deliberately NOT done reactively (risk to the gk_session/Stripe flow).
