@@ -4,8 +4,9 @@ import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2 } from "lucide-react";
+import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2 } from "lucide-react";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
+import { splitSong, analyzeGuideTiming, SplitError, type TimedLine } from "@/lib/daw/stemTiming";
 import { downloadBlob } from "@/lib/download";
 
 const DEV_BYPASS_KEY = "gk:dev:studio";
@@ -89,11 +90,28 @@ function VocalBoothInner() {
   // ── mixdown ──
   const [mixing, setMixing] = useState(false);
 
+  // ── split-your-own-song → guide vocal + energy-based line timing ──
+  const [splitting, setSplitting] = useState(false);
+  const [guideVocalBlob, setGuideVocalBlob] = useState<Blob | null>(null);
+  const [guideVocalUrl, setGuideVocalUrl] = useState<string | null>(null);
+  const [guideEnabled, setGuideEnabled] = useState(true);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [timedLines, setTimedLines] = useState<TimedLine[] | null>(null);
+  const [activeLineIdx, setActiveLineIdx] = useState(-1);
+  const [timing, setTiming] = useState(false);
+
   const backingRef = useRef<HTMLAudioElement | null>(null);
   const vocalPlaybackRef = useRef<HTMLAudioElement | null>(null);
+  const guideVocalRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const splitInputRef = useRef<HTMLInputElement>(null);
   const teleprompterRef = useRef<HTMLDivElement | null>(null);
+  const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const rafRef = useRef<number | null>(null);
+  const timedLinesRef = useRef<TimedLine[] | null>(null);
+  const activeLineRef = useRef(-1);
+
+  const guideAudible = guideEnabled && !isPreviewing && !!guideVocalUrl;
 
   const lyricLines = lyrics.split("\n");
 
@@ -123,6 +141,27 @@ function VocalBoothInner() {
     return () => URL.revokeObjectURL(url);
   }, [backingFile]);
 
+  // Guide-vocal object URL lifecycle.
+  useEffect(() => {
+    if (!guideVocalBlob) { setGuideVocalUrl(null); return; }
+    const url = URL.createObjectURL(guideVocalBlob);
+    setGuideVocalUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [guideVocalBlob]);
+
+  // Keep refs used by the rAF loop in sync (avoids stale closures).
+  useEffect(() => {
+    timedLinesRef.current = timedLines;
+    activeLineRef.current = -1;
+    setActiveLineIdx(-1);
+  }, [timedLines]);
+
+  // Mute/unmute the guide vocal without interrupting playback sync.
+  useEffect(() => {
+    const g = guideVocalRef.current;
+    if (g) g.muted = !guideAudible;
+  }, [guideAudible]);
+
   // Drive teleprompter scroll + progress from backing playback time.
   useEffect(() => {
     if (!backingPlaying) {
@@ -135,10 +174,32 @@ function VocalBoothInner() {
         const frac = a.currentTime / a.duration;
         setProgress(frac);
         setPosition(a.currentTime);
+
+        // Keep the guide vocal locked to the backing track (correct audible drift).
+        const g = guideVocalRef.current;
+        if (g && !g.paused && Math.abs(g.currentTime - a.currentTime) > 0.075) {
+          g.currentTime = a.currentTime;
+        }
+
         const el = teleprompterRef.current;
         if (el) {
-          const max = el.scrollHeight - el.clientHeight;
-          if (max > 0) el.scrollTop = frac * max;
+          const tl = timedLinesRef.current;
+          if (tl && tl.length) {
+            // Energy-based highlight: the latest line whose start time has passed.
+            let idx = -1;
+            for (let k = 0; k < tl.length; k++) {
+              if (tl[k].t <= a.currentTime) idx = tl[k].idx; else break;
+            }
+            if (idx !== activeLineRef.current) {
+              activeLineRef.current = idx;
+              setActiveLineIdx(idx);
+              const lineEl = idx >= 0 ? lineRefs.current[idx] : null;
+              if (lineEl) el.scrollTop = lineEl.offsetTop - el.clientHeight / 2 + lineEl.clientHeight / 2;
+            }
+          } else {
+            const max = el.scrollHeight - el.clientHeight;
+            if (max > 0) el.scrollTop = frac * max;
+          }
         }
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -150,6 +211,29 @@ function VocalBoothInner() {
   const pickSong = useCallback((song: SongDraft) => {
     setLyrics(song.aiDraft ?? "");
     setLyricSource(song.draftId);
+    // New lyrics invalidate any previously computed timing.
+    setTimedLines(null);
+    setActiveLineIdx(-1);
+  }, []);
+
+  const resetGuide = useCallback(() => {
+    setGuideVocalBlob(null);
+    setTimedLines(null);
+    setActiveLineIdx(-1);
+    activeLineRef.current = -1;
+  }, []);
+
+  // Energy-based, approximate timing of lyric lines against the guide vocal.
+  const runTiming = useCallback(async (blob: Blob, currentLyrics: string) => {
+    if (!currentLyrics.trim()) { setTimedLines(null); return; }
+    setTiming(true);
+    try {
+      setTimedLines(await analyzeGuideTiming(blob, currentLyrics.split("\n")));
+    } catch {
+      setTimedLines(null);
+    } finally {
+      setTiming(false);
+    }
   }, []);
 
   const handleFile = useCallback((file: File | null) => {
@@ -159,26 +243,76 @@ function VocalBoothInner() {
       return;
     }
     recorder.reset();
+    resetGuide();
     setBackingFile(file);
     setProgress(0);
     setPosition(0);
     setBackingPlaying(false);
-  }, [recorder, toast]);
+  }, [recorder, resetGuide, toast]);
+
+  // Split a full song → instrumental becomes the backing track, vocals the guide.
+  const handleSplitFile = useCallback(async (file: File | null) => {
+    if (!file) return;
+    if (!isAudioLike(file)) {
+      toast({ title: "Not an audio file", description: file.name, variant: "destructive" });
+      return;
+    }
+    recorder.reset();
+    resetGuide();
+    setSplitting(true);
+    try {
+      const { instrumental, vocals } = await splitSong(file);
+      const baseName = file.name.replace(/\.[^.]+$/, "") || "song";
+      setBackingFile(new File([instrumental], `${baseName} (instrumental).wav`, { type: "audio/wav" }));
+      setProgress(0);
+      setPosition(0);
+      setBackingPlaying(false);
+      setGuideVocalBlob(vocals);
+      toast({ title: "Song split", description: "Instrumental loaded as your backing track; vocals added as a guide." });
+      void runTiming(vocals, lyrics);
+    } catch (e) {
+      const err = e as SplitError;
+      toast({
+        title: err?.paywall ? "Pro required" : "Couldn't split song",
+        description: err?.message ?? "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSplitting(false);
+    }
+  }, [recorder, resetGuide, runTiming, lyrics, toast]);
+
+  // Prepare + start the guide vocal in lockstep with the backing track. Returns
+  // the play() promise (or null) so callers can kick it off inside the SAME user
+  // gesture as the backing track — iOS/Safari blocks a 2nd audio.play() that
+  // happens after an awaited promise resolves.
+  const startGuide = useCallback((): Promise<void> | null => {
+    const a = backingRef.current;
+    const g = guideVocalRef.current;
+    if (!a || !g || !guideVocalUrl) return null;
+    g.currentTime = a.currentTime;
+    g.muted = !guideAudible;
+    return g.play().catch(() => {});
+  }, [guideVocalUrl, guideAudible]);
 
   const toggleBacking = useCallback(async () => {
     const a = backingRef.current;
     if (!a) return;
     if (a.paused) {
-      try { await a.play(); } catch { /* gesture/autoplay guard */ }
+      // Start backing + guide together, no awaits in between (autoplay guard).
+      const guidePlay = startGuide();
+      await Promise.allSettled([a.play(), guidePlay ?? Promise.resolve()]);
     } else {
       a.pause();
     }
-  }, []);
+  }, [startGuide]);
 
   const seekBacking = useCallback((frac: number) => {
     const a = backingRef.current;
     if (a && a.duration > 0) {
       a.currentTime = frac * a.duration;
+      const g = guideVocalRef.current;
+      if (g) g.currentTime = a.currentTime;
       setProgress(frac);
       setPosition(a.currentTime);
     }
@@ -193,42 +327,54 @@ function VocalBoothInner() {
     a.currentTime = 0;
     const ok = await recorder.start();
     if (!ok) return;
-    try {
-      await a.play();
-    } catch {
+    // Start backing + guide together so the guide isn't blocked by autoplay.
+    const guidePlay = startGuide();
+    const [backingResult] = await Promise.allSettled([a.play(), guidePlay ?? Promise.resolve()]);
+    if (backingResult.status === "rejected") {
       recorder.stop();
       toast({ title: "Playback blocked", description: "Tap play once, then try recording again.", variant: "destructive" });
     }
-  }, [backingFile, recorder, toast]);
+  }, [backingFile, recorder, startGuide, toast]);
 
   const stopTake = useCallback(() => {
     recorder.stop();
     backingRef.current?.pause();
   }, [recorder]);
 
+  const onBackingPause = useCallback(() => {
+    setBackingPlaying(false);
+    guideVocalRef.current?.pause();
+  }, []);
+
   // Auto-stop the take when the backing track ends.
   const onBackingEnded = useCallback(() => {
     setBackingPlaying(false);
+    setIsPreviewing(false);
+    guideVocalRef.current?.pause();
     if (recorder.isRecording) recorder.stop();
   }, [recorder]);
 
-  // Preview vocal + backing together from the top.
+  // Preview vocal + backing together from the top (guide stays muted during preview).
   const previewTake = useCallback(async () => {
     const a = backingRef.current;
     const v = vocalPlaybackRef.current;
     if (!a || !v) return;
+    setIsPreviewing(true);
     a.currentTime = 0;
     v.currentTime = 0;
     try {
       await Promise.all([a.play(), v.play()]);
     } catch {
+      setIsPreviewing(false);
       toast({ title: "Couldn't start preview", variant: "destructive" });
     }
   }, [toast]);
 
   const stopPreview = useCallback(() => {
+    setIsPreviewing(false);
     backingRef.current?.pause();
     vocalPlaybackRef.current?.pause();
+    guideVocalRef.current?.pause();
   }, []);
 
   const mixAndExport = useCallback(async () => {
@@ -312,6 +458,27 @@ function VocalBoothInner() {
               )}
             </div>
 
+            {/* Auto-time lyrics to the guide vocal (energy-based, approximate) */}
+            {guideVocalUrl && (
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                <span className="text-[11px] text-muted-foreground leading-snug">
+                  {timedLines
+                    ? "Lyrics timed to the guide vocal — energy-based & approximate."
+                    : "Time your lyric lines to the guide vocal (approximate)."}
+                </span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1.5 shrink-0"
+                  disabled={timing || !lyrics.trim()}
+                  onClick={() => guideVocalBlob && runTiming(guideVocalBlob, lyrics)}
+                >
+                  {timing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                  {timedLines ? "Re-time" : "Auto-time"}
+                </Button>
+              </div>
+            )}
+
             {/* Editable lyrics / teleprompter */}
             {recorder.isRecording || backingPlaying ? (
               <div
@@ -319,11 +486,27 @@ function VocalBoothInner() {
                 className="rounded-xl border border-amber-500/30 bg-black/40 p-4 h-[320px] overflow-y-auto scroll-smooth"
               >
                 {lyrics.trim() ? (
-                  lyricLines.map((line, i) => (
-                    <p key={i} className={`text-lg leading-relaxed ${line.trim().startsWith("[") ? "text-amber-400 font-semibold mt-3" : "text-white/90"}`}>
-                      {line || "\u00A0"}
-                    </p>
-                  ))
+                  lyricLines.map((line, i) => {
+                    const isSection = line.trim().startsWith("[");
+                    const isActive = i === activeLineIdx;
+                    return (
+                      <p
+                        key={i}
+                        ref={(el) => { lineRefs.current[i] = el; }}
+                        className={`text-lg leading-relaxed transition-colors ${
+                          isActive
+                            ? "text-amber-300 font-semibold"
+                            : isSection
+                              ? "text-amber-400/80 font-semibold mt-3"
+                              : timedLines
+                                ? "text-white/40"
+                                : "text-white/90"
+                        }`}
+                      >
+                        {line || "\u00A0"}
+                      </p>
+                    );
+                  })
                 ) : (
                   <p className="text-muted-foreground text-sm">No lyrics loaded — add some to follow along.</p>
                 )}
@@ -331,7 +514,7 @@ function VocalBoothInner() {
             ) : (
               <textarea
                 value={lyrics}
-                onChange={(e) => setLyrics(e.target.value)}
+                onChange={(e) => { setLyrics(e.target.value); if (timedLines) setTimedLines(null); }}
                 placeholder="Paste or pick lyrics here. Section markers like [Verse] / [Chorus] are highlighted while you sing."
                 className="w-full h-[320px] rounded-xl border border-border/40 bg-black/40 p-4 text-sm text-white/90 resize-none focus:outline-none focus:border-amber-500/40 font-mono"
               />
@@ -353,14 +536,45 @@ function VocalBoothInner() {
                 style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
                 onChange={(e) => { handleFile(e.target.files?.[0] ?? null); if (e.target) e.target.value = ""; }}
               />
+              <input
+                ref={splitInputRef}
+                type="file"
+                accept=".wav,.mp3,.m4a,.aac,.flac,.ogg,.oga,.weba,.aiff,.au,.snd,.wma"
+                style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
+                onChange={(e) => { handleSplitFile(e.target.files?.[0] ?? null); if (e.target) e.target.value = ""; }}
+              />
               {!backingFile ? (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex flex-col items-center justify-center gap-2 py-8 rounded-lg border-2 border-dashed border-border/30 text-muted-foreground hover:text-white hover:border-amber-500/40 transition-colors"
-                >
-                  <Upload className="w-5 h-5" />
-                  <span className="text-sm">Upload an instrumental</span>
-                </button>
+                splitting ? (
+                  <div className="w-full flex flex-col items-center justify-center gap-2 py-8 text-amber-400">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Splitting your song…</span>
+                    <span className="text-[10px] text-muted-foreground text-center px-4">Separating vocals from the instrumental — this can take a moment.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-lg border-2 border-dashed border-border/30 text-muted-foreground hover:text-white hover:border-amber-500/40 transition-colors"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span className="text-sm">Upload an instrumental</span>
+                    </button>
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <div className="h-px flex-1 bg-border/40" /> or <div className="h-px flex-1 bg-border/40" />
+                    </div>
+                    <button
+                      onClick={() => splitInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 hover:bg-amber-500/10 transition-colors"
+                    >
+                      <Scissors className="w-4 h-4" />
+                      <span className="text-sm font-medium">Split your own song</span>
+                    </button>
+                    <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+                      Upload a full track — we'll split it into a backing instrumental plus an
+                      approximate guide vocal to sing along to.
+                    </p>
+                  </div>
+                )
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-2">
@@ -387,14 +601,35 @@ function VocalBoothInner() {
                     />
                     <span className="text-[10px] font-mono text-muted-foreground w-16 text-right shrink-0">{fmtTime(position)} / {fmtTime(duration)}</span>
                   </div>
+                  {guideVocalUrl && (
+                    <div className="rounded-lg border border-border/40 bg-black/20 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-white/80 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-amber-500" /> Guide vocal
+                        </span>
+                        <button
+                          onClick={() => setGuideEnabled((v) => !v)}
+                          className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-colors ${guideEnabled ? "border-amber-500/40 text-amber-400 bg-amber-500/10" : "border-border/50 text-muted-foreground"}`}
+                        >
+                          {guideEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                          {guideEnabled ? "On" : "Off"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        Extracted from your song (approximate — expect some bleed). Plays in sync with the
+                        backing track; it's never added to your exported mix.
+                      </p>
+                    </div>
+                  )}
                   <audio
                     ref={backingRef}
                     src={backingUrl ?? undefined}
                     onPlay={() => setBackingPlaying(true)}
-                    onPause={() => setBackingPlaying(false)}
+                    onPause={onBackingPause}
                     onEnded={onBackingEnded}
                     onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
                   />
+                  <audio ref={guideVocalRef} src={guideVocalUrl ?? undefined} preload="auto" />
                 </>
               )}
             </div>
