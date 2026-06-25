@@ -23,6 +23,8 @@ import LabelArtistPage from "@/pages/label-artist";
 import LibraryPage from "@/pages/library";
 import SubmitTrackPage from "@/pages/submit-track";
 import ConvertPage from "@/pages/convert";
+import SongwritingStudio from "@/pages/songwriting";
+import AdminLabel from "@/pages/admin-label";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
 
@@ -45,12 +47,14 @@ function Router() {
       <Route path="/admin" component={AdminAnalytics} />
       <Route path="/admin/waitlist" component={AdminWaitlist} />
       <Route path="/admin/tracks" component={AdminTracks} />
+      <Route path="/admin/label" component={AdminLabel} />
       <Route path="/optimizer" component={Optimizer} />
       <Route path="/label" component={LabelPage} />
       <Route path="/label/:artist" component={LabelArtistPage} />
       <Route path="/library" component={LibraryPage} />
       <Route path="/submit" component={SubmitTrackPage} />
       <Route path="/convert" component={ConvertPage} />
+      <Route path="/songwriting" component={SongwritingStudio} />
       <Route component={NotFound} />
     </Switch>
   );

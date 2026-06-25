@@ -17,6 +17,8 @@ import storageRouter from "./storage";
 import adminAuthRouter from "./adminAuth";
 import activateRouter from "./activate";
 import convertRouter from "./convert";
+import lyricsRouter from "./lyrics";
+import adminLabelRouter from "./adminLabel";
 
 const router: IRouter = Router();
 
@@ -38,5 +40,7 @@ router.use(tracksRouter);
 router.use(storageRouter);
 router.use(activateRouter);
 router.use(convertRouter);
+router.use(lyricsRouter);
+router.use(adminLabelRouter);
 
 export default router;

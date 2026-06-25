@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, varchar, real, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, varchar, real, uuid, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { usersTable } from "./auth";
 
 export const trackStatusEnum = pgEnum("track_status", ["pending", "accepted", "rejected"]);
@@ -15,6 +15,10 @@ export const tracksTable = pgTable("tracks", {
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   submittedByUserId: varchar("submitted_by_user_id", { length: 255 }),
+  // Label admin controls
+  adminOverride: boolean("admin_override").notNull().default(false),
+  overrideExpiresAt: timestamp("override_expires_at", { withTimezone: true }),
+  takenDown: boolean("taken_down").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

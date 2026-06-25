@@ -198,7 +198,7 @@ export async function mlkVocalRemoval(
   multiplier: number = 0.75,
 ): Promise<GNSVocalResult> {
   const filter = channels >= 2
-    ? "pan=stereo|c0=c0-c1|c1=c1-c0"
+    ? "pan=stereo|c0=c0-c1|c1=c0-c1"
     : "equalizer=f=2500:t=q:w=2:g=-9";
   const rawBuf = await ffmpegFilterToWav(filePath, filter, channels >= 2 ? 2 : 1);
   const { buf, parity } = await applyMLKv3Fast(rawBuf, multiplier);
@@ -307,7 +307,7 @@ export async function mlkStemSplit(
   const vocalExtract = isStereo
     ? "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=180,lowpass=f=5000"
     : "highpass=f=180,lowpass=f=5000";
-  const instrExtract = isStereo ? "pan=stereo|c0=c0-c1|c1=c1-c0" : "aecho=0.8:0.88:6:0.4";
+  const instrExtract = isStereo ? "pan=stereo|c0=c0-c1|c1=c0-c1" : "aecho=0.8:0.88:6:0.4";
 
   // One entry per stem: extraction filter + output channel count. Each becomes
   // an independent ffmpeg process so failures isolate to a single stem.
@@ -316,7 +316,7 @@ export async function mlkStemSplit(
     { name: "drums",        extract: "highpass=f=200,lowpass=f=2500", ch: channels,                   outPath: `${stemDir}/GKP_drums.wav`        },
     { name: "bass",         extract: "lowpass=f=250",                 ch: channels,                   outPath: `${stemDir}/GKP_bass.wav`         },
     { name: "other",        extract: "highpass=f=2500",               ch: channels,                   outPath: `${stemDir}/GKP_other.wav`        },
-    { name: "instrumental", extract: instrExtract,                    ch: isStereo ? 2 : channels,    outPath: `${stemDir}/GKP_instrumental.wav` },
+    { name: "instrumental", extract: instrExtract,                    ch: isStereo ? 2 : channels,    outPath: `${stemDir}/GKP_instrumental.wav`  },
   ];
 
   // Render a single stem in its own ffmpeg process: [source] → extraction →
