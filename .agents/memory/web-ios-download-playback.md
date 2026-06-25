@@ -33,3 +33,13 @@ and iOS leaves the context suspended → silent playback.
 **How to apply:** any new Web Audio play path on the web must resume first. Note
 the dedicated voice-removal / mastering / convert pages use native `<audio controls>`
 and are NOT affected — this only bites Web Audio (Studio, DAW, live monitor).
+
+## A 2nd synced `<audio>.play()` must start in the SAME gesture, not after an await
+When two `<audio>` elements play together (e.g. backing track + a synced guide
+vocal), the second element's `play()` must be kicked off in the same user gesture
+as the first — do NOT `await first.play()` then call `second.play()`. iOS treats
+the second call as no-longer-in-a-gesture and silently blocks it, so the guide is
+absent with no error.
+**How to apply:** set both `currentTime`/`muted` synchronously, then launch both
+together: `await Promise.allSettled([a.play(), g.play()])`. Check the backing
+result for rejection (the guide is optional, swallow its failure).

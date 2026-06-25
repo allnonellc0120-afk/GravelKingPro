@@ -10,7 +10,7 @@ description: All pages, routes, access tiers, and nav structure for GravelKing P
 - `/pricing` — Pricing (all)
 - `/report` — Report (all)
 - `/kernel` — Kernel Dashboard (hard gate: `isPro` = pro or node_auditor tier)
-- `/contact` — Contact (all) — kevm@gravelkingpro.it.com, All N One LLC
+- `/contact` — Contact (all) — public business contact email + All N One LLC (shown on the page itself)
 - `/songbot` — Songwriter (all, free) — template lyric generator, 8 genres
 - `/beatmaker` — Beat Maker (all, 30s free; Pro: up to 120s) — MLK v3 kernel
 - `/download` — Download page (all) — free local version description + download
