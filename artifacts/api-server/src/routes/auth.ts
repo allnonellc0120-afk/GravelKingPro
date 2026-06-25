@@ -58,27 +58,77 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
+/**
+ * Owner accounts that always receive full lifetime access on sign-in, regardless
+ * of Stripe state or which database (dev/prod) the server is connected to. Keyed
+ * by verified OIDC email (lower-cased) so the grant survives an OIDC sub vs. legacy
+ * UUID row mismatch. `node_auditor` is the top tier (a superset of every feature);
+ * `isDeveloper` additionally unlocks the admin/label tooling.
+ */
+const LIFETIME_GRANTS: Record<string, { tier: string; isDeveloper: boolean }> = {
+  "allnonellc0120@gmail.com": { tier: "node_auditor", isDeveloper: true },
+  "hopelaborde66@gmail.com": { tier: "node_auditor", isDeveloper: false },
+};
+
 async function upsertUser(claims: Record<string, unknown>) {
-  const userData = {
-    id: claims.sub as string,
-    email: (claims.email as string) || null,
+  const sub = claims.sub as string;
+  const rawEmail = (claims.email as string) || null;
+  const grant = rawEmail
+    ? LIFETIME_GRANTS[rawEmail.toLowerCase().trim()]
+    : undefined;
+
+  const profile = {
+    email: rawEmail,
     firstName: (claims.first_name as string) || null,
     lastName: (claims.last_name as string) || null,
     profileImageUrl: (claims.profile_image_url || claims.picture) as
       | string
       | null,
+    updatedAt: new Date(),
+    // Owner allowlist: force full lifetime access (+admin for the developer email).
+    // Non-allowlisted users keep whatever isPro/tier Stripe set — we never touch it.
+    ...(grant
+      ? { isPro: true, subscriptionTier: grant.tier, isDeveloper: grant.isDeveloper }
+      : {}),
   };
 
+  // 1) Row already keyed by this OIDC sub — update profile in place.
+  const [bySub] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, sub));
+  if (bySub) {
+    const [user] = await db
+      .update(usersTable)
+      .set(profile)
+      .where(eq(usersTable.id, sub))
+      .returning();
+    return user;
+  }
+
+  // 2) No sub-keyed row yet, but a row already exists for this email (e.g. created
+  //    by grant-access or a legacy session). Adopt it rather than inserting a second
+  //    row — `email` is UNIQUE, so a plain insert keyed by sub would throw. The
+  //    returned id becomes the session id, so entitlement lookups stay consistent.
+  if (rawEmail) {
+    const [byEmail] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, rawEmail));
+    if (byEmail) {
+      const [user] = await db
+        .update(usersTable)
+        .set(profile)
+        .where(eq(usersTable.id, byEmail.id))
+        .returning();
+      return user;
+    }
+  }
+
+  // 3) Brand-new user — insert keyed by the OIDC sub.
   const [user] = await db
     .insert(usersTable)
-    .values(userData)
-    .onConflictDoUpdate({
-      target: usersTable.id,
-      set: {
-        ...userData,
-        updatedAt: new Date(),
-      },
-    })
+    .values({ id: sub, ...profile })
     .returning();
   return user;
 }
