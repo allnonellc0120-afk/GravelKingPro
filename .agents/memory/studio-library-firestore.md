@@ -27,12 +27,17 @@ the doc id == PG project id (`saveSongDraft(data, projectId)`), and have revise
 never throws. Do **not** also write a draft at generate time — it produces an
 orphan duplicate, and free users have no `gk_session` so it isn't queryable anyway.
 
-## Rule: paid features that mint artifacts must be verified server-side
-The IP certificate is gated by `hasStudio(req)` + a server-side 25%
-authorship-threshold check in `GET /lyrics/certificate/:projectId`. The client
-fetches that endpoint before rendering the printable cert.
-**Why:** paid-feature boundaries are security boundaries (threat_model.md); a
-UI-only `isPro && isEligible` gate can be bypassed by faking client state.
-**Note:** pre-existing Pro lyric endpoints (`/lyrics/regenerate-line`, `/revise`,
-`/expand`) are still UI-gated only — flagged but intentionally not changed to
-avoid locking out existing sessions mid-flow.
+## Rule: every Gemini-backed lyric endpoint must be protected server-side
+Paid-feature and cost boundaries are security boundaries (threat_model.md): a
+UI-only `isPro` / quota gate is client-bypassable and exposes Gemini spend.
+- **Pro-only AI editor endpoints** (`/lyrics/regenerate-line`, `/lyrics/rhymes`,
+  `/lyrics/expand`) go through a `requireStudio` middleware (`hasStudio(req)` →
+  403). The IP certificate (`GET /lyrics/certificate/:projectId`) also checks
+  `hasStudio` **plus** the server-side 25% authorship threshold before issuing.
+- **Anonymous-reachable AI endpoints** (`/lyrics/generate`, `/lyrics/convert-style`)
+  can't be Pro-gated (free tier uses them), so they get the shared `rateLimit`
+  middleware instead — same defense the audio/master/studio-mix routes use.
+**Why:** the in-app "2 free generations" counter is React state only; the server
+had zero quota, so direct API calls = unbounded Gemini cost.
+**How to apply:** any *new* lyric/AI endpoint that calls Gemini must get either
+`requireStudio` (if paid) or `rateLimit` (if free) — never ship one bare.
