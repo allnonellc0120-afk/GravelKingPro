@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Layout } from "@/components/layout";
+import { ToolHelp } from "@/components/tool-help";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -770,6 +771,16 @@ export default function SongwritingStudio() {
           <div className="flex items-center justify-center gap-2 mb-1">
             <Music2 className="w-6 h-6 text-amber-500" />
             <span className="text-xs font-bold tracking-widest uppercase text-amber-500">Songwriting Studio</span>
+            <ToolHelp
+              title="Songwriting Studio"
+              summary="AI co-writes a full song from your idea. Free gives you the draft; Pro lets you edit line-by-line and certify your authorship."
+              steps={[
+                "Enter a theme, mood or lyric seed and pick a genre.",
+                "Generate — Gemini writes the complete song.",
+                "Pro: edit line-by-line, certify your human–AI authorship, and send it to Suno.",
+              ]}
+              note="Free drafts carry no IP rights — only Pro edits establish certified authorship."
+            />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Build it here. Send it to Suno.</h1>
           <p className="text-muted-foreground text-sm max-w-lg mx-auto">
