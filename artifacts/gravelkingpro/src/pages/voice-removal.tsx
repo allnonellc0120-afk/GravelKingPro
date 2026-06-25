@@ -241,41 +241,73 @@ export default function VoiceRemoval() {
                     <p className="text-sm font-semibold text-blue-300">Polish with Suno AI</p>
                     <Badge variant="outline" className="ml-auto text-[9px] border-blue-400/30 text-blue-400">Bring Your Own Sub</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Use your own Suno subscription to remix and polish this instrumental — runs on your account, on your dime.
-                    Download the split, upload it to Suno as a style reference, paste the prompt below.
-                  </p>
-                  <div className="flex items-center gap-2 rounded border border-border/40 bg-background/60 p-2">
-                    <code className="flex-1 truncate text-[11px] font-mono text-muted-foreground">
-                      {buildSunoPrompt(fileName)}
-                    </code>
-                    <button
-                      onClick={() => void copySunoPrompt()}
-                      className="shrink-0 p-1 rounded hover:bg-border/20 transition-colors"
-                      title="Copy prompt"
-                    >
-                      {copiedSuno
-                        ? <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        : <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />}
-                    </button>
+
+                  {/* Steps */}
+                  <ol className="space-y-2">
+                    {[
+                      {
+                        n: "1",
+                        label: "Download your split as an audio file",
+                        action: (
+                          <Button size="sm" variant="outline" onClick={download}
+                            className="h-7 px-2.5 border-blue-500/30 text-blue-300 hover:bg-blue-500/10 text-xs">
+                            <Download className="w-3 h-3 mr-1" /> Download
+                          </Button>
+                        ),
+                      },
+                      {
+                        n: "2",
+                        label: 'Open Suno → click "Create" → switch to Advanced',
+                        action: (
+                          <Button size="sm"
+                            className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                            onClick={() => window.open("https://suno.com/create", "_blank", "noopener")}>
+                            <ExternalLink className="w-3 h-3 mr-1" /> Open Suno
+                          </Button>
+                        ),
+                      },
+                      {
+                        n: "3",
+                        label: 'In Advanced, click "Upload Audio" — load this file as your audio reference',
+                        action: null,
+                      },
+                      {
+                        n: "4",
+                        label: "Add your lyrics + style prompt below, then use the Audio / Style influence slider to set how close to stick to your instrumental",
+                        action: null,
+                      },
+                    ].map(({ n, label, action }) => (
+                      <li key={n} className="flex items-start gap-2.5">
+                        <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold flex items-center justify-center">{n}</span>
+                        <span className="flex-1 text-xs text-muted-foreground leading-relaxed">{label}</span>
+                        {action && <span className="shrink-0">{action}</span>}
+                      </li>
+                    ))}
+                  </ol>
+
+                  {/* Copyable style prompt */}
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">Style prompt to paste in Suno:</p>
+                    <div className="flex items-center gap-2 rounded border border-border/40 bg-background/60 p-2">
+                      <code className="flex-1 truncate text-[11px] font-mono text-muted-foreground">
+                        {buildSunoPrompt(fileName)}
+                      </code>
+                      <button
+                        onClick={() => void copySunoPrompt()}
+                        className="shrink-0 p-1 rounded hover:bg-border/20 transition-colors"
+                        title="Copy prompt"
+                      >
+                        {copiedSuno
+                          ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          : <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={download} className="flex-1 border-blue-500/30 text-blue-300 hover:bg-blue-500/10">
-                      <Download className="w-3.5 h-3.5 mr-1.5" /> 1. Download Split
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => window.open("https://suno.com/create", "_blank", "noopener")}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> 2. Open Suno →
-                    </Button>
-                  </div>
+
                   <p className="text-[10px] text-muted-foreground text-center">
-                    Suno plans from $8/mo ·{" "}
-                    <a href="https://suno.com/pricing" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-                      suno.com/pricing
-                    </a>
+                    Requires a Suno subscription ($8–$24/mo) ·{" "}
+                    <a href="https://suno.com/pricing" target="_blank" rel="noopener noreferrer"
+                      className="underline hover:text-foreground">suno.com/pricing</a>
                   </p>
                 </div>
 
