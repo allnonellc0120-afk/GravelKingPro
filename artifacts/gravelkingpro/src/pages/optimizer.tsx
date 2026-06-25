@@ -226,13 +226,13 @@ export default function Optimizer() {
             <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">Pro Plus</Badge>
             <ToolHelp
               title="Hardware Optimizer"
-              summary="Detects your device's hardware, applies Morris Law Kernel V3.5 optimizations, and benchmarks real audio-processing performance."
+              summary="Detects your CPU topology and runs a DGEMM benchmark to gauge audio-processing throughput, presented alongside the Morris Law Kernel V3.5 optimization sequence."
               steps={[
                 "Run the scan to detect your CPU topology.",
-                "Apply the kernel optimizations (CPU affinity, memory locking).",
-                "Run the benchmark to see real GFLOPS before and after.",
+                "Step through the kernel optimization sequence (CPU affinity, memory locking).",
+                "Run the DGEMM benchmark to compare before/after GFLOPS.",
               ]}
-              note="Runs entirely on your device. Metrics reflect your actual detected hardware — not demo numbers."
+              note="The benchmark runs on our server kernel; if the runner is unavailable it falls back to clearly-labeled demo numbers. The optimization steps are an illustrative walkthrough, not guaranteed changes to your local machine."
             />
           </div>
           <p className="text-muted-foreground text-sm">
