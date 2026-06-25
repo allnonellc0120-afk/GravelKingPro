@@ -1,0 +1,36 @@
+# GRAVEL KING APP: FINAL COMPREHENSIVE ARCHITECTURE & DEPLOYMENT DIRECTIVE
+# ATTENTION AGENT: This is the definitive blueprint for the app. Build sequentially, phase by phase. Do not jump ahead.
+
+## PHASE 1: BACKEND CLOUD INFRASTRUCTURE & MORRIS LAW KERNEL V3
+1. **Authentication:** Pull `GCP_SERVICE_ACCOUNT` from Replit Secrets and initialize the Google Cloud SDK.
+2. **Database:** Scaffold two Firestore collections: `audio_jobs` and `song_drafts`.
+3. **Core Engine:** Structure all server-side processing under a unified service module named `morris-law-kernel-v3.js`. Install `ffmpeg` in the Docker container.
+4. **Endpoints:**
+   - `/api/generate-lyrics`: Connects to Vertex AI (Gemini).
+   - `/api/voice-separator-intake`: 4-stage FFmpeg pipeline (Compression, Isolation, Patching, Mastering). Updates Firestore `audio_jobs` status at each stage.
+   - `/api/kernel-status`: Health-check endpoint. Must return: `{ "status": 200, "engine": "Morris Law Kernel V3", "state": "ACTIVE" }`.
+5. **Deployment Specs:** Deploy the container to Google Cloud Run. Allocate a MINIMUM of **2GB of memory** and a **10-minute timeout** to prevent FFmpeg memory crashes.
+
+## PHASE 2: TIERED USER AUTHENTICATION & DASHBOARD
+1. **Stripe Webhook Listeners:** Ensure `/api/webhook/stripe` maps successful payments to update a user's Firestore document to `tier: 'pro'`. Do not break existing checkout code.
+2. **The Media Library:** Dashboard must display the user's saved lyrics (`song_drafts`), split audio stems (`audio_jobs`), and vocal booth performance tracks.
+
+## PHASE 3: THE COLLABORATIVE SONGWRITER STUDIO & COPYRIGHT GATE
+1. **Free Tier:** Render lyrics as read-only text with a "100% AI - Not Copyrightable" badge.
+2. **Pro Tier ($29.99/mo):** Render lyrics line-by-line as editable fields. Include a "Regenerate Line" button that uses Gemini contextually (doesn't count toward human edits).
+3. **Authorship Ledger:** Track manual line changes. Once the **25% threshold** is met, the progress bar turns Green and unlocks an IP-Certification digital stamp/PDF generator.
+4. **Copyright Filter:** Before generation or certification, use Gemini to pre-screen lyrics. If generic/original, return 'CLEAN'. If plagiarized, return 'FLAGGED' and block execution. Force a user liability checkbox.
+
+## PHASE 4: AUTOMATED SUNO/UDIO API HANDOFF (THE NO-EXIT RULE)
+1. **Integrated Prompting:** Send style tags/lyrics to the Suno API. Fetch the audio AND the word-level lyric timestamps (`get-timestamped-lyrics`).
+2. **Auto-Routing:** Automatically feed the returned Suno audio file directly into the `/api/voice-separator-intake` pipeline. Save timestamps to Firestore for the visualizer.
+
+## PHASE 5: THE VOCAL BOOTH / KARAOKE STUDIO
+1. **Isolation:** Build this as a full-screen, standalone page component (`KaraokeStudio.jsx`) restricted to Pro users with `status: 'split_complete'` tracks.
+2. **Zero-Latency Monitoring:** Force low-latency audio constraints:
+   `echoCancellation: false, noiseSuppression: false, autoGainControl: false, latency: 0` and set `latencyHint: 'interactive'`.
+3. **UI Engine:** Use `requestAnimationFrame` and the saved Suno timestamps to highlight flowing lyrics StarMaker-style. Include a "Live Monitoring (Hear Yourself)" toggle switch so users can turn it off if they are using Bluetooth.
+4. **Mixer:** Mix microphone input with the instrumental playback. Normalize the final track to Spotify-ready volumes and save it to the dashboard.
+
+# EXECUTION RULE
+Operate in an APPEND-ONLY capacity for existing files. Do not overwrite functional global code. Begin Phase 1 immediately and output the live URL for the `/api/kernel-status` check as soon as it's deployed.
