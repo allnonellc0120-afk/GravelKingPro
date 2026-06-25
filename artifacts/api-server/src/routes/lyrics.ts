@@ -73,7 +73,7 @@ const lyricsRouter = Router();
 
 // ─── POST /api/lyrics/generate ───────────────────────────────────────────────
 // Supports both simple (story prompt) and advanced (timeline canvas) modes.
-lyricsRouter.post("/api/lyrics/generate", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/generate", async (req: Request, res: Response) => {
   const {
     story, genre, bpm, mode,
     key, vocalType, genreTags,
@@ -166,7 +166,7 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 });
 
 // ─── POST /api/lyrics/expand ─────────────────────────────────────────────────
-lyricsRouter.post("/api/lyrics/expand", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/expand", async (req: Request, res: Response) => {
   const { partialLyrics, genre, bpm, styleContext } = req.body as {
     partialLyrics?: string;
     genre?: string;
@@ -208,7 +208,7 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 
 // ─── POST /api/lyrics/regenerate-line ────────────────────────────────────────
 // Returns 3 distinct variations. Pro only (enforced in UI, not here).
-lyricsRouter.post("/api/lyrics/regenerate-line", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/regenerate-line", async (req: Request, res: Response) => {
   const { line, instruction, sectionLabel, genre, songConcept, prevLine, nextLine } = req.body as {
     line?: string;
     instruction?: string;
@@ -265,7 +265,7 @@ VARIATION_3: [line here]`;
 
 // ─── POST /api/lyrics/rhymes ─────────────────────────────────────────────────
 // Gemini-powered rhyme suggestions for the rhyming tray.
-lyricsRouter.post("/api/lyrics/rhymes", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/rhymes", async (req: Request, res: Response) => {
   const { word, genre } = req.body as { word?: string; genre?: string };
   if (!word || word.trim().length < 2) {
     res.status(400).json({ error: "word is required" });
@@ -295,7 +295,7 @@ Rules:
 });
 
 // ─── POST /api/lyrics/convert-style ──────────────────────────────────────────
-lyricsRouter.post("/api/lyrics/convert-style", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/convert-style", async (req: Request, res: Response) => {
   const { styleDescription } = req.body as { styleDescription?: string };
   if (!styleDescription || styleDescription.trim().length < 3) {
     res.status(400).json({ error: "styleDescription is required" });
@@ -326,7 +326,7 @@ Output the style tags only:`;
 
 // ─── POST /api/lyrics/forensic-entry ─────────────────────────────────────────
 // Log a single edit event to the immutable forensic ledger.
-lyricsRouter.post("/api/lyrics/forensic-entry", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/forensic-entry", async (req: Request, res: Response) => {
   const {
     projectId, sessionId, editType, lineIndex,
     originalText, newText, regenInstruction,
@@ -367,7 +367,7 @@ lyricsRouter.post("/api/lyrics/forensic-entry", async (req: Request, res: Respon
 });
 
 // ─── POST /api/lyrics/project ────────────────────────────────────────────────
-lyricsRouter.post("/api/lyrics/project", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
   const {
     aiDraft, title, genre, bpm, sunoPrompt,
     mode, storyPrompt, key, vocalType, genreTags,
@@ -425,7 +425,7 @@ lyricsRouter.post("/api/lyrics/project", async (req: Request, res: Response) => 
 });
 
 // ─── POST /api/lyrics/revise ─────────────────────────────────────────────────
-lyricsRouter.post("/api/lyrics/revise", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
   const { projectId, content, linesState, editType, lineIndex, originalLineText, regenInstruction } = req.body as {
     projectId?: string;
     content?: string;
@@ -481,7 +481,7 @@ lyricsRouter.post("/api/lyrics/revise", async (req: Request, res: Response) => {
 });
 
 // ─── GET /api/lyrics/project/:id ─────────────────────────────────────────────
-lyricsRouter.get("/api/lyrics/project/:id", async (req: Request, res: Response) => {
+lyricsRouter.get("/lyrics/project/:id", async (req: Request, res: Response) => {
   const id = String(req.params["id"]);
 
   const project = await db.query.lyricProjectsTable.findFirst({
@@ -507,7 +507,7 @@ lyricsRouter.get("/api/lyrics/project/:id", async (req: Request, res: Response) 
 });
 
 // ─── POST /api/lyrics/timeline-blocks ────────────────────────────────────────
-lyricsRouter.post("/api/lyrics/timeline-blocks", async (req: Request, res: Response) => {
+lyricsRouter.post("/lyrics/timeline-blocks", async (req: Request, res: Response) => {
   const { projectId, blocks } = req.body as {
     projectId?: string;
     blocks?: Array<{ timestampMs: number; label: string; sectionType: string; sortOrder: number }>;
