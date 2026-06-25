@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { saveSongDraft, updateSongDraft } from "../lib/firestore";
+import { saveSongDraft, updateSongDraft, queryLibraryBySession } from "../lib/firestore";
+import { hasStudio } from "../lib/entitlement";
 import {
   db,
   lyricProjectsTable,
@@ -159,17 +160,8 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
     const lyrics = fullText.replace(/^SUNO_PROMPT:.*$/m, "").trim();
     const lines = parseToLines(lyrics);
 
-    saveSongDraft({
-      mode: isAdvanced ? "advanced" : "simple",
-      genre: genre ?? undefined,
-      storyPrompt: isAdvanced ? undefined : (story ?? undefined),
-      aiDraft: lyrics,
-      stylePrompt,
-      authorshipScore: 0,
-      isCopyrightEligible: false,
-      lineCount: lines.length,
-    });
-
+    // Note: the library entry is created when the user SAVES a project
+    // (POST /lyrics/project), keyed by the project id so revise can update it.
     res.json({ lyrics, stylePrompt, lines });
   } catch (err) {
     req.log.error({ err }, "Gemini lyric generation failed");
@@ -433,6 +425,25 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
     updatedAt: new Date(),
   });
 
+  // Canonical library entry, keyed by the project id so /lyrics/revise can
+  // update its authorship score + certification status against the same doc.
+  saveSongDraft(
+    {
+      sessionId,
+      projectId: id,
+      mode: mode || "simple",
+      genre: genre ?? undefined,
+      storyPrompt: storyPrompt ?? undefined,
+      aiDraft,
+      stylePrompt: stylePrompt ?? sunoPrompt ?? undefined,
+      authorshipScore: 0,
+      isCopyrightEligible: false,
+      is_certified: false,
+      lineCount: parseToLines(aiDraft).length,
+    },
+    id,
+  );
+
   res.json({ id });
 });
 
@@ -462,7 +473,7 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
   }
 
   const score = levenshteinPercent(project.aiDraft, content);
-  const eligible = score >= 20;
+  const eligible = score >= 25;
 
   await db.insert(lyricRevisionsTable).values({
     id: randomUUID(),
@@ -493,10 +504,53 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
     updateSongDraft(projectId, {
       authorshipScore: score,
       isCopyrightEligible: eligible,
+      is_certified: eligible,
     });
   }
 
   res.json({ authorshipScore: score, isCopyrightEligible: eligible });
+});
+
+// ─── GET /api/library/studio ─────────────────────────────────────────────────
+// Returns the current session's saved song drafts + audio jobs from Firestore.
+lyricsRouter.get("/library/studio", async (req: Request, res: Response) => {
+  const sessionId = (req.cookies as Record<string, string>)?.["gk_session"];
+  if (!sessionId) {
+    res.json({ songs: [], jobs: [] });
+    return;
+  }
+  const data = await queryLibraryBySession(sessionId);
+  res.json(data);
+});
+
+// ─── GET /api/lyrics/certificate/:projectId ──────────────────────────────────
+// Server-verified IP certificate payload. Requires Studio (Pro) tier AND a
+// project that has reached the 25% human-authorship threshold. Gating lives
+// here, not just in the UI, so the certificate cannot be minted by faking client state.
+lyricsRouter.get("/lyrics/certificate/:projectId", async (req: Request, res: Response) => {
+  if (!(await hasStudio(req))) {
+    res.status(403).json({ error: "A Pro (Studio) subscription is required to certify authorship." });
+    return;
+  }
+
+  const project = await db.query.lyricProjectsTable.findFirst({
+    where: eq(lyricProjectsTable.id, String(req.params["projectId"])),
+  });
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (!project.isCopyrightEligible || (project.authorshipScore ?? 0) < 25) {
+    res.status(403).json({ error: "This work has not reached the 25% human-authorship threshold yet." });
+    return;
+  }
+
+  res.json({
+    title: project.title,
+    genre: project.genre,
+    authorshipScore: project.authorshipScore,
+    certifiedAt: new Date().toISOString(),
+  });
 });
 
 // ─── GET /api/lyrics/project/:id ─────────────────────────────────────────────

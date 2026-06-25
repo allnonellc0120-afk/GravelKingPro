@@ -1,0 +1,60 @@
+# GRAVEL KING STUDIO: MASTER DEVELOPMENT BLUEPRINT & EXECUTION PLAN
+# ATTENTION REPLIT AGENT: 
+You are to build this application strictly in the sequential phases outlined below. **DO NOT build out of order.** Do not start Phase 2 until Phase 1 is fully coded, tested, and operational. Build one working module at a time to prevent breaking the codebase.
+
+## PHASE 1: BACKEND CLOUD INFRASTRUCTURE (THE FOUNDATION)
+**Goal:** Establish the serverless API, database, and media processing environment.
+1.  **Authentication:** Pull `GCP_SERVICE_ACCOUNT` from Replit Secrets and initialize the Google Cloud SDK.
+2.  **Database:** Scaffold two Firestore collections: `audio_jobs` and `song_drafts`.
+3.  **Media Environment:** Create a Dockerfile for Cloud Run using a Node.js base. **You must install `ffmpeg` in this container.**
+4.  **Endpoints:**
+    *   `/api/generate-lyrics`: Connects to Vertex AI (Gemini).
+    *   `/api/voice-separator-intake`: Accepts audio uploads, creates a document in `audio_jobs`, runs a 4-stage FFmpeg processing pipeline (1. Compression, 2. Isolation, 3. Patching, 4. Mastering), and updates the Firestore status at each stage.
+5.  **VERIFICATION:** Deploy to Cloud Run and ensure both endpoints return 200 OK statuses before moving to Phase 2.
+
+## PHASE 2: TIERED USER AUTHENTICATION & DASHBOARD (THE GATES)
+**Goal:** Build the user profile library and restrict access based on subscription tiers.
+1.  **User State:** Implement an auth state that recognizes `tier: 'free'` and `tier: 'pro'` ($29.99/mo). 
+2.  **The Library (User Dashboard):** Build a unified profile page where users can view their saved outputs. It must fetch data from Firestore:
+    *   Saved Lyrics (from `song_drafts`).
+    *   Processed Audio Stems (from `audio_jobs`).
+    *   Studio Performance Tracks (recorded in the Vocal Booth).
+3.  **VERIFICATION:** Ensure the dashboard correctly saves and fetches user-specific data from Firestore before moving to Phase 3.
+
+## PHASE 3: THE COLLABORATIVE SONGWRITER STUDIO (THE LEDGER)
+**Goal:** Build the Gemini-powered lyric generator with IP-certification tracking.
+1.  **Free Tier Logic:** Can generate 100% AI lyrics. The UI must render these as read-only text blocks with a watermarked "100% AI - Not Copyrightable" badge. Provide an "Upgrade to Pro to Edit" button.
+2.  **Pro Tier Logic:** Render lyrics line-by-line as editable input fields.
+    *   **Regenerate Button:** Pro users can click "Regenerate" on a single line. The backend must pass the song context to Gemini to ensure the new line fits the narrative. *(Note: AI-regenerated lines do NOT count toward the human-edit threshold).*
+    *   **Manual Edits:** Users can manually type and change lines. 
+3.  **The Authorship Ledger (Progress Bar):** 
+    *   Implement a highly visible progress bar at the top of the Studio.
+    *   Track the percentage of manually edited lines vs. total lines. 
+    *   **The Threshold:** Set the target threshold to **25%**. 
+4.  **IP Certification:** Once the 25% threshold is reached:
+    *   The progress bar turns Green.
+    *   Update the Firestore `song_drafts` document to include `is_certified: true`.
+    *   Unlock a "Download Certificate" button that generates a PDF containing the User Name, Song Title, Date, and a "Certified Human-AI Collaborative Work" watermark.
+5.  **VERIFICATION:** Ensure line-by-line editing works, state saves to the Dashboard, and the 25% math triggers the PDF download before moving to Phase 4.
+
+## PHASE 4: AUTOMATED SUNO/UDIO API HANDOFF (THE NO-EXIT RULE)
+**Goal:** Keep the user inside Gravel King to generate the instrumental.
+1.  **API Integration:** From the Songwriter Studio, add a "Generate Instrumental" button.
+2.  **Workflow:** Send the Gemini-created style tags and lyrics directly to the Suno API via the backend.
+3.  **Auto-Routing:** When the Suno API returns the generated audio file, the backend must *automatically* pass that file into the `/api/voice-separator-intake` endpoint (Phase 1) to split the vocals from the instrumental.
+4.  **VERIFICATION:** Ensure a user can click one button to generate a song and end up with a split instrumental in their Library without leaving the app.
+
+## PHASE 5: THE VOCAL BOOTH / KARAOKE STUDIO (THE PRO DAW)
+**Goal:** Build a dedicated, full-page recording environment for Pro users.
+1.  **Module Isolation:** Build this as a standalone, full-screen page (`KaraokeStudio.jsx/html`) to prevent UI clutter.
+2.  **Access Gates:** 
+    *   Strictly enforce `$29.99/mo` Pro-Tier access.
+    *   Only allow users to load tracks that have a `status: 'split_complete'` flag from our internal Voice Separator.
+3.  **The Engine:**
+    *   Use `requestAnimationFrame` to build a flowing, StarMaker-style lyric visualizer that syncs text to the audio playback position.
+    *   Use the Web Audio API to mix the instrumental playback with live microphone input.
+4.  **Post-Production:** Provide a "Master Track" button that normalizes the final mixed recording (mic + instrumental) to Spotify-ready volume. Save the final file to the User Dashboard.
+5.  **VERIFICATION:** Ensure microphone latency is handled and the final mixed track saves correctly to the database.
+
+# FINAL INSTRUCTION
+Begin execution on **PHASE 1** immediately. Output the code for Phase 1, confirm it is operational, and explicitly state "PHASE 1 COMPLETE" in the terminal before starting Phase 2.
