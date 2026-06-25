@@ -93,6 +93,65 @@ async function initStripe() {
   }
 }
 
+async function migrateAppSchema() {
+  try {
+    await db.execute(sql`
+      ALTER TABLE lyric_projects
+        ADD COLUMN IF NOT EXISTS mode              text        NOT NULL DEFAULT 'simple',
+        ADD COLUMN IF NOT EXISTS story_prompt      text,
+        ADD COLUMN IF NOT EXISTS key               text,
+        ADD COLUMN IF NOT EXISTS vocal_type        text,
+        ADD COLUMN IF NOT EXISTS genre_tags        text,
+        ADD COLUMN IF NOT EXISTS lines_state       jsonb,
+        ADD COLUMN IF NOT EXISTS style_prompt      text,
+        ADD COLUMN IF NOT EXISTS generation_count  integer     DEFAULT 1,
+        ADD COLUMN IF NOT EXISTS is_locked         boolean     DEFAULT false
+    `);
+
+    await db.execute(sql`
+      ALTER TABLE lyric_revisions
+        ADD COLUMN IF NOT EXISTS edit_type          text,
+        ADD COLUMN IF NOT EXISTS line_index         integer,
+        ADD COLUMN IF NOT EXISTS original_line_text text,
+        ADD COLUMN IF NOT EXISTS regen_instruction  text
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS lyric_timeline_blocks (
+        id             text        PRIMARY KEY,
+        project_id     text        NOT NULL REFERENCES lyric_projects(id) ON DELETE CASCADE,
+        timestamp_ms   integer     NOT NULL DEFAULT 0,
+        label          text        NOT NULL,
+        section_type   text,
+        sort_order     integer     NOT NULL DEFAULT 0,
+        created_at     timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS lyric_forensic_ledger (
+        id                       text        PRIMARY KEY,
+        project_id               text        NOT NULL REFERENCES lyric_projects(id) ON DELETE CASCADE,
+        session_id               text,
+        edit_type                text        NOT NULL,
+        line_index               integer,
+        original_text            text,
+        new_text                 text,
+        regen_instruction        text,
+        levenshtein_delta        integer,
+        authorship_score_before  integer,
+        authorship_score_after   integer,
+        created_at               timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    logger.info("App schema migration complete");
+  } catch (err: unknown) {
+    logger.error({ err }, "App schema migration failed — continuing anyway");
+  }
+}
+
+await migrateAppSchema();
 await initStripe();
 
 app.listen(port, (err) => {
