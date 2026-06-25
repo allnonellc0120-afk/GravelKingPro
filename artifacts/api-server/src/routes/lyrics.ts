@@ -210,6 +210,82 @@ lyricsRouter.post("/api/lyrics/revise", async (req: Request, res: Response) => {
   res.json({ authorshipScore: score, isCopyrightEligible: eligible });
 });
 
+// POST /api/lyrics/expand — Gemini completes partial user-written lyrics
+lyricsRouter.post("/api/lyrics/expand", async (req: Request, res: Response) => {
+  const { partialLyrics, genre, bpm, styleContext } = req.body as {
+    partialLyrics?: string;
+    genre?: string;
+    bpm?: number;
+    styleContext?: string;
+  };
+
+  if (!partialLyrics || typeof partialLyrics !== "string" || partialLyrics.trim().length < 5) {
+    res.status(400).json({ error: "partialLyrics is required (min 5 characters)" });
+    return;
+  }
+
+  const prompt = `You are a professional songwriter. The user has written these lyrics (full or partial) for a ${genre || "Pop"} song${bpm ? ` at ${bpm} BPM` : ""}${styleContext ? ` with this style: ${styleContext}` : ""}:
+
+---
+${partialLyrics.trim()}
+---
+
+Your job: complete and expand these lyrics into a full song. Rules:
+- PRESERVE every line the user wrote exactly as written — do not change them
+- Fill in missing sections around the user's lines
+- Use standard structure: [Verse 1] [Pre-Chorus] [Chorus] [Verse 2] [Pre-Chorus] [Chorus] [Bridge] [Outro/Chorus]
+- Match the rhyme scheme, syllable count and emotional tone already established
+- Output ONLY the lyrics — no explanations, no commentary
+
+After the lyrics, on the LAST LINE output exactly:
+SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
+
+  try {
+    const fullText = (await geminiGenerate(prompt)).trim();
+    const sunoMatch = fullText.match(/^SUNO_PROMPT:\s*(.+)$/m);
+    const sunoPrompt = sunoMatch ? sunoMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
+    const lyrics = fullText.replace(/^SUNO_PROMPT:.*$/m, "").trim();
+    res.json({ lyrics, sunoPrompt });
+  } catch (err) {
+    req.log.error({ err }, "Gemini expand failed");
+    res.status(500).json({ error: "Expansion failed. Please try again." });
+  }
+});
+
+// POST /api/lyrics/convert-style — Gemini converts free-text style → Suno-compatible tags
+lyricsRouter.post("/api/lyrics/convert-style", async (req: Request, res: Response) => {
+  const { styleDescription } = req.body as { styleDescription?: string };
+
+  if (!styleDescription || typeof styleDescription !== "string" || styleDescription.trim().length < 3) {
+    res.status(400).json({ error: "styleDescription is required" });
+    return;
+  }
+
+  const prompt = `Convert this music style description into Suno AI style tags.
+
+Description: "${styleDescription.trim()}"
+
+Rules:
+- Output ONLY comma-separated style tags — no labels, no explanations, no full sentences
+- Maximum 120 characters total
+- Translate artist/song references into their actual sonic characteristics:
+  e.g. "sounds like Drake" → "melodic rap, Toronto drill, emotional vocals, dark trap"
+  e.g. "like Radiohead" → "art rock, melancholic, layered guitars, ethereal vocals"
+- Include: genre, mood adjectives, key instruments, tempo feel, vocal style
+- Example output: dark trap, heavy 808s, atmospheric strings, 140bpm, melodic vocals, midnight energy
+
+Output the style tags only:`;
+
+  try {
+    const raw = (await geminiGenerate(prompt)).trim();
+    const tags = raw.replace(/^(style tags:|output:|tags:)/i, "").trim().slice(0, 180);
+    res.json({ styleTags: tags });
+  } catch (err) {
+    req.log.error({ err }, "Gemini style conversion failed");
+    res.status(500).json({ error: "Style conversion failed. Please try again." });
+  }
+});
+
 /**
  * Levenshtein edit distance expressed as a percentage of the original length.
  * Capped at 100. Used for the Authorship Meter.
