@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
+import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -109,6 +110,16 @@ export default function ConvertPage() {
             <RefreshCw className="w-5 h-5 text-amber-400" />
             <h1 className="text-2xl font-bold tracking-tight">File Converter</h1>
             <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400">Free</Badge>
+            <ToolHelp
+              title="File Converter"
+              summary="Converts any audio or video file to MP3, WAV, FLAC, M4A or OGG. Audio is extracted from video automatically."
+              steps={[
+                "Pick the output format.",
+                "Drag in or browse for your audio or video file.",
+                "Convert, then download the result.",
+              ]}
+              note="Free for everyone, and runs locally — no third-party upload."
+            />
           </div>
           <p className="text-sm text-muted-foreground">
             Convert any audio or video file to MP3, WAV, FLAC, M4A, or OGG.

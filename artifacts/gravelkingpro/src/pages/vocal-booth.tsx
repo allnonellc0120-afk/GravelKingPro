@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
+import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -421,6 +422,16 @@ function VocalBoothInner() {
               <h1 className="text-xl font-bold tracking-tight leading-none">Vocal Booth</h1>
               <p className="text-xs text-muted-foreground mt-0.5">Sing over a track, record, mix down</p>
             </div>
+            <ToolHelp
+              title="Vocal Booth"
+              summary="Sing over a backing track with a scrolling teleprompter, record your take, and mix it down with the instrumental."
+              steps={[
+                "Load a backing track, or split one of your own songs into instrumental + guide vocal.",
+                "Paste or pick lyrics; toggle the guide vocal to hear the melody.",
+                "Record your take, then mix down to instrumental + your vocal.",
+              ]}
+              note="Lyric highlighting is energy-based and approximate (no transcription). The mixdown contains only the instrumental and your recorded vocal — never the guide vocal."
+            />
           </div>
           <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">Studio</Badge>
         </div>

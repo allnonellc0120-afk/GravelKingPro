@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
+import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -141,6 +142,16 @@ export default function VoiceRemoval() {
                 3 free
               </Badge>
             )}
+            <ToolHelp
+              title="Voice Splitter"
+              summary="Splits a song into a separate instrumental and vocal track by cancelling the center-panned vocal."
+              steps={[
+                "Drag in or browse for an audio or video file.",
+                "Press Split — it processes locally with MLK v3.",
+                "Preview the instrumental and vocal, then download the ones you want.",
+              ]}
+              note="Center-cancel separation is approximate — expect some bleed, and it works best on true stereo mixes."
+            />
           </div>
           <p className="text-sm text-muted-foreground">
             Instant vocal removal — extracts the instrumental by cancelling center-panned vocals.

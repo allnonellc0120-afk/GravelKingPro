@@ -1,5 +1,6 @@
 import { useCallback, useId, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
+import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +140,16 @@ export default function MixStudio() {
           <div className="flex items-center gap-2 min-w-0 shrink-0">
             <h1 className="text-base font-bold tracking-tight">Mix Studio</h1>
             <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] shrink-0">Studio</Badge>
+            <ToolHelp
+              title="Mix Studio"
+              summary="A full in-browser DAW — record and import multiple tracks, add plugins, and mix them into a final stereo track."
+              steps={[
+                "Add tracks by importing files or recording live.",
+                "Set volume and pan, and add plugins per track.",
+                "Mix down and export the finished stereo file.",
+              ]}
+              note="Everything runs in your browser — save your project to pick it back up later."
+            />
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <ProjectManager

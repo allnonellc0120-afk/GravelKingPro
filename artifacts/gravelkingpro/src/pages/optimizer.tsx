@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
+import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -223,6 +224,16 @@ export default function Optimizer() {
             <Cpu className="w-5 h-5 text-amber-500" />
             <h1 className="text-2xl font-bold">MLK V3.5 Hardware Optimizer</h1>
             <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">Pro Plus</Badge>
+            <ToolHelp
+              title="Hardware Optimizer"
+              summary="Detects your device's hardware, applies Morris Law Kernel V3.5 optimizations, and benchmarks real audio-processing performance."
+              steps={[
+                "Run the scan to detect your CPU topology.",
+                "Apply the kernel optimizations (CPU affinity, memory locking).",
+                "Run the benchmark to see real GFLOPS before and after.",
+              ]}
+              note="Runs entirely on your device. Metrics reflect your actual detected hardware — not demo numbers."
+            />
           </div>
           <p className="text-muted-foreground text-sm">
             Runs entirely on your device — detects your hardware topology, applies kernel optimizations, and benchmarks real performance.

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
+import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -137,6 +138,16 @@ export default function Mastering() {
                 1 free download
               </Badge>
             )}
+            <ToolHelp
+              title="Mastering"
+              summary="Runs a professional mastering chain — EQ, compression and loudness, with optional denoise — to polish a finished mix."
+              steps={[
+                "Upload your mixed-down track.",
+                "Choose a preset that matches the genre or feel.",
+                "Preview the master, then download it.",
+              ]}
+              note="Runs locally with MLK v3 — your audio is never uploaded to a third party."
+            />
           </div>
           <p className="text-sm text-muted-foreground">
             Apply a professional mastering chain with optional denoise. Runs locally with MLK v3 — no upload to third parties.
