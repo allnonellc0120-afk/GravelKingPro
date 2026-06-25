@@ -1,0 +1,39 @@
+# GRAVEL KING APP: ARCHITECT'S MASTER VISION (A TO Z)
+# ATTENTION AGENT: READ AND CACHED ONLY. DO NOT EXECUTE UNTIL COMMANDED STEP-BY-STEP.
+
+## THE MACRO VISION
+We are refactoring the current application into a lean, dual-utility AI Music Production & IP Pipeline. The platform solves the two massive pain points in the modern AI music workflow: dirty stem separation and the AI copyright crisis. We are building the world's first platform that gamifies and verifies human authorship to unlock legal copyright protection.
+
+## THE A TO Z WORKFLOW OVERVIEW
+
+1. SYSTEM ENTRY:
+   - User enters a streamlined, two-tab ecosystem: [1] Voice Splitter & Remix, and [2] Songwriting Studio.
+
+2. CORE ENGINE 1: ADAPTIVE VOICE SPLITTER & GENRE REMIXER
+   - Users upload a track (e.g., audio rip). 
+   - A client-side/low-cost central channel elimination script runs to strip main vocals instantly.
+   - If user sets the UI slider to 100% Original: The app routes to a high-compute Neural Split node for clean stems.
+   - If user sets the slider < 100% (Remix Mode): The app takes the rough, bleeding instrumental and passes it to an audio-conditioned generative music node with an 80/20 weight. It reads the original chord progression but "patches" digital artifacts and re-synthesizes it into a clean backing track based on a background style prompt.
+
+3. CORE ENGINE 2: SONGWRITING & INTEGRATED PROMPTER
+   - Simple Mode: Users type a raw story. Gemini extracts theme tags, structures a lyric sheet, and outputs an optimized prompt payload.
+   - Advanced Mode: Users use a visual timeline canvas to set BPM, genres, and time-stamped commands (e.g., `0:00 [Violin Intro]`). Gemini embeds these structural metatags directly into the lyrics.
+
+4. INTERACTIVE SURGICAL EDITOR & GAMIFIED COPYRIGHT
+   - Clicking a line transforms *only that line* into an editable field with a real-time rhyming tray.
+   - Highlighting a line allows a targeted AI refresh (e.g., "make this line about X") while strictly maintaining syllable counts.
+   - THE CORE PROPRIETARY FEATURE (THE AUTHORSHIP METER): A visual progress bar tracks the Levenshtein edit distance between the original AI draft and the user's manual edits. When variance hits 20%, the bar turns Green, unlocking "Copyright Eligible" status. The database logs a forensic revision history.
+
+5. INTEGRATED AUDIOPREVIEW & PAYWALL
+   - The app uses the generative audio node to play a 30-second preview of the lyrics/beat directly in-app.
+   - A natural-language feedback box allows users to tweak the prompt via Gemini (e.g., "less electric sound") for one free revision. Request #3 hits a Stripe premium paywall.
+
+6. PERFORMANCE, EXPORT & LEGAL EXECUTION
+   - Lyrics are auto-anchored to millisecond timestamps based on the BPM, powering a scrolling karaoke-style recording teleprompter.
+   - Universal Export: User can export the style prompt, a universal `.lrc` timed lyric file for BandLab/StarMaker, or a pre-rendered, ready-to-file U.S. Copyright Office Form PA PDF complete with the automated forensic authorship log.
+
+7. POST-PROCESSING:
+   - Final audio is pushed through the proprietary MLK Volume 3 Moore's Law Kernel for a selection of preset mastering curves.
+
+## CURRENT DIRECTIVE FOR AGENT:
+This is the master roadmap. Do not rewrite any files or code blocks yet. Acknowledge that you have fully ingested this framework, outline your technical understanding of how we will approach this layout, and await my explicit, step-by-step instructions for Step 1.
