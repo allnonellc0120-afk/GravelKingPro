@@ -164,3 +164,5 @@ overrides:
   uuid: "11.1.1"
   # GHSA-qx2v-qp2m-jg93: postcss<8.5.10 vulnerable; force patched version across all transitive deps
   postcss: "8.5.15"
+  # Force single @opentelemetry/api resolution so drizzle-orm doesn't duplicate across peer variants
+  "@opentelemetry/api": "1.9.1"

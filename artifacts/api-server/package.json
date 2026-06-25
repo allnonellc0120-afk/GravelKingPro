@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@google-cloud/firestore": "^8.6.0",
     "@google-cloud/storage": "^7.21.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
