@@ -101,3 +101,15 @@ id = "jwWuoMhaW3zvW94AARX9Z"
 uri = "file://screenshots/promo-video-intro.jpg"
 type = "image"
 title = "GravelKing Pro — Marketing Video (Intro Scene)"
+
+[[outputs]]
+id = "wIrfgq2Ei8hI0skaQJlsv"
+uri = "file://exports/GravelKingPro-Pitch.pdf"
+type = "pdf"
+title = "GravelKing Pro — Promo Pitch (PDF)"
+
+[[outputs]]
+id = "xyH87XyRsCayoHj1HwdwC"
+uri = "file://exports/GravelKingPro-WhitePaper.pdf"
+type = "pdf"
+title = "GravelKing Pro — Technical White Paper (PDF)"
