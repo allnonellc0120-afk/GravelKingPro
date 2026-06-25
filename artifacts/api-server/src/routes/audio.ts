@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { createAudioJob, completeAudioJob } from "../lib/firestore";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -380,6 +381,14 @@ audioRouter.post(
         const useNeural = tier === "node_auditor";
         const { channels } = await getAudioInfo(filePath);
 
+        const fsJobId = createAudioJob({
+          fileName: req.file.originalname,
+          mode: "voice_remove",
+          tier,
+          status: "STAGE_1_PROCESSING",
+          sessionId: (req.cookies as Record<string, string>)?.["gk_session"],
+        });
+
         let result;
         const routing: "local" = "local";
         let stack: string;
@@ -407,6 +416,8 @@ audioRouter.post(
           model = MLK_KERNEL;
           protocol = MLK_PROTOCOL;
         }
+
+        completeAudioJob(fsJobId, { status: "STAGE_1_COMPLETE", stack, model });
 
         const instrumentalBuf = result.instrumental;
         const kernelParity = result.kernelParity;

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import { saveSongDraft, updateSongDraft } from "../lib/firestore";
 import {
   db,
   lyricProjectsTable,
@@ -157,6 +158,17 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
     const stylePrompt = sunoMatch ? sunoMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
     const lyrics = fullText.replace(/^SUNO_PROMPT:.*$/m, "").trim();
     const lines = parseToLines(lyrics);
+
+    saveSongDraft({
+      mode: isAdvanced ? "advanced" : "simple",
+      genre: genre ?? undefined,
+      storyPrompt: isAdvanced ? undefined : (story ?? undefined),
+      aiDraft: lyrics,
+      stylePrompt,
+      authorshipScore: 0,
+      isCopyrightEligible: false,
+      lineCount: lines.length,
+    });
 
     res.json({ lyrics, stylePrompt, lines });
   } catch (err) {
@@ -476,6 +488,13 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
       updatedAt: new Date(),
     })
     .where(eq(lyricProjectsTable.id, projectId));
+
+  if (projectId) {
+    updateSongDraft(projectId, {
+      authorshipScore: score,
+      isCopyrightEligible: eligible,
+    });
+  }
 
   res.json({ authorshipScore: score, isCopyrightEligible: eligible });
 });
