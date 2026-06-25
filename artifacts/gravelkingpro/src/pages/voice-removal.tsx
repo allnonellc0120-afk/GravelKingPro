@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Download, Upload, Mic2, CheckCircle2, AlertCircle, FileVideo } from "lucide-react";
+import { Download, Upload, Mic2, CheckCircle2, AlertCircle, FileVideo, Wand2, Copy, Check, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
@@ -32,6 +32,7 @@ export default function VoiceRemoval() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [isVideo, setIsVideo] = useState(false);
+  const [copiedSuno, setCopiedSuno] = useState(false);
 
   const processFile = useCallback(async (file: File) => {
     setFileName(file.name);
@@ -101,6 +102,20 @@ export default function VoiceRemoval() {
   const download = () => {
     if (!resultUrl) return;
     downloadUrl(resultUrl, `gravelking_instrumental.${resultFormat}`);
+  };
+
+  const buildSunoPrompt = (name: string) => {
+    const base = name.replace(/\.[^.]+$/, "").replace(/[_\-]/g, " ").trim();
+    const words = base.split(" ").filter(w => w.length > 2).slice(0, 4).join(", ");
+    return words
+      ? `${words}, instrumental, no vocals, polished studio mix, radio ready`
+      : "instrumental beat, no vocals, polished studio mix, radio ready";
+  };
+
+  const copySunoPrompt = async () => {
+    await navigator.clipboard.writeText(buildSunoPrompt(fileName));
+    setCopiedSuno(true);
+    setTimeout(() => setCopiedSuno(false), 2000);
   };
 
   const reset = () => {
@@ -218,6 +233,52 @@ export default function VoiceRemoval() {
                     New File
                   </Button>
                 </div>
+
+                {/* Polish in Suno */}
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Wand2 className="w-4 h-4 text-blue-400 shrink-0" />
+                    <p className="text-sm font-semibold text-blue-300">Polish with Suno AI</p>
+                    <Badge variant="outline" className="ml-auto text-[9px] border-blue-400/30 text-blue-400">Bring Your Own Sub</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use your own Suno subscription to remix and polish this instrumental — runs on your account, on your dime.
+                    Download the split, upload it to Suno as a style reference, paste the prompt below.
+                  </p>
+                  <div className="flex items-center gap-2 rounded border border-border/40 bg-background/60 p-2">
+                    <code className="flex-1 truncate text-[11px] font-mono text-muted-foreground">
+                      {buildSunoPrompt(fileName)}
+                    </code>
+                    <button
+                      onClick={() => void copySunoPrompt()}
+                      className="shrink-0 p-1 rounded hover:bg-border/20 transition-colors"
+                      title="Copy prompt"
+                    >
+                      {copiedSuno
+                        ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        : <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />}
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={download} className="flex-1 border-blue-500/30 text-blue-300 hover:bg-blue-500/10">
+                      <Download className="w-3.5 h-3.5 mr-1.5" /> 1. Download Split
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => window.open("https://suno.com/create", "_blank", "noopener")}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> 2. Open Suno →
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Suno plans from $8/mo ·{" "}
+                    <a href="https://suno.com/pricing" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+                      suno.com/pricing
+                    </a>
+                  </p>
+                </div>
+
                 <a
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("Just removed the vocals from my track in seconds using GravelKing Pro 🔥 No plugins, no installs — free to try → gravelkingpro.it.com #MusicProduction #VocalRemoval #BeatMaker")}`}
                   target="_blank"

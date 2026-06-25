@@ -6,3 +6,6 @@ export * from "./analytics";
 export * from "./mlk";
 export * from "./tracks";
 export * from "./email_capture";
+export * from "./conversations";
+export * from "./messages";
+export * from "./lyrics";

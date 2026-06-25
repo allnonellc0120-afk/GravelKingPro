@@ -12,11 +12,8 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const links = [
-    { href: "/", label: "Dashboard" },
-    { href: "/studio", label: "Studio" },
-    { href: "/voice-removal", label: "Voice Removal" },
-    { href: "/mastering", label: "Mastering" },
-    { href: "/convert", label: "Convert" },
+    { href: "/voice-removal", label: "Voice Splitter" },
+    { href: "/songwriting", label: "Songwriting Studio" },
     { href: "/label", label: "Label" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
