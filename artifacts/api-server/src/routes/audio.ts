@@ -398,14 +398,29 @@ audioRouter.post(
 
         if (useNeural) {
           // Neural UVR separation for Node Auditor tier — real AI quality.
-          result = await uvrVocalRemoval(filePath, ext, multiplier);
-          req.log.info(
-            { separator: "UVR_MDXNET", ext },
-            "voice_remove processed via neural UVR-MDX-Net for Node Auditor",
-          );
-          stack = UVR_STACK;
-          model = UVR_MODEL;
-          protocol = UVR_PROTOCOL;
+          // The neural runner (torch/ONNX + downloaded model) is not present in
+          // the published deploy image, so it can fail in production. Rather than
+          // dead-ending the request with a 500, fall back to the always-available
+          // DSP separator so the user still gets a working instrumental.
+          try {
+            result = await uvrVocalRemoval(filePath, ext, multiplier);
+            req.log.info(
+              { separator: "UVR_MDXNET", ext },
+              "voice_remove processed via neural UVR-MDX-Net for Node Auditor",
+            );
+            stack = UVR_STACK;
+            model = UVR_MODEL;
+            protocol = UVR_PROTOCOL;
+          } catch (neuralErr: any) {
+            req.log.warn(
+              { err: neuralErr?.message, separator: "UVR_MDXNET", ext, channels },
+              "neural UVR unavailable; falling back to DSP center extraction",
+            );
+            result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
+            stack = MLK_STACK;
+            model = MLK_KERNEL;
+            protocol = MLK_PROTOCOL;
+          }
         } else {
           // Free/weekly/monthly: instant DSP vocal removal (center-channel extraction).
           result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
