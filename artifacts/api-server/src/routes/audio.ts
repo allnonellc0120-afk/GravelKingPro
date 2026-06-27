@@ -19,6 +19,11 @@ import {
   UVR_MODEL,
   UVR_STACK,
 } from "../gkp-separator";
+import {
+  replicateVoiceRemove,
+  replicateStemSplit,
+  isConfigured as replicateIsConfigured,
+} from "../replicateDemucs";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
@@ -396,41 +401,63 @@ audioRouter.post(
         let model: string;
         let protocol: string;
 
-        if (useNeural) {
-          // Neural UVR separation for Node Auditor tier — real AI quality.
-          // The neural runner (torch/ONNX + downloaded model) is not present in
-          // the published deploy image, so it can fail in production. Rather than
-          // dead-ending the request with a 500, fall back to the always-available
-          // DSP separator so the user still gets a working instrumental.
+        if (replicateIsConfigured()) {
+          // Primary: Replicate Demucs htdemucs — real neural AI separation.
+          // Falls back through UVR (Node Auditor) → DSP so the route never 500s.
+          try {
+            result = await replicateVoiceRemove(filePath, multiplier);
+            stack = result.stack;
+            model = result.model;
+            protocol = result.protocol;
+            req.log.info(
+              { separator: "replicate_demucs_htdemucs", ext },
+              "voice_remove via Replicate Demucs htdemucs",
+            );
+          } catch (replicateErr: any) {
+            req.log.warn(
+              { err: replicateErr?.message, separator: "replicate_demucs" },
+              "Replicate Demucs failed; falling back",
+            );
+            if (useNeural) {
+              try {
+                result = await uvrVocalRemoval(filePath, ext, multiplier);
+                req.log.info({ separator: "UVR_MDXNET", ext }, "voice_remove fallback via UVR");
+                stack = UVR_STACK; model = UVR_MODEL; protocol = UVR_PROTOCOL;
+              } catch {
+                result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
+                stack = MLK_STACK; model = MLK_KERNEL; protocol = MLK_PROTOCOL;
+              }
+            } else {
+              result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
+              req.log.info({ separator: "MLK_v3_DSP", ext }, "voice_remove fallback via DSP");
+              stack = MLK_STACK; model = MLK_KERNEL; protocol = MLK_PROTOCOL;
+            }
+          }
+        } else if (useNeural) {
+          // No Replicate token — Node Auditor tier: UVR → DSP.
           try {
             result = await uvrVocalRemoval(filePath, ext, multiplier);
             req.log.info(
               { separator: "UVR_MDXNET", ext },
-              "voice_remove processed via neural UVR-MDX-Net for Node Auditor",
+              "voice_remove via neural UVR-MDX-Net for Node Auditor",
             );
-            stack = UVR_STACK;
-            model = UVR_MODEL;
-            protocol = UVR_PROTOCOL;
+            stack = UVR_STACK; model = UVR_MODEL; protocol = UVR_PROTOCOL;
           } catch (neuralErr: any) {
             req.log.warn(
               { err: neuralErr?.message, separator: "UVR_MDXNET", ext, channels },
               "neural UVR unavailable; falling back to DSP center extraction",
             );
             result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
-            stack = MLK_STACK;
-            model = MLK_KERNEL;
-            protocol = MLK_PROTOCOL;
+            stack = MLK_STACK; model = MLK_KERNEL; protocol = MLK_PROTOCOL;
           }
         } else {
-          // Free/weekly/monthly: instant DSP vocal removal (center-channel extraction).
+          // No Replicate token — instant DSP vocal removal (center-channel extraction).
           result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
           req.log.info(
             { separator: "MLK_v3_DSP", ext, channels },
-            "voice_remove processed via instant DSP center extraction",
+            "voice_remove via DSP center extraction",
           );
-          stack = MLK_STACK;
-          model = MLK_KERNEL;
-          protocol = MLK_PROTOCOL;
+          stack = MLK_STACK; model = MLK_KERNEL; protocol = MLK_PROTOCOL;
         }
 
         completeAudioJob(fsJobId, { status: "STAGE_1_COMPLETE", stack, model });
@@ -520,16 +547,40 @@ audioRouter.post(
     // ── Stem splitting — Morris Law Kernel v3 (fast local) ───────────────────
     if (mode === "stem_split") {
       try {
-        // Fast in-process MLK v3 band/spatial split — completes in seconds.
         const { channels } = await getAudioInfo(filePath);
-        const mlkResult = await mlkStemSplit(filePath, ext, channels, multiplier);
+        let stemResult;
+        let stemSeparatorLabel = "MLK_v3";
+        let stemModelLabel: string = MLK_KERNEL;
+        let stemProtocolLabel: string = MLK_PROTOCOL;
+
+        if (replicateIsConfigured()) {
+          // Primary: Replicate Demucs htdemucs — real neural 4-stem separation.
+          try {
+            stemResult = await replicateStemSplit(filePath, multiplier);
+            stemSeparatorLabel = "Demucs_htdemucs";
+            stemModelLabel = stemResult.model;
+            stemProtocolLabel = stemResult.protocol;
+            req.log.info({ separator: "replicate_demucs_htdemucs" }, "stem_split via Replicate Demucs htdemucs");
+          } catch (replicateErr: any) {
+            req.log.warn(
+              { err: replicateErr?.message },
+              "Replicate Demucs stem_split failed; falling back to DSP",
+            );
+            stemResult = await mlkStemSplit(filePath, ext, channels, multiplier);
+            req.log.info({ separator: "MLK_v3_DSP" }, "stem_split DSP fallback");
+          }
+        } else {
+          // No Replicate token — instant DSP band/spatial split.
+          stemResult = await mlkStemSplit(filePath, ext, channels, multiplier);
+          req.log.info({ separator: "MLK_v3_DSP" }, "stem_split via DSP (no Replicate token)");
+        }
 
         const event: TelemetryEvent = {
           routing: "local",
-          parity: mlkResult.kernelParity,
+          parity: stemResult.kernelParity,
           efficiency: "1.0000",
           decayRate: "0.0000",
-          sampleCount: String(mlkResult.zipBuffer.length),
+          sampleCount: String(stemResult.zipBuffer.length),
           timestamp: new Date().toISOString(),
         };
         telemetryBus.emit("run", event);
@@ -538,10 +589,10 @@ audioRouter.post(
           db.insert(processRunsTable).values({
             userId: req.user.id,
             routing: "local",
-            parity: mlkResult.kernelParity,
+            parity: stemResult.kernelParity,
             efficiency: 1,
             decayRate: 0,
-            sampleCount: mlkResult.zipBuffer.length,
+            sampleCount: stemResult.zipBuffer.length,
             fileName: req.file.originalname,
           }).catch(() => {});
         }
@@ -558,13 +609,13 @@ audioRouter.post(
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_stems.zip"`);
         res.setHeader("X-GK-Mode", "stem_split");
         res.setHeader("X-GK-Routing", "local");
-        res.setHeader("X-GK-Parity", mlkResult.kernelParity);
-        res.setHeader("X-GK-Stems", mlkResult.stems.join(","));
-        res.setHeader("X-GK-Separator", "MLK_v3");
-        res.setHeader("X-GK-Model", MLK_KERNEL);
-        res.setHeader("X-GK-Protocol", MLK_PROTOCOL);
-        res.setHeader("X-GK-Stack", mlkResult.stack);
-        res.send(mlkResult.zipBuffer);
+        res.setHeader("X-GK-Parity", stemResult.kernelParity);
+        res.setHeader("X-GK-Stems", stemResult.stems.join(","));
+        res.setHeader("X-GK-Separator", stemSeparatorLabel);
+        res.setHeader("X-GK-Model", stemModelLabel);
+        res.setHeader("X-GK-Protocol", stemProtocolLabel);
+        res.setHeader("X-GK-Stack", stemResult.stack);
+        res.send(stemResult.zipBuffer);
         return;
       } catch (err: any) {
         await unlink(filePath).catch(() => {});
