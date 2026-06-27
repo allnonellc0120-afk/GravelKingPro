@@ -5,9 +5,10 @@ import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2 } from "lucide-react";
+import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2, Search } from "lucide-react";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
 import { splitSong, analyzeGuideTiming, SplitError, type TimedLine } from "@/lib/daw/stemTiming";
+import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
 import { downloadBlob } from "@/lib/download";
 
 const DEV_BYPASS_KEY = "gk:dev:studio";
@@ -79,6 +80,10 @@ function VocalBoothInner() {
   const [songsLoading, setSongsLoading] = useState(true);
   const [lyrics, setLyrics] = useState("");
   const [lyricSource, setLyricSource] = useState<string>("");
+  const [lrcQuery, setLrcQuery] = useState("");
+  const [lrcResults, setLrcResults] = useState<LrclibTrack[] | null>(null);
+  const [lrcSearching, setLrcSearching] = useState(false);
+  const [timingSource, setTimingSource] = useState<"lrc" | "energy" | null>(null);
 
   // ── backing track ──
   const [backingFile, setBackingFile] = useState<File | null>(null);
@@ -212,26 +217,65 @@ function VocalBoothInner() {
   const pickSong = useCallback((song: SongDraft) => {
     setLyrics(song.aiDraft ?? "");
     setLyricSource(song.draftId);
-    // New lyrics invalidate any previously computed timing.
     setTimedLines(null);
+    setTimingSource(null);
     setActiveLineIdx(-1);
   }, []);
+
+  const searchLrclib = useCallback(async () => {
+    if (!lrcQuery.trim()) return;
+    setLrcSearching(true);
+    setLrcResults(null);
+    try {
+      const results = await searchLyrics(lrcQuery.trim());
+      setLrcResults(results.slice(0, 8));
+    } catch {
+      toast({ title: "Lyrics search failed", description: "Could not reach lrclib.net", variant: "destructive" });
+    } finally {
+      setLrcSearching(false);
+    }
+  }, [lrcQuery, toast]);
+
+  const pickLrcTrack = useCallback((track: LrclibTrack) => {
+    setLrcResults(null);
+    setLrcQuery("");
+    setActiveLineIdx(-1);
+    activeLineRef.current = -1;
+    if (track.syncedLyrics) {
+      const lrcLines = parseLrc(track.syncedLyrics).filter((l) => l.text.trim());
+      setLyrics(lrcLines.map((l) => l.text).join("\n"));
+      setTimedLines(lrcLines.map((l, i) => ({ idx: i, t: l.timeMs / 1000 })));
+      setTimingSource("lrc");
+      setLyricSource(`lrc:${track.id}`);
+      toast({ title: "Lyrics loaded", description: `${track.trackName} — ${track.artistName} · synced timing` });
+    } else if (track.plainLyrics) {
+      setLyrics(track.plainLyrics);
+      setTimedLines(null);
+      setTimingSource(null);
+      setLyricSource(`lrc:${track.id}`);
+      toast({ title: "Lyrics loaded", description: `${track.trackName} — ${track.artistName} · no synced timing` });
+    }
+  }, [toast]);
 
   const resetGuide = useCallback(() => {
     setGuideVocalBlob(null);
     setTimedLines(null);
+    setTimingSource(null);
     setActiveLineIdx(-1);
     activeLineRef.current = -1;
   }, []);
 
   // Energy-based, approximate timing of lyric lines against the guide vocal.
   const runTiming = useCallback(async (blob: Blob, currentLyrics: string) => {
-    if (!currentLyrics.trim()) { setTimedLines(null); return; }
+    if (!currentLyrics.trim()) { setTimedLines(null); setTimingSource(null); return; }
     setTiming(true);
     try {
-      setTimedLines(await analyzeGuideTiming(blob, currentLyrics.split("\n")));
+      const timed = await analyzeGuideTiming(blob, currentLyrics.split("\n"));
+      setTimedLines(timed);
+      setTimingSource(timed ? "energy" : null);
     } catch {
       setTimedLines(null);
+      setTimingSource(null);
     } finally {
       setTiming(false);
     }
@@ -469,12 +513,58 @@ function VocalBoothInner() {
               )}
             </div>
 
+            {/* lrclib lyrics search */}
+            <div className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Search lrclib.net</div>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={lrcQuery}
+                  onChange={(e) => setLrcQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void searchLrclib(); }}
+                  placeholder="Artist · Song name"
+                  className="flex-1 rounded-lg bg-black/40 border border-border/40 px-3 py-1.5 text-xs text-white/90 placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/40"
+                />
+                <button
+                  onClick={() => void searchLrclib()}
+                  disabled={lrcSearching || !lrcQuery.trim()}
+                  className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black px-3 py-1.5 text-xs font-semibold disabled:opacity-40 flex items-center gap-1"
+                >
+                  {lrcSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              {lrcResults !== null && (
+                lrcResults.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">No results found.</p>
+                ) : (
+                  <ul className="space-y-0.5 max-h-44 overflow-y-auto">
+                    {lrcResults.map((t) => (
+                      <li key={t.id}>
+                        <button
+                          onClick={() => pickLrcTrack(t)}
+                          className="w-full text-left rounded-lg px-2.5 py-1.5 hover:bg-white/5 transition-colors"
+                        >
+                          <div className="text-xs font-medium text-white/90 truncate">{t.trackName}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {t.artistName}{t.albumName ? ` · ${t.albumName}` : ""}
+                            {t.syncedLyrics && <span className="text-amber-500 ml-1">· synced</span>}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              )}
+            </div>
+
             {/* Auto-time lyrics to the guide vocal (energy-based, approximate) */}
             {guideVocalUrl && (
               <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2">
                 <span className="text-[11px] text-muted-foreground leading-snug">
                   {timedLines
-                    ? "Lyrics timed to the guide vocal — energy-based & approximate."
+                    ? timingSource === "lrc"
+                      ? "Precise synced timing from lrclib.net."
+                      : "Lyrics timed to the guide vocal — energy-based & approximate."
                     : "Time your lyric lines to the guide vocal (approximate)."}
                 </span>
                 <Button
@@ -525,7 +615,7 @@ function VocalBoothInner() {
             ) : (
               <textarea
                 value={lyrics}
-                onChange={(e) => { setLyrics(e.target.value); if (timedLines) setTimedLines(null); }}
+                onChange={(e) => { setLyrics(e.target.value); if (timedLines) { setTimedLines(null); setTimingSource(null); } }}
                 placeholder="Paste or pick lyrics here. Section markers like [Verse] / [Chorus] are highlighted while you sing."
                 className="w-full h-[320px] rounded-xl border border-border/40 bg-black/40 p-4 text-sm text-white/90 resize-none focus:outline-none focus:border-amber-500/40 font-mono"
               />

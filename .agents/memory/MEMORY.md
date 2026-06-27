@@ -5,7 +5,8 @@
 - [getUserMedia exact deviceId fallback](getusermedia-exact-fallback.md) — exact deviceId throws OverconstrainedError if device gone; retry without constraint to fall back to default
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
-- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove + stem_split both run instant in-process MLK v3 DSP; never assume 44-byte WAV header on ffmpeg output
+- [Replicate separation provider](replicate-separation.md) — replicateClient.ts + replicateDemucs.ts; voice_remove + stem_split use Replicate htdemucs as primary, DSP always fallback
+- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove + stem_split: Replicate Demucs primary (REPLICATE_API_TOKEN), DSP fallback; never assume 44-byte WAV header on ffmpeg output
 - [Voice removal CPU neural not viable](voice-removal-cpu-neural.md) — CPU neural ~7x realtime + torch cu130 too big → prod silently faked success; voice_remove now routes direct to honest DSP, real AI deferred to paid cloud GPU
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
@@ -36,5 +37,5 @@
 - [Mobile audio result handling](mobile-audio-result-handling.md) — native can't use object URLs / Linking blob:; write bytes to expo-file-system cache, play via expo-av, share via expo-sharing
 - [DAW DSP accuracy](daw-dsp-accuracy.md) — EQ/plugins are RBJ-correct except Gate (it's a downward compressor, not a real gate; needs AudioWorklet); stem split is band-split+center-cancel, heavy midrange bleed, not true separation
 - [Web iOS download + playback](web-ios-download-playback.md) — web downloads must use anchor download attr via lib/download.ts (never window.open → opens in 3rd-party app); Web Audio play handlers must await ctx.resume() inside the gesture or iOS plays silently; a 2nd synced <audio>.play() must launch in the same gesture (Promise.allSettled), not after an await
-- [Vocal Booth karaoke invariants](vocal-booth-karaoke.md) — guide vocal NEVER enters the mixdown export (instrumental + recorded vocal only); lyric timing is energy-based & approximate, never claim transcription/alignment
+- [Vocal Booth karaoke invariants](vocal-booth-karaoke.md) — guide vocal NEVER in mixdown; lrclib search gives ms-accurate LRC sync (label "Precise synced timing"); energy-based is honest fallback (label "approximate")
 - [Studio library Firestore linkage](studio-library-firestore.md) — song_drafts must key by PG project id (not random draftId) or certification updates a ghost doc; paid artifact-minting (IP cert) must verify server-side, not UI-only
