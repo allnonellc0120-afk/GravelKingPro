@@ -1,15 +1,24 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Zap, Menu, X, User, LogIn } from "lucide-react";
+import { Zap, Menu, X, User, LogIn, Crown, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
 
+const TIER_LABEL: Record<string, { label: string; className: string }> = {
+  weekly:       { label: "Weekly",       className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+  monthly:      { label: "Pro",          className: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  node_auditor: { label: "Node Auditor", className: "bg-amber-500/20 text-amber-300 border-amber-400/40" },
+};
+
 export function Layout({ children, noPadding }: { children: ReactNode; noPadding?: boolean }) {
   const [location] = useLocation();
-  const { isPro, isDeveloper } = useAppState();
+  const { isPro, isDeveloper, tier } = useAppState();
   const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const tierInfo = tier ? TIER_LABEL[tier] : null;
+  const showUpgradeNudge = !tier || tier === "weekly";
 
   const links = [
     { href: "/voice-removal", label: "Voice Splitter" },
@@ -59,6 +68,18 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
               Download
             </Link>
 
+            {/* Upgrade nudge — only for free/weekly users */}
+            {showUpgradeNudge && (
+              <Link
+                href="/pricing"
+                className="flex items-center gap-1 text-xs font-semibold text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1.5 rounded-md transition-colors"
+              >
+                <Crown className="w-3 h-3" />
+                {!tier ? "Upgrade" : "Go Pro"}
+                <ArrowRight className="w-3 h-3 ml-0.5" />
+              </Link>
+            )}
+
             {/* User avatar / sign in */}
             {user ? (
               <Link href="/account">
@@ -74,9 +95,16 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
                       {initials}
                     </div>
                   )}
-                  <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors hidden lg:block">
-                    {displayName}
-                  </span>
+                  <div className="hidden lg:flex flex-col items-start">
+                    <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors leading-tight">
+                      {displayName}
+                    </span>
+                    {tierInfo && (
+                      <span className={`text-[9px] font-bold border rounded px-1.5 leading-4 mt-0.5 ${tierInfo.className}`}>
+                        {tierInfo.label}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Link>
             ) : (
@@ -172,6 +200,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
           <div className="flex items-center gap-4">
             <Link href="/label" className="hover:text-amber-500 transition-colors">Label</Link>
             <Link href="/library" className="hover:text-amber-500 transition-colors">Library</Link>
+            <Link href="/pitch" className="hover:text-amber-500 transition-colors">IP Embed</Link>
             <Link href="/contact" className="hover:text-amber-500 transition-colors">Contact</Link>
             <Link href="/download" className="hover:text-amber-500 transition-colors">Download</Link>
             <Link href="/pricing" className="hover:text-amber-500 transition-colors">Pricing</Link>
