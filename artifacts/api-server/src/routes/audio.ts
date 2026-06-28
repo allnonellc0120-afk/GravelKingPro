@@ -269,7 +269,14 @@ audioRouter.post(
     // If the upload is a video container, extract the audio stream to WAV first.
     // This prevents the UVR Python runner from hanging on MP4/MOV/etc files
     // (it only speaks audio formats). ffmpeg handles video extraction in seconds.
-    const VIDEO_CONTAINER_EXTS = new Set(["mp4","mov","m4v","avi","mkv","webm","wmv","flv","m4a","aac","ogg","opus","wma","flac"]);
+    // Pre-convert every non-WAV format to 44.1 kHz stereo WAV so that:
+    //   (a) torchaudio on Cloud Run can always decode the input
+    //   (b) the DSP fallback's 5 parallel ffmpeg processes each read a WAV
+    //       instead of decoding MP3/AAC/FLAC 5× in parallel (much faster)
+    const VIDEO_CONTAINER_EXTS = new Set([
+      "mp4","mov","m4v","avi","mkv","webm","wmv","flv",
+      "mp3","m4a","aac","ogg","oga","opus","wma","flac","aiff","au",
+    ]);
     if (VIDEO_CONTAINER_EXTS.has(ext.toLowerCase())) {
       const wavId = randomUUID();
       const wavPath = `/tmp/gk_vid2aud_${wavId}.wav`;
