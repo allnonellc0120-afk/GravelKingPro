@@ -269,7 +269,7 @@ audioRouter.post(
     // If the upload is a video container, extract the audio stream to WAV first.
     // This prevents the UVR Python runner from hanging on MP4/MOV/etc files
     // (it only speaks audio formats). ffmpeg handles video extraction in seconds.
-    const VIDEO_CONTAINER_EXTS = new Set(["mp4","mov","m4v","avi","mkv","webm","wmv","flv"]);
+    const VIDEO_CONTAINER_EXTS = new Set(["mp4","mov","m4v","avi","mkv","webm","wmv","flv","m4a","aac","ogg","opus","wma","flac"]);
     if (VIDEO_CONTAINER_EXTS.has(ext.toLowerCase())) {
       const wavId = randomUUID();
       const wavPath = `/tmp/gk_vid2aud_${wavId}.wav`;
