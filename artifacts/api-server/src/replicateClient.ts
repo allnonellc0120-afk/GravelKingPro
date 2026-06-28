@@ -14,14 +14,49 @@ export function isConfigured(): boolean {
   return Boolean(getToken());
 }
 
-async function replicateFetch(path: string, opts: RequestInit = {}): Promise<Response> {
+// Default per-request network timeout. Every Replicate HTTP call is bounded by
+// an AbortController so a stalled connection (upload, version GET, prediction
+// create, poll GET) can never hang the route + hold a concurrency slot — it
+// throws, the caller catches, and we fall back to DSP. The overall poll loop
+// has its own (longer) deadline on top of this per-request bound.
+const REPLICATE_FETCH_TIMEOUT_MS = 30_000;
+const UPLOAD_TIMEOUT_MS = 90_000; // large multipart uploads need more headroom
+
+/**
+ * fetch() with a hard AbortController deadline. On timeout it throws a clear
+ * error (not a silent hang) so callers fall back to DSP.
+ */
+async function fetchWithTimeout(
+  url: string,
+  opts: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(`Replicate request timed out after ${timeoutMs}ms: ${url}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function replicateFetch(
+  path: string,
+  opts: RequestInit = {},
+  timeoutMs = REPLICATE_FETCH_TIMEOUT_MS,
+): Promise<Response> {
   const token = getToken();
   if (!token) throw new Error("REPLICATE_API_TOKEN is not set");
   const headers: Record<string, string> = {
     Authorization: `Token ${token}`,
     ...(opts.headers as Record<string, string> ?? {}),
   };
-  return fetch(`${REPLICATE_BASE}${path}`, { ...opts, headers });
+  return fetchWithTimeout(`${REPLICATE_BASE}${path}`, { ...opts, headers }, timeoutMs);
 }
 
 /**
@@ -39,11 +74,15 @@ export async function uploadFile(
   const form = new FormData();
   form.append("content", new Blob([new Uint8Array(buf)], { type: mimeType }), filename);
 
-  const res = await fetch(`${REPLICATE_BASE}/files`, {
-    method: "POST",
-    headers: { Authorization: `Token ${token}` },
-    body: form,
-  });
+  const res = await fetchWithTimeout(
+    `${REPLICATE_BASE}/files`,
+    {
+      method: "POST",
+      headers: { Authorization: `Token ${token}` },
+      body: form,
+    },
+    UPLOAD_TIMEOUT_MS,
+  );
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -61,63 +100,154 @@ export async function uploadFile(
   return url;
 }
 
+// Low-credit Replicate accounts get prediction creation throttled to a tiny
+// burst (6/min, burst 1) with a ~10s reset window. The throttle is transient:
+// a single isolated request succeeds. So on 429 we wait out the window
+// (respecting the server's retry_after) and retry instead of giving up — only
+// falling back to DSP if the throttle won't clear after several attempts.
+const MAX_429_RETRIES = 3;
+const MAX_RETRY_WAIT_MS = 15_000;
+const DEFAULT_RETRY_WAIT_MS = 6_000;
+
+// Cache the resolved latest version hash per model so we don't re-fetch the
+// model document on every request (the demucs model has no active deployment,
+// so every call would otherwise pay an extra round-trip).
+const versionCache = new Map<string, string>();
+
+function parseRetryAfterMs(res: Response, body: string): number {
+  const hdr = res.headers.get("retry-after");
+  if (hdr) {
+    const secs = Number(hdr);
+    if (Number.isFinite(secs) && secs > 0) {
+      return Math.min(secs * 1000, MAX_RETRY_WAIT_MS);
+    }
+  }
+  try {
+    const j = JSON.parse(body) as { retry_after?: number };
+    if (typeof j.retry_after === "number" && j.retry_after > 0) {
+      return Math.min(j.retry_after * 1000, MAX_RETRY_WAIT_MS);
+    }
+  } catch {
+    /* body wasn't JSON — use default */
+  }
+  return DEFAULT_RETRY_WAIT_MS;
+}
+
 /**
- * Create a prediction, trying the deployment endpoint first.
- * If the model has no active deployment (404), automatically fetches the
- * latest version hash and falls back to the version-based predictions endpoint.
- * Returns the prediction ID.
+ * Thrown ONLY when a model genuinely has no released version (a deployment-only
+ * model). Distinct from network/auth/not-found errors so `createPrediction` can
+ * route to the deployment endpoint exclusively in that case — never on a
+ * transient failure (which would reintroduce the 404+burst-token bug).
+ */
+class NoReleasedVersionError extends Error {}
+
+async function resolveLatestVersion(owner: string, name: string): Promise<string> {
+  const key = `${owner}/${name}`;
+  const cached = versionCache.get(key);
+  if (cached) return cached;
+
+  const modelRes = await replicateFetch(`/models/${owner}/${name}`);
+  if (!modelRes.ok) {
+    const body = await modelRes.text().catch(() => "");
+    throw new Error(`Replicate model ${owner}/${name} not found (${modelRes.status}): ${body}`);
+  }
+  const modelData = (await modelRes.json()) as { latest_version?: { id?: string } };
+  const version = modelData.latest_version?.id;
+  if (!version) {
+    throw new NoReleasedVersionError(`Replicate model ${owner}/${name} has no released version`);
+  }
+  versionCache.set(key, version);
+  return version;
+}
+
+/**
+ * POST a prediction-creation request (produced by `makeRequest`) and return the
+ * prediction ID, retrying on a 429 throttle (waiting out the reset window).
+ * `makeRequest` is a thunk so each retry issues a fresh request.
+ */
+async function postPredictionWithRetry(
+  makeRequest: () => Promise<Response>,
+): Promise<string> {
+  let lastBody = "";
+
+  for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+    const res = await makeRequest();
+
+    if (res.status === 429) {
+      lastBody = await res.text().catch(() => "");
+      if (attempt < MAX_429_RETRIES) {
+        const waitMs = parseRetryAfterMs(res, lastBody) + 1_000;
+        await new Promise<void>((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw new Error(
+        `Replicate createPrediction throttled (429) after ${attempt + 1} attempts: ${lastBody}`,
+      );
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Replicate createPrediction failed (${res.status}): ${body}`);
+    }
+
+    const data = (await res.json()) as { id?: string; error?: string };
+    if (data.error) throw new Error(`Replicate prediction error: ${data.error}`);
+    if (!data.id) throw new Error("Replicate createPrediction: no id in response");
+    return data.id;
+  }
+
+  throw new Error(`Replicate createPrediction throttled (429): ${lastBody}`);
+}
+
+/**
+ * Create a prediction and return its ID, retrying on a 429 throttle.
+ *
+ * IMPORTANT: we resolve the model's latest version with a GET (which does NOT
+ * count against the prediction-creation rate limit) and POST directly to the
+ * versioned `/predictions` endpoint. We deliberately do NOT hit the deployment
+ * endpoint (`/models/{owner}/{name}/predictions`): for a model with no active
+ * deployment it returns 404 *after* consuming a prediction-creation rate token.
+ * Under the low-credit burst-1 throttle that throwaway 404 ate the only allowed
+ * token, so the real versioned POST that followed always hit a 429 and forced a
+ * premature DSP fallback. One prediction-creation POST per attempt = no
+ * self-inflicted throttle.
+ *
+ * If the model has no released version (a deployment-only model), we fall back
+ * to the deployment endpoint.
  */
 export async function createPrediction(
   owner: string,
   name: string,
   input: Record<string, unknown>,
 ): Promise<string> {
-  const res = await replicateFetch(`/models/${owner}/${name}/predictions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input }),
-  });
-
-  if (res.status === 404) {
-    // Model has no active deployment — resolve latest version hash and use
-    // the version-based predictions endpoint instead.
-    const modelRes = await replicateFetch(`/models/${owner}/${name}`);
-    if (!modelRes.ok) {
-      const body = await modelRes.text().catch(() => "");
-      throw new Error(`Replicate model ${owner}/${name} not found (${modelRes.status}): ${body}`);
+  let version: string;
+  try {
+    version = await resolveLatestVersion(owner, name);
+  } catch (err) {
+    if (!(err instanceof NoReleasedVersionError)) {
+      // Transient failure (network/auth/not-found/timeout). Do NOT hit the
+      // deployment endpoint — for a versioned model that 404s and burns the
+      // burst token. Propagate so the route falls back to DSP.
+      throw err;
     }
-    const modelData = (await modelRes.json()) as { latest_version?: { id?: string } };
-    const version = modelData.latest_version?.id;
-    if (!version) {
-      throw new Error(`Replicate model ${owner}/${name} has no released version`);
-    }
+    // Genuinely deployment-only model. Use the deployment endpoint directly
+    // (with retry); there's no throwaway 404 in this path.
+    return postPredictionWithRetry(() =>
+      replicateFetch(`/models/${owner}/${name}/predictions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      }),
+    );
+  }
 
-    const vRes = await replicateFetch(`/predictions`, {
+  return postPredictionWithRetry(() =>
+    replicateFetch(`/predictions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ version, input }),
-    });
-
-    if (!vRes.ok) {
-      const body = await vRes.text().catch(() => "");
-      throw new Error(`Replicate createPrediction (versioned) failed (${vRes.status}): ${body}`);
-    }
-
-    const vData = (await vRes.json()) as { id?: string; error?: string };
-    if (vData.error) throw new Error(`Replicate prediction error: ${vData.error}`);
-    if (!vData.id) throw new Error("Replicate createPrediction: no id in response");
-    return vData.id;
-  }
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Replicate createPrediction failed (${res.status}): ${body}`);
-  }
-
-  const data = (await res.json()) as { id?: string; error?: string };
-  if (data.error) throw new Error(`Replicate prediction error: ${data.error}`);
-  if (!data.id) throw new Error("Replicate createPrediction: no id in response");
-  return data.id;
+    }),
+  );
 }
 
 /**

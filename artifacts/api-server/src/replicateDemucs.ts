@@ -25,10 +25,26 @@ export const REPLICATE_MODEL    = "htdemucs";
 export const REPLICATE_KERNEL   = "MLK_v3";
 export const REPLICATE_STACK    = `${REPLICATE_PROTOCOL}+Demucs_htdemucs+${REPLICATE_KERNEL}`;
 
+// Stem downloads are bounded by an AbortController so a stalled delivery URL
+// can't hang the route + hold a concurrency slot; on timeout it throws → the
+// caller falls back to DSP.
+const STEM_DOWNLOAD_TIMEOUT_MS = 60_000;
+
 async function downloadToBuffer(url: string): Promise<Buffer> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Demucs stem download failed (${res.status}): ${url}`);
-  return Buffer.from(await res.arrayBuffer());
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), STEM_DOWNLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`Demucs stem download failed (${res.status}): ${url}`);
+    return Buffer.from(await res.arrayBuffer());
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(`Demucs stem download timed out after ${STEM_DOWNLOAD_TIMEOUT_MS}ms: ${url}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function parseStemUrls(output: unknown): Record<string, string> {
@@ -66,7 +82,11 @@ export async function replicateVoiceRemove(
   const output = await runModel(
     "ryan5453",
     "demucs",
-    { audio: audioUrl, model: "htdemucs", two_stems: "vocals", output_format: "wav" },
+    // `stem: "vocals"` puts the model in two-stem mode → returns `vocals` +
+    // `no_vocals` (the instrumental). NOTE: the param is `stem`, NOT `two_stems`
+    // (which this model ignores, defaulting to a full 4-stem split that has no
+    // instrumental key).
+    { audio: audioUrl, model: "htdemucs", stem: "vocals", output_format: "wav" },
     // 60 s: if Demucs hasn't responded, fall back to DSP immediately so the HTTP
     // connection stays well within Replit's 4-min proxy timeout / SIGTERM window.
     60_000,
