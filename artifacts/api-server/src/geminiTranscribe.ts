@@ -132,9 +132,12 @@ export async function transcribeWithGemini(
     signal: AbortSignal.timeout(90_000),
   });
 
+  // Always read as text first — avoids res.json() crashing on chunked /
+  // non-JSON Vertex AI error responses before our own catch can handle it.
+  const bodyText = await res.text().catch(() => "");
+
   if (!res.ok) {
-    const errText = await res.text().catch(() => `HTTP ${res.status}`);
-    throw new Error(`Vertex AI Gemini ${res.status}: ${errText.slice(0, 400)}`);
+    throw new Error(`Vertex AI Gemini ${res.status}: ${bodyText.slice(0, 400)}`);
   }
 
   type VertexResponse = {
@@ -142,7 +145,12 @@ export async function transcribeWithGemini(
       content?: { parts?: Array<{ text?: string }> };
     }>;
   };
-  const result  = await res.json() as VertexResponse;
+  let result: VertexResponse = {};
+  try {
+    result = JSON.parse(bodyText) as VertexResponse;
+  } catch {
+    throw new Error(`Vertex AI returned non-JSON: ${bodyText.slice(0, 200)}`);
+  }
   const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
   let segments: TranscriptSegment[] = [];
