@@ -62,8 +62,9 @@ export async function uploadFile(
 }
 
 /**
- * Create a prediction via the new-style model endpoint
- * (no version hash required — uses the latest deployment).
+ * Create a prediction, trying the deployment endpoint first.
+ * If the model has no active deployment (404), automatically fetches the
+ * latest version hash and falls back to the version-based predictions endpoint.
  * Returns the prediction ID.
  */
 export async function createPrediction(
@@ -76,6 +77,37 @@ export async function createPrediction(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ input }),
   });
+
+  if (res.status === 404) {
+    // Model has no active deployment — resolve latest version hash and use
+    // the version-based predictions endpoint instead.
+    const modelRes = await replicateFetch(`/models/${owner}/${name}`);
+    if (!modelRes.ok) {
+      const body = await modelRes.text().catch(() => "");
+      throw new Error(`Replicate model ${owner}/${name} not found (${modelRes.status}): ${body}`);
+    }
+    const modelData = (await modelRes.json()) as { latest_version?: { id?: string } };
+    const version = modelData.latest_version?.id;
+    if (!version) {
+      throw new Error(`Replicate model ${owner}/${name} has no released version`);
+    }
+
+    const vRes = await replicateFetch(`/predictions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version, input }),
+    });
+
+    if (!vRes.ok) {
+      const body = await vRes.text().catch(() => "");
+      throw new Error(`Replicate createPrediction (versioned) failed (${vRes.status}): ${body}`);
+    }
+
+    const vData = (await vRes.json()) as { id?: string; error?: string };
+    if (vData.error) throw new Error(`Replicate prediction error: ${vData.error}`);
+    if (!vData.id) throw new Error("Replicate createPrediction: no id in response");
+    return vData.id;
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
