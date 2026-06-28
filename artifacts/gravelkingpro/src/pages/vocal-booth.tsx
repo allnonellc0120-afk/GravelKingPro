@@ -10,6 +10,7 @@ import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBooth
 import { splitSong, analyzeGuideTiming, SplitError, type TimedLine } from "@/lib/daw/stemTiming";
 import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
 import { downloadBlob } from "@/lib/download";
+import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
 
 const DEV_BYPASS_KEY = "gk:dev:studio";
 
@@ -1143,6 +1144,15 @@ function VocalBoothInner() {
                   <audio ref={guideVocalRef} src={guideVocalUrl ?? undefined} preload="auto" />
                 </>
               )}
+            </div>
+
+            {/* ── Live Vocal Monitoring — hear yourself through reverb/echo presets ── */}
+            <div className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Live Monitoring</div>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Pick a preset to hear your voice live through effects while you sing. Tap again to stop.
+              </p>
+              <LiveVocalMonitor />
             </div>
 
             {/* Recorder */}

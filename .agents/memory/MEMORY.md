@@ -5,11 +5,9 @@
 - [getUserMedia exact deviceId fallback](getusermedia-exact-fallback.md) — exact deviceId throws OverconstrainedError if device gone; retry without constraint to fall back to default
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
-- [Replicate separation provider](replicate-separation.md) — replicateClient.ts + replicateDemucs.ts; voice_remove + stem_split use Replicate htdemucs as primary, DSP always fallback
-- [Replicate timeout → DSP fallback](replicate-timeout-fallback.md) — voice_remove 60 s / stem_split 90 s; longer timeouts fill concurrency slots during SIGTERM → "Processing failed" UI crash
-- [Replicate Demucs prediction gotchas](replicate-demucs-prediction.md) — version-GET+single /predictions POST (deployment endpoint 404 burns burst token→429→DSP); `stem` not `two_stems`; bound EVERY fetch not just polling
-- [Whisper transcription](whisper-transcription.md) — replicateWhisper.ts + POST /api/audio/transcribe; vaibhavs10/incredibly-fast-whisper primary → openai/whisper fallback; tap-to-time manual mode also in vocal booth
-- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove + stem_split: Replicate Demucs primary (REPLICATE_API_TOKEN), DSP fallback; never assume 44-byte WAV header on ffmpeg output
+- [Vertex AI Gemini transcription](vertex-ai-gemini-transcription.md) — POST /api/audio/transcribe now uses GCP_SERVICE_ACCOUNT → Vertex AI gemini-2.0-flash; same credential pattern as Firestore; no Replicate/Replit proxy
+- [Cloud Run Demucs separation](cloud-run-demucs.md) — voice_remove + stem_split route to DEMUCS_URL (Cloud Run) via demucsCloudRun.ts; auth via REMOTE_KERNEL_API_KEY; python-api/main.py has /separate endpoint; DSP always fallback
+- [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove + stem_split: Cloud Run Demucs primary (DEMUCS_URL), DSP fallback; never assume 44-byte WAV header on ffmpeg output
 - [Voice removal CPU neural not viable](voice-removal-cpu-neural.md) — CPU neural ~7x realtime + torch cu130 too big → prod silently faked success; voice_remove now routes direct to honest DSP, real AI deferred to paid cloud GPU
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)

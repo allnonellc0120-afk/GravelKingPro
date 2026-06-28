@@ -19,12 +19,12 @@ import {
   UVR_MODEL,
   UVR_STACK,
 } from "../gkp-separator";
+import { transcribeWithGemini } from "../geminiTranscribe";
 import {
-  replicateVoiceRemove,
-  replicateStemSplit,
-  isConfigured as replicateIsConfigured,
-} from "../replicateDemucs";
-import { transcribeAudio } from "../replicateWhisper";
+  demucsVoiceRemove,
+  demucsStemSplit,
+  isDemucsConfigured,
+} from "../demucsCloudRun";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
@@ -404,38 +404,27 @@ audioRouter.post(
         let model: string;
         let protocol: string;
 
-        if (replicateIsConfigured()) {
-          // Primary: Replicate Demucs htdemucs — real neural AI separation.
-          // Falls back through UVR (Node Auditor) → DSP so the route never 500s.
+        if (isDemucsConfigured()) {
+          // Primary: Cloud Run Demucs htdemucs — real neural AI separation.
+          // Falls back to DSP so the route never 500s.
           try {
-            result = await replicateVoiceRemove(filePath, multiplier);
+            result = await demucsVoiceRemove(filePath, multiplier);
             routing = "remote";
             stack = result.stack;
             model = result.model;
             protocol = result.protocol;
             req.log.info(
-              { separator: "replicate_demucs_htdemucs", ext },
-              "voice_remove via Replicate Demucs htdemucs",
+              { separator: "cloudrun_demucs_htdemucs", ext },
+              "voice_remove via Cloud Run Demucs htdemucs",
             );
-          } catch (replicateErr: any) {
+          } catch (demucsErr: any) {
             req.log.warn(
-              { err: replicateErr?.message, separator: "replicate_demucs" },
-              "Replicate Demucs failed; falling back",
+              { err: demucsErr?.message, separator: "cloudrun_demucs" },
+              "Cloud Run Demucs failed; falling back to DSP",
             );
-            if (useNeural) {
-              try {
-                result = await uvrVocalRemoval(filePath, ext, multiplier);
-                req.log.info({ separator: "UVR_MDXNET", ext }, "voice_remove fallback via UVR");
-                stack = UVR_STACK; model = UVR_MODEL; protocol = UVR_PROTOCOL;
-              } catch {
-                result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
-                stack = MLK_STACK; model = MLK_KERNEL; protocol = MLK_PROTOCOL;
-              }
-            } else {
-              result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
-              req.log.info({ separator: "MLK_v3_DSP", ext }, "voice_remove fallback via DSP");
-              stack = MLK_STACK; model = MLK_KERNEL; protocol = MLK_PROTOCOL;
-            }
+            result = await mlkVocalRemoval(filePath, ext, channels, multiplier);
+            req.log.info({ separator: "MLK_v3_DSP", ext }, "voice_remove fallback via DSP");
+            stack = MLK_STACK; model = MLK_KERNEL; protocol = MLK_PROTOCOL;
           }
         } else if (useNeural) {
           // No Replicate token — Node Auditor tier: UVR → DSP.
@@ -564,27 +553,27 @@ audioRouter.post(
         // Demucs ran; "local" for the in-process DSP fallback.
         let stemRouting: "local" | "remote" = "local";
 
-        if (replicateIsConfigured()) {
-          // Primary: Replicate Demucs htdemucs — real neural 4-stem separation.
+        if (isDemucsConfigured()) {
+          // Primary: Cloud Run Demucs htdemucs — real neural 4-stem separation.
           try {
-            stemResult = await replicateStemSplit(filePath, multiplier);
+            stemResult = await demucsStemSplit(filePath, multiplier);
             stemRouting = "remote";
             stemSeparatorLabel = "Demucs_htdemucs";
             stemModelLabel = stemResult.model;
             stemProtocolLabel = stemResult.protocol;
-            req.log.info({ separator: "replicate_demucs_htdemucs" }, "stem_split via Replicate Demucs htdemucs");
-          } catch (replicateErr: any) {
+            req.log.info({ separator: "cloudrun_demucs_htdemucs" }, "stem_split via Cloud Run Demucs htdemucs");
+          } catch (demucsErr: any) {
             req.log.warn(
-              { err: replicateErr?.message },
-              "Replicate Demucs stem_split failed; falling back to DSP",
+              { err: demucsErr?.message },
+              "Cloud Run Demucs stem_split failed; falling back to DSP",
             );
             stemResult = await mlkStemSplit(filePath, ext, channels, multiplier);
             req.log.info({ separator: "MLK_v3_DSP" }, "stem_split DSP fallback");
           }
         } else {
-          // No Replicate token — instant DSP band/spatial split.
+          // No Cloud Run Demucs configured — instant DSP band/spatial split.
           stemResult = await mlkStemSplit(filePath, ext, channels, multiplier);
-          req.log.info({ separator: "MLK_v3_DSP" }, "stem_split via DSP (no Replicate token)");
+          req.log.info({ separator: "MLK_v3_DSP" }, "stem_split via DSP (no Cloud Run)");
         }
 
         const event: TelemetryEvent = {
@@ -706,20 +695,15 @@ audioRouter.post(
       return;
     }
     const filePath = req.file.path;
-    if (!replicateIsConfigured()) {
-      await unlink(filePath).catch(() => {});
-      res.status(503).json({ error: "Transcription is not configured on this server." });
-      return;
-    }
     try {
-      const result = await transcribeAudio(filePath);
+      const result = await transcribeWithGemini(filePath);
       res.json(result);
     } catch (err: any) {
-      // Degrade gracefully: never surface raw Replicate errors (e.g. 429 credit
-      // throttling) to the user. The client falls back to manual Tap-to-Time.
+      // Degrade gracefully: never surface raw Vertex AI errors to the user.
+      // The client falls back to manual Tap-to-Time.
       const raw = String(err?.message ?? "");
-      const busy = /429|throttl|rate limit|credit|quota/i.test(raw);
-      req.log.warn({ err: raw }, "transcription unavailable; client falls back to tap-to-time");
+      const busy = /quota|limit|429|throttl/i.test(raw);
+      req.log.warn({ err: raw }, "Gemini transcription unavailable; client falls back to tap-to-time");
       res.status(502).json({
         error: busy
           ? "Auto-transcribe is busy right now. Use Tap-to-Time below to sync your lyrics."

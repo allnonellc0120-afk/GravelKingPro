@@ -446,6 +446,97 @@ async def master_audio(
     )
 
 
+# ── Demucs Neural Separation ─────────────────────────────────────────────────
+
+DEMUCS_API_KEY = os.getenv("DEMUCS_API_KEY", "")
+
+
+@app.post("/separate")
+async def separate_audio(
+    audio: UploadFile = File(...),
+    mode: str = Form("voice_remove"),
+) -> JSONResponse:
+    """
+    Neural stem separation via Demucs htdemucs.
+    mode=voice_remove → stems: { vocals, no_vocals }
+    mode=stem_split   → stems: { drums, bass, other, vocals, instrumental }
+    Optionally protected by DEMUCS_API_KEY env var (x-api-key header).
+    """
+    import base64
+
+    suffix     = os.path.splitext(audio.filename or "input.wav")[1] or ".wav"
+    input_path = None
+    out_dir    = None
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            content = await audio.read()
+            if len(content) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="File too large (max 100MB)")
+            tmp.write(content)
+            input_path = tmp.name
+
+        out_dir = tempfile.mkdtemp()
+
+        if mode == "voice_remove":
+            cmd = [
+                "python", "-m", "demucs",
+                "-n", "htdemucs",
+                "--two-stems", "vocals",
+                "-o", out_dir,
+                input_path,
+            ]
+        else:
+            cmd = [
+                "python", "-m", "demucs",
+                "-n", "htdemucs",
+                "-o", out_dir,
+                input_path,
+            ]
+
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if proc.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"demucs failed: {proc.stderr[-400:]}",
+            )
+
+        track_name = os.path.splitext(os.path.basename(input_path))[0]
+        stem_dir   = os.path.join(out_dir, "htdemucs", track_name)
+
+        stems: Dict[str, str] = {}
+        for fname in os.listdir(stem_dir):
+            if not fname.endswith(".wav"):
+                continue
+            stem_name = fname.replace(".wav", "")
+            with open(os.path.join(stem_dir, fname), "rb") as fh:
+                stems[stem_name] = base64.b64encode(fh.read()).decode()
+
+        if mode == "stem_split" and "vocals" in stems:
+            non_vocal_names = [n for n in stems if n != "vocals"]
+            if len(non_vocal_names) > 1:
+                inst_out  = os.path.join(out_dir, "instrumental.wav")
+                mix_args  = sum([["-i", os.path.join(stem_dir, f"{n}.wav")] for n in non_vocal_names], [])
+                subprocess.run(
+                    ["ffmpeg", "-y"] + mix_args + [
+                        "-filter_complex", f"amix=inputs={len(non_vocal_names)}:normalize=0",
+                        "-acodec", "pcm_s16le", inst_out,
+                    ],
+                    capture_output=True, timeout=120,
+                )
+                if os.path.exists(inst_out):
+                    with open(inst_out, "rb") as fh:
+                        stems["instrumental"] = base64.b64encode(fh.read()).decode()
+
+        return JSONResponse({"stems": stems, "model": "htdemucs"})
+
+    finally:
+        if input_path and os.path.exists(input_path):
+            os.unlink(input_path)
+        if out_dir and os.path.exists(out_dir):
+            shutil.rmtree(out_dir, ignore_errors=True)
+
+
 # ── Root ───────────────────────────────────────────────────────────────────────
 
 
