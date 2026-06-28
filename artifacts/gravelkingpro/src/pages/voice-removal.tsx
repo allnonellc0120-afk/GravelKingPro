@@ -1,68 +1,199 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Download, Upload, Mic2, CheckCircle2, AlertCircle, FileVideo, Wand2, Copy, Check, ExternalLink } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import {
+  Download, Upload, Mic2, CheckCircle2, AlertCircle,
+  FileText, Wand2, Scissors, Play, Pause, Volume2, VolumeX,
+  Crown, ArrowRight, RefreshCcw, Send,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
-import { downloadUrl } from "@/lib/download";
-import { Link } from "wouter";
-import { EmailCapture } from "@/components/email-capture";
+import { downloadBlob } from "@/lib/download";
+import { Link, useLocation } from "wouter";
+import { unzipSync } from "fflate";
 
-type State = "idle" | "uploading" | "processing" | "done" | "error";
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-const VIDEO_EXTS = ["mp4", "mov", "m4v", "avi", "mkv", "webm", "wmv", "flv"];
-function isVideoFile(name: string) {
-  return VIDEO_EXTS.some((e) => name.toLowerCase().endsWith(`.${e}`));
+type SplitStage = "idle" | "uploading" | "analyzing" | "splitting" | "lyrics" | "done" | "error";
+
+interface StemPair {
+  vocalBlob: Blob;
+  instrBlob: Blob;
+  vocalUrl: string;
+  instrUrl: string;
+  lyrics: string;
+  filename: string;
+  remaining: number | null;
 }
 
+// ── Stage config ───────────────────────────────────────────────────────────────
+
+interface StageInfo {
+  key: SplitStage;
+  label: string;
+  detail: string;
+  Icon: React.ElementType;
+}
+
+const STAGES: StageInfo[] = [
+  { key: "uploading",  label: "Upload",           detail: "Sending your track…",           Icon: Upload   },
+  { key: "analyzing",  label: "AI Analyzing",      detail: "Reading audio format & length…", Icon: Wand2    },
+  { key: "splitting",  label: "Splitting",          detail: "Neural stem separation running…",Icon: Scissors },
+  { key: "lyrics",     label: "Lyric Prediction",  detail: "Transcribing vocal stem…",       Icon: FileText },
+];
+
+const ACTIVE_STAGES = new Set<SplitStage>(["uploading","analyzing","splitting","lyrics"]);
+
+// ── Progress bar for a running stage ─────────────────────────────────────────
+
+function StageBar({ stage }: { stage: SplitStage }) {
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    setPct(0);
+    const durations: Partial<Record<SplitStage, number>> = {
+      uploading: 3000, analyzing: 3000, splitting: 90_000, lyrics: 12_000,
+    };
+    const dur = durations[stage] ?? 5000;
+    const interval = 200;
+    const step = (interval / dur) * 90;
+    const id = setInterval(() => setPct(p => Math.min(90, p + step)), interval);
+    return () => clearInterval(id);
+  }, [stage]);
+  return (
+    <div className="w-full h-1 bg-border/30 rounded-full overflow-hidden mt-2">
+      <motion.div
+        className="h-full bg-purple-500 rounded-full"
+        animate={{ width: `${pct}%` }}
+        transition={{ ease: "linear" }}
+      />
+    </div>
+  );
+}
+
+// ── Single audio player card ──────────────────────────────────────────────────
+
+interface PlayerProps {
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  url: string;
+  blob: Blob;
+  filename: string;
+  volume: number;
+  onVolumeChange: (v: number) => void;
+  audioRef: React.RefObject<HTMLAudioElement>;
+}
+
+function StemPlayer({ label, icon: Icon, color, url, blob, filename, volume, onVolumeChange, audioRef }: PlayerProps) {
+  const [playing, setPlaying] = useState(false);
+  const muted = volume === 0;
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume, audioRef]);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { void audioRef.current.play(); setPlaying(true); }
+  };
+
+  return (
+    <div className={`rounded-xl border ${color} p-4 space-y-3`}>
+      <div className="flex items-center gap-2">
+        <Icon className="w-4 h-4" />
+        <span className="font-semibold text-sm">{label}</span>
+        {muted && <Badge variant="outline" className="text-[10px] ml-auto border-yellow-500/30 text-yellow-400">Muted</Badge>}
+      </div>
+      <audio ref={audioRef} src={url} onEnded={() => setPlaying(false)} className="hidden" />
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="outline" onClick={toggle} className="w-9 h-9 p-0 shrink-0 border-border/40">
+          {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+        </Button>
+        <div className="flex items-center gap-2 flex-1">
+          {muted ? <VolumeX className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> : <Volume2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+          <Slider
+            value={[Math.round(volume * 100)]}
+            min={0} max={100} step={1}
+            onValueChange={([v]) => onVolumeChange(v / 100)}
+            className="flex-1"
+          />
+          <span className="text-[10px] text-muted-foreground w-7 text-right">{Math.round(volume * 100)}%</span>
+        </div>
+      </div>
+      <Button
+        size="sm" variant="outline"
+        onClick={() => downloadBlob(blob, filename)}
+        className="w-full h-8 text-xs border-border/40 gap-1.5"
+      >
+        <Download className="w-3 h-3" /> Download {label}
+      </Button>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function VoiceRemoval() {
-  const { hasSplits, sepStrength } = useAppState();
+  const { hasSplits } = useAppState();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [state, setState] = useState<State>("idle");
-  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState<SplitStage>("idle");
   const [fileName, setFileName] = useState("");
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [resultFormat, setResultFormat] = useState<"wav" | "mp3">("wav");
-  const [remaining, setRemaining] = useState<number | null>(null);
+  const [stems, setStems] = useState<StemPair | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [isVideo, setIsVideo] = useState(false);
-  const [copiedSuno, setCopiedSuno] = useState(false);
+
+  const [vocalVol, setVocalVol]   = useState(1);
+  const [instrVol, setInstrVol]   = useState(1);
+  const [bothPlaying, setBothPlaying] = useState(false);
+  const [singAlong, setSingAlong] = useState(false);
+
+  const vocalRef = useRef<HTMLAudioElement>(null);
+  const instrRef = useRef<HTMLAudioElement>(null);
+  const stageTimer1 = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stageTimer2 = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = () => {
+    if (stageTimer1.current) clearTimeout(stageTimer1.current);
+    if (stageTimer2.current) clearTimeout(stageTimer2.current);
+  };
 
   const processFile = useCallback(async (file: File) => {
+    clearTimers();
     setFileName(file.name);
-    setIsVideo(isVideoFile(file.name));
-    setState("uploading");
-    setProgress(10);
-    setResultUrl(null);
+    setStems(null);
     setErrorMsg("");
+    setSingAlong(false);
+    setBothPlaying(false);
+    setStage("uploading");
+
+    stageTimer1.current = setTimeout(() => setStage("analyzing"), 2_000);
+    stageTimer2.current = setTimeout(() => setStage("splitting"), 5_000);
 
     const fd = new FormData();
     fd.append("audio", file);
-    fd.append("mode", "voice_remove");
-    fd.append("multiplier", String(sepStrength));
+    fd.append("mode", "stem_split");
+    fd.append("multiplier", "0.75");
 
     try {
-      setProgress(30);
-      setState("processing");
-
       const resp = await fetch("/api/kernel/process-audio", {
         method: "POST",
         body: fd,
         credentials: "include",
       });
 
-      setProgress(90);
+      clearTimers();
 
       if (resp.status === 402) {
         const data = await resp.json() as { error: string };
-        setState("error");
+        setStage("error");
         setErrorMsg(data.error ?? "Free limit reached.");
         return;
       }
@@ -72,27 +203,50 @@ export default function VoiceRemoval() {
       }
 
       const rem = resp.headers.get("X-GK-Free-Remaining");
-      if (rem !== null) setRemaining(parseInt(rem));
+      const remaining = rem !== null ? parseInt(rem) : null;
 
-      const ct = resp.headers.get("Content-Type") ?? "";
-      const fmt: "wav" | "mp3" = ct.includes("mpeg") ? "mp3" : "wav";
-      setResultFormat(fmt);
+      setStage("lyrics");
 
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      setResultUrl(url);
-      setState("done");
-      setProgress(100);
+      const arrayBuf = await resp.arrayBuffer();
+      const files = unzipSync(new Uint8Array(arrayBuf));
+
+      const vocalData = files["GKP_vocals.wav"];
+      const instrData = files["GKP_instrumental.wav"];
+      if (!vocalData || !instrData) throw new Error("Missing stems in server response.");
+
+      const vocalBlob = new Blob([vocalData], { type: "audio/wav" });
+      const instrBlob = new Blob([instrData], { type: "audio/wav" });
+      const vocalUrl = URL.createObjectURL(vocalBlob);
+      const instrUrl = URL.createObjectURL(instrBlob);
+
+      let lyrics = "";
+      try {
+        const tfd = new FormData();
+        tfd.append("audio", vocalBlob, "vocal.wav");
+        const tres = await fetch("/api/audio/transcribe", {
+          method: "POST", body: tfd, credentials: "include",
+        });
+        if (tres.ok) {
+          const td = await tres.json() as { fullText?: string };
+          lyrics = td.fullText ?? "";
+        }
+      } catch {
+        // Non-critical
+      }
+
+      setStems({ vocalBlob, instrBlob, vocalUrl, instrUrl, lyrics, filename: file.name, remaining });
+      setStage("done");
     } catch (err: any) {
-      setState("error");
+      clearTimers();
+      setStage("error");
       setErrorMsg(err.message ?? "Something went wrong.");
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Split failed", description: err.message, variant: "destructive" });
     }
-  }, [toast, sepStrength]);
+  }, [toast]);
 
   const handleFile = (files: FileList | null) => {
     if (!files?.length) return;
-    processFile(files[0]);
+    void processFile(files[0]);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -100,67 +254,126 @@ export default function VoiceRemoval() {
     handleFile(e.dataTransfer.files);
   };
 
-  const download = () => {
-    if (!resultUrl) return;
-    downloadUrl(resultUrl, `gravelking_instrumental.${resultFormat}`);
-  };
-
-  const buildSunoPrompt = (name: string) => {
-    const base = name.replace(/\.[^.]+$/, "").replace(/[_\-]/g, " ").trim();
-    const words = base.split(" ").filter(w => w.length > 2).slice(0, 4).join(", ");
-    return words
-      ? `${words}, instrumental, no vocals, polished studio mix, radio ready`
-      : "instrumental beat, no vocals, polished studio mix, radio ready";
-  };
-
-  const copySunoPrompt = async () => {
-    await navigator.clipboard.writeText(buildSunoPrompt(fileName));
-    setCopiedSuno(true);
-    setTimeout(() => setCopiedSuno(false), 2000);
-  };
-
   const reset = () => {
-    setState("idle");
-    setProgress(0);
+    clearTimers();
+    setStage("idle");
     setFileName("");
-    setResultUrl(null);
+    setStems(null);
     setErrorMsg("");
-    setIsVideo(false);
+    setSingAlong(false);
+    setBothPlaying(false);
+    if (vocalRef.current) vocalRef.current.pause();
+    if (instrRef.current) instrRef.current.pause();
   };
 
-  const busy = state === "uploading" || state === "processing";
+  const playBoth = () => {
+    if (bothPlaying) {
+      vocalRef.current?.pause();
+      instrRef.current?.pause();
+      setBothPlaying(false);
+    } else {
+      void Promise.allSettled([vocalRef.current?.play(), instrRef.current?.play()]);
+      setBothPlaying(true);
+    }
+  };
+
+  const toggleSingAlong = () => {
+    const next = !singAlong;
+    setSingAlong(next);
+    setVocalVol(next ? 0 : 1);
+    if (vocalRef.current) vocalRef.current.volume = next ? 0 : 1;
+    if (next) {
+      void instrRef.current?.play();
+      setBothPlaying(true);
+    }
+  };
+
+  const sendToSongwriting = () => {
+    if (!stems?.lyrics) return;
+    try {
+      localStorage.setItem("gk:prefill:split_lyrics", JSON.stringify({
+        text: stems.lyrics,
+        filename: stems.filename,
+      }));
+    } catch {}
+    navigate("/songwriting");
+  };
+
+  const stageIndex = STAGES.findIndex(s => s.key === stage);
 
   return (
     <Layout>
       <div className="max-w-2xl mx-auto space-y-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Mic2 className="w-5 h-5 text-purple-400" />
-            <h1 className="text-2xl font-bold tracking-tight">Voice Removal</h1>
-            {!hasSplits && (
-              <Badge variant="outline" className="text-[10px] border-purple-500/30 text-purple-400">
-                3 free
-              </Badge>
-            )}
-            <ToolHelp
-              title="Voice Splitter"
-              summary="Splits a song into separate instrumental and vocal tracks using AI source separation."
-              steps={[
-                "Drag in or browse for an audio or video file.",
-                "Press Split — neural Demucs separates the stems, polished with MLK v3.",
-                "Preview the instrumental and vocal, then download the ones you want.",
-              ]}
-              note="If the AI engine is momentarily unavailable, it falls back to a fast center-cancel split, which is approximate and works best on true stereo mixes."
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Studio-quality vocal removal — AI source separation extracts a clean instrumental
-            from your track. Audio and video files supported.
-          </p>
-        </div>
 
-        {/* Upload zone */}
-        {state === "idle" && (
+        {/* ── Header ── */}
+        <div className="flex items-center gap-2">
+          <Mic2 className="w-5 h-5 text-purple-400" />
+          <h1 className="text-2xl font-bold tracking-tight">Voice Splitter</h1>
+          {!hasSplits && (
+            <Badge variant="outline" className="text-[10px] border-purple-500/30 text-purple-400">1 free</Badge>
+          )}
+          <ToolHelp
+            title="Voice Splitter"
+            summary="Splits your track into a vocal stem and instrumental stem using neural AI separation."
+            steps={[
+              "Drop or choose any audio/video file up to 100 MB.",
+              "Watch the 4-step progress — Upload → Analyze → Split → Lyric Prediction.",
+              "Use the vocal/instrumental players independently — mute vocals to sing along.",
+              "Hit 'Send to Songwriting Studio' to load the predicted lyrics into your session.",
+            ]}
+            note="Neural AI runs on Cloud Run Demucs. Falls back to MLK V3 DSP if unavailable — results are still strong."
+          />
+        </div>
+        <p className="text-sm text-muted-foreground -mt-4">
+          Get both stems — vocal + instrumental — plus predicted lyrics ready for your next session.
+        </p>
+
+        {/* ── 4-step progress tracker ── */}
+        <AnimatePresence>
+          {ACTIVE_STAGES.has(stage) && (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <Card className="border-purple-500/20 bg-purple-500/5">
+                <CardContent className="pt-5 pb-4 px-5 space-y-4">
+                  <div className="grid grid-cols-4 gap-2">
+                    {STAGES.map((s, i) => {
+                      const done = i < stageIndex;
+                      const active = s.key === stage;
+                      const pending = i > stageIndex;
+                      return (
+                        <div key={s.key} className="flex flex-col items-center gap-1.5 text-center">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                            done    ? "bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400" :
+                            active  ? "bg-purple-500/20 border-2 border-purple-500 text-purple-400" :
+                            "bg-secondary/40 border-2 border-border/30 text-muted-foreground/40"
+                          }`}>
+                            {done
+                              ? <CheckCircle2 className="w-4 h-4" />
+                              : <s.Icon className={`w-4 h-4 ${active ? "animate-pulse" : ""}`} />}
+                          </div>
+                          <span className={`text-[10px] font-medium leading-tight ${
+                            done ? "text-emerald-400" : active ? "text-purple-400" : "text-muted-foreground/40"
+                          }`}>{s.label}</span>
+                          {active && (
+                            <span className="text-[9px] text-muted-foreground leading-tight">{s.detail}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {ACTIVE_STAGES.has(stage) && <StageBar stage={stage} />}
+
+                  <p className="text-xs text-muted-foreground text-center font-medium truncate">
+                    {fileName}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Upload zone ── */}
+        {stage === "idle" && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
             <Card
               className="border-2 border-dashed border-purple-500/30 bg-purple-500/5 hover:border-purple-500/60 hover:bg-purple-500/10 transition-all cursor-pointer"
@@ -168,17 +381,19 @@ export default function VoiceRemoval() {
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
             >
-              <CardContent className="py-16 flex flex-col items-center gap-4">
+              <CardContent className="py-14 flex flex-col items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-purple-500/10 flex items-center justify-center">
                   <Upload className="w-7 h-7 text-purple-400" />
                 </div>
                 <div className="text-center">
-                  <p className="font-medium">Drop your track here</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    MP3, WAV, FLAC, M4A, MP4, MOV · up to 100 MB
-                  </p>
+                  <p className="font-semibold">Drop your track here</p>
+                  <p className="text-xs text-muted-foreground mt-1">MP3, WAV, FLAC, M4A, MP4, MOV · up to 100 MB</p>
                 </div>
-                <Button variant="outline" className="border-purple-500/40 text-purple-400 hover:bg-purple-500/10" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                <Button
+                  variant="outline"
+                  className="border-purple-500/40 text-purple-400 hover:bg-purple-500/10"
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                >
                   Choose File
                 </Button>
               </CardContent>
@@ -193,160 +408,133 @@ export default function VoiceRemoval() {
           </motion.div>
         )}
 
-        {/* Processing */}
-        <AnimatePresence>
-          {busy && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Card className="border-purple-500/20 bg-purple-500/5">
-                <CardContent className="py-10 space-y-4 text-center">
-                  <div className="text-sm text-muted-foreground flex items-center justify-center gap-2">
-                    {isVideo && <FileVideo className="w-4 h-4 text-purple-400" />}
-                    {state === "uploading"
-                      ? "Uploading…"
-                      : isVideo
-                        ? "Extracting audio from video, then removing vocals…"
-                        : "Removing vocals…"}
+        {/* ── Done — dual stem players ── */}
+        {stage === "done" && stems && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+
+            {/* Success badge */}
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <p className="font-semibold text-sm">Split complete — vocal + instrumental ready</p>
+              {stems.remaining !== null && (
+                <Badge variant="outline" className="ml-auto text-[10px] border-purple-500/30 text-purple-400">
+                  {stems.remaining} free left
+                </Badge>
+              )}
+            </div>
+
+            {/* Two players */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <StemPlayer
+                label="Vocals"
+                icon={Mic2}
+                color="border-purple-500/30 bg-purple-500/5"
+                url={stems.vocalUrl}
+                blob={stems.vocalBlob}
+                filename={`gkp_vocals_${stems.filename.replace(/\.[^.]+$/, "")}.wav`}
+                volume={vocalVol}
+                onVolumeChange={(v) => { setVocalVol(v); if (vocalRef.current) vocalRef.current.volume = v; }}
+                audioRef={vocalRef as React.RefObject<HTMLAudioElement>}
+              />
+              <StemPlayer
+                label="Instrumental"
+                icon={Volume2}
+                color="border-emerald-500/30 bg-emerald-500/5"
+                url={stems.instrUrl}
+                blob={stems.instrBlob}
+                filename={`gkp_instrumental_${stems.filename.replace(/\.[^.]+$/, "")}.wav`}
+                volume={instrVol}
+                onVolumeChange={(v) => { setInstrVol(v); if (instrRef.current) instrRef.current.volume = v; }}
+                audioRef={instrRef as React.RefObject<HTMLAudioElement>}
+              />
+            </div>
+
+            {/* Playback controls */}
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                className={`flex-1 border-border/40 gap-2 ${bothPlaying ? "border-purple-500/50 text-purple-400" : ""}`}
+                onClick={playBoth}
+              >
+                {bothPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {bothPlaying ? "Pause Both" : "Play Together"}
+              </Button>
+              <Button
+                variant={singAlong ? "default" : "outline"}
+                className={`flex-1 gap-2 ${singAlong ? "bg-amber-500 hover:bg-amber-600 text-black font-semibold" : "border-border/40"}`}
+                onClick={toggleSingAlong}
+              >
+                <Mic2 className="w-4 h-4" />
+                {singAlong ? "Sing Along ON" : "Sing Along Mode"}
+              </Button>
+            </div>
+            {singAlong && (
+              <p className="text-xs text-amber-400 text-center -mt-1">
+                Vocals muted — instrumental playing. Sing over it!
+              </p>
+            )}
+
+            {/* Lyric prediction */}
+            {stems.lyrics ? (
+              <Card className="border-sky-500/20 bg-sky-500/5">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-sky-400 shrink-0" />
+                    <span className="font-semibold text-sm text-sky-300">Predicted Lyrics</span>
+                    <Badge variant="outline" className="ml-auto text-[10px] border-sky-500/30 text-sky-400">AI transcription</Badge>
                   </div>
-                  <div className="text-xs font-medium text-purple-400">{fileName}</div>
-                  <Progress value={progress} className="h-1.5" />
-                  <p className="text-xs text-muted-foreground">Separating with our neural AI engine — falls back to instant on-server processing if unavailable.</p>
+                  <pre className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap font-sans max-h-48 overflow-y-auto rounded bg-background/50 border border-border/30 p-3">
+                    {stems.lyrics}
+                  </pre>
+                  <Button
+                    onClick={sendToSongwriting}
+                    className="w-full bg-sky-600 hover:bg-sky-700 text-white gap-2 font-semibold"
+                  >
+                    <Send className="w-4 h-4" />
+                    Send to Songwriting Studio
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Lyrics load into your studio session — edit them to claim authorship
+                  </p>
                 </CardContent>
               </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Done */}
-        {state === "done" && resultUrl && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-emerald-500/30 bg-emerald-500/5">
-              <CardContent className="py-8 space-y-5">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <div>
-                    <p className="font-semibold text-sm">Instrumental ready</p>
-                    <p className="text-xs text-muted-foreground">{fileName} · {resultFormat.toUpperCase()}</p>
-                  </div>
-                  {!hasSplits && remaining !== null && (
-                    <Badge variant="outline" className="ml-auto text-[10px] border-purple-500/30 text-purple-400">
-                      {remaining} free left
-                    </Badge>
-                  )}
-                </div>
-
-                <audio src={resultUrl} controls className="w-full h-10" />
-
-                <div className="flex gap-3">
-                  <Button onClick={download} className="flex-1 bg-purple-600 hover:bg-purple-700">
-                    <Download className="w-4 h-4 mr-2" /> Download {resultFormat.toUpperCase()}
+            ) : (
+              <div className="rounded-xl border border-border/30 bg-card/30 p-4 text-center space-y-2">
+                <FileText className="w-4 h-4 text-muted-foreground mx-auto" />
+                <p className="text-xs text-muted-foreground">Lyric prediction unavailable for this track.</p>
+                <Link href="/songwriting">
+                  <Button variant="outline" size="sm" className="border-border/40 gap-1.5">
+                    <Send className="w-3 h-3" /> Open Songwriting Studio
                   </Button>
-                  <Button variant="outline" onClick={reset} className="border-border/40">
-                    New File
+                </Link>
+              </div>
+            )}
+
+            {/* Upgrade / new file */}
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 border-border/40 gap-2" onClick={reset}>
+                <RefreshCcw className="w-3.5 h-3.5" /> New File
+              </Button>
+              {!hasSplits && (
+                <Link href="/pricing" className="flex-1">
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700 gap-2 font-semibold">
+                    <Crown className="w-4 h-4" /> Unlimited Splits
                   </Button>
-                </div>
+                </Link>
+              )}
+            </div>
 
-                {/* Polish in Suno */}
-                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Wand2 className="w-4 h-4 text-blue-400 shrink-0" />
-                    <p className="text-sm font-semibold text-blue-300">Polish with Suno AI</p>
-                    <Badge variant="outline" className="ml-auto text-[9px] border-blue-400/30 text-blue-400">Bring Your Own Sub</Badge>
-                  </div>
-
-                  {/* Steps */}
-                  <ol className="space-y-2">
-                    {[
-                      {
-                        n: "1",
-                        label: "Download your split as an audio file",
-                        action: (
-                          <Button size="sm" variant="outline" onClick={download}
-                            className="h-7 px-2.5 border-blue-500/30 text-blue-300 hover:bg-blue-500/10 text-xs">
-                            <Download className="w-3 h-3 mr-1" /> Download
-                          </Button>
-                        ),
-                      },
-                      {
-                        n: "2",
-                        label: 'Open Suno → click "Create" → switch to Advanced',
-                        action: (
-                          <Button size="sm"
-                            className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs"
-                            onClick={() => window.open("https://suno.com/create", "_blank", "noopener")}>
-                            <ExternalLink className="w-3 h-3 mr-1" /> Open Suno
-                          </Button>
-                        ),
-                      },
-                      {
-                        n: "3",
-                        label: 'In Advanced, click "Upload Audio" — load this file as your audio reference',
-                        action: null,
-                      },
-                      {
-                        n: "4",
-                        label: "Add your lyrics + style prompt below, then use the Audio / Style influence slider to set how close to stick to your instrumental",
-                        action: null,
-                      },
-                    ].map(({ n, label, action }) => (
-                      <li key={n} className="flex items-start gap-2.5">
-                        <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold flex items-center justify-center">{n}</span>
-                        <span className="flex-1 text-xs text-muted-foreground leading-relaxed">{label}</span>
-                        {action && <span className="shrink-0">{action}</span>}
-                      </li>
-                    ))}
-                  </ol>
-
-                  {/* Copyable style prompt */}
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">Style prompt to paste in Suno:</p>
-                    <div className="flex items-center gap-2 rounded border border-border/40 bg-background/60 p-2">
-                      <code className="flex-1 truncate text-[11px] font-mono text-muted-foreground">
-                        {buildSunoPrompt(fileName)}
-                      </code>
-                      <button
-                        onClick={() => void copySunoPrompt()}
-                        className="shrink-0 p-1 rounded hover:bg-border/20 transition-colors"
-                        title="Copy prompt"
-                      >
-                        {copiedSuno
-                          ? <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          : <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    Requires a Suno subscription ($8–$24/mo) ·{" "}
-                    <a href="https://suno.com/pricing" target="_blank" rel="noopener noreferrer"
-                      className="underline hover:text-foreground">suno.com/pricing</a>
-                  </p>
-                </div>
-
-                <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("Just removed the vocals from my track in seconds using GravelKing Pro 🔥 No plugins, no installs — free to try → gravelkingpro.it.com #MusicProduction #VocalRemoval #BeatMaker")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full rounded-md border border-border/40 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-                >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.912-5.622Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  Post your result to X
-                </a>
-
-                {!hasSplits && (
-                  <>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Free tier outputs MP3. <Link href="/pricing" className="text-purple-400 hover:underline">Upgrade</Link> for WAV + unlimited runs.
-                    </p>
-                    <EmailCapture source="voice_removal_result" />
-                  </>
-                )}
-              </CardContent>
-            </Card>
+            {!hasSplits && (
+              <p className="text-xs text-muted-foreground text-center">
+                Free tier exports WAV. <Link href="/pricing" className="text-purple-400 hover:underline">Upgrade</Link> for unlimited splits + WAV downloads.
+              </p>
+            )}
           </motion.div>
         )}
 
-        {/* Error */}
-        {state === "error" && (
+        {/* ── Error ── */}
+        {stage === "error" && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <Card className="border-red-500/30 bg-red-500/5">
               <CardContent className="py-8 space-y-4">
@@ -354,15 +542,12 @@ export default function VoiceRemoval() {
                   <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
                   <p className="text-sm text-red-400">{errorMsg}</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   <Button variant="outline" onClick={reset} className="border-border/40">Try Again</Button>
-                  {errorMsg.toLowerCase().includes("limit") && (
-                    <>
-                      <Link href="/pricing">
-                        <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">Upgrade</Button>
-                      </Link>
-                      <EmailCapture source="voice_removal_limit_hit" />
-                    </>
+                  {(errorMsg.toLowerCase().includes("limit") || errorMsg.toLowerCase().includes("subscribe")) && (
+                    <Link href="/pricing">
+                      <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">Upgrade</Button>
+                    </Link>
                   )}
                 </div>
               </CardContent>
@@ -370,19 +555,21 @@ export default function VoiceRemoval() {
           </motion.div>
         )}
 
-        {/* Info */}
-        <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground">
-          {[
-            { label: "Neural AI", desc: "Real Demucs separation" },
-            { label: "Reliable", desc: "Instant on-server fallback" },
-            { label: "Any format", desc: "Audio & video" },
-          ].map((i) => (
-            <div key={i.label} className="p-3 rounded-lg border border-border/20 bg-card/30 space-y-1">
-              <p className="font-medium text-foreground/80">{i.label}</p>
-              <p>{i.desc}</p>
-            </div>
-          ))}
-        </div>
+        {/* ── Feature grid ── */}
+        {stage === "idle" && (
+          <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground">
+            {[
+              { label: "Neural AI",       desc: "Demucs htdemucs stems"    },
+              { label: "Both Stems",      desc: "Vocal + instrumental"      },
+              { label: "Lyric Predict",   desc: "Auto-transcribed vocals"   },
+            ].map((i) => (
+              <div key={i.label} className="p-3 rounded-lg border border-border/20 bg-card/30 space-y-1">
+                <p className="font-medium text-foreground/80">{i.label}</p>
+                <p>{i.desc}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Layout>
   );

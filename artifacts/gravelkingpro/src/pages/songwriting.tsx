@@ -447,6 +447,34 @@ export default function SongwritingStudio() {
     setAuthorshipScore(levenshteinPercent(aiDraft, currentText));
   }, [lines, aiDraft]);
 
+  // ── Voice Splitter prefill — load lyrics sent from the split page ──────────
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("gk:prefill:split_lyrics");
+      if (!raw) return;
+      localStorage.removeItem("gk:prefill:split_lyrics");
+      const { text, filename } = JSON.parse(raw) as { text: string; filename: string };
+      if (!text?.trim()) return;
+      const rawLines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
+      const newLines: LineState[] = rawLines.map((l: string) => ({
+        id: crypto.randomUUID(),
+        type: "lyric" as const,
+        text: l,
+        aiOriginal: l,
+        isHumanEdited: false,
+        sectionContext: "verse",
+      }));
+      setAiDraft(text);
+      setLines(newLines);
+      toast({
+        title: "Lyrics loaded from Voice Splitter",
+        description: `From: ${filename} — edit lines to build your authorship score`,
+      });
+    } catch {
+      // Non-critical
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Generate ──────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (generationCount >= 2 && !isPro) {
