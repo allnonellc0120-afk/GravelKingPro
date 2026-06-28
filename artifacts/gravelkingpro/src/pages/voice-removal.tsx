@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,23 +13,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
+import { useSplitter, type SplitStage } from "@/lib/splitterStore";
 import { downloadBlob } from "@/lib/download";
 import { Link, useLocation } from "wouter";
-import { unzipSync } from "fflate";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type SplitStage = "idle" | "uploading" | "analyzing" | "splitting" | "lyrics" | "done" | "error";
-
-interface StemPair {
-  vocalBlob: Blob;
-  instrBlob: Blob;
-  vocalUrl: string;
-  instrUrl: string;
-  lyrics: string;
-  filename: string;
-  remaining: number | null;
-}
 
 // ── Stage config ───────────────────────────────────────────────────────────────
 
@@ -145,10 +131,7 @@ export default function VoiceRemoval() {
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [stage, setStage] = useState<SplitStage>("idle");
-  const [fileName, setFileName] = useState("");
-  const [stems, setStems] = useState<StemPair | null>(null);
-  const [errorMsg, setErrorMsg] = useState("");
+  const { stage, fileName, stems, errorMsg, processFile, reset: resetSplit } = useSplitter();
 
   const [vocalVol, setVocalVol]   = useState(1);
   const [instrVol, setInstrVol]   = useState(1);
@@ -157,92 +140,17 @@ export default function VoiceRemoval() {
 
   const vocalRef = useRef<HTMLAudioElement>(null);
   const instrRef = useRef<HTMLAudioElement>(null);
-  const stageTimer1 = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stageTimer2 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearTimers = () => {
-    if (stageTimer1.current) clearTimeout(stageTimer1.current);
-    if (stageTimer2.current) clearTimeout(stageTimer2.current);
-  };
-
-  const processFile = useCallback(async (file: File) => {
-    clearTimers();
-    setFileName(file.name);
-    setStems(null);
-    setErrorMsg("");
-    setSingAlong(false);
-    setBothPlaying(false);
-    setStage("uploading");
-
-    stageTimer1.current = setTimeout(() => setStage("analyzing"), 2_000);
-    stageTimer2.current = setTimeout(() => setStage("splitting"), 5_000);
-
-    const fd = new FormData();
-    fd.append("audio", file);
-    fd.append("mode", "stem_split");
-    fd.append("multiplier", "0.75");
-
-    try {
-      const resp = await fetch("/api/kernel/process-audio", {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-      });
-
-      clearTimers();
-
-      if (resp.status === 402) {
-        const data = await resp.json() as { error: string };
-        setStage("error");
-        setErrorMsg(data.error ?? "Free limit reached.");
-        return;
-      }
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({})) as { error?: string };
-        throw new Error(data.error ?? "Processing failed");
-      }
-
-      const rem = resp.headers.get("X-GK-Free-Remaining");
-      const remaining = rem !== null ? parseInt(rem) : null;
-
-      setStage("lyrics");
-
-      const arrayBuf = await resp.arrayBuffer();
-      const files = unzipSync(new Uint8Array(arrayBuf));
-
-      const vocalData = files["GKP_vocals.wav"];
-      const instrData = files["GKP_instrumental.wav"];
-      if (!vocalData || !instrData) throw new Error("Missing stems in server response.");
-
-      const vocalBlob = new Blob([vocalData], { type: "audio/wav" });
-      const instrBlob = new Blob([instrData], { type: "audio/wav" });
-      const vocalUrl = URL.createObjectURL(vocalBlob);
-      const instrUrl = URL.createObjectURL(instrBlob);
-
-      let lyrics = "";
-      try {
-        const tfd = new FormData();
-        tfd.append("audio", vocalBlob, "vocal.wav");
-        const tres = await fetch("/api/audio/transcribe", {
-          method: "POST", body: tfd, credentials: "include",
-        });
-        if (tres.ok) {
-          const td = await tres.json() as { fullText?: string };
-          lyrics = td.fullText ?? "";
-        }
-      } catch {
-        // Non-critical
-      }
-
-      setStems({ vocalBlob, instrBlob, vocalUrl, instrUrl, lyrics, filename: file.name, remaining });
-      setStage("done");
-    } catch (err: any) {
-      clearTimers();
-      setStage("error");
-      setErrorMsg(err.message ?? "Something went wrong.");
-      toast({ title: "Split failed", description: err.message, variant: "destructive" });
+  // The store owns the error text; surface it once as a toast when it appears.
+  const lastToastedError = useRef<string>("");
+  useEffect(() => {
+    if (stage === "error" && errorMsg && errorMsg !== lastToastedError.current) {
+      lastToastedError.current = errorMsg;
+      toast({ title: "Split failed", description: errorMsg, variant: "destructive" });
+    } else if (stage !== "error") {
+      lastToastedError.current = "";
     }
-  }, [toast]);
+  }, [stage, errorMsg, toast]);
 
   const handleFile = (files: FileList | null) => {
     if (!files?.length) return;
@@ -255,11 +163,7 @@ export default function VoiceRemoval() {
   };
 
   const reset = () => {
-    clearTimers();
-    setStage("idle");
-    setFileName("");
-    setStems(null);
-    setErrorMsg("");
+    resetSplit();
     setSingAlong(false);
     setBothPlaying(false);
     if (vocalRef.current) vocalRef.current.pause();
