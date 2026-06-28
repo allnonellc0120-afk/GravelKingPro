@@ -715,7 +715,17 @@ audioRouter.post(
       const result = await transcribeAudio(filePath);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message ?? "Transcription failed" });
+      // Degrade gracefully: never surface raw Replicate errors (e.g. 429 credit
+      // throttling) to the user. The client falls back to manual Tap-to-Time.
+      const raw = String(err?.message ?? "");
+      const busy = /429|throttl|rate limit|credit|quota/i.test(raw);
+      req.log.warn({ err: raw }, "transcription unavailable; client falls back to tap-to-time");
+      res.status(502).json({
+        error: busy
+          ? "Auto-transcribe is busy right now. Use Tap-to-Time below to sync your lyrics."
+          : "Couldn't auto-transcribe this track. Use Tap-to-Time below to sync your lyrics.",
+        fallback: "tap-timing",
+      });
     } finally {
       await unlink(filePath).catch(() => {});
     }

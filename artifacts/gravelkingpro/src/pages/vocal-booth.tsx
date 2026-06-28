@@ -473,7 +473,11 @@ function VocalBoothInner() {
         fullText: string;
       };
       if (!data.segments || data.segments.length === 0) {
-        throw new Error("No speech detected — try a track with clearer vocals.");
+        toast({
+          title: "No clear vocals detected",
+          description: "Use Tap-to-Time below to sync your lyrics by ear.",
+        });
+        return;
       }
       // Group Whisper segments into lyric lines (new line on 1 s+ gap or 55+ chars).
       const lines: string[] = [];
@@ -508,10 +512,12 @@ function VocalBoothInner() {
         description: `${lines.length} lines detected with precise timing.`,
       });
     } catch (err: unknown) {
+      // Auto-transcribe is a convenience; Tap-to-Time is the always-available path.
       toast({
-        title: "Transcription failed",
-        description: (err as { message?: string })?.message ?? "Could not transcribe vocals",
-        variant: "destructive",
+        title: "Auto-transcribe unavailable",
+        description:
+          (err as { message?: string })?.message ??
+          "Use Tap-to-Time below to sync your lyrics by ear.",
       });
     } finally {
       setTranscribing(false);

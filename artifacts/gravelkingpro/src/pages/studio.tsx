@@ -89,7 +89,7 @@ type UsageRemaining = { voice_remove: number; stem_split: number; master: number
 type PaywallInfo = { feature: ProcessMode; limit: number; used: number; message: string; code?: string };
 
 export default function Studio() {
-  const { isPro, hasSplits } = useAppState();
+  const { isPro, hasSplits, sepStrength, setSepStrength } = useAppState();
   const { toast } = useToast();
 
   // Server-driven free-use accounting. -1 = unlimited (paid). null = unknown.
@@ -111,7 +111,7 @@ export default function Studio() {
   const [state, setState] = useState<ProcessState>("idle");
 
   const [progress, setProgress] = useState(0);
-  const [multiplier, setMultiplier] = useState([0.75]);
+  const [multiplier, setMultiplier] = useState([sepStrength]);
   const [sliceSize, setSliceSize] = useState("2");
   const [mode, setMode] = useState<ProcessMode>(() => {
     const saved = localStorage.getItem("gkp_studio_tool") as ProcessMode | null;
@@ -1035,7 +1035,7 @@ export default function Studio() {
                         <label className="text-sm font-medium">Signal Strength</label>
                         <span className="text-sm font-mono text-muted-foreground">{multiplier[0].toFixed(2)}</span>
                       </div>
-                      <Slider value={multiplier} onValueChange={setMultiplier} min={0.1} max={2.0} step={0.01} disabled={state === "processing" || !isPro} data-testid="slider-studio-multiplier" />
+                      <Slider value={multiplier} onValueChange={(v) => { setMultiplier(v); setSepStrength(v[0]); }} min={0.1} max={2.0} step={0.01} disabled={state === "processing" || !isPro} data-testid="slider-studio-multiplier" />
                       <p className="text-xs text-muted-foreground">Below 1.0 reduces amplitude. Above 1.0 boosts it.</p>
                     </div>
                     <div className="space-y-2">

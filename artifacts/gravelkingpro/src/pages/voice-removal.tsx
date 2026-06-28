@@ -21,7 +21,7 @@ function isVideoFile(name: string) {
 }
 
 export default function VoiceRemoval() {
-  const { hasSplits } = useAppState();
+  const { hasSplits, sepStrength } = useAppState();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,7 +46,7 @@ export default function VoiceRemoval() {
     const fd = new FormData();
     fd.append("audio", file);
     fd.append("mode", "voice_remove");
-    fd.append("multiplier", "0.75");
+    fd.append("multiplier", String(sepStrength));
 
     try {
       setProgress(30);
@@ -88,7 +88,7 @@ export default function VoiceRemoval() {
       setErrorMsg(err.message ?? "Something went wrong.");
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
-  }, [toast]);
+  }, [toast, sepStrength]);
 
   const handleFile = (files: FileList | null) => {
     if (!files?.length) return;
