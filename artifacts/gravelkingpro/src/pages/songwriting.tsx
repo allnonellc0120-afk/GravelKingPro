@@ -11,7 +11,7 @@ import {
   Sparkles, Music2, Edit3, Lock, Copy, ExternalLink,
   CheckCircle2, AlertTriangle, Loader2, RotateCcw,
   FileText, Clock, Wand2, Check, RefreshCw, Plus, Trash2,
-  ChevronRight, Mic, X,
+  ChevronRight, Mic, X, Share2, Shield,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -434,6 +434,12 @@ export default function SongwritingStudio() {
   const [isSaving, setIsSaving] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
 
+  // ── IP Embed ───────────────────────────────────────────────────────────────
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [embedToken, setEmbedToken] = useState<string | null>(null);
+  const [embedCopied, setEmbedCopied] = useState(false);
+  const [showEmbed, setShowEmbed] = useState(false);
+
   // ── Authorship score recompute whenever lines change ─────────────────────
   useEffect(() => {
     if (!aiDraft || lines.length === 0) return;
@@ -701,8 +707,8 @@ export default function SongwritingStudio() {
       toast({ title: "Save your project first", description: "Save and edit to 25% authorship before certifying.", variant: "destructive" });
       return;
     }
-    // Server verifies Pro entitlement + 25% threshold before issuing certificate data.
-    let cert: { title: string; genre: string | null; authorshipScore: number; certifiedAt: string };
+    type CertResponse = { title: string; genre: string | null; authorshipScore: number; certifiedAt: string; embedToken: string; embedUrl: string };
+    let cert: CertResponse;
     try {
       const r = await fetch(`/api/lyrics/certificate/${projectId}`, { credentials: "include" });
       if (!r.ok) {
@@ -710,13 +716,19 @@ export default function SongwritingStudio() {
         toast({ title: "Certificate unavailable", description: d.error || "Could not verify eligibility.", variant: "destructive" });
         return;
       }
-      cert = (await r.json()) as typeof cert;
+      cert = (await r.json()) as CertResponse;
     } catch {
       toast({ title: "Error", description: "Could not reach the certification service.", variant: "destructive" });
       return;
     }
+
+    setEmbedUrl(cert.embedUrl);
+    setEmbedToken(cert.embedToken);
+    setShowEmbed(true);
+
     const songTitle = (cert.title || `${cert.genre ?? genre} Work`).slice(0, 80);
     const date = new Date(cert.certifiedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const fingerprint = `GKP-${cert.embedToken.slice(0, 8).toUpperCase()}-${cert.embedToken.slice(8, 16).toUpperCase()}`;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>IP Certificate</title>
 <style>
   @page { size: letter landscape; margin: 0; }
@@ -730,6 +742,7 @@ export default function SongwritingStudio() {
   .score { font-size: 20px; font-weight: bold; color: #2a7a2a; margin: 22px 0; }
   .legal { font-size: 12px; color: #555; max-width: 640px; margin: 20px auto 0; line-height: 1.5; }
   .footer { margin-top: 36px; border-top: 2px solid #c9a227; padding-top: 16px; font-size: 10px; color: #888; }
+  .fp { background: #f5f0e8; border: 1px solid #d4b96e; border-radius: 4px; padding: 6px 12px; display: inline-block; margin-top: 10px; font-family: monospace; font-size: 12px; letter-spacing: 2px; color: #8a6914; }
   @media print { body { background: #fff; } .cert { margin: 0 auto; } }
 </style></head>
 <body><div class="cert">
@@ -744,13 +757,13 @@ export default function SongwritingStudio() {
   expression — through manual line-by-line editing and reconfiguration of AI-generated elements —
   to support a claim of human authorship under current U.S. Copyright Office guidance. The complete
   forensic edit ledger is retained on file.</div>
-  <div class="footer">Verified by forensic authorship ledger · Generated ${new Date().toISOString()}</div>
+  <div class="footer">Verified by forensic authorship ledger<br><div class="fp">${fingerprint}</div></div>
 </div>
 <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
 </body></html>`;
     const w = window.open("", "_blank", "width=1000,height=760");
     if (!w) {
-      toast({ title: "Pop-up blocked", description: "Allow pop-ups to download your certificate.", variant: "destructive" });
+      toast({ title: "Pop-up blocked", description: "Allow pop-ups to open the printable certificate.", variant: "destructive" });
       return;
     }
     w.document.write(html);
@@ -1081,13 +1094,72 @@ export default function SongwritingStudio() {
                     </p>
                   )}
                   {isEligible ? (
-                    <Button onClick={downloadCertificate} variant="outline" className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold">
-                      <FileText className="w-4 h-4 mr-2" />Download IP Certificate (PDF)
-                    </Button>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button onClick={() => void downloadCertificate()} variant="outline" className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold text-xs">
+                          <FileText className="w-3.5 h-3.5 mr-1.5" />Print Certificate
+                        </Button>
+                        <Button onClick={() => void downloadCertificate()} variant="outline" className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 font-semibold text-xs">
+                          <Share2 className="w-3.5 h-3.5 mr-1.5" />Get Embed Code
+                        </Button>
+                      </div>
+                      {/* Embed code panel — shown after cert fetch */}
+                      {showEmbed && embedUrl && embedToken && (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Share2 className="w-4 h-4 text-amber-400" />
+                            <span className="text-sm font-semibold text-amber-400">Your IP Embed Code</span>
+                            <button onClick={() => setShowEmbed(false)} className="ml-auto text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Paste this <code className="bg-muted/60 px-1 py-0.5 rounded text-amber-400">&lt;iframe&gt;</code> anywhere — your website, SoundCloud bio, press kit, or social profile. Anyone who clicks it sees your certified authorship proof.
+                          </p>
+                          {/* Fingerprint */}
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/60 border border-border/40">
+                            <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="text-xs text-muted-foreground">Fingerprint:</span>
+                            <span className="text-xs font-mono text-emerald-400 tracking-wider">
+                              GKP-{embedToken.slice(0, 8).toUpperCase()}-{embedToken.slice(8, 16).toUpperCase()}
+                            </span>
+                          </div>
+                          {/* The iframe code */}
+                          <div className="relative">
+                            <pre className="rounded-lg bg-background/80 border border-border/50 p-3 text-xs font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">{`<iframe\n  src="${window.location.origin}${embedUrl}"\n  width="600"\n  height="400"\n  frameborder="0"\n  title="IP Certificate"\n  style="border-radius:8px;border:1px solid #c9a227;max-width:100%"\n></iframe>`}</pre>
+                            <button
+                              onClick={async () => {
+                                const code = `<iframe\n  src="${window.location.origin}${embedUrl}"\n  width="600"\n  height="400"\n  frameborder="0"\n  title="IP Certificate"\n  style="border-radius:8px;border:1px solid #c9a227;max-width:100%"\n></iframe>`;
+                                await navigator.clipboard.writeText(code);
+                                setEmbedCopied(true);
+                                setTimeout(() => setEmbedCopied(false), 2000);
+                              }}
+                              className="absolute top-2 right-2 p-1.5 rounded bg-muted/60 hover:bg-muted border border-border/40 transition-colors"
+                              title="Copy embed code"
+                            >
+                              {embedCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+                            </button>
+                          </div>
+                          {/* Direct link */}
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={embedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
+                            >
+                              <ExternalLink className="w-3 h-3" />View certificate page directly
+                            </a>
+                            <span className="text-xs text-muted-foreground">— share this URL directly too</span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/60 border-t border-border/30 pt-2">
+                            The embed code is tied to this project's authorship score. If you edit further and recertify, generate a new code.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border/30 text-xs text-muted-foreground">
                       <Lock className="w-3.5 h-3.5 text-amber-500/70 shrink-0" />
-                      <span>Reach 25% authorship to unlock your Form PA copyright certificate.</span>
+                      <span>Reach 25% authorship to unlock your shareable IP embed code + printable certificate.</span>
                     </div>
                   )}
                 </div>

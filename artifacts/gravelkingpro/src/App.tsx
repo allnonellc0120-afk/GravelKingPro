@@ -26,6 +26,7 @@ import ConvertPage from "@/pages/convert";
 import SongwritingStudio from "@/pages/songwriting";
 import VocalBooth from "@/pages/vocal-booth";
 import AdminLabel from "@/pages/admin-label";
+import PitchPage from "@/pages/pitch";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
 
@@ -57,6 +58,7 @@ function Router() {
       <Route path="/convert" component={ConvertPage} />
       <Route path="/songwriting" component={SongwritingStudio} />
       <Route path="/vocal-booth" component={VocalBooth} />
+      <Route path="/pitch" component={PitchPage} />
       <Route component={NotFound} />
     </Switch>
   );

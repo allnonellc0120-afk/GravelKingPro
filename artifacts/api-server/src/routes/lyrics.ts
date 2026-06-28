@@ -11,8 +11,22 @@ import {
   lyricTimelineBlocksTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac } from "crypto";
 import type { LineState } from "@workspace/db";
+
+const EMBED_SECRET = process.env["SESSION_SECRET"] ?? "gravelking-embed-secret";
+
+function makeEmbedToken(projectId: string, authorshipScore: number): string {
+  return createHmac("sha256", EMBED_SECRET)
+    .update(`${projectId}|${authorshipScore}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function verifyEmbedToken(projectId: string, authorshipScore: number, token: string): boolean {
+  const expected = makeEmbedToken(projectId, authorshipScore);
+  return expected === token;
+}
 
 const GEMINI_BASE = process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"] ?? "";
 const GEMINI_KEY  = process.env["AI_INTEGRATIONS_GEMINI_API_KEY"]  ?? "";
@@ -602,12 +616,95 @@ lyricsRouter.get("/lyrics/certificate/:projectId", async (req: Request, res: Res
     return;
   }
 
+  const score = project.authorshipScore ?? 0;
+  const token = makeEmbedToken(String(project.id), score);
+
   res.json({
     title: project.title,
     genre: project.genre,
-    authorshipScore: project.authorshipScore,
+    authorshipScore: score,
     certifiedAt: new Date().toISOString(),
+    embedToken: token,
+    embedUrl: `/api/lyrics/embed/${project.id}?token=${token}`,
   });
+});
+
+// ─── GET /api/lyrics/embed/:projectId — publicly shareable certificate page ───
+// No auth required — token acts as the capability proof.
+lyricsRouter.get("/lyrics/embed/:projectId", async (req: Request, res: Response) => {
+  const projectId = String(req.params["projectId"]);
+  const token = String(req.query["token"] ?? "");
+
+  const project = await db.query.lyricProjectsTable.findFirst({
+    where: eq(lyricProjectsTable.id, projectId),
+  });
+
+  if (!project) {
+    res.status(404).send("<h1>Certificate not found</h1>");
+    return;
+  }
+
+  const score = project.authorshipScore ?? 0;
+  if (!verifyEmbedToken(projectId, score, token)) {
+    res.status(403).send("<h1>Invalid or expired certificate token</h1>");
+    return;
+  }
+
+  if (!project.isCopyrightEligible || score < 25) {
+    res.status(403).send("<h1>This work has not reached the authorship threshold</h1>");
+    return;
+  }
+
+  const title = (project.title ?? "Untitled Work").slice(0, 80);
+  const genre = project.genre ?? "Music";
+  const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const fingerprint = `GKP-${token.slice(0, 8).toUpperCase()}-${token.slice(8, 16).toUpperCase()}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IP Certificate — ${title}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Georgia,"Times New Roman",serif;background:#0d0d0d;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+  .cert{background:#fffdf6;border:8px double #c9a227;border-radius:4px;padding:40px 48px;max-width:600px;width:100%;text-align:center}
+  .seal{font-size:10px;font-weight:bold;letter-spacing:4px;text-transform:uppercase;color:#c9a227;font-family:Arial,sans-serif}
+  h1{font-size:22px;margin:14px 0 4px;color:#161616}
+  .badge{display:inline-block;margin:10px 0;padding:6px 16px;border:2px solid #2a7a2a;border-radius:999px;color:#2a7a2a;font-weight:bold;letter-spacing:1px;text-transform:uppercase;font-size:11px;font-family:Arial,sans-serif}
+  .title{font-size:20px;font-style:italic;margin:20px 0 4px;color:#1a1a1a}
+  .row{font-size:13px;color:#555;margin:4px 0;font-family:Arial,sans-serif}
+  .score{font-size:18px;font-weight:bold;color:#2a7a2a;margin:16px 0;font-family:Arial,sans-serif}
+  .legal{font-size:11px;color:#666;max-width:480px;margin:14px auto 0;line-height:1.6;font-family:Arial,sans-serif}
+  .footer{margin-top:24px;border-top:2px solid #c9a227;padding-top:12px;font-size:10px;color:#999;font-family:monospace}
+  .fp{background:#f5f0e8;border:1px solid #d4b96e;border-radius:4px;padding:6px 12px;display:inline-block;margin-top:8px;font-size:11px;letter-spacing:2px;color:#8a6914}
+</style>
+</head>
+<body>
+<div class="cert">
+  <div class="seal">Gravel King Productions · Engine 2 IP Pipeline</div>
+  <h1>Certificate of Human–AI Collaborative Authorship</h1>
+  <div class="badge">Certified Human-AI Collaborative Work</div>
+  <div class="title">&ldquo;${title.replace(/</g, "&lt;").replace(/>/g, "&gt;")}&rdquo;</div>
+  <div class="row">Genre: ${genre}</div>
+  <div class="row">Date: ${date}</div>
+  <div class="score">Human Authorship Score: ${score}%</div>
+  <div class="legal">This document certifies that the named work contains sufficient human creative
+  expression — through manual line-by-line editing of AI-generated elements —
+  to support a claim of human authorship under current U.S. Copyright Office guidance
+  (Thaler v. Vidal, 2023). The complete forensic edit ledger is retained on file.</div>
+  <div class="footer">
+    Verified by forensic authorship ledger<br>
+    <div class="fp">${fingerprint}</div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("X-Frame-Options", "ALLOWALL");
+  res.send(html);
 });
 
 // ─── GET /api/lyrics/project/:id ─────────────────────────────────────────────

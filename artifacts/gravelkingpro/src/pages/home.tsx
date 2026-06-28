@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Mic2, Scissors, Wand2, Layers,
   Play, ChevronRight, CheckCircle2, Zap, Download,
-  Mail, Lock, Bell, X,
+  Mail, Lock, Bell, X, Crown, FileCode2, Activity,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -193,7 +193,7 @@ function NotifyBanner() {
 }
 
 export default function Home() {
-  const { isPro } = useAppState();
+  const { isPro, tier } = useAppState();
   const { isAuthenticated, login } = useAuth();
   const { toast } = useToast();
   const search = useSearch();
@@ -351,6 +351,43 @@ export default function Home() {
             ))}
           </div>
         </div>
+
+        {/* ── Upgrade nudge — shown for free/weekly users only ── */}
+        {!isPro && (
+          <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/8 via-amber-400/4 to-transparent p-5 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-semibold text-amber-400">
+                {!tier ? "Upgrade to unlock Pro tools" : "Go Pro — you're on Weekly"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                { icon: <FileCode2 className="w-3.5 h-3.5" />, label: "IP Embed Code", sub: "Certified authorship widget for your bio" },
+                { icon: <Activity className="w-3.5 h-3.5" />, label: "Kernel Dashboard", sub: "Before/after track optimization + telemetry" },
+                { icon: <Mic2 className="w-3.5 h-3.5" />, label: "Vocal Booth", sub: "Karaoke mode with precise lyric sync" },
+              ].map((item) => (
+                <div key={item.label} className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-background/40 border border-border/30">
+                  <div className="text-amber-500/60 mt-0.5 shrink-0">{item.icon}</div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold">{item.label}</span>
+                      <Lock className="w-2.5 h-2.5 text-muted-foreground/50" />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Link href="/pricing">
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-8 px-4 mt-1">
+                <Crown className="w-3 h-3 mr-1.5" />
+                {!tier ? "Upgrade to Studio — $39.99/mo" : "Go Studio — unlock IP embed + Kernel"}
+                <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* ── Pricing Strip ── */}
         <div className="space-y-4">

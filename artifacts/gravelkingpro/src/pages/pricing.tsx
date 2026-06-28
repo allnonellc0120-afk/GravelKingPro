@@ -36,7 +36,10 @@ const STUDIO_FEATURES = [
   { label: "Live multitrack DAW", highlight: "Mix 8+ tracks in real time" },
   { label: "Live microphone recording", highlight: "USB mic, audio interface, phone input" },
   { label: "Per-stem live meters", highlight: "Real-time RMS / peak on every channel" },
-  { label: "PDF export reports", highlight: "Shareable mastering certificates" },
+  { label: "Songwriting Studio — line-by-line AI editor", highlight: "Edit AI drafts, rhyme tray, AI variation picker" },
+  { label: "IP Embed Code — shareable certificate", highlight: "Hashed embed widget for your website, bio, or press kit" },
+  { label: "Kernel Dashboard (10 optimizations/day)", highlight: "Before/after waveform comparison on saved DAW tracks" },
+  { label: "PDF export reports", highlight: "Shareable mastering + authorship certificates" },
   { label: "Priority support", highlight: "48-hour response guarantee" },
 ];
 
