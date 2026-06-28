@@ -13,7 +13,7 @@ import { randomUUID } from "crypto";
 import { join, basename, extname, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { zipSync } from "fflate";
-import { applyMLKv3, applyMLKv3Fast } from "./kernel-v3";
+import { applyMLKv3Fast } from "./kernel-v3";
 
 const execFileAsync = promisify(execFile);
 
@@ -116,7 +116,7 @@ export async function gnsStemSplit(
     for (const file of stemFiles) {
       const rawBuf  = await readFile(join(stemDir, file));
       const s16Buf  = await normalizeToS16le(rawBuf);
-      const { buf, parity } = applyMLKv3(s16Buf, multiplier);
+      const { buf, parity } = await applyMLKv3Fast(s16Buf, multiplier);
       if (parity !== "MLK_V3_VALIDATED") kernelParity = parity;
       const label = file.replace(".wav", "");
       zipInput[`GKP_${label}.wav`] = new Uint8Array(buf);
@@ -129,7 +129,7 @@ export async function gnsStemSplit(
       .map((f) => join(stemDir, f));
     if (instrumentalSources.length > 1) {
       const instRaw = await mixStemsToInstrumental(instrumentalSources);
-      const { buf, parity } = applyMLKv3(instRaw, multiplier);
+      const { buf, parity } = await applyMLKv3Fast(instRaw, multiplier);
       if (parity !== "MLK_V3_VALIDATED") kernelParity = parity;
       zipInput["GKP_instrumental.wav"] = new Uint8Array(buf);
       stemNames.push("instrumental");
@@ -246,7 +246,7 @@ export async function uvrVocalRemoval(
 
     const rawBuf = await readFile(parsed.instrumental);
     const s16Buf = await normalizeToS16le(rawBuf);
-    const { buf, parity } = applyMLKv3(s16Buf, multiplier);
+    const { buf, parity } = await applyMLKv3Fast(s16Buf, multiplier);
 
     return {
       instrumental: buf,
@@ -421,7 +421,7 @@ export async function gnsVocalRemoval(
 
     // ── Stage 2: MLK v3 Post-Processing ─────────────────────────────────────
     const s16Buf              = await normalizeToS16le(noVocalBuf);
-    const { buf, parity }     = applyMLKv3(s16Buf, multiplier);
+    const { buf, parity }     = await applyMLKv3Fast(s16Buf, multiplier);
 
     return {
       instrumental: buf,
