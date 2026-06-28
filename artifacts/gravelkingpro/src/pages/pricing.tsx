@@ -28,10 +28,10 @@ const WEEKLY_FEATURES = [
 ];
 
 const STUDIO_FEATURES = [
-  { label: "MLK V3.5 Hardware Optimizer", highlight: "Runs locally — optimizes YOUR device for audio processing" },
-  { label: "CPU affinity + NUMA tuning", highlight: "Pins cores, locks memory, detects your hardware topology" },
-  { label: "Real benchmark metrics", highlight: "Live GFLOPS, parity, efficiency — not demo numbers" },
-  { label: "Guided step-by-step setup", highlight: "Click-through optimization walkthrough" },
+  { label: "MLK V3.5 Quality Optimizer", highlight: "Auto-tunes your separation settings for your plan" },
+  { label: "Personalized recommendations", highlight: "Honest device + plan tips to improve speed & quality" },
+  { label: "Live server benchmark", highlight: "Real GFLOPS throughput of our processing servers" },
+  { label: "One-click apply", highlight: "Applies the recommended settings to your account" },
   { label: "Fully adjustable mastering kernel", highlight: "Custom EQ, compression, limiting per track" },
   { label: "Live multitrack DAW", highlight: "Mix 8+ tracks in real time" },
   { label: "Live microphone recording", highlight: "USB mic, audio interface, phone input" },
@@ -50,7 +50,7 @@ const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref
   },
   monthly: {
     planName: "GravelKing Pro Plus",
-    ctaLabel: "Launch the Hardware Optimizer",
+    ctaLabel: "Launch the Quality Optimizer",
     ctaHref: "/optimizer",
   },
   node_auditor: {
@@ -402,7 +402,7 @@ export default function Pricing() {
                 <CardTitle className="text-lg text-amber-500 flex items-center gap-2">
                   <Crown className="w-4 h-4" /> GravelKing Pro Plus
                 </CardTitle>
-                <CardDescription>Studio tools + MLK V3.5 hardware optimizer — runs locally on your machine</CardDescription>
+                <CardDescription>Studio tools + the MLK V3.5 Quality Optimizer that tunes your separation settings</CardDescription>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold">$39.99</span>
                   <span className="text-muted-foreground text-sm">/mo</span>

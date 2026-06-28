@@ -20,6 +20,13 @@ const PROMO_CODES: Record<string, SubscriptionTier> = {
 };
 const PROMO_STORAGE_KEY = "gkp_promo_code";
 
+const SEP_STRENGTH_KEY = "gkp_sep_strength";
+const DEFAULT_SEP_STRENGTH = 0.75;
+function clampStrength(n: number) {
+  if (Number.isNaN(n)) return DEFAULT_SEP_STRENGTH;
+  return Math.min(2.0, Math.max(0.1, n));
+}
+
 interface AppState {
   tier: SubscriptionTier;
   /** weekly+ : unlimited voice removal / stem split + preset masters */
@@ -43,6 +50,9 @@ interface AppState {
   /** Returns true if code was valid, false if invalid */
   redeemPromo: (code: string) => boolean;
   revokePromo: () => void;
+  /** Persisted separation/carve strength (multiplier) applied across the separation tools */
+  sepStrength: number;
+  setSepStrength: (n: number) => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -77,12 +87,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activePromo, setActivePromo] = useState<string | null>(null);
   const [results, setResults] = useState<Results>(null);
   const [hasRun, setHasRun] = useState(false);
+  const [sepStrength, setSepStrengthState] = useState<number>(DEFAULT_SEP_STRENGTH);
 
   useEffect(() => {
     const saved = localStorage.getItem(PROMO_STORAGE_KEY);
     if (saved && PROMO_CODES[saved]) {
       setActivePromo(saved);
     }
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(SEP_STRENGTH_KEY);
+    if (saved !== null) setSepStrengthState(clampStrength(parseFloat(saved)));
   }, []);
 
   const refreshSubscription = useCallback(async (): Promise<{ tier: SubscriptionTier; plan: string | null; isDeveloper?: boolean }> => {
@@ -136,6 +152,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(PROMO_STORAGE_KEY);
   }, []);
 
+  const setSepStrength = useCallback((n: number) => {
+    const c = clampStrength(n);
+    setSepStrengthState(c);
+    try { localStorage.setItem(SEP_STRENGTH_KEY, String(c)); } catch { /* localStorage unavailable */ }
+  }, []);
+
   return (
     <AppContext.Provider value={{
       tier: effectiveTier,
@@ -154,6 +176,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activePromo,
       redeemPromo,
       revokePromo,
+      sepStrength,
+      setSepStrength,
     }}>
       {children}
     </AppContext.Provider>

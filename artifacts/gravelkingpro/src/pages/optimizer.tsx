@@ -1,151 +1,114 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { motion, AnimatePresence } from "framer-motion";
+import { Slider } from "@/components/ui/slider";
+import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
-  Cpu, Zap, Lock, CheckCircle2, ChevronRight, BarChart2,
-  AlertCircle, Terminal, ArrowRight, RefreshCw, Shield,
+  Cpu, Zap, Lock, CheckCircle2, Gauge, Sparkles, Server,
+  Smartphone, Monitor, ArrowRight, Lightbulb, BarChart2, ShieldCheck, Loader2,
 } from "lucide-react";
 
-type Phase =
-  | "locked"
-  | "welcome"
-  | "detecting"
-  | "detected"
-  | "optimizing"
-  | "benchmarking"
-  | "done";
+type Phase = "ready" | "done";
 
-interface HardwareInfo {
-  cores: number;
-  threads: number;
-  arch: string;
+interface DeviceInfo {
+  cores: number | null;
+  memoryGb: number | null;
+  browser: string;
   platform: string;
-  memory: string;
-  numaNodes: number;
-  blasBackend: string;
+  isMobile: boolean;
 }
 
-interface BenchmarkResult {
+interface ServerBench {
   gflops: number;
   peakGflops: number;
-  minGflops: number;
   matrixSize: number;
-  mmapLocked: boolean;
-  numaAware: boolean;
-  avgTimeSec: number;
   demo: boolean;
 }
 
-const STEP_LABELS = [
-  "Detect hardware topology",
-  "Pin CPU cores + set thread affinity",
-  "Lock memory pages (NIST SP 800-223)",
-  "Enable NUMA-aware allocation",
-  "Tune BLAS thread count",
-  "Run DGEMM benchmark",
-];
+const TUNED_STRENGTH = 0.75;
 
-function TerminalLine({ text, delay = 0 }: { text: string; delay?: number }) {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(true), delay);
-    return () => clearTimeout(t);
-  }, [delay]);
-  return visible ? (
-    <div className="font-mono text-xs text-emerald-400 leading-5">{text}</div>
-  ) : null;
+function detectDevice(): DeviceInfo {
+  const nav = navigator as unknown as { deviceMemory?: number };
+  const ua = navigator.userAgent;
+  let browser = "your browser";
+  if (/edg\//i.test(ua)) browser = "Edge";
+  else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
+  else if (/chrome|crios/i.test(ua)) browser = "Chrome";
+  else if (/safari/i.test(ua)) browser = "Safari";
+  const isMobile = /mobi|android|iphone|ipad|ipod/i.test(ua);
+  let platform = isMobile ? "Mobile device" : "Desktop";
+  if (/iphone|ipad|ipod/i.test(ua)) platform = "iOS";
+  else if (/android/i.test(ua)) platform = "Android";
+  else if (/mac/i.test(navigator.platform)) platform = "macOS";
+  else if (/win/i.test(navigator.platform)) platform = "Windows";
+  else if (/linux/i.test(navigator.platform)) platform = "Linux";
+  return {
+    cores: navigator.hardwareConcurrency || null,
+    memoryGb: typeof nav.deviceMemory === "number" ? nav.deviceMemory : null,
+    browser,
+    platform,
+    isMobile,
+  };
+}
+
+function ConfigRow({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note?: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/40 p-3">
+      <div className="mt-0.5 shrink-0 text-emerald-400">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-sm text-emerald-300/90 font-mono break-words">{value}</p>
+        {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
+      </div>
+    </div>
+  );
+}
+
+function DeviceStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/20 bg-card/30 p-3 space-y-1">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        {icon}
+        <span className="text-[11px] uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="text-sm font-mono text-foreground/90">{value}</p>
+    </div>
+  );
 }
 
 export default function Optimizer() {
-  const { isPro, tier } = useAppState();
-  const [phase, setPhase] = useState<Phase>(isPro || tier === "node_auditor" ? "welcome" : "locked");
-  const [step, setStep] = useState(0);
-  const [hw, setHw] = useState<HardwareInfo | null>(null);
-  const [result, setResult] = useState<BenchmarkResult | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [baselineGflops, setBaselineGflops] = useState<number | null>(null);
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  const { isPro, tier, hasSplits, isLoadingSubscription, sepStrength, setSepStrength } = useAppState();
+  const unlocked = isPro || tier === "node_auditor";
 
-  useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
+  const [phase, setPhase] = useState<Phase>("ready");
+  const [device, setDevice] = useState<DeviceInfo | null>(null);
+  const [bench, setBench] = useState<ServerBench | null>(null);
+  const [benchState, setBenchState] = useState<"idle" | "running" | "done" | "unavailable">("idle");
 
-  useEffect(() => {
-    if (!isPro && tier !== "node_auditor") {
-      setPhase("locked");
-    }
-  }, [isPro, tier]);
+  const planName =
+    tier === "node_auditor" ? "Node Auditor"
+    : tier === "monthly" ? "Pro Plus (Studio)"
+    : tier === "weekly" ? "Weekly"
+    : "Free";
 
-  function addLog(msg: string) {
-    setLogs((l) => [...l, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  const formatLabel = hasSplits ? "WAV · lossless 44.1 kHz" : "MP3 · 320 kbps";
+  const limitLabel = hasSplits ? "Unlimited runs" : "3 free voice removals";
+
+  function runOptimize() {
+    setDevice(detectDevice());
+    // Auto-apply the one setting we can safely tune: the tuned separation strength.
+    // It persists and is read by Voice Removal and Studio. You can fine-tune it below.
+    setSepStrength(TUNED_STRENGTH);
+    setPhase("done");
   }
 
-  async function runDetection() {
-    setPhase("detecting");
-    setLogs([]);
-    addLog("MLK-V 3.5 Optimizer initializing...");
-
-    await delay(400);
-    addLog("Reading /proc/cpuinfo...");
-    await delay(300);
-
-    const cores = navigator.hardwareConcurrency || 4;
-    const platform = navigator.platform || "unknown";
-    const arch = platform.toLowerCase().includes("win") ? "x86_64 (Windows)" :
-      platform.toLowerCase().includes("mac") ? "arm64/x86_64 (macOS)" : "x86_64 (Linux)";
-
-    addLog(`Detected ${cores} logical CPUs`);
-    await delay(200);
-    addLog(`Platform: ${arch}`);
-    await delay(200);
-    addLog("Probing NUMA topology...");
-    await delay(400);
-    addLog("Checking available memory...");
-    await delay(300);
-
-    const mem = (navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB` : "8+ GB";
-    addLog(`Available system memory: ${mem}`);
-    await delay(200);
-    addLog("Detection complete.");
-
-    const info: HardwareInfo = {
-      cores,
-      threads: cores,
-      arch,
-      platform,
-      memory: mem,
-      numaNodes: cores >= 16 ? 2 : 1,
-      blasBackend: "OpenBLAS / AVX-512",
-    };
-    setHw(info);
-    setPhase("detected");
-  }
-
-  async function runOptimization() {
-    setPhase("optimizing");
-    setStep(0);
-    addLog("Starting MLK-V 3.5 optimization sequence...");
-
-    for (let i = 0; i < STEP_LABELS.length - 1; i++) {
-      setStep(i);
-      addLog(`→ ${STEP_LABELS[i]}...`);
-      await delay(600 + Math.random() * 400);
-      addLog(`  ✓ ${STEP_LABELS[i]} — applied`);
-    }
-
-    addLog("All pre-benchmark optimizations applied.");
-    await delay(300);
-
-    setStep(5);
-    setPhase("benchmarking");
-    addLog("Running DGEMM benchmark (4096×4096, 8 iterations)...");
-
+  async function runBenchmark() {
+    setBenchState("running");
     try {
       const res = await fetch("/api/mlk/benchmark/run", {
         method: "POST",
@@ -153,344 +116,315 @@ export default function Optimizer() {
         credentials: "include",
         body: JSON.stringify({ matrixSize: 4096, iterations: 8 }),
       });
-      const data = await res.json() as BenchmarkResult;
-      addLog(`Benchmark complete.`);
-      addLog(`  Peak: ${data.peakGflops.toFixed(2)} GFLOPS`);
-      addLog(`  Avg:  ${data.gflops.toFixed(2)} GFLOPS`);
-      addLog(`  Min:  ${data.minGflops.toFixed(2)} GFLOPS`);
-      addLog(`  mmap locked: ${data.mmapLocked ? "YES" : "no"}`);
-      addLog(`  NUMA aware:  ${data.numaAware ? "YES" : "no"}`);
-      addLog("MLK-V 3.5 optimization session complete.");
-      setResult(data);
-      setBaselineGflops(data.gflops * 0.44); // show approx baseline (unoptimized ~44%)
+      if (!res.ok) throw new Error("unavailable");
+      const data = await res.json() as { gflops: number; peakGflops: number; matrixSize: number; demo: boolean };
+      setBench({
+        gflops: data.gflops,
+        peakGflops: data.peakGflops,
+        matrixSize: data.matrixSize,
+        demo: !!data.demo,
+      });
+      setBenchState("done");
     } catch {
-      addLog("Benchmark runner unavailable — using demo metrics.");
-      const demo: BenchmarkResult = {
-        gflops: 180.5,
-        peakGflops: 220.3,
-        minGflops: 161.2,
-        matrixSize: 4096,
-        mmapLocked: true,
-        numaAware: false,
-        avgTimeSec: 0.754,
-        demo: true,
-      };
-      setResult(demo);
-      setBaselineGflops(demo.gflops * 0.44);
+      setBench(null);
+      setBenchState("unavailable");
     }
-
-    setPhase("done");
   }
 
-  if (phase === "locked") {
+  // ── Loading state (subscription resolving) ────────────────────────────────
+  if (isLoadingSubscription) {
     return (
       <Layout>
-        <div className="max-w-2xl mx-auto text-center space-y-6 py-20 px-4">
-          <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
-            <Lock className="w-7 h-7 text-amber-500" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold mb-2">MLK V3.5 Hardware Optimizer</h1>
-            <p className="text-muted-foreground text-lg">
-              Optimizes your device locally for audio processing using the Morris Law Kernel V3.5.
-              Requires a <strong>GravelKing Pro Plus</strong> subscription.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left text-sm">
-            {[
-              { icon: <Cpu className="w-4 h-4 text-amber-500" />, label: "CPU affinity pinning", sub: "Dedicates cores to audio" },
-              { icon: <Shield className="w-4 h-4 text-emerald-500" />, label: "Memory locking", sub: "NIST SP 800-223 aligned" },
-              { icon: <BarChart2 className="w-4 h-4 text-sky-400" />, label: "Real GFLOPS metrics", sub: "Not demo numbers" },
-            ].map((f) => (
-              <div key={f.label} className="border border-border/30 rounded-lg p-3 bg-card/20">
-                <div className="flex items-center gap-2 mb-1">{f.icon}<span className="font-medium">{f.label}</span></div>
-                <p className="text-xs text-muted-foreground">{f.sub}</p>
-              </div>
-            ))}
-          </div>
-          <Button asChild size="lg" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-            <Link href="/pricing">Get Pro Plus — $39.99/mo</Link>
-          </Button>
+        <div className="max-w-3xl mx-auto py-24 flex items-center justify-center text-muted-foreground gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Checking your plan…
         </div>
       </Layout>
     );
   }
 
+  // ── Locked (paid feature) ─────────────────────────────────────────────────
+  if (!unlocked) {
+    return (
+      <Layout>
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+            <h1 className="text-2xl font-bold tracking-tight">MLK V3.5 Quality Optimizer</h1>
+            <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400">Pro Plus</Badge>
+          </div>
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="py-12 flex flex-col items-center text-center gap-5">
+              <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <Lock className="w-7 h-7 text-amber-400" />
+              </div>
+              <div className="space-y-2 max-w-md">
+                <p className="font-semibold">A Pro Plus feature</p>
+                <p className="text-sm text-muted-foreground">
+                  The Quality Optimizer tunes your separation settings for your plan, gives
+                  honest recommendations to improve speed and quality, and runs a live
+                  throughput benchmark of the servers that process your audio.
+                </p>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-3 w-full max-w-xl text-left">
+                {[
+                  { icon: <Sparkles className="w-4 h-4 text-amber-400" />, t: "Auto-tuned settings", d: "Best separation settings for your plan, applied to your account" },
+                  { icon: <Lightbulb className="w-4 h-4 text-amber-400" />, t: "Honest recommendations", d: "Device + plan tips — no fabricated claims" },
+                  { icon: <Server className="w-4 h-4 text-amber-400" />, t: "Live server benchmark", d: "Real throughput of our processing servers" },
+                ].map((f) => (
+                  <div key={f.t} className="rounded-lg border border-border/30 bg-card/40 p-3 space-y-1">
+                    {f.icon}
+                    <p className="text-sm font-medium">{f.t}</p>
+                    <p className="text-xs text-muted-foreground">{f.d}</p>
+                  </div>
+                ))}
+              </div>
+              <Link href="/pricing">
+                <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
+                  See plans <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Unlocked ──────────────────────────────────────────────────────────────
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto space-y-6 py-8 px-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Cpu className="w-5 h-5 text-amber-500" />
-            <h1 className="text-2xl font-bold">MLK V3.5 Hardware Optimizer</h1>
-            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">Pro Plus</Badge>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-emerald-400" />
+            <h1 className="text-2xl font-bold tracking-tight">MLK V3.5 Quality Optimizer</h1>
+            <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{planName}</Badge>
             <ToolHelp
-              title="Hardware Optimizer"
-              summary="Detects your CPU topology and runs a DGEMM benchmark to gauge audio-processing throughput, presented alongside the Morris Law Kernel V3.5 optimization sequence."
+              title="Quality Optimizer"
+              summary="Applies the best separation settings your plan allows and gives honest, specific recommendations to get the most out of GravelKing."
               steps={[
-                "Run the scan to detect your CPU topology.",
-                "Step through the kernel optimization sequence (CPU affinity, memory locking).",
-                "Run the DGEMM benchmark to compare before/after GFLOPS.",
+                "Press Optimize — we detect your device and apply the recommended settings to your account.",
+                "Review the applied configuration and fine-tune separation strength if you want.",
+                "Optionally run a live benchmark of our processing servers.",
               ]}
-              note="The benchmark runs on our server kernel; if the runner is unavailable it falls back to clearly-labeled demo numbers. The optimization steps are an illustrative walkthrough, not guaranteed changes to your local machine."
+              note="Your audio is processed on our servers, so results are the same on any device. Your device specs only affect the in-browser live Studio/DAW."
             />
           </div>
-          <p className="text-muted-foreground text-sm">
-            Runs entirely on your device — detects your hardware topology, applies kernel optimizations, and benchmarks real performance.
+          <p className="text-sm text-muted-foreground">
+            Honest tuning — we apply the best settings your plan allows and tell you exactly
+            what does and doesn't move the needle. No fabricated metrics.
           </p>
         </div>
 
-        {/* Steps */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {STEP_LABELS.map((label, i) => {
-            const done = phase === "done" || (phase === "benchmarking" && i < 5) || (phase === "optimizing" && i < step);
-            const active = (phase === "optimizing" && i === step) || (phase === "benchmarking" && i === 5);
-            return (
-              <div
-                key={label}
-                className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs transition-colors ${
-                  done ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" :
-                  active ? "border-amber-500/40 bg-amber-500/10 text-amber-400" :
-                  "border-border/30 bg-card/20 text-muted-foreground"
-                }`}
-              >
-                {done ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /> :
-                 active ? <RefreshCw className="w-3.5 h-3.5 shrink-0 mt-0.5 animate-spin" /> :
-                 <div className="w-3.5 h-3.5 rounded-full border border-border/50 shrink-0 mt-0.5" />}
-                <span className="leading-tight">{label}</span>
-              </div>
-            );
-          })}
-        </div>
+        {phase === "ready" && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <Card className="border-emerald-500/20 bg-emerald-500/5">
+              <CardContent className="py-12 flex flex-col items-center text-center gap-5">
+                <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                  <Gauge className="w-7 h-7 text-emerald-400" />
+                </div>
+                <div className="space-y-2 max-w-md">
+                  <p className="font-semibold">Optimize your setup</p>
+                  <p className="text-sm text-muted-foreground">
+                    We'll detect your device, apply the recommended separation settings to
+                    your account, and show honest recommendations for your plan.
+                  </p>
+                </div>
+                <Button onClick={runOptimize} className="bg-emerald-600 hover:bg-emerald-700" data-testid="button-optimize">
+                  <Zap className="w-4 h-4 mr-1.5" /> Optimize
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
-        {/* Welcome */}
-        <AnimatePresence mode="wait">
-          {phase === "welcome" && (
-            <motion.div key="welcome" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <Card className="border-amber-500/20 bg-amber-500/5">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Zap className="w-4 h-4 text-amber-500" />
-                    Ready to optimize your hardware
-                  </CardTitle>
-                  <CardDescription>
-                    This tool will detect your CPU topology, apply NUMA-aware memory settings, pin thread affinity, and lock memory pages for deterministic audio processing.
-                    No files leave your device.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={runDetection} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-                    <Cpu className="w-4 h-4 mr-2" />Detect My Hardware
+        {phase === "done" && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+            {/* Applied configuration */}
+            <Card className="border-emerald-500/30 bg-emerald-500/5">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Applied to your account
+                </CardTitle>
+                <CardDescription>The best settings your {planName} plan allows are active.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-2 gap-3">
+                <ConfigRow
+                  icon={<Sparkles className="w-4 h-4" />}
+                  label="Separation engine"
+                  value="Neural AI (Demucs)"
+                  note="Primary on every run, with an instant on-server fallback if the AI engine is busy."
+                />
+                <ConfigRow
+                  icon={<ShieldCheck className="w-4 h-4" />}
+                  label="Output format"
+                  value={formatLabel}
+                  note={hasSplits ? "Lossless downloads on your plan." : "Free tier outputs MP3. Upgrade for lossless WAV."}
+                />
+                <ConfigRow
+                  icon={<Gauge className="w-4 h-4" />}
+                  label="Run allowance"
+                  value={limitLabel}
+                />
+                <ConfigRow
+                  icon={<Cpu className="w-4 h-4" />}
+                  label="Separation strength"
+                  value={sepStrength.toFixed(2)}
+                  note="Applied to Voice Removal and Studio. Tuned default — adjust below."
+                />
+              </CardContent>
+            </Card>
+
+            {/* Fine-tune separation strength */}
+            <Card className="border-border/30 bg-card/40">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-emerald-400" /> Fine-tune separation strength
+                </CardTitle>
+                <CardDescription>
+                  Controls how aggressively the MLK v3 kernel carves the separated audio. This changes the
+                  character of the result, not the processing speed. {TUNED_STRENGTH.toFixed(2)} is our tuned default.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Lighter carve</span>
+                  <span className="text-sm font-mono text-emerald-300">{sepStrength.toFixed(2)}</span>
+                  <span className="text-sm text-muted-foreground">Deeper carve</span>
+                </div>
+                <Slider
+                  value={[sepStrength]}
+                  onValueChange={(v) => setSepStrength(v[0])}
+                  min={0.1}
+                  max={2.0}
+                  step={0.01}
+                  data-testid="slider-optimizer-strength"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="border-border/40" onClick={() => setSepStrength(TUNED_STRENGTH)}>
+                    Reset to recommended
                   </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
+                </div>
+              </CardContent>
+            </Card>
 
-          {phase === "detecting" && (
-            <motion.div key="detecting" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <Card className="border-border/40 bg-card/20">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin text-amber-500" />
-                    Detecting hardware...
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TerminalOutput logs={logs} logsEndRef={logsEndRef} />
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {phase === "detected" && hw && (
-            <motion.div key="detected" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <Card className="border-emerald-500/20 bg-card/20">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    Hardware detected
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <HwStat label="CPU Cores" value={String(hw.cores)} />
-                    <HwStat label="Architecture" value={hw.arch.split(" ")[0]} />
-                    <HwStat label="System Memory" value={hw.memory} />
-                    <HwStat label="NUMA Nodes" value={String(hw.numaNodes)} />
-                    <HwStat label="BLAS Backend" value="OpenBLAS" />
-                    <HwStat label="Platform" value={hw.platform.slice(0, 12)} />
-                  </div>
-                  <div className="border border-amber-500/20 rounded-lg p-3 bg-amber-500/5 text-xs text-amber-400">
-                    <strong>Click "Run Optimization"</strong> to apply CPU affinity, memory locking, and NUMA-aware allocation — then benchmark your device with a 4096×4096 DGEMM matrix multiply.
-                  </div>
-                  <Button onClick={runOptimization} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-                    <Zap className="w-4 h-4 mr-2" />Run Optimization + Benchmark
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {(phase === "optimizing" || phase === "benchmarking") && (
-            <motion.div key="running" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <Card className="border-border/40 bg-card/20">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin text-amber-500" />
-                    {phase === "benchmarking" ? "Benchmarking..." : "Applying optimizations..."}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TerminalOutput logs={logs} logsEndRef={logsEndRef} />
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {phase === "done" && result && (
-            <motion.div key="done" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-              <Card className="border-emerald-500/20 bg-emerald-500/5">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    Optimization complete
-                  </CardTitle>
-                  <CardDescription>Your device has been tuned for maximum audio processing performance.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Metrics */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <MetricCard label="Avg GFLOPS" value={result.gflops.toFixed(1)} color="text-amber-400" />
-                    <MetricCard label="Peak GFLOPS" value={result.peakGflops.toFixed(1)} color="text-emerald-400" />
-                    <MetricCard label="Min GFLOPS" value={result.minGflops.toFixed(1)} color="text-sky-400" />
-                    <MetricCard label="Matrix Size" value={`${result.matrixSize}²`} color="text-purple-400" />
-                  </div>
-
-                  {/* Baseline vs optimized */}
-                  {baselineGflops && (
-                    <div className="border border-border/30 rounded-lg p-4 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Performance Gain</p>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">Baseline (unoptimized)</span>
-                            <span>{baselineGflops.toFixed(1)} GFLOPS</span>
-                          </div>
-                          <div className="h-2 bg-secondary rounded-full">
-                            <div className="h-2 bg-border rounded-full" style={{ width: "44%" }} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-emerald-400 font-medium">MLK V3.5 optimized</span>
-                            <span className="text-emerald-400 font-medium">{result.gflops.toFixed(1)} GFLOPS</span>
-                          </div>
-                          <div className="h-2 bg-secondary rounded-full">
-                            <div className="h-2 bg-emerald-500 rounded-full" style={{ width: "100%" }} />
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-xs text-emerald-400 font-semibold">
-                        ≈ {((result.gflops / baselineGflops - 1) * 100).toFixed(0)}% improvement on same hardware
+            {/* Recommendations */}
+            <Card className="border-border/30 bg-card/40">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-400" /> Recommendations
+                </CardTitle>
+                <CardDescription>Specific, honest ways to get better and faster results.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!hasSplits && (
+                  <div className="flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3">
+                    <ArrowRight className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Upgrade for lossless WAV + unlimited runs</p>
+                      <p className="text-xs text-muted-foreground">
+                        You already get neural AI separation on every run. A paid plan unlocks lossless
+                        WAV output and removes run limits — the biggest available quality upgrade.{" "}
+                        <Link href="/pricing" className="text-amber-400 hover:underline">See plans</Link>.
                       </p>
                     </div>
-                  )}
-
-                  {/* Optimization flags */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <FlagRow label="Memory pages locked" ok={result.mmapLocked} />
-                    <FlagRow label="NUMA-aware allocation" ok={result.numaAware} />
-                    <FlagRow label="CPU affinity set" ok />
-                    <FlagRow label="BLAS threads pinned" ok />
                   </div>
-
-                  {result.demo && (
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground border border-border/30 rounded p-3">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
-                      <span>Benchmark ran in demo mode — install Python + numpy + scipy on your machine to get real hardware metrics from the full MLK V3.5 kernel.</span>
+                )}
+                {device?.isMobile && (
+                  <div className="flex items-start gap-3 rounded-lg border border-border/30 p-3">
+                    <Smartphone className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Use a desktop browser for the live Studio</p>
+                      <p className="text-xs text-muted-foreground">
+                        Every audio tool works on mobile, but the live Studio/DAW (real-time mixing)
+                        runs smoother on a desktop browser.
+                      </p>
                     </div>
-                  )}
-
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      onClick={() => { setPhase("welcome"); setResult(null); setLogs([]); setStep(0); }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Run Again
-                    </Button>
-                    {tier === "node_auditor" && (
-                      <Button asChild size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-                        <Link href="/kernel">
-                          View Kernel Dashboard <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                        </Link>
-                      </Button>
-                    )}
                   </div>
-                </CardContent>
-              </Card>
+                )}
+                <div className="flex items-start gap-3 rounded-lg border border-border/30 p-3">
+                  <Sparkles className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Start from the highest-quality source</p>
+                    <p className="text-xs text-muted-foreground">
+                      Separation is cleanest from a WAV or FLAC source. A low-bitrate MP3 limits the
+                      result no matter which engine runs.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-lg border border-border/30 p-3">
+                  <Server className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Your device never bottlenecks quality</p>
+                    <p className="text-xs text-muted-foreground">
+                      Processing runs on our servers, so you get identical results on any device.
+                      Keep individual files reasonably short for the fastest turnaround.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Terminal log */}
-              <Card className="border-border/40 bg-card/10">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs flex items-center gap-2 text-muted-foreground">
-                    <Terminal className="w-3.5 h-3.5" />Full optimization log
+            {/* Detected device */}
+            {device && (
+              <Card className="border-border/30 bg-card/40">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Monitor className="w-4 h-4 text-sky-400" /> Your device
                   </CardTitle>
+                  <CardDescription>Detected in your browser — affects only the in-browser live Studio/DAW.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <TerminalOutput logs={logs} logsEndRef={logsEndRef} />
+                <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <DeviceStat icon={<Cpu className="w-3.5 h-3.5" />} label="CPU cores" value={device.cores ? String(device.cores) : "Not reported"} />
+                  <DeviceStat icon={<BarChart2 className="w-3.5 h-3.5" />} label="Memory" value={device.memoryGb ? `~${device.memoryGb} GB` : "Not reported"} />
+                  <DeviceStat icon={<Monitor className="w-3.5 h-3.5" />} label="Platform" value={device.platform} />
+                  <DeviceStat icon={<Sparkles className="w-3.5 h-3.5" />} label="Browser" value={device.browser} />
                 </CardContent>
               </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+
+            {/* Optional server benchmark */}
+            <Card className="border-border/30 bg-card/40">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Server className="w-4 h-4 text-emerald-400" /> Processing-server benchmark
+                </CardTitle>
+                <CardDescription>
+                  A live DGEMM throughput test of the GravelKing servers that process your audio —
+                  not your device.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {benchState === "done" && bench && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <DeviceStat icon={<Zap className="w-3.5 h-3.5" />} label="Avg throughput" value={`${bench.gflops.toFixed(1)} GFLOPS`} />
+                    <DeviceStat icon={<Gauge className="w-3.5 h-3.5" />} label="Peak" value={`${bench.peakGflops.toFixed(1)} GFLOPS`} />
+                    <DeviceStat icon={<Cpu className="w-3.5 h-3.5" />} label="Matrix" value={`${bench.matrixSize}²`} />
+                  </div>
+                )}
+                {benchState === "done" && bench?.demo && (
+                  <p className="text-xs text-muted-foreground">Sample benchmark (small matrix) — representative, not a full production run.</p>
+                )}
+                {benchState === "unavailable" && (
+                  <p className="text-xs text-muted-foreground">The benchmark runner is momentarily unavailable. Try again shortly.</p>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-border/40"
+                  onClick={() => void runBenchmark()}
+                  disabled={benchState === "running"}
+                  data-testid="button-run-benchmark"
+                >
+                  {benchState === "running"
+                    ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Running…</>
+                    : <><BarChart2 className="w-3.5 h-3.5 mr-1.5" /> {bench ? "Run again" : "Run benchmark"}</>}
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
     </Layout>
   );
-}
-
-function TerminalOutput({ logs, logsEndRef }: { logs: string[]; logsEndRef: React.RefObject<HTMLDivElement | null> }) {
-  return (
-    <div className="bg-black/60 rounded-lg p-3 font-mono text-xs text-emerald-400 space-y-0.5 max-h-48 overflow-y-auto">
-      {logs.length === 0 && <span className="text-muted-foreground">Waiting...</span>}
-      {logs.map((l, i) => <div key={i}>{l}</div>)}
-      <div ref={logsEndRef} />
-    </div>
-  );
-}
-
-function HwStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border border-border/30 rounded p-2.5 bg-secondary/20">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-      <p className="text-sm font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="border border-border/30 rounded-lg p-3 bg-card/20 text-center">
-      <p className={`text-xl font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
-    </div>
-  );
-}
-
-function FlagRow({ label, ok }: { label: string; ok: boolean }) {
-  return (
-    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded border ${ok ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-border/20 text-muted-foreground"}`}>
-      {ok
-        ? <CheckCircle2 className="w-3 h-3 shrink-0" />
-        : <div className="w-3 h-3 rounded-full border border-border/50 shrink-0" />}
-      {label}
-    </div>
-  );
-}
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
