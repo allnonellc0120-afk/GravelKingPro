@@ -1,75 +1,77 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const facts = [
+  "200 million AI tracks generated in 2024.",
+  "The U.S. Copyright Office denied protection to all of them.",
+  "Without proof of human authorship — your music isn't legally yours.",
+];
 
 export function Scene1() {
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 500),
-      setTimeout(() => setPhase(2), 2000),
-      setTimeout(() => setPhase(3), 4000),
+      setTimeout(() => setPhase(1), 400),
+      setTimeout(() => setPhase(2), 1800),
+      setTimeout(() => setPhase(3), 3200),
     ];
     return () => timers.forEach(t => clearTimeout(t));
   }, []);
 
   return (
-    <motion.div 
-      className="absolute inset-0 flex items-center justify-center overflow-hidden"
-      initial={{ opacity: 0, scale: 1.1 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+    <motion.div
+      className="absolute inset-0 flex items-center justify-center overflow-hidden bg-[#050505]"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.05 }}
+      transition={{ duration: 0.5 }}
     >
-      <video
-        src={`${import.meta.env.BASE_URL}videos/mpc_pads.mp4`}
-        className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-screen"
-        autoPlay
-        muted
-        playsInline
+      {/* Pulsing red grid */}
+      <div className="absolute inset-0 opacity-10"
+        style={{
+          backgroundImage: 'linear-gradient(#ff000030 1px, transparent 1px), linear-gradient(90deg, #ff000030 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }}
       />
 
-      {/* Kinetic Waveform Elements */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-40 mix-blend-screen gap-2 px-10">
-        {Array.from({ length: 40 }).map((_, i) => (
-          <motion.div
-            key={i}
-            className="flex-1 bg-[#c9a227]"
-            initial={{ scaleY: 0 }}
-            animate={{ scaleY: phase >= 1 ? [0.2, Math.random() * 0.8 + 0.2, 0.2] : 0 }}
-            transition={{
-              duration: 0.5 + Math.random(),
-              repeat: Infinity,
-              repeatType: "reverse",
-              ease: "easeInOut",
-              delay: i * 0.02
-            }}
-            style={{ height: '40vh', transformOrigin: 'center' }}
-          />
-        ))}
-      </div>
+      {/* Alert pulse */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        animate={{ boxShadow: ['inset 0 0 0px #ff0000', 'inset 0 0 120px #ff000044', 'inset 0 0 0px #ff0000'] }}
+        transition={{ duration: 2.5, repeat: Infinity }}
+      />
 
-      <div className="z-10 text-center px-10">
-        <motion.h1 
-          className="text-[7vw] font-black uppercase tracking-tighter leading-none"
+      <div className="relative z-10 flex flex-col items-center text-center px-[8vw] gap-[3vh]">
+        <motion.div
+          className="text-[1.4vw] font-black uppercase tracking-[0.4em] text-red-500 font-mono"
+          initial={{ opacity: 0, y: -10 }}
+          animate={phase >= 1 ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
+          transition={{ duration: 0.4 }}
         >
-          <motion.span 
-            className="block text-[#f5f5f5]"
-            initial={{ opacity: 0, y: 50, skewY: 5 }}
-            animate={phase >= 1 ? { opacity: 1, y: 0, skewY: 0 } : { opacity: 0, y: 50, skewY: 5 }}
-            transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 20 }}
-          >
-            Your music
-          </motion.span>
-          <motion.span 
-            className="block text-[#c9a227] italic"
-            initial={{ opacity: 0, x: -100 }}
-            animate={phase >= 2 ? { opacity: 1, x: 0 } : { opacity: 0, x: -100 }}
-            transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 20 }}
-          >
-            is everywhere.
-          </motion.span>
-        </motion.h1>
+          ⚠ RIGHTS ALERT
+        </motion.div>
+
+        <div className="flex flex-col gap-[2vh]">
+          {facts.map((fact, i) => (
+            <AnimatePresence key={i}>
+              {phase >= i + 1 && (
+                <motion.p
+                  className={`font-black leading-tight tracking-tight ${
+                    i === 2
+                      ? 'text-[3.8vw] text-red-400'
+                      : 'text-[2.8vw] text-white/70'
+                  }`}
+                  initial={{ opacity: 0, x: -60, filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {fact}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          ))}
+        </div>
       </div>
     </motion.div>
   );

@@ -1,103 +1,95 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function Scene2() {
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 500),
-      setTimeout(() => setPhase(2), 2000),
-      setTimeout(() => setPhase(3), 4000),
+      setTimeout(() => setPhase(1), 400),
+      setTimeout(() => setPhase(2), 1800),
+      setTimeout(() => setPhase(3), 3500),
       setTimeout(() => setPhase(4), 5500),
     ];
     return () => timers.forEach(t => clearTimeout(t));
   }, []);
 
-  const stems = [
-    { name: 'VOCALS', color: '#f5f5f5' },
-    { name: 'DRUMS', color: '#c9a227' },
-    { name: 'BASS', color: '#f5f5f5' },
-    { name: 'OTHER', color: '#c9a227' },
-  ];
-
   return (
     <motion.div
-      className="absolute inset-0 flex items-center overflow-hidden"
+      className="absolute inset-0 flex items-center justify-center overflow-hidden bg-[#0a0802]"
       initial={{ opacity: 0, x: '100vw' }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: '-100vw' }}
-      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
     >
-      <video
-        src={`${import.meta.env.BASE_URL}videos/keyboard_play.mp4`}
-        className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-screen"
-        autoPlay
-        muted
-        playsInline
+      {/* Gold radial glow */}
+      <motion.div
+        className="absolute rounded-full pointer-events-none"
+        style={{ width: '80vw', height: '80vw', background: 'radial-gradient(circle, #c9a22720 0%, transparent 70%)' }}
+        animate={{ scale: [1, 1.08, 1] }}
+        transition={{ duration: 4, repeat: Infinity }}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
 
-      <div className="relative z-10 flex w-full px-[8vw] items-center justify-between">
-        
-        <div className="flex flex-col w-[50vw]">
-          <motion.div className="overflow-hidden">
-            <motion.h2
-              className="text-[6vw] font-black tracking-tighter uppercase leading-none"
-              initial={{ y: "100%", opacity: 0 }}
-              animate={phase >= 1 ? { y: 0, opacity: 1 } : { y: "100%", opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            >
-              <span className="text-[#c9a227]">Split vocals.</span>
-            </motion.h2>
-          </motion.div>
-          <motion.div className="overflow-hidden">
-            <motion.h2
-              className="text-[6vw] font-black tracking-tighter uppercase leading-none"
-              initial={{ y: "100%", opacity: 0 }}
-              animate={phase >= 2 ? { y: 0, opacity: 1 } : { y: "100%", opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            >
-              <span className="text-[#f5f5f5]">Isolate stems.</span>
-            </motion.h2>
-          </motion.div>
-          
-          <motion.p
-            className="text-[2.5vw] font-bold text-[#f5f5f5]/50 mt-6 tracking-widest uppercase font-mono"
-            initial={{ opacity: 0, filter: 'blur(10px)' }}
-            animate={phase >= 3 ? { opacity: 1, filter: 'blur(0px)' } : { opacity: 0, filter: 'blur(10px)' }}
-            transition={{ duration: 0.8 }}
+      <div className="relative z-10 flex flex-col items-center text-center px-[8vw] max-w-[85vw] gap-[4vh]">
+
+        <motion.div
+          className="text-[1.3vw] font-black uppercase tracking-[0.5em] text-[#c9a227]/70 font-mono"
+          initial={{ opacity: 0 }}
+          animate={phase >= 1 ? { opacity: 1 } : { opacity: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          U.S. Copyright Office — 2023 Policy Statement
+        </motion.div>
+
+        <motion.div className="overflow-hidden">
+          <motion.h2
+            className="text-[5.5vw] font-black uppercase leading-tight tracking-tighter text-white"
+            initial={{ y: '110%' }}
+            animate={phase >= 1 ? { y: 0 } : { y: '110%' }}
+            transition={{ type: 'spring', stiffness: 280, damping: 24 }}
           >
-            In seconds.
-          </motion.p>
-        </div>
+            Human edits =
+          </motion.h2>
+        </motion.div>
+        <motion.div className="overflow-hidden -mt-[2vh]">
+          <motion.h2
+            className="text-[5.5vw] font-black uppercase leading-tight tracking-tighter text-[#c9a227]"
+            initial={{ y: '110%' }}
+            animate={phase >= 2 ? { y: 0 } : { y: '110%' }}
+            transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+          >
+            Human authorship.
+          </motion.h2>
+        </motion.div>
 
-        {/* Dynamic Stems */}
-        <div className="flex flex-col gap-6 w-[35vw] mr-[2vw]">
-          {stems.map((stem, i) => (
-            <div key={stem.name} className="flex items-center gap-4">
-              <motion.span 
-                className="text-[1.5vw] font-black uppercase w-[8vw] text-right"
-                style={{ color: stem.color }}
-                initial={{ opacity: 0, x: 20 }}
-                animate={phase >= 1 ? { opacity: 1, x: 0 } : { opacity: 0, x: 20 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-              >
-                {stem.name}
-              </motion.span>
-              <div className="flex-1 h-[2vh] bg-white/10 overflow-hidden relative">
-                <motion.div
-                  className="absolute left-0 top-0 bottom-0"
-                  style={{ backgroundColor: stem.color }}
-                  initial={{ width: "0%", left: "50%" }}
-                  animate={phase >= 2 ? { width: `${80 - i * 15}%`, left: 0 } : { width: "0%", left: "50%" }}
-                  transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.15 }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+        <AnimatePresence>
+          {phase >= 3 && (
+            <motion.div
+              className="border border-[#c9a227]/40 bg-[#c9a227]/8 rounded-xl px-[4vw] py-[2vw] mt-[2vh]"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6 }}
+            >
+              <p className="text-[2.2vw] font-bold text-white/80 leading-relaxed">
+                But only if you can <span className="text-[#c9a227]">prove it</span> — with a documented record<br/>
+                of your creative contribution.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
+        <AnimatePresence>
+          {phase >= 4 && (
+            <motion.p
+              className="text-[1.8vw] font-black uppercase tracking-[0.3em] text-red-400"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              No proof? No rights.
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

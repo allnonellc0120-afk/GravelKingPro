@@ -9,21 +9,21 @@ import { Scene5 } from './video_scenes/Scene5';
 import { Scene6 } from './video_scenes/Scene6';
 
 export const SCENE_DURATIONS = {
-  intro: 5000,
-  stems: 7000,
-  mastering: 8000,
-  daw: 10000,
-  embed: 10000,
-  outro: 5000,
+  rights_alert: 5000,
+  law_fact:     7000,
+  forensic:     8000,
+  ip_embed:    10000,
+  workflow:    10000,
+  outro:        5000,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
-  intro: Scene1,
-  stems: Scene2,
-  mastering: Scene3,
-  daw: Scene4,
-  embed: Scene5,
-  outro: Scene6,
+  rights_alert: Scene1,
+  law_fact:     Scene2,
+  forensic:     Scene3,
+  ip_embed:     Scene4,
+  workflow:     Scene5,
+  outro:        Scene6,
 };
 
 const SCENE_START_SEC: Record<string, number> = (() => {
@@ -73,7 +73,7 @@ export default function VideoTemplate({
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[#0a0a0a] text-[#f5f5f5]">
-      {/* Persistent Midground Layer */}
+      {/* Persistent ambient layer */}
       <div className="absolute inset-0 pointer-events-none">
         <motion.div
           className="absolute border border-white/5 opacity-40 mix-blend-overlay"
@@ -81,7 +81,7 @@ export default function VideoTemplate({
             x: ['-10vw', '40vw', '10vw', '-10vw'][currentScene % 4],
             y: ['20vh', '-10vh', '50vh', '20vh'][currentScene % 4],
             scale: [1, 2, 1.5, 1][currentScene % 4],
-            rotate: [0, 45, -45, 0][currentScene % 4]
+            rotate: [0, 45, -45, 0][currentScene % 4],
           }}
           transition={{ duration: 5, ease: [0.16, 1, 0.3, 1] }}
           style={{ width: '40vw', height: '40vw' }}
@@ -91,7 +91,7 @@ export default function VideoTemplate({
           animate={{
             x: ['80vw', '10vw', '50vw', '80vw'][currentScene % 4],
             y: ['80vh', '20vh', '-20vh', '80vh'][currentScene % 4],
-            scale: [1, 0.8, 1.2, 1][currentScene % 4]
+            scale: [1, 0.8, 1.2, 1][currentScene % 4],
           }}
           transition={{ duration: 7, ease: [0.16, 1, 0.3, 1] }}
           style={{ width: '50vw', height: '50vw' }}
