@@ -144,18 +144,18 @@ export default function VoiceRemoval() {
             )}
             <ToolHelp
               title="Voice Splitter"
-              summary="Splits a song into a separate instrumental and vocal track by cancelling the center-panned vocal."
+              summary="Splits a song into separate instrumental and vocal tracks using AI source separation."
               steps={[
                 "Drag in or browse for an audio or video file.",
-                "Press Split — it processes locally with MLK v3.",
+                "Press Split — neural Demucs separates the stems, polished with MLK v3.",
                 "Preview the instrumental and vocal, then download the ones you want.",
               ]}
-              note="Center-cancel separation is approximate — expect some bleed, and it works best on true stereo mixes."
+              note="If the AI engine is momentarily unavailable, it falls back to a fast center-cancel split, which is approximate and works best on true stereo mixes."
             />
           </div>
           <p className="text-sm text-muted-foreground">
-            Instant vocal removal — extracts the instrumental by cancelling center-panned vocals.
-            Works best on stereo tracks. Audio and video files supported.
+            Studio-quality vocal removal — AI source separation extracts a clean instrumental
+            from your track. Audio and video files supported.
           </p>
         </div>
 
@@ -209,7 +209,7 @@ export default function VoiceRemoval() {
                   </div>
                   <div className="text-xs font-medium text-purple-400">{fileName}</div>
                   <Progress value={progress} className="h-1.5" />
-                  <p className="text-xs text-muted-foreground">Processing on server — your file never leaves.</p>
+                  <p className="text-xs text-muted-foreground">Separating with our neural AI engine — falls back to instant on-server processing if unavailable.</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -373,8 +373,8 @@ export default function VoiceRemoval() {
         {/* Info */}
         <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground">
           {[
-            { label: "Instant", desc: "Results in seconds" },
-            { label: "100% on-server", desc: "File stays private" },
+            { label: "Neural AI", desc: "Real Demucs separation" },
+            { label: "Reliable", desc: "Instant on-server fallback" },
             { label: "Any format", desc: "Audio & video" },
           ].map((i) => (
             <div key={i.label} className="p-3 rounded-lg border border-border/20 bg-card/30 space-y-1">

@@ -518,7 +518,7 @@ export default function Pricing() {
         >
           {[
             { title: "30-day money-back guarantee", sub: "Not satisfied? Full refund, no questions." },
-            { title: "Your data stays private", sub: "Files are processed in memory and never stored." },
+            { title: "Your data stays private", sub: "Files are processed securely and never permanently stored." },
             { title: "Works on any device", sub: "Desktop, tablet, phone — no install needed." },
           ].map((b) => (
             <div key={b.title} className="border border-border/30 rounded-lg p-4 bg-card/10">

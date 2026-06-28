@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 
 export type TelemetryEvent = {
-  routing: "local";
+  routing: "local" | "remote";
   parity: string;
   efficiency: string;
   decayRate: string;

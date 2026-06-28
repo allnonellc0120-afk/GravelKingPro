@@ -56,7 +56,7 @@ const MODES: Array<{
   {
     value: "voice_remove",
     label: "Voice Removal",
-    description: "Center-channel cancellation — extracts the instrumental track (stereo only)",
+    description: "Neural AI separation — extracts the instrumental track",
     icon: <Mic2 className="w-4 h-4 text-purple-400" />,
     requiresStudio: false,
   },

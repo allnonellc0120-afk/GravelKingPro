@@ -397,7 +397,9 @@ audioRouter.post(
         });
 
         let result;
-        const routing: "local" = "local";
+        // Honest engine reporting: "remote" when real neural Replicate Demucs
+        // ran, "local" for the in-process DSP / local-neural fallback paths.
+        let routing: "local" | "remote" = "local";
         let stack: string;
         let model: string;
         let protocol: string;
@@ -407,6 +409,7 @@ audioRouter.post(
           // Falls back through UVR (Node Auditor) → DSP so the route never 500s.
           try {
             result = await replicateVoiceRemove(filePath, multiplier);
+            routing = "remote";
             stack = result.stack;
             model = result.model;
             protocol = result.protocol;
@@ -516,6 +519,10 @@ audioRouter.post(
             res.setHeader("X-GK-Routing", routing);
             res.setHeader("X-GK-Parity", kernelParity);
             res.setHeader("X-GK-Format", "mp3");
+            res.setHeader("X-GK-Separator", model);
+            res.setHeader("X-GK-Model", model);
+            res.setHeader("X-GK-Protocol", protocol);
+            res.setHeader("X-GK-Stack", stack);
             res.send(mp3Buf);
           } finally {
             await unlink(mp3InPath).catch(() => {});
@@ -553,11 +560,15 @@ audioRouter.post(
         let stemSeparatorLabel = "MLK_v3";
         let stemModelLabel: string = MLK_KERNEL;
         let stemProtocolLabel: string = MLK_PROTOCOL;
+        // Honest engine reporting: "remote" only when real neural Replicate
+        // Demucs ran; "local" for the in-process DSP fallback.
+        let stemRouting: "local" | "remote" = "local";
 
         if (replicateIsConfigured()) {
           // Primary: Replicate Demucs htdemucs — real neural 4-stem separation.
           try {
             stemResult = await replicateStemSplit(filePath, multiplier);
+            stemRouting = "remote";
             stemSeparatorLabel = "Demucs_htdemucs";
             stemModelLabel = stemResult.model;
             stemProtocolLabel = stemResult.protocol;
@@ -577,7 +588,7 @@ audioRouter.post(
         }
 
         const event: TelemetryEvent = {
-          routing: "local",
+          routing: stemRouting,
           parity: stemResult.kernelParity,
           efficiency: "1.0000",
           decayRate: "0.0000",
@@ -589,7 +600,7 @@ audioRouter.post(
         if (req.isAuthenticated()) {
           db.insert(processRunsTable).values({
             userId: req.user.id,
-            routing: "local",
+            routing: stemRouting,
             parity: stemResult.kernelParity,
             efficiency: 1,
             decayRate: 0,
@@ -609,7 +620,7 @@ audioRouter.post(
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_stems.zip"`);
         res.setHeader("X-GK-Mode", "stem_split");
-        res.setHeader("X-GK-Routing", "local");
+        res.setHeader("X-GK-Routing", stemRouting);
         res.setHeader("X-GK-Parity", stemResult.kernelParity);
         res.setHeader("X-GK-Stems", stemResult.stems.join(","));
         res.setHeader("X-GK-Separator", stemSeparatorLabel);

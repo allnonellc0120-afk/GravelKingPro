@@ -19,7 +19,7 @@ const FEATURES = [
   {
     icon: <Mic2 className="w-6 h-6 text-purple-400" />,
     title: "Voice Removal",
-    description: "Strip vocals from any stereo track using center-channel cancellation. Get a clean instrumental in seconds.",
+    description: "Strip vocals from any track with real neural AI separation. Get a clean instrumental in seconds.",
     badge: "1 Free Use",
     badgeColor: "border-sky-500/40 text-sky-400",
     href: "/studio",
