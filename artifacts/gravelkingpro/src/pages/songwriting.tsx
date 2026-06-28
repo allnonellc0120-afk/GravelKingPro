@@ -348,22 +348,22 @@ function LyricLineRow({
         </div>
       ) : (
         <div className="flex items-center gap-2 px-3 py-2">
-          <p className={`flex-1 text-sm font-mono leading-relaxed ${line.isHumanEdited ? "text-emerald-300/90" : "text-foreground/85"}`}>
+          {/* Tapping the line text directly enters edit mode — like the Notes app */}
+          <p
+            className={`flex-1 text-sm font-mono leading-relaxed select-text ${
+              line.isHumanEdited ? "text-emerald-300/90" : "text-foreground/85"
+            } ${isPro ? "cursor-text hover:text-foreground" : ""}`}
+            onClick={isPro ? onStartEdit : undefined}
+            title={isPro ? "Tap to edit this line" : undefined}
+          >
             {line.text}
           </p>
           {isPro ? (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <button
-                onClick={onStartEdit}
-                className="p-1.5 rounded hover:bg-border/30 text-muted-foreground hover:text-foreground transition-colors"
-                title="Edit this line"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </button>
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={onStartRemix}
-                className="p-1.5 rounded hover:bg-amber-500/20 text-muted-foreground hover:text-amber-400 transition-colors"
-                title="AI remix this line"
+                className="p-1.5 rounded hover:bg-amber-500/20 text-muted-foreground/40 hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100"
+                title="AI remix this line — get 3 variations"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
@@ -965,7 +965,7 @@ export default function SongwritingStudio() {
                 <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/15 flex items-center gap-2">
                   <Edit3 className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
                   <p className="text-[11px] text-amber-500/70">
-                    Hover any line → <strong>✏️</strong> to edit directly or <strong>↻</strong> to get 3 AI variations with your instruction.
+                    Tap any line to edit it directly. Hover for <strong>↻</strong> to get 3 AI variations with your instruction.
                     <span className="text-emerald-400/70 ml-1">Green = human edited.</span>
                   </p>
                 </div>

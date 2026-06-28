@@ -6,6 +6,8 @@
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
 - [Replicate separation provider](replicate-separation.md) — replicateClient.ts + replicateDemucs.ts; voice_remove + stem_split use Replicate htdemucs as primary, DSP always fallback
+- [Replicate timeout → DSP fallback](replicate-timeout-fallback.md) — voice_remove 60 s / stem_split 90 s; longer timeouts fill concurrency slots during SIGTERM → "Processing failed" UI crash
+- [Whisper transcription](whisper-transcription.md) — replicateWhisper.ts + POST /api/audio/transcribe; vaibhavs10/incredibly-fast-whisper primary → openai/whisper fallback; tap-to-time manual mode also in vocal booth
 - [Audio separation & WAV header](audio-separation-wav-header.md) — voice_remove + stem_split: Replicate Demucs primary (REPLICATE_API_TOKEN), DSP fallback; never assume 44-byte WAV header on ffmpeg output
 - [Voice removal CPU neural not viable](voice-removal-cpu-neural.md) — CPU neural ~7x realtime + torch cu130 too big → prod silently faked success; voice_remove now routes direct to honest DSP, real AI deferred to paid cloud GPU
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
