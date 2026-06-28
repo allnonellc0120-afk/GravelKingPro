@@ -67,7 +67,9 @@ export async function replicateVoiceRemove(
     "ryan5453",
     "demucs",
     { audio: audioUrl, model: "htdemucs", two_stems: "vocals", output_format: "wav" },
-    240_000,
+    // 60 s: if Demucs hasn't responded, fall back to DSP immediately so the HTTP
+    // connection stays well within Replit's 4-min proxy timeout / SIGTERM window.
+    60_000,
   );
 
   const stemUrls = parseStemUrls(output);
@@ -120,7 +122,8 @@ export async function replicateStemSplit(
     "ryan5453",
     "demucs",
     { audio: audioUrl, model: "htdemucs", output_format: "wav" },
-    300_000,
+    // 90 s: 4-stem is slower than 2-stem; still well inside Replit's proxy window.
+    90_000,
   );
 
   const stemUrls = parseStemUrls(output);

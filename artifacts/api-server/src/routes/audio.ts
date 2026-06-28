@@ -24,6 +24,7 @@ import {
   replicateStemSplit,
   isConfigured as replicateIsConfigured,
 } from "../replicateDemucs";
+import { transcribeAudio } from "../replicateWhisper";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
@@ -679,6 +680,35 @@ audioRouter.post(
       res.status(500).json({ success: false, error: err.message });
     }
   }
+);
+
+// ── Vocal transcription (Whisper via Replicate) ───────────────────────────────
+// POST /api/audio/transcribe — accepts audio, returns { segments, fullText }.
+// Rate-limited; not concurrency-limited (Whisper runs on Replicate's infra).
+audioRouter.post(
+  "/audio/transcribe",
+  audioRateLimit,
+  upload.single("audio"),
+  async (req: Request, res: Response) => {
+    if (!req.file) {
+      res.status(400).json({ error: "No audio file uploaded." });
+      return;
+    }
+    const filePath = req.file.path;
+    if (!replicateIsConfigured()) {
+      await unlink(filePath).catch(() => {});
+      res.status(503).json({ error: "Transcription is not configured on this server." });
+      return;
+    }
+    try {
+      const result = await transcribeAudio(filePath);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message ?? "Transcription failed" });
+    } finally {
+      await unlink(filePath).catch(() => {});
+    }
+  },
 );
 
 export default audioRouter;

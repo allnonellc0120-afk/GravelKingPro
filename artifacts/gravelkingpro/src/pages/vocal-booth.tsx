@@ -5,7 +5,7 @@ import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2 } from "lucide-react";
+import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock } from "lucide-react";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
 import { splitSong, analyzeGuideTiming, SplitError, type TimedLine } from "@/lib/daw/stemTiming";
 import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
@@ -256,6 +256,9 @@ function VocalBoothInner() {
   const [timedLines, setTimedLines] = useState<TimedLine[] | null>(null);
   const [activeLineIdx, setActiveLineIdx] = useState(-1);
   const [timing, setTiming] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [tapTimingActive, setTapTimingActive] = useState(false);
+  const [tapTimes, setTapTimes] = useState<number[]>([]);
 
   const backingRef = useRef<HTMLAudioElement | null>(null);
   const vocalPlaybackRef = useRef<HTMLAudioElement | null>(null);
@@ -278,6 +281,11 @@ function VocalBoothInner() {
   const guideAudible = guideEnabled && !isPreviewing && !!guideVocalUrl;
 
   const lyricLines = lyrics.split("\n");
+  const timableLines = lyricLines
+    .map((text, idx) => ({ text, idx }))
+    .filter(({ text }) => text.trim() && !text.trim().startsWith("["));
+  const tapTimingLineIdx = tapTimes.length;
+  const tapTimingDone = tapTimingLineIdx >= timableLines.length && timableLines.length > 0;
 
   // Load saved songs from the studio library.
   useEffect(() => {
@@ -447,6 +455,101 @@ function VocalBoothInner() {
       toast({ title: "Lyrics loaded", description: `${track.trackName} — ${track.artistName} · no synced timing` });
     }
   }, [toast]);
+
+  // ── Whisper transcription ──────────────────────────────────────────────────
+  const transcribeVocals = useCallback(async () => {
+    if (!backingFile) return;
+    setTranscribing(true);
+    try {
+      const fd = new FormData();
+      fd.append("audio", backingFile, backingFile.name);
+      const r = await fetch("/api/audio/transcribe", { method: "POST", body: fd, credentials: "include" });
+      if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(d.error ?? "Transcription failed");
+      }
+      const data = (await r.json()) as {
+        segments: Array<{ text: string; start: number; end: number }>;
+        fullText: string;
+      };
+      if (!data.segments || data.segments.length === 0) {
+        throw new Error("No speech detected — try a track with clearer vocals.");
+      }
+      // Group Whisper segments into lyric lines (new line on 1 s+ gap or 55+ chars).
+      const lines: string[] = [];
+      const times: TimedLine[] = [];
+      let currentLine = "";
+      let lineStartTime = data.segments[0]?.start ?? 0;
+      let prevEnd = 0;
+      for (const seg of data.segments) {
+        const text = seg.text.trim();
+        if (!text) continue;
+        const gap = prevEnd ? seg.start - prevEnd : 0;
+        if (currentLine && (gap > 1.0 || currentLine.length + text.length > 55)) {
+          lines.push(currentLine.trim());
+          times.push({ idx: lines.length - 1, t: lineStartTime });
+          currentLine = text;
+          lineStartTime = seg.start;
+        } else {
+          currentLine = currentLine ? `${currentLine} ${text}` : text;
+        }
+        prevEnd = seg.end;
+      }
+      if (currentLine.trim()) {
+        lines.push(currentLine.trim());
+        times.push({ idx: lines.length - 1, t: lineStartTime });
+      }
+      setLyrics(lines.join("\n"));
+      setTimedLines(times);
+      setTimingSource("lrc");
+      setLyricSource("whisper");
+      toast({
+        title: "Vocals transcribed!",
+        description: `${lines.length} lines detected with precise timing.`,
+      });
+    } catch (err: unknown) {
+      toast({
+        title: "Transcription failed",
+        description: (err as { message?: string })?.message ?? "Could not transcribe vocals",
+        variant: "destructive",
+      });
+    } finally {
+      setTranscribing(false);
+    }
+  }, [backingFile, toast]);
+
+  // ── Tap-to-time ────────────────────────────────────────────────────────────
+  const startTapTiming = useCallback(() => {
+    setTapTimingActive(true);
+    setTapTimes([]);
+    setTimedLines(null);
+    setTimingSource(null);
+    toast({ title: "Tap timing started", description: "Play the track and tap when each line begins." });
+  }, [toast]);
+
+  const handleTapTime = useCallback(() => {
+    const t = backingRef.current?.currentTime ?? 0;
+    setTapTimes((prev) => {
+      const newTimes = [...prev, t];
+      const linesAll = lyrics.split("\n");
+      const timable = linesAll
+        .map((text, idx) => ({ text, idx }))
+        .filter(({ text }) => text.trim() && !text.trim().startsWith("["));
+      if (newTimes.length >= timable.length) {
+        const tl: TimedLine[] = timable.map((l, i) => ({ idx: l.idx, t: newTimes[i] ?? 0 }));
+        setTimedLines(tl);
+        setTimingSource("lrc");
+        setTapTimingActive(false);
+        toast({ title: "Timing locked!", description: `${tl.length} lines timed.` });
+      }
+      return newTimes;
+    });
+  }, [lyrics, toast]);
+
+  const cancelTapTiming = useCallback(() => {
+    setTapTimingActive(false);
+    setTapTimes([]);
+  }, []);
 
   const resetGuide = useCallback(() => {
     setGuideVocalBlob(null);
@@ -776,13 +879,39 @@ function VocalBoothInner() {
               )}
             </div>
 
+            {/* ── Whisper auto-transcription (Smule-style timed lyric detection) ── */}
+            {backingFile && (
+              <div className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Auto-detect vocals</div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    {timingSource === "lrc" && lyricSource === "whisper"
+                      ? "Lyrics and timing were auto-detected from the track."
+                      : "Transcribe vocals from the loaded track with precise timestamps."}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5 shrink-0"
+                    disabled={transcribing}
+                    onClick={() => void transcribeVocals()}
+                  >
+                    {transcribing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                    {transcribing ? "Transcribing…" : timedLines && lyricSource === "whisper" ? "Re-transcribe" : "Transcribe Vocals"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Auto-time lyrics to the guide vocal (energy-based, approximate) */}
             {guideVocalUrl && (
               <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2">
                 <span className="text-[11px] text-muted-foreground leading-snug">
                   {timedLines
                     ? timingSource === "lrc"
-                      ? "Precise synced timing from lrclib.net."
+                      ? lyricSource === "whisper"
+                        ? "Precise timing auto-detected via Whisper."
+                        : "Precise synced timing from lrclib.net."
                       : "Lyrics timed to the guide vocal — energy-based & approximate."
                     : "Time your lyric lines to the guide vocal (approximate)."}
                 </span>
@@ -838,6 +967,46 @@ function VocalBoothInner() {
                 placeholder="Paste or pick lyrics here. Section markers like [Verse] / [Chorus] are highlighted while you sing."
                 className="w-full h-[320px] rounded-xl border border-border/40 bg-black/40 p-4 text-sm text-white/90 resize-none focus:outline-none focus:border-amber-500/40 font-mono"
               />
+            )}
+
+            {/* ── Tap-to-time: manually stamp each lyric line while playing ── */}
+            {!tapTimingActive ? (
+              !timedLines && lyrics.trim() && (
+                <button
+                  onClick={startTapTiming}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 transition-colors"
+                >
+                  <Clock className="w-3.5 h-3.5" /> Tap to time lyrics while playing
+                </button>
+              )
+            ) : (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-amber-400">
+                    Line {Math.min(tapTimingLineIdx + 1, timableLines.length)} of {timableLines.length}
+                  </span>
+                  <button onClick={cancelTapTiming} className="text-xs text-muted-foreground hover:text-white transition-colors">
+                    Cancel
+                  </button>
+                </div>
+                {!tapTimingDone && (
+                  <p className="text-sm font-mono text-white/90 bg-black/30 rounded px-2 py-1 truncate">
+                    {timableLines[tapTimingLineIdx]?.text ?? ""}
+                  </p>
+                )}
+                <Button
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold text-base h-12"
+                  onClick={handleTapTime}
+                  disabled={tapTimingDone || !backingPlaying}
+                >
+                  {tapTimingDone ? "✓ All lines timed" : "▶ Now"}
+                </Button>
+                {!backingPlaying && !tapTimingDone && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Play the track first, then tap ▶ Now each time a lyric line begins.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
