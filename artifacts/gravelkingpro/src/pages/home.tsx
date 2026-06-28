@@ -8,53 +8,77 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Mic2, Scissors, Wand2, Layers,
-  Play, ChevronRight, CheckCircle2, Zap, Download,
-  Mail, Lock, Bell, X, Crown, FileCode2, Activity,
+  Mic2, Scissors, Wand2, Music2, FileCode2, PenLine, Activity,
+  Play, ChevronRight, CheckCircle2, Zap, Download, Mail, Bell,
+  X, Crown, ShieldCheck, ArrowRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
-const FEATURES = [
+const AUDIO_TOOLS = [
   {
-    icon: <Mic2 className="w-6 h-6 text-purple-400" />,
+    icon: <Mic2 className="w-5 h-5 text-purple-400" />,
     title: "Voice Removal",
-    description: "Strip vocals from any track with real neural AI separation. Get a clean instrumental in seconds.",
+    description: "Strip vocals from any track with neural AI separation. Get a clean instrumental in seconds.",
     badge: "1 Free Use",
     badgeColor: "border-sky-500/40 text-sky-400",
-    href: "/studio",
+    href: "/voice-removal",
     cta: "Try it free",
-    img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80",
+    color: "purple",
   },
   {
-    icon: <Scissors className="w-6 h-6 text-emerald-400" />,
+    icon: <Scissors className="w-5 h-5 text-emerald-400" />,
     title: "Stem Splitting",
-    description: "Separate bass, midrange, highs, and instrumental stems — download each as a clean WAV file.",
+    description: "Separate bass, midrange, highs, and vocals. Download each stem as a clean WAV file.",
     badge: "1 Free Use",
     badgeColor: "border-sky-500/40 text-sky-400",
     href: "/studio",
     cta: "Try it free",
-    img: "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=800&q=80",
+    color: "emerald",
   },
   {
-    icon: <Wand2 className="w-6 h-6 text-sky-400" />,
+    icon: <Wand2 className="w-5 h-5 text-sky-400" />,
     title: "Audio Mastering",
-    description: "6 professional presets: Normal, Broadcast, Vinyl, Podcast, Club, and Film. One click to a polished master.",
+    description: "6 professional presets: Broadcast, Vinyl, Podcast, Club, Film, Normal. One click to a polished master.",
     badge: "30s Preview Free",
     badgeColor: "border-emerald-500/40 text-emerald-400",
-    href: "/studio",
+    href: "/mastering",
     cta: "Master now",
-    img: "https://audiosorcerer.com/images/blog/2024/07/Mastering-For-Vinyl-Blog-Image-3-1024x536.jpg",
+    color: "sky",
   },
   {
-    icon: <Layers className="w-6 h-6 text-amber-400" />,
-    title: "Mix Studio",
-    description: "Multi-track editor with speed/pitch control, live vocal monitoring, per-stem metrics, and layer mixing.",
+    icon: <Music2 className="w-5 h-5 text-amber-400" />,
+    title: "Vocal Booth",
+    description: "Sing over any track with karaoke-style lyric sync, Sing Along Mode, and real-time vocal monitoring.",
     badge: "Studio",
     badgeColor: "border-amber-500/40 text-amber-400",
-    href: "/mix",
+    href: "/vocal-booth",
+    cta: "Open Booth",
+    color: "amber",
+  },
+];
+
+const IP_TOOLS = [
+  {
+    icon: <PenLine className="w-5 h-5 text-violet-400" />,
+    title: "Songwriting Studio",
+    description: "Document your lyrics, co-writers, and creative timeline. Build an airtight record of authorship for every song.",
+    href: "/songwriting",
     cta: "Open Studio",
-    img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80",
+  },
+  {
+    icon: <FileCode2 className="w-5 h-5 text-amber-400" />,
+    title: "IP Embed Code",
+    description: "Generate a certified authorship widget for your website, SoundCloud, or social bio that proves you created the track.",
+    href: "/kernel",
+    cta: "Get your embed",
+  },
+  {
+    icon: <Activity className="w-5 h-5 text-emerald-400" />,
+    title: "Kernel Dashboard",
+    description: "Audio fingerprinting, before/after optimization telemetry, and a PDF-exportable report of your processing session.",
+    href: "/kernel",
+    cta: "View dashboard",
   },
 ];
 
@@ -63,26 +87,26 @@ const PLANS = [
     name: "Starter",
     price: "Free",
     color: "border-border/30",
-    features: ["1 free voice removal", "0 stem splits", "1 full master preview", "Live vocal monitoring"],
+    features: ["1 free voice removal", "1 mastering preview", "Songwriting Studio (basic)", "Live vocal monitoring"],
   },
   {
-    name: "GravelKing Weekly",
-    price: "$9.99",
-    period: "/week",
-    color: "border-emerald-500/40 bg-emerald-500/5",
+    name: "GravelKing Pro",
+    price: "$39.99",
+    period: "/mo",
+    color: "border-amber-500/40 bg-amber-500/5",
     highlight: true,
     badge: "Most Popular",
-    badgeColor: "bg-emerald-500 text-black",
-    features: ["Unlimited voice removal", "Unlimited 5-stem splitting", "All preset masters + denoise", "Download all stems as WAV", "Processing history"],
+    badgeColor: "bg-amber-500 text-black",
+    features: ["Unlimited voice removal", "Unlimited 5-stem splits", "All mastering presets", "IP Embed Code + authorship cert", "WAV downloads for all stems", "Processing history"],
   },
   {
-    name: "GravelKing Studio",
-    price: "$29.99",
-    period: "/month",
-    color: "border-amber-500/40 bg-amber-500/5",
-    badge: "Full Studio",
-    badgeColor: "bg-amber-500 text-black",
-    features: ["Everything in Weekly", "Adjustable mastering kernel", "Live DAW + recording", "Kernel Dashboard + PDF", "Priority support"],
+    name: "Node Auditor",
+    price: "$499",
+    period: "/mo",
+    color: "border-purple-500/40 bg-purple-500/5",
+    badge: "Enterprise",
+    badgeColor: "bg-purple-500 text-white",
+    features: ["Everything in Pro", "1T-scale benchmarking", "Morris Law V2 access", "Adjustable mastering kernel", "Priority support + custom integrations"],
   },
 ];
 
@@ -116,11 +140,6 @@ function NotifyBanner() {
     }
   };
 
-  const handleDismiss = () => {
-    sessionStorage.setItem("notify_dismissed", "true");
-    setDismissed(true);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -128,27 +147,20 @@ function NotifyBanner() {
       className="relative rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-transparent p-5 mb-6"
     >
       <button
-        onClick={handleDismiss}
+        onClick={() => { sessionStorage.setItem("notify_dismissed", "true"); setDismissed(true); }}
         className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors"
         aria-label="Dismiss"
       >
         <X className="w-4 h-4" />
       </button>
-
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
           <Bell className="w-5 h-5 text-amber-400" />
         </div>
-
         <div className="flex-1 min-w-0">
           <AnimatePresence mode="wait">
             {state === "done" ? (
-              <motion.div
-                key="done"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 pt-1"
-              >
+              <motion.div key="done" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2 pt-1">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div>
                   <p className="font-semibold text-emerald-400">Check your inbox!</p>
@@ -157,12 +169,8 @@ function NotifyBanner() {
               </motion.div>
             ) : (
               <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <p className="font-semibold text-amber-400 mb-0.5">
-                  Pro is live — get 3 days free
-                </p>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Enter your email and we'll send you a direct link to activate your free trial. No commitment.
-                </p>
+                <p className="font-semibold text-amber-400 mb-0.5">Pro is live — get 3 days free</p>
+                <p className="text-sm text-muted-foreground mb-3">Enter your email and we'll send you a direct activation link. No commitment.</p>
                 <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm">
                   <Input
                     type="email"
@@ -171,15 +179,8 @@ function NotifyBanner() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     className="bg-background/60 border-amber-500/20 focus-visible:ring-amber-500/30 h-9 text-sm"
-                    data-testid="input-notify-email"
                   />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="bg-amber-500 hover:bg-amber-600 text-black font-semibold shrink-0"
-                    disabled={state === "loading"}
-                    data-testid="button-notify-submit"
-                  >
+                  <Button type="submit" size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold shrink-0" disabled={state === "loading"}>
                     {state === "loading" ? "…" : "Get Free Trial"}
                   </Button>
                 </form>
@@ -201,148 +202,110 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(search);
     if (params.get("activated") === "1") {
-      toast({
-        title: "Lifetime access activated!",
-        description: "Your Node Auditor plan is now live on this device. All tools are unlocked.",
-      });
+      toast({ title: "Lifetime access activated!", description: "Your Node Auditor plan is now live. All tools are unlocked." });
       window.history.replaceState({}, "", "/");
     } else if (params.get("activated") === "invalid") {
-      toast({
-        title: "Activation link invalid",
-        description: "This link has already been used or is not valid. Contact support.",
-        variant: "destructive",
-      });
+      toast({ title: "Activation link invalid", description: "This link has already been used or is not valid.", variant: "destructive" });
       window.history.replaceState({}, "", "/");
     }
   }, []);
 
   return (
     <Layout>
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-12">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-16">
 
         {!isPro && <NotifyBanner />}
 
         {/* ── Hero ── */}
-        <div className="relative rounded-2xl overflow-hidden text-center space-y-5 pt-4 pb-10 px-4">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=1200&q=80)` }}
-          />
-          <div className="absolute inset-0 bg-black/70" />
-          <div className="relative z-10 space-y-5 pt-4">
-            <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 text-xs font-medium text-amber-400">
-              <Zap className="w-3.5 h-3.5" /> Server-side audio processing — your files never leave our servers
+        <div className="relative rounded-2xl overflow-hidden text-center space-y-6 pt-6 pb-12 px-6">
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=1200&q=80)` }} />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/75 to-black/85" />
+
+          <div className="relative z-10 space-y-6">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 rounded-full px-4 py-1.5 text-xs font-medium text-amber-400">
+                <Zap className="w-3.5 h-3.5" /> Server-side AI audio processing
+              </span>
+              <span className="inline-flex items-center gap-1.5 bg-violet-500/15 border border-violet-500/25 rounded-full px-4 py-1.5 text-xs font-medium text-violet-400">
+                <ShieldCheck className="w-3.5 h-3.5" /> IP rights certification
+              </span>
             </div>
-            <h1 className="text-4xl font-bold tracking-tight leading-tight">
-              Professional audio tools,<br />
-              <span className="text-amber-500">no plugin required.</span>
+
+            <h1 className="text-5xl font-bold tracking-tight leading-tight">
+              Make music.<br />
+              <span className="text-amber-500">Own it.</span>
             </h1>
-            <p className="text-muted-foreground text-base max-w-xl mx-auto">
-              GravelKing Productions handles voice removal, stem splitting, and mastering — entirely on the server. Upload a file or pick a tool and go.
+
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed">
+              GravelKing Pro separates vocals, masters your tracks, and certifies your authorship —
+              the only platform that combines professional audio tools with IP rights documentation.
             </p>
+
             <div className="flex items-center justify-center gap-3 flex-wrap">
-              <Link href="/studio">
-                <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-12 px-8 text-base shadow-lg shadow-amber-500/20">
-                  <Play className="w-4 h-4 mr-2 fill-current" /> Open Studio — It's Free
+              <Link href="/voice-removal">
+                <Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-12 px-8 text-base shadow-lg shadow-amber-500/25">
+                  <Play className="w-4 h-4 mr-2 fill-current" /> Try Voice Removal — Free
                 </Button>
               </Link>
-              <Link href="/pricing">
-                <Button variant="outline" className="h-12 px-8 text-base border-white/30 text-white hover:bg-white/10">
-                  See Pricing <ChevronRight className="w-4 h-4 ml-1" />
+              <Link href="/songwriting">
+                <Button variant="outline" className="h-12 px-8 text-base border-violet-500/40 text-violet-300 hover:bg-violet-500/10 hover:border-violet-500/60">
+                  <ShieldCheck className="w-4 h-4 mr-2" /> Protect Your IP
                 </Button>
               </Link>
             </div>
+
             {!isAuthenticated && (
               <p className="text-xs text-muted-foreground">
-                <button onClick={login} className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</button> to save your processing history and unlock your free trial.
+                <button onClick={login} className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</button> to save your sessions and unlock your free trial.
               </p>
             )}
 
-            {/* DAW preview mockup */}
-            <div className="mt-6 rounded-xl border border-white/10 bg-black/60 backdrop-blur-sm overflow-hidden shadow-2xl shadow-black/60 max-w-2xl mx-auto text-left">
-              {/* Transport bar */}
-              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/8 bg-white/3">
-                <div className="flex gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-red-500/70" />
-                  <div className="w-2 h-2 rounded-full bg-yellow-500/70" />
-                  <div className="w-2 h-2 rounded-full bg-emerald-500/70" />
-                </div>
-                <span className="text-[10px] font-mono text-white/30 tracking-widest">MIX STUDIO</span>
-                <div className="ml-auto flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {["▐▐","▶","■"].map((s,i) => (
-                      <div key={i} className={`w-6 h-5 rounded text-[8px] flex items-center justify-center border ${i===1 ? "border-amber-500/60 text-amber-400 bg-amber-500/10" : "border-white/10 text-white/30"}`}>{s}</div>
-                    ))}
-                  </div>
-                  <div className="font-mono text-[10px] text-amber-400/80 border border-amber-500/20 rounded px-1.5 py-0.5 bg-amber-500/5">0:00.000</div>
-                </div>
-              </div>
-              {/* Tracks */}
+            {/* Two-pillar stat strip */}
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl mx-auto">
               {[
-                { label: "Kick",   color: "bg-amber-500",   bars: [0.9,0.1,0.85,0.1,0.88,0.1,0.9,0.1,0.85,0.1,0.9,0.1,0.88,0.1,0.9,0.1] },
-                { label: "Vocals", color: "bg-purple-400",  bars: [0.4,0.6,0.55,0.7,0.45,0.65,0.5,0.72,0.48,0.63,0.52,0.68,0.44,0.71,0.5,0.6] },
-                { label: "Bass",   color: "bg-cyan-400",    bars: [0.7,0.65,0.72,0.68,0.7,0.66,0.71,0.67,0.69,0.64,0.73,0.68,0.7,0.65,0.72,0.67] },
-                { label: "FX",     color: "bg-emerald-400", bars: [0.2,0.3,0.25,0.35,0.28,0.22,0.32,0.18,0.27,0.33,0.21,0.29,0.26,0.31,0.23,0.28] },
-              ].map((track) => (
-                <div key={track.label} className="flex items-stretch border-b border-white/5 last:border-0">
-                  <div className="w-16 shrink-0 px-3 py-2 flex flex-col justify-center gap-0.5 border-r border-white/5">
-                    <span className="text-[10px] font-medium text-white/60">{track.label}</span>
-                    <div className="flex gap-1">
-                      <div className="text-[8px] px-1 rounded border border-white/10 text-white/20">M</div>
-                      <div className="text-[8px] px-1 rounded border border-white/10 text-white/20">S</div>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex items-center gap-px px-2 py-2">
-                    {track.bars.map((h, i) => (
-                      <div key={i} className={`flex-1 rounded-sm ${track.color} opacity-70`} style={{ height: `${h * 28}px` }} />
-                    ))}
-                  </div>
+                { val: "5", label: "Stem types" },
+                { val: "6", label: "Master presets" },
+                { val: "IP", label: "Rights certified" },
+                { val: "WAV", label: "Lossless output" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-sm py-3 px-2 text-center">
+                  <div className="text-xl font-bold text-amber-400">{s.val}</div>
+                  <div className="text-[10px] text-white/40 mt-0.5">{s.label}</div>
                 </div>
               ))}
-              <div className="px-4 py-1.5 flex items-center gap-2 bg-white/2">
-                <span className="text-[9px] text-white/20 font-medium tracking-widest uppercase">Plugins active</span>
-                {["EQ","Comp","Reverb","Limiter"].map(p => (
-                  <span key={p} className="text-[9px] px-1.5 py-0.5 rounded border border-amber-500/20 text-amber-400/50 bg-amber-500/5">{p}</span>
-                ))}
-                <span className="ml-auto text-[9px] text-white/20">Pro only</span>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* ── Features ── */}
-        <div className="space-y-4">
+        {/* ── Audio Tools ── */}
+        <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">What you can do</h2>
-            <Link href="/studio" className="text-xs text-amber-500 hover:text-amber-400 flex items-center gap-1">
+            <div>
+              <h2 className="text-xl font-bold">Audio Production Tools</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">AI-powered separation, mastering, and performance — all server-side.</p>
+            </div>
+            <Link href="/studio" className="text-xs text-amber-500 hover:text-amber-400 flex items-center gap-1 shrink-0">
               Open Studio <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {FEATURES.map((f, i) => (
-              <motion.div key={f.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
+            {AUDIO_TOOLS.map((f, i) => (
+              <motion.div key={f.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
                 <Link href={f.href}>
-                  <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:border transition-all cursor-pointer h-full group overflow-hidden">
-                    <div className="relative h-36 overflow-hidden">
-                      <img
-                        src={f.img}
-                        alt={f.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
-                      <div className="absolute top-3 right-3">
-                        <Badge variant="outline" className={`text-[10px] px-2 py-0.5 backdrop-blur-sm bg-black/40 ${f.badgeColor}`}>{f.badge}</Badge>
-                      </div>
-                      <div className="absolute bottom-3 left-3 w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center border border-white/10">
+                  <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:border transition-all cursor-pointer h-full group">
+                    <CardContent className="p-5 flex items-start gap-4">
+                      <div className={`w-10 h-10 rounded-lg bg-secondary/60 flex items-center justify-center shrink-0 border border-white/10 group-hover:border-amber-500/30 transition-colors`}>
                         {f.icon}
                       </div>
-                    </div>
-                    <CardContent className="p-4 space-y-2">
-                      <h3 className="font-semibold group-hover:text-amber-400 transition-colors">{f.title}</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{f.description}</p>
-                      <div className="flex items-center gap-1 text-xs text-amber-500 font-medium pt-1">
-                        {f.cta} <ChevronRight className="w-3.5 h-3.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">{f.title}</h3>
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${f.badgeColor}`}>{f.badge}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{f.description}</p>
+                        <div className="flex items-center gap-1 text-xs text-amber-500 font-medium mt-2">
+                          {f.cta} <ArrowRight className="w-3 h-3" />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -352,47 +315,80 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── Upgrade nudge — shown for free/weekly users only ── */}
-        {!isPro && (
-          <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/8 via-amber-400/4 to-transparent p-5 space-y-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Crown className="w-4 h-4 text-amber-400" />
-              <span className="text-sm font-semibold text-amber-400">
-                {!tier ? "Upgrade to unlock Pro tools" : "Go Pro — you're on Weekly"}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {[
-                { icon: <FileCode2 className="w-3.5 h-3.5" />, label: "IP Embed Code", sub: "Certified authorship widget for your bio" },
-                { icon: <Activity className="w-3.5 h-3.5" />, label: "Kernel Dashboard", sub: "Before/after track optimization + telemetry" },
-                { icon: <Mic2 className="w-3.5 h-3.5" />, label: "Vocal Booth", sub: "Karaoke mode with precise lyric sync" },
-              ].map((item) => (
-                <div key={item.label} className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-background/40 border border-border/30">
-                  <div className="text-amber-500/60 mt-0.5 shrink-0">{item.icon}</div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold">{item.label}</span>
-                      <Lock className="w-2.5 h-2.5 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.sub}</p>
-                  </div>
+        {/* ── IP Rights Tools ── */}
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/8 via-violet-400/4 to-transparent p-6 space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldCheck className="w-5 h-5 text-violet-400" />
+                  <h2 className="text-xl font-bold">IP Rights & Certification</h2>
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  Build an airtight authorship record. Certify ownership. Embed proof anywhere online.
+                </p>
+              </div>
+              <Badge variant="outline" className="border-violet-500/40 text-violet-400 text-[10px] whitespace-nowrap shrink-0">Pro Feature</Badge>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {IP_TOOLS.map((tool, i) => (
+                <motion.div key={tool.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
+                  <Link href={isPro ? tool.href : "/pricing"}>
+                    <Card className="border-violet-500/20 bg-background/50 hover:border-violet-400/40 hover:bg-violet-500/5 transition-all cursor-pointer h-full group">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="w-9 h-9 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center group-hover:bg-violet-500/15 transition-colors">
+                          {tool.icon}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-sm group-hover:text-violet-300 transition-colors mb-1">{tool.title}</h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed">{tool.description}</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-violet-400 font-medium">
+                          {isPro ? tool.cta : "Upgrade to unlock"} <ArrowRight className="w-3 h-3" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </motion.div>
               ))}
             </div>
-            <Link href="/pricing">
-              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-8 px-4 mt-1">
-                <Crown className="w-3 h-3 mr-1.5" />
-                {!tier ? "Upgrade to Studio — $39.99/mo" : "Go Studio — unlock IP embed + Kernel"}
-                <ChevronRight className="w-3 h-3 ml-1" />
-              </Button>
-            </Link>
+
+            {!isPro && (
+              <div className="flex items-center justify-between gap-4 pt-1 border-t border-violet-500/15">
+                <p className="text-xs text-muted-foreground">IP tools included in GravelKing Pro ($39.99/mo)</p>
+                <Link href="/pricing">
+                  <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs h-8 px-4 shrink-0">
+                    <Crown className="w-3 h-3 mr-1.5" /> Upgrade to Pro
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* ── How it works ── */}
+        <div className="space-y-5">
+          <h2 className="text-xl font-bold text-center">How it works</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { step: "1", title: "Upload your track", body: "Drop any audio file — MP3, WAV, FLAC, M4A. Processing happens on our servers; nothing is stored permanently.", color: "text-amber-400 border-amber-500/30 bg-amber-500/8" },
+              { step: "2", title: "Process & separate", body: "Neural AI splits vocals from instrumentals, separates into 5 stems, or masters to your preset — in under 60 seconds.", color: "text-emerald-400 border-emerald-500/30 bg-emerald-500/8" },
+              { step: "3", title: "Certify & download", body: "Download lossless WAV stems, then use the IP Embed Code to certify your authorship across every platform you distribute on.", color: "text-violet-400 border-violet-500/30 bg-violet-500/8" },
+            ].map((step) => (
+              <div key={step.step} className={`rounded-xl border p-5 ${step.color}`}>
+                <div className="text-2xl font-black mb-3 opacity-60">{step.step}</div>
+                <h3 className="font-semibold text-sm mb-1.5">{step.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* ── Pricing Strip ── */}
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Simple pricing</h2>
+            <h2 className="text-xl font-bold">Simple pricing</h2>
             <Link href="/pricing" className="text-xs text-amber-500 hover:text-amber-400 flex items-center gap-1">
               Full details <ChevronRight className="w-3.5 h-3.5" />
             </Link>
@@ -426,9 +422,9 @@ export default function Home() {
                       <Button
                         variant={plan.highlight ? "default" : "outline"}
                         size="sm"
-                        className={`w-full text-xs ${plan.highlight ? "bg-emerald-500 hover:bg-emerald-600 text-black font-semibold" : plan.badge === "Full Studio" ? "border-amber-500/40 text-amber-400 hover:bg-amber-500/10" : ""}`}
+                        className={`w-full text-xs ${plan.highlight ? "bg-amber-500 hover:bg-amber-600 text-black font-semibold" : plan.badge === "Enterprise" ? "border-purple-500/40 text-purple-400 hover:bg-purple-500/10" : ""}`}
                       >
-                        {plan.price === "Free" ? "Get Started" : `Get ${plan.name.replace("GravelKing ", "")}`}
+                        {plan.price === "Free" ? "Get Started" : `Get ${plan.name}`}
                       </Button>
                     </Link>
                   </CardContent>
@@ -439,7 +435,21 @@ export default function Home() {
         </div>
 
         {/* ── Bottom CTAs ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-6">
+          <a href="/whitepaper.html" target="_blank" rel="noopener noreferrer">
+            <Card className="border-border/30 bg-card/40 hover:border-violet-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
+              <CardContent className="p-5 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm group-hover:text-violet-300 transition-colors">IP Whitepaper</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Read the technical brief on GravelKing's audio fingerprinting and IP rights architecture.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </a>
+
           <Link href="/download">
             <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
               <CardContent className="p-5 flex items-start gap-3">
@@ -448,55 +458,25 @@ export default function Home() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Download Free</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Run GravelKing locally. Free features work on your machine — upgrade online.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Run GravelKing locally on your machine — free features work offline, upgrade online.</p>
                 </div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/contact">
-            <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
+            <Card className="border-border/30 bg-card/40 hover:border-sky-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
               <CardContent className="p-5 flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg bg-secondary/60 flex items-center justify-center shrink-0">
                   <Mail className="w-5 h-5 text-sky-400" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Contact Us</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Licensing, enterprise, Node Auditor access, or custom integrations.</p>
+                  <h3 className="font-semibold text-sm group-hover:text-sky-300 transition-colors">Contact & Licensing</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Enterprise pricing, Node Auditor access, custom integrations, or licensing inquiries.</p>
                 </div>
               </CardContent>
             </Card>
           </Link>
-
-          {isPro ? (
-            <Link href="/kernel">
-              <Card className="border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all cursor-pointer group h-full">
-                <CardContent className="p-5 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
-                    <Zap className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Kernel Dashboard</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Live telemetry, MLK v3 analysis, routing config, and PDF reports.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ) : (
-            <Link href="/pricing">
-              <Card className="border-border/30 bg-card/40 hover:border-amber-500/30 hover:bg-card/60 transition-all cursor-pointer group h-full">
-                <CardContent className="p-5 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-secondary/60 flex items-center justify-center shrink-0">
-                    <Lock className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm group-hover:text-amber-400 transition-colors">Kernel Dashboard</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Live kernel metrics, routing, and PDF reports — Pro & Node Auditor.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
         </div>
 
       </motion.div>
