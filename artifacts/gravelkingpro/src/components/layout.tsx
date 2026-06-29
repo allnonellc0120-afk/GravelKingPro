@@ -198,7 +198,13 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
 
       <footer className="border-t border-border/20 bg-card/30 py-4">
         <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} GravelKing Productions · All N One LLC</span>
+          <span>
+            © {new Date().getFullYear()} GravelKing Productions · All N One LLC
+            <span className="ml-2 opacity-40 font-mono">
+              v{new Date(__APP_BUILD__).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })}&nbsp;
+              {new Date(__APP_BUILD__).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </span>
           <div className="flex items-center gap-4">
             <Link href="/label" className="hover:text-amber-500 transition-colors">Label</Link>
             <Link href="/library" className="hover:text-amber-500 transition-colors">Library</Link>
