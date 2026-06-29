@@ -664,8 +664,12 @@ audioRouter.post(
         res.send(stemResult.zipBuffer);
         return;
       } catch (err: any) {
+        req.log.error({ err: err?.message ?? String(err) }, "stem_split failed");
         await unlink(filePath).catch(() => {});
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({
+          success: false,
+          error: err?.message ?? err?.toString() ?? "Stem split processing failed. Try a shorter file or try again.",
+        });
         return;
       }
     }

@@ -1095,7 +1095,7 @@ function VocalBoothInner() {
                   <div className="w-full flex flex-col items-center justify-center gap-2 py-8 text-amber-400">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span className="text-sm">Splitting your song…</span>
-                    <span className="text-[10px] text-muted-foreground text-center px-4">Separating vocals from the instrumental — this can take a moment.</span>
+                    <span className="text-[10px] text-muted-foreground text-center px-4">Separating vocals from the instrumental — this usually takes 30–90 seconds. Please keep this page open.</span>
                   </div>
                 ) : (
                   <div className="space-y-2">

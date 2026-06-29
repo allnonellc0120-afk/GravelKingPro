@@ -45,11 +45,28 @@ export async function splitSong(file: File): Promise<SplitResult> {
   form.append("multiplier", "0.75");
   form.append("stemsOnly", "primary"); // only vocals + instrumental — prevents iOS OOM on large ZIPs
 
-  const resp = await fetch("/api/kernel/process-audio", {
-    method: "POST",
-    credentials: "include",
-    body: form,
-  });
+  // 3-minute timeout — Replicate can take 90s+ on large files
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3 * 60 * 1000);
+
+  let resp: Response;
+  try {
+    resp = await fetch("/api/kernel/process-audio", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (fetchErr: unknown) {
+    clearTimeout(timeoutId);
+    const isAbort = fetchErr instanceof DOMException && fetchErr.name === "AbortError";
+    throw new SplitError(
+      isAbort
+        ? "Split timed out — the song may be too long. Try a shorter clip (under 5 minutes)."
+        : "Network error while splitting. Check your connection and try again.",
+    );
+  }
+  clearTimeout(timeoutId);
 
   if (resp.status === 402 || resp.status === 403) {
     const data = (await resp.json().catch(() => ({}))) as { error?: string; code?: string };
@@ -60,7 +77,9 @@ export async function splitSong(file: File): Promise<SplitResult> {
   }
   if (!resp.ok) {
     const data = (await resp.json().catch(() => ({}))) as { error?: string };
-    throw new SplitError(data.error ?? `Split failed (server returned ${resp.status}).`);
+    throw new SplitError(
+      data.error ?? `Split failed (server error ${resp.status}). Try a shorter file or try again in a moment.`,
+    );
   }
 
   const zipBlob = await resp.blob();
