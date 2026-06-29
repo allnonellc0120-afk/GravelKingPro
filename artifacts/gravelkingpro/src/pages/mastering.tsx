@@ -48,7 +48,7 @@ export default function Mastering() {
   const processFile = useCallback(async (file: File, selectedPreset: PresetId, denoise: boolean) => {
     setFileName(file.name);
     setState("processing");
-    setProgress(20);
+    setProgress(15);
     setResultUrl(null);
     setErrorMsg("");
 
@@ -58,15 +58,31 @@ export default function Mastering() {
     fd.append("preset", selectedPreset);
     fd.append("denoise", String(denoise));
 
+    // 3-minute hard cap — keeps mobile browsers from hanging forever when the
+    // tab is backgrounded or the connection stalls mid-upload/download.
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => { timedOut = true; controller.abort(); }, 180_000);
+
+    // Slow-crawl the progress bar while the server is working so the user
+    // knows the page hasn't frozen. Stops at 85 to leave room for the
+    // "response received" jump to 95.
+    let crawlValue = 15;
+    const crawlId = setInterval(() => {
+      crawlValue = Math.min(85, crawlValue + 1);
+      setProgress(crawlValue);
+    }, 800);
+
     try {
-      setProgress(50);
       const resp = await fetch("/api/kernel/master", {
         method: "POST",
         body: fd,
         credentials: "include",
+        signal: controller.signal,
       });
 
-      setProgress(90);
+      clearInterval(crawlId);
+      setProgress(95);
 
       if (resp.status === 402) {
         const data = await resp.json() as { error: string };
@@ -87,9 +103,17 @@ export default function Mastering() {
       setState("done");
       setProgress(100);
     } catch (err: any) {
+      clearInterval(crawlId);
       setState("error");
-      setErrorMsg(err.message ?? "Something went wrong.");
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      const name = (err as { name?: string } | null)?.name;
+      const isAbort = timedOut || name === "AbortError" || name === "TimeoutError";
+      const msg = isAbort
+        ? "Mastering took too long. Keep the app open while processing, or try a shorter clip."
+        : (err.message ?? "Something went wrong.");
+      setErrorMsg(msg);
+      toast({ title: "Mastering failed", description: msg, variant: "destructive" });
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [toast]);
 
@@ -249,7 +273,7 @@ export default function Mastering() {
                   <p className="text-sm text-muted-foreground">Mastering with <span className="text-sky-400 font-medium">{selectedPreset.label}</span>…</p>
                   <p className="text-xs text-muted-foreground/70">{fileName}</p>
                   <Progress value={progress} className="h-1.5" />
-                  <p className="text-xs text-muted-foreground">Local processing — your audio stays on the server.</p>
+                  <p className="text-xs text-muted-foreground">Processing on the server — keep this page open until it finishes.</p>
                 </CardContent>
               </Card>
             </motion.div>
