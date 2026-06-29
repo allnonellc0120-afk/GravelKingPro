@@ -26,6 +26,10 @@ import {
   demucsStemSplit,
   isDemucsConfigured,
 } from "../demucsCloudRun";
+import {
+  replicateStemSplit,
+  isConfigured as isReplicateConfigured,
+} from "../replicateDemucs";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
@@ -557,13 +561,34 @@ audioRouter.post(
     if (mode === "stem_split") {
       try {
         const { channels } = await getAudioInfo(filePath);
-        let stemResult;
+        type StemResultShape = Awaited<ReturnType<typeof mlkStemSplit>>;
+        let stemResult: StemResultShape;
         let stemSeparatorLabel = "MLK_v3";
         let stemModelLabel: string = MLK_KERNEL;
         let stemProtocolLabel: string = MLK_PROTOCOL;
-        // Honest engine reporting: "remote" only when real neural Replicate
-        // Demucs ran; "local" for the in-process DSP fallback.
+        // Honest engine reporting: "remote" only when real neural separation ran.
         let stemRouting: "local" | "remote" = "local";
+
+        // Tries Replicate Demucs (cloud GPU), falls back to local DSP band-split.
+        // Returns the result and the routing/label metadata to apply.
+        async function runReplicateThenDsp(label: string): Promise<{
+          result: StemResultShape;
+          routing: "local" | "remote";
+          separator: string;
+        }> {
+          if (isReplicateConfigured()) {
+            try {
+              const r = await replicateStemSplit(filePath, multiplier, primaryStemsOnly);
+              req.log.info({ separator: "replicate_demucs_htdemucs" }, `${label} via Replicate Demucs`);
+              return { result: r, routing: "remote", separator: "Replicate_Demucs_htdemucs" };
+            } catch (repErr: any) {
+              req.log.warn({ err: repErr?.message }, `${label} Replicate failed; falling back to DSP`);
+            }
+          }
+          const r = await mlkStemSplit(filePath, ext, channels, multiplier, primaryStemsOnly);
+          req.log.info({ separator: "MLK_v3_DSP" }, `${label} via DSP`);
+          return { result: r, routing: "local", separator: "MLK_v3_DSP" };
+        }
 
         if (isDemucsConfigured()) {
           // Primary: Cloud Run Demucs htdemucs — real neural 4-stem separation.
@@ -577,15 +602,23 @@ audioRouter.post(
           } catch (demucsErr: any) {
             req.log.warn(
               { err: demucsErr?.message },
-              "Cloud Run Demucs stem_split failed; falling back to DSP",
+              "Cloud Run Demucs stem_split failed; trying Replicate then DSP",
             );
-            stemResult = await mlkStemSplit(filePath, ext, channels, multiplier, primaryStemsOnly);
-            req.log.info({ separator: "MLK_v3_DSP" }, "stem_split DSP fallback");
+            const { result, routing, separator } = await runReplicateThenDsp("stem_split fallback");
+            stemResult = result;
+            stemRouting = routing;
+            stemSeparatorLabel = separator;
+            stemModelLabel = stemResult.model;
+            stemProtocolLabel = stemResult.protocol;
           }
         } else {
-          // No Cloud Run Demucs configured — instant DSP band/spatial split.
-          stemResult = await mlkStemSplit(filePath, ext, channels, multiplier, primaryStemsOnly);
-          req.log.info({ separator: "MLK_v3_DSP" }, "stem_split via DSP (no Cloud Run)");
+          // No Cloud Run configured — try Replicate Demucs, then DSP.
+          const { result, routing, separator } = await runReplicateThenDsp("stem_split");
+          stemResult = result;
+          stemRouting = routing;
+          stemSeparatorLabel = separator;
+          stemModelLabel = stemResult.model;
+          stemProtocolLabel = stemResult.protocol;
         }
 
         const event: TelemetryEvent = {

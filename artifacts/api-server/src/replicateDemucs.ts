@@ -121,12 +121,19 @@ export async function replicateVoiceRemove(
 const CANONICAL_STEMS = ["vocals", "drums", "bass", "other"] as const;
 
 /**
- * 4-stem split via Replicate Demucs htdemucs.
- * Returns a shape compatible with mlkStemSplit (GNSResult).
+ * 4-stem split (or 2-stem when onlyPrimaryStems=true) via Replicate Demucs htdemucs.
+ *
+ * onlyPrimaryStems=true  → two-stem Replicate run (vocals + no_vocals). Faster,
+ *   lower bandwidth, produces exactly what the Voice Splitter page needs.
+ * onlyPrimaryStems=false → full 4-stem run; all stems + synthesized instrumental
+ *   are included in the ZIP for the DAW/Studio.
+ *
+ * ZIP keys always use the GKP_ prefix so the client can read them consistently.
  */
 export async function replicateStemSplit(
   filePath: string,
   multiplier = 0.75,
+  onlyPrimaryStems = false,
 ): Promise<{
   zipBuffer: Buffer;
   protocol: string;
@@ -138,6 +145,62 @@ export async function replicateStemSplit(
   const audioBuf = await readFile(filePath);
   const audioUrl = await uploadFile(audioBuf, "input.wav", "audio/wav");
 
+  // ── Two-stem mode (Voice Splitter) ────────────────────────────────────────
+  if (onlyPrimaryStems) {
+    const output = await runModel(
+      "ryan5453",
+      "demucs",
+      { audio: audioUrl, model: "htdemucs", stem: "vocals", output_format: "wav" },
+      90_000,
+    );
+
+    const stemUrls = parseStemUrls(output);
+    const vocalUrl = stemUrls["vocals"];
+    const instUrl  =
+      stemUrls["no_vocals"] ??
+      stemUrls["accompaniment"] ??
+      stemUrls["no_vocal"] ??
+      stemUrls["instrumental"];
+
+    if (!vocalUrl || !instUrl) {
+      throw new Error(
+        `Replicate two-stem missing URLs. Keys: ${Object.keys(stemUrls).join(", ")}`,
+      );
+    }
+
+    const mixId    = randomUUID();
+    const vocalTmp = `/tmp/gk_replic_${mixId}_vocals.wav`;
+    const instTmp  = `/tmp/gk_replic_${mixId}_inst.wav`;
+    try {
+      await Promise.all([
+        writeFile(vocalTmp, await downloadToBuffer(vocalUrl)),
+        writeFile(instTmp,  await downloadToBuffer(instUrl)),
+      ]);
+
+      const [vocalCarved, instCarved] = await Promise.all([
+        applyMLKv3Fast(await readFile(vocalTmp), multiplier),
+        applyMLKv3Fast(await readFile(instTmp),  multiplier),
+      ]);
+
+      return {
+        zipBuffer: Buffer.from(
+          zipSync({
+            "GKP_vocals.wav":       new Uint8Array(vocalCarved.buf),
+            "GKP_instrumental.wav": new Uint8Array(instCarved.buf),
+          }),
+        ),
+        protocol:     REPLICATE_PROTOCOL,
+        model:        REPLICATE_MODEL,
+        stems:        ["vocals", "instrumental"],
+        kernelParity: instCarved.parity,
+        stack:        REPLICATE_STACK,
+      };
+    } finally {
+      await Promise.all([unlink(vocalTmp).catch(() => {}), unlink(instTmp).catch(() => {})]);
+    }
+  }
+
+  // ── Full 4-stem mode (Studio / DAW) ───────────────────────────────────────
   const output = await runModel(
     "ryan5453",
     "demucs",
@@ -214,13 +277,13 @@ export async function replicateStemSplit(
       }
     }
 
-    // Build zip
+    // Build zip — always use GKP_ prefix so clients can read consistently
     const zipEntries: Record<string, Uint8Array> = {};
     for (const [name, { buf }] of Object.entries(carvedBufs)) {
-      zipEntries[`${name}.wav`] = new Uint8Array(buf);
+      zipEntries[`GKP_${name}.wav`] = new Uint8Array(buf);
     }
     if (instrumentalCarved) {
-      zipEntries["instrumental.wav"] = new Uint8Array(instrumentalCarved.buf);
+      zipEntries["GKP_instrumental.wav"] = new Uint8Array(instrumentalCarved.buf);
     }
 
     const stemNames = [
