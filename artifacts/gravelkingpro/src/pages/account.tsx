@@ -25,7 +25,7 @@ const TIER_META = {
     color: "text-emerald-400",
     border: "border-emerald-500/30",
     icon: <Scissors className="w-4 h-4 text-emerald-400" />,
-    description: "Unlimited voice removal, stem splitting + preset masters",
+    description: "Full MLK v3 mastering suite + Vocal Booth + WAV exports",
   },
   monthly: {
     label: "GravelKing Studio",
@@ -51,8 +51,8 @@ const TIER_META = {
 } as const;
 
 const TIER_FEATURES: Record<string, string[]> = {
-  null:         ["3 free voice removals", "1 free stem split", "1 free full master", "Audio preview (30s)"],
-  weekly:       ["Everything in Starter", "Unlimited voice removal", "Unlimited 5-stem splitting", "All preset masters + denoise", "Download WAV stems"],
+  null:         ["Mastering 30s preview", "Vocal Booth access", "Songwriting Studio (basic)", "Live vocal monitoring"],
+  weekly:       ["Everything in Starter", "Full MLK v3 mastering suite", "Unlimited WAV exports", "IP Embed Code + authorship cert", "Vocal Booth + karaoke DAW"],
   monthly:      ["Everything in Weekly", "Adjustable mastering kernel", "Live DAW + recording", "Waveform + plugin chain", "PDF reports"],
   node_auditor: ["Everything in Studio", "Enterprise benchmarking", "Custom reports", "SLA guarantee", "Dedicated support"],
   developer:    ["Everything in Node Auditor", "Admin dashboard access", "Analytics & waitlist", "Full admin controls", "Developer tools"],

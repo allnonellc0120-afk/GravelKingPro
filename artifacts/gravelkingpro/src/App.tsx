@@ -3,13 +3,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppProvider } from "@/lib/context";
-import { SplitterProvider } from "@/lib/splitterStore";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
 import Report from "@/pages/report";
 import Studio from "@/pages/mix-studio";
-import VoiceRemoval from "@/pages/voice-removal";
 import Mastering from "@/pages/mastering";
 import KernelDashboard from "@/pages/kernel";
 import Contact from "@/pages/contact";
@@ -39,7 +37,6 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/studio" component={Studio} />
       <Route path="/mix" component={Studio} />
-      <Route path="/voice-removal" component={VoiceRemoval} />
       <Route path="/mastering" component={Mastering} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/report" component={Report} />
@@ -70,14 +67,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AppProvider>
-          <SplitterProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <RouteSeo />
-              <PageTracker />
-              <Router />
-            </WouterRouter>
-            <Toaster />
-          </SplitterProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <RouteSeo />
+            <PageTracker />
+            <Router />
+          </WouterRouter>
+          <Toaster />
         </AppProvider>
       </TooltipProvider>
     </QueryClientProvider>

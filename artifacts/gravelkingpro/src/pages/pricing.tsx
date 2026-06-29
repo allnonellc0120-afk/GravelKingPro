@@ -18,26 +18,21 @@ const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
 };
 
 const WEEKLY_FEATURES = [
-  { label: "Unlimited voice removal", highlight: "Isolate instrumentals instantly" },
-  { label: "Unlimited 5-stem splitting", highlight: "Vocals, drums, bass, synths, other" },
-  { label: "Full preset mastering suite", highlight: "12 broadcast-ready presets" },
-  { label: "AI noise reduction", highlight: "Clean audio in one click" },
-  { label: "WAV stem downloads", highlight: "Studio-quality 44.1kHz exports" },
+  { label: "Full MLK v3 mastering suite", highlight: "6 broadcast-ready presets" },
+  { label: "Unlimited WAV exports", highlight: "Studio-quality 44.1kHz output" },
+  { label: "Vocal Booth + karaoke DAW", highlight: "Record over any backing track" },
+  { label: "IP Embed Code", highlight: "Certified authorship widget" },
   { label: "No watermark", highlight: "Clean, professional output" },
   { label: "Cancel anytime", highlight: "No commitment, full control" },
 ];
 
 const STUDIO_FEATURES = [
-  { label: "MLK V3.5 Quality Optimizer", highlight: "Auto-tunes your separation settings for your plan" },
-  { label: "Personalized recommendations", highlight: "Honest device + plan tips to improve speed & quality" },
-  { label: "Live server benchmark", highlight: "Real GFLOPS throughput of our processing servers" },
-  { label: "One-click apply", highlight: "Applies the recommended settings to your account" },
-  { label: "Fully adjustable mastering kernel", highlight: "Custom EQ, compression, limiting per track" },
-  { label: "Live multitrack DAW", highlight: "Mix 8+ tracks in real time" },
+  { label: "MLK v3 mastering kernel", highlight: "All 6 presets + fully adjustable EQ, compression, limiting" },
+  { label: "Vocal Booth + karaoke DAW", highlight: "Sing along with lyric sync, teleprompter, and guide vocal" },
+  { label: "Live multitrack DAW", highlight: "Mix 8+ tracks in real time with per-channel metering" },
   { label: "Live microphone recording", highlight: "USB mic, audio interface, phone input" },
-  { label: "Per-stem live meters", highlight: "Real-time RMS / peak on every channel" },
-  { label: "Songwriting Studio — line-by-line AI editor", highlight: "Edit AI drafts, rhyme tray, AI variation picker" },
   { label: "IP Embed Code — shareable certificate", highlight: "Hashed embed widget for your website, bio, or press kit" },
+  { label: "Songwriting Studio", highlight: "Document lyrics, co-writers, and creative timeline" },
   { label: "Kernel Dashboard (10 optimizations/day)", highlight: "Before/after waveform comparison on saved DAW tracks" },
   { label: "PDF export reports", highlight: "Shareable mastering + authorship certificates" },
   { label: "Priority support", highlight: "48-hour response guarantee" },
@@ -48,8 +43,8 @@ type SuccessInfo = { planId: PlanId; planName: string; ctaLabel: string; ctaHref
 const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref: string }> = {
   weekly: {
     planName: "GravelKing Weekly",
-    ctaLabel: "Remove your first vocals",
-    ctaHref: "/voice-removal",
+    ctaLabel: "Master your first track",
+    ctaHref: "/mastering",
   },
   monthly: {
     planName: "GravelKing Pro Plus",
@@ -319,11 +314,11 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>1 voice removal</FeatureRow>
-                  <FeatureRow yes={false}>Stem splits</FeatureRow>
-                  <FeatureRow yes>1 full master, then 30 s previews</FeatureRow>
-                  <FeatureRow yes={false}>Unlimited processing</FeatureRow>
-                  <FeatureRow yes={false}>Live Audio Studio</FeatureRow>
+                  <FeatureRow yes>Mastering 30s preview</FeatureRow>
+                  <FeatureRow yes>Vocal Booth access</FeatureRow>
+                  <FeatureRow yes>Songwriting Studio (basic)</FeatureRow>
+                  <FeatureRow yes={false}>Full WAV exports</FeatureRow>
+                  <FeatureRow yes={false}>IP Embed Code</FeatureRow>
                 </ul>
               </CardContent>
               <CardFooter>

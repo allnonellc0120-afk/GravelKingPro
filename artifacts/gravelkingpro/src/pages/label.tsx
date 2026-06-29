@@ -109,7 +109,7 @@ export default function LabelPage() {
                   </Button>
                 </Link>
               )}
-              <Link href="/voice-removal">
+              <Link href="/mastering">
                 <Button variant="outline" className="h-11 px-7 border-white/20 text-white hover:bg-white/10">
                   <Headphones className="w-4 h-4 mr-2" /> Try the Tools
                 </Button>
