@@ -32,12 +32,25 @@ export interface SplitResult {
   vocals: Blob;
 }
 
+/** Progress events emitted during splitSong(). */
+export type SplitProgress =
+  | { stage: "uploading"; pct: number }
+  | { stage: "compressing" }
+  | { stage: "separating"; pct: number }
+  | { stage: "finishing" };
+
 /**
  * Split a full song into stems on the server and return the instrumental +
  * vocal blobs. Uses the Studio stem-split path, which requires a Pro
  * subscription (the page is already Pro-gated, so entitled users pass).
+ *
+ * onProgress receives stage events: uploading (real XHR %) → compressing →
+ * separating (animated %) → finishing.
  */
-export async function splitSong(file: File): Promise<SplitResult> {
+export async function splitSong(
+  file: File,
+  onProgress?: (p: SplitProgress) => void,
+): Promise<SplitResult> {
   const form = new FormData();
   form.append("audio", file, file.name);
   form.append("mode", "stem_split");
@@ -45,44 +58,71 @@ export async function splitSong(file: File): Promise<SplitResult> {
   form.append("multiplier", "0.75");
   form.append("stemsOnly", "primary"); // only vocals + instrumental — prevents iOS OOM on large ZIPs
 
-  // 3-minute timeout — Replicate can take 90s+ on large files
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3 * 60 * 1000);
+  // Use XHR so we get real upload-progress events.
+  const { status, body } = await new Promise<{ status: number; body: Blob }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.responseType = "blob";
+    xhr.withCredentials = true;
+    // Hard 3-minute timeout — Replicate can take 90 s on large files
+    xhr.timeout = 3 * 60 * 1000;
 
-  let resp: Response;
-  try {
-    resp = await fetch("/api/kernel/process-audio", {
-      method: "POST",
-      credentials: "include",
-      body: form,
-      signal: controller.signal,
-    });
-  } catch (fetchErr: unknown) {
-    clearTimeout(timeoutId);
-    const isAbort = fetchErr instanceof DOMException && fetchErr.name === "AbortError";
-    throw new SplitError(
-      isAbort
-        ? "Split timed out — the song may be too long. Try a shorter clip (under 5 minutes)."
-        : "Network error while splitting. Check your connection and try again.",
-    );
-  }
-  clearTimeout(timeoutId);
+    let processingTimer: ReturnType<typeof setInterval> | null = null;
+    let processingPct = 0;
 
-  if (resp.status === 402 || resp.status === 403) {
-    const data = (await resp.json().catch(() => ({}))) as { error?: string; code?: string };
-    throw new SplitError(data.error ?? "Splitting a song requires a GravelKing Pro subscription.", {
-      paywall: true,
-      code: data.code,
-    });
+    // ── Upload phase ─────────────────────────────────────────────────────────
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) {
+        onProgress?.({ stage: "uploading", pct: Math.round((e.loaded / e.total) * 100) });
+      }
+    };
+
+    // Upload complete → server is now compressing + running the AI separator
+    xhr.upload.onload = () => {
+      onProgress?.({ stage: "compressing" });
+      // Switch to "separating" after ~3 s (server compression is fast)
+      setTimeout(() => {
+        onProgress?.({ stage: "separating", pct: 0 });
+        processingTimer = setInterval(() => {
+          processingPct = Math.min(90, processingPct + 1.5);
+          onProgress?.({ stage: "separating", pct: Math.round(processingPct) });
+        }, 1000);
+      }, 3000);
+    };
+
+    // ── Response received ────────────────────────────────────────────────────
+    xhr.onload = () => {
+      if (processingTimer) clearInterval(processingTimer);
+      onProgress?.({ stage: "finishing" });
+      resolve({ status: xhr.status, body: xhr.response as Blob });
+    };
+
+    const fail = (msg: string, opts?: { paywall?: boolean }) => {
+      if (processingTimer) clearInterval(processingTimer);
+      reject(new SplitError(msg, opts));
+    };
+
+    xhr.onerror   = () => fail("Network error while splitting. Check your connection and try again.");
+    xhr.onabort   = () => fail("Split timed out — the song may be too long. Try a shorter clip (under 5 minutes).");
+    xhr.ontimeout = () => fail("Split timed out — the song may be too long. Try a shorter clip (under 5 minutes).");
+
+    xhr.open("POST", "/api/kernel/process-audio");
+    xhr.send(form);
+  });
+
+  // ── Handle error status codes ────────────────────────────────────────────
+  if (status === 402 || status === 403) {
+    let errMsg = "Splitting a song requires a GravelKing Pro subscription.";
+    let code: string | undefined;
+    try { const d = JSON.parse(await body.text()) as { error?: string; code?: string }; if (d.error) errMsg = d.error; code = d.code; } catch {}
+    throw new SplitError(errMsg, { paywall: true, code });
   }
-  if (!resp.ok) {
-    const data = (await resp.json().catch(() => ({}))) as { error?: string };
-    throw new SplitError(
-      data.error ?? `Split failed (server error ${resp.status}). Try a shorter file or try again in a moment.`,
-    );
+  if (status < 200 || status >= 300) {
+    let errMsg = `Split failed (server error ${status}). Try a shorter file or try again in a moment.`;
+    try { const d = JSON.parse(await body.text()) as { error?: string }; if (d.error) errMsg = d.error; } catch {}
+    throw new SplitError(errMsg);
   }
 
-  const zipBlob = await resp.blob();
+  const zipBlob = body;
   const { unzip } = await import("fflate");
   const bytes = new Uint8Array(await zipBlob.arrayBuffer());
   const files = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
