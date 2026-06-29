@@ -331,6 +331,142 @@ export default function Mastering() {
             </div>
           ))}
         </div>
+        {/* ── SEO content — always rendered ── */}
+        <div className="mt-12 border-t border-border/20 pt-8 space-y-10 text-sm">
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground/90">How audio mastering works</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              GravelKing Pro applies the{" "}
+              <strong className="text-foreground/70">MLK v3 multi-band kernel</strong> server-side
+              to your uploaded audio. The process runs a loudness pass targeting your chosen preset's
+              LUFS standard, applies multi-band compression and EQ shaping, optionally runs a
+              spectral denoise sweep, and returns a fully processed WAV — all without requiring
+              any plug-ins or a DAW on your device.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Every preset matches a specific delivery platform or aesthetic. Baseline is a
+              good default for anything going to streaming. Broadcast follows the EBU R128 standard
+              used by television and radio. YouTube targets –14 LUFS, and SoundCloud targets –11 LUFS
+              for the loudest allowed level on that platform.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground/90">Preset guide</h2>
+            <div className="grid grid-cols-1 gap-2">
+              {[
+                { name: "Baseline",    desc: "Balanced +10% low-end boost, targeting YouTube loudness. Good all-purpose starting point." },
+                { name: "Normal",      desc: "Neutral loudness curve for any content where you want minimal coloration." },
+                { name: "Broadcast",   desc: "EBU R128 compliant at –23 LUFS. Required for TV, podcast distribution, and terrestrial radio." },
+                { name: "Vinyl",       desc: "Warm analog-style processing with boosted lows and soft high-end roll-off." },
+                { name: "Podcast",     desc: "Optimised for voice clarity: gentle compression, reduced room noise, and speech presence boost." },
+                { name: "Club",        desc: "Heavy sub-bass, punchy transient shaping, and loud overall level for PA systems." },
+                { name: "Film",        desc: "Wide cinematic dynamics with restrained limiting — preserves peaks for sync licensing." },
+                { name: "YouTube",     desc: "–14 LUFS integrated loudness, the level at which YouTube's normalizer stops reducing volume." },
+                { name: "SoundCloud",  desc: "–11 LUFS · the loudest level allowed before SoundCloud's compressor kicks in." },
+                { name: "Apple Music", desc: "–16 LUFS per Apple Sound Check. Ensures your track is not attenuated on Apple devices." },
+                { name: "Spacious",    desc: "Reverb tail and stereo widener for ambient, orchestral, or lo-fi tracks needing space." },
+              ].map(p => (
+                <div key={p.name} className="flex gap-3">
+                  <span className="w-24 shrink-0 font-medium text-foreground/70">{p.name}</span>
+                  <span className="text-muted-foreground leading-relaxed">{p.desc}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground/90">Supported file types and output</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Upload any of: <strong className="text-foreground/70">MP3, WAV, FLAC, M4A, AAC, OGG, AIFF, OPUS</strong>.
+              Video files (MP4, MOV) are also accepted. Free-tier users receive a 30-second preview WAV
+              to evaluate the preset before committing.{" "}
+              <Link href="/pricing" className="text-sky-400 hover:underline">GravelKing Pro</Link>{" "}
+              returns the full-length master as a 16-bit stereo 44.1 kHz WAV, ready for distribution
+              or further editing in any DAW.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground/90">Common use cases</h2>
+            <ul className="text-muted-foreground space-y-1.5 list-disc list-inside leading-relaxed">
+              <li>Prepare a final track for streaming release on Spotify, Apple Music, or YouTube</li>
+              <li>Match loudness across an EP or album so every track feels consistent</li>
+              <li>Get broadcast-compliant levels for a podcast episode or radio submission</li>
+              <li>Add warmth and analog character to a digital beat or sample-based track</li>
+              <li>Master an{" "}
+                <Link href="/voice-removal" className="text-sky-400 hover:underline">extracted instrumental</Link>{" "}
+                from the Voice Removal tool for release or sync licensing
+              </li>
+              <li>Run a quick loudness check before submitting to a label or sync library</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-foreground/90">Frequently asked questions</h2>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">What does the Denoise option do?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Enabling Denoise runs a spectral subtraction pass before mastering, reducing
+                broadband noise, hiss, and room tone. It works best on vocal recordings and
+                acoustic instruments. For heavily produced electronic tracks, leave it off — it
+                can subtly affect the texture of synthesised pads and cymbals.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">Will mastering fix a poorly mixed track?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Mastering optimises the final output level, frequency balance, and stereo image of
+                a mix that is already well-balanced. It cannot repair a mix where individual
+                elements clash, where the low end is undefined, or where there is clipping in the
+                source file. If your track needs significant tonal correction, mix it first in a DAW
+                and then master here.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">Is the 30-second free preview the whole master?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                The preview is a 30-second excerpt taken from the start of the master, processed at
+                full quality so you can evaluate how the preset sounds on your track before
+                upgrading. The output format, loudness target, and processing chain are identical
+                to what you receive on a full download with a Pro subscription.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">Which preset should I choose for Spotify?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Spotify normalises playback to –14 LUFS (similar to YouTube) so the YouTube preset
+                is a good match. You can also use Baseline, which targets a similar level with a
+                slightly warmer low-end. Avoid very loud presets like SoundCloud (–11 LUFS) if
+                Spotify is your primary platform — they will be turned down during playback.
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-base font-semibold text-foreground/90">Related tools</h2>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "Voice Removal", href: "/voice-removal" },
+                { label: "Studio (Stem Splitting)", href: "/studio" },
+                { label: "Download", href: "/download" },
+                { label: "Pricing", href: "/pricing" },
+              ].map(({ label, href }) => (
+                <Link key={href} href={href}>
+                  <span className="inline-flex items-center rounded-md border border-border/30 px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-border/60 transition-colors">
+                    {label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+        </div>
       </div>
     </Layout>
   );
