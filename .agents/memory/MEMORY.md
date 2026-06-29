@@ -41,3 +41,4 @@
 - [Vocal Booth karaoke invariants](vocal-booth-karaoke.md) — guide vocal NEVER in mixdown; lrclib search gives ms-accurate LRC sync (label "Precise synced timing"); energy-based is honest fallback (label "approximate")
 - [Studio library Firestore linkage](studio-library-firestore.md) — song_drafts must key by PG project id (not random draftId) or certification updates a ghost doc; paid artifact-minting (IP cert) must verify server-side, not UI-only
 - [Splitter state persistence](splitter-state-persistence.md) — heavy audio tool state+processing must live above the router + mirror result to IndexedDB (iPad nav/backgrounding wipes component useState); needs runId+AbortController race guards
+- [Stem ZIP size (iOS OOM)](stem-zip-size.md) — stemsOnly=primary body param → server returns 2 stems only; Studio (source=studio, no stemsOnly) still gets all 5; vocal booth keeps source=studio for Pro auth but adds stemsOnly=primary
