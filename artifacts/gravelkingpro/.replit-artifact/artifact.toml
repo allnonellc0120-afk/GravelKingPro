@@ -28,7 +28,7 @@ to = "/pricing.html"
 
 [[services.production.rewrites]]
 from = "/voice-removal"
-to = "/voice-removal.html"
+to = "/mastering.html"
 
 [[services.production.rewrites]]
 from = "/mastering"
