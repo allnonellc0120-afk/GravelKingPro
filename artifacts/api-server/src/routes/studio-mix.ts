@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -12,6 +12,9 @@ import { applyMLKv3Fast } from "../kernel-v3";
 
 const execFileAsync = promisify(execFile);
 
+// Per-file limit: 50 MB is ample for Pro stems (a 5-min 24-bit stereo WAV is
+// ~50 MB). The old 200 MB cap let a non-subscriber write up to 1.6 GB to /tmp
+// before getting a 403 — now the entitlement check runs before multer.
 const upload = multer({
   storage: multer.diskStorage({
     destination: "/tmp",
@@ -20,13 +23,28 @@ const upload = multer({
       cb(null, `gk_mix_in_${randomUUID()}.${ext}`);
     },
   }),
-  limits: { fileSize: 200 * 1024 * 1024, files: 8 },
+  limits: { fileSize: 50 * 1024 * 1024, files: 6 },
 });
 
 const studioRouter = Router();
 
 const studioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 5 });
 const studioConcurrency = concurrencyLimit(2);
+
+// Entitlement check runs BEFORE multer so that non-subscribers are rejected
+// before any bytes are written to /tmp. Without this, multer would write up
+// to 6 × 50 MB = 300 MB to disk for every anonymous request.
+async function requireStudio(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (!await hasStudio(req)) {
+    res.status(403).json({
+      success: false,
+      error: "The live DAW and Mix Studio export require a GravelKing Studio (monthly) subscription.",
+      code: "STUDIO_REQUIRED",
+    });
+    return;
+  }
+  next();
+}
 
 type VoicePreset = {
   semitoneOffset: number;
@@ -54,18 +72,9 @@ studioRouter.post(
   "/kernel/studio-mix",
   studioRateLimit,
   studioConcurrency,
-  upload.array("tracks", 8),
+  requireStudio,
+  upload.array("tracks", 6),
   async (req: Request, res: Response) => {
-    // ── Studio (monthly) subscription gate ───────────────────────────────────────
-    if (!await hasStudio(req)) {
-      res.status(403).json({
-        success: false,
-        error: "The live DAW and Mix Studio export require a GravelKing Studio (monthly) subscription.",
-        code: "STUDIO_REQUIRED",
-      });
-      return;
-    }
-
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) {
       res.status(400).json({ success: false, error: "No audio files uploaded." });
