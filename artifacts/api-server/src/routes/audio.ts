@@ -19,7 +19,8 @@ import {
   UVR_MODEL,
   UVR_STACK,
 } from "../gkp-separator";
-import { transcribeWithGemini } from "../geminiTranscribe";
+import { transcribeWithGemini, isGeminiConfigured } from "../geminiTranscribe";
+import { transcribeAudio as transcribeWithWhisper, isConfigured as isWhisperConfigured } from "../replicateWhisper";
 import {
   demucsVoiceRemove,
   demucsStemSplit,
@@ -693,9 +694,10 @@ audioRouter.post(
   }
 );
 
-// ── Vocal transcription (Whisper via Replicate) ───────────────────────────────
+// ── Vocal transcription ────────────────────────────────────────────────────────
 // POST /api/audio/transcribe — accepts audio, returns { segments, fullText }.
-// Rate-limited; not concurrency-limited (Whisper runs on Replicate's infra).
+// Tries Gemini (Vertex AI) first when configured; falls back to Replicate
+// Whisper so the feature works even if one provider is unavailable.
 audioRouter.post(
   "/audio/transcribe",
   audioRateLimit,
@@ -707,14 +709,33 @@ audioRouter.post(
     }
     const filePath = req.file.path;
     try {
-      const result = await transcribeWithGemini(filePath);
+      let result: { segments: unknown[]; fullText: string } | undefined;
+
+      // Primary: Gemini Vertex AI (GCP_SERVICE_ACCOUNT)
+      if (isGeminiConfigured()) {
+        try {
+          result = await transcribeWithGemini(filePath);
+        } catch (geminiErr: any) {
+          req.log.warn(
+            { err: String(geminiErr?.message ?? "") },
+            "Gemini transcription failed; trying Replicate Whisper",
+          );
+        }
+      }
+
+      // Fallback: Replicate Whisper (REPLICATE_API_TOKEN)
+      if (!result) {
+        if (!isWhisperConfigured()) {
+          throw new Error("No transcription provider available — configure GCP_SERVICE_ACCOUNT or REPLICATE_API_TOKEN");
+        }
+        result = await transcribeWithWhisper(filePath);
+      }
+
       res.json(result);
     } catch (err: any) {
-      // Degrade gracefully: never surface raw Vertex AI errors to the user.
-      // The client falls back to manual Tap-to-Time.
       const raw = String(err?.message ?? "");
       const busy = /quota|limit|429|throttl/i.test(raw);
-      req.log.warn({ err: raw }, "Gemini transcription unavailable; client falls back to tap-to-time");
+      req.log.warn({ err: raw }, "Transcription unavailable; client falls back to tap-to-time");
       res.status(502).json({
         error: busy
           ? "Auto-transcribe is busy right now. Use Tap-to-Time below to sync your lyrics."
