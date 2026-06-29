@@ -4,28 +4,22 @@
   "locale": "en_US",
   "twitterCard": "summary_large_image",
   "ogImage": "/opengraph.jpg",
-  "ogImageAlt": "GravelKing Productions — professional server-side audio tools",
+  "ogImageAlt": "GravelKing Productions — master your music and own your IP",
   "ogImageWidth": 1280,
   "ogImageHeight": 720,
   "defaultTitle": "GravelKing Productions",
-  "defaultDescription": "Professional server-side audio tools: voice removal, stem splitting, mastering, voice changer, and denoise. Processed on our servers by All N One LLC.",
+  "defaultDescription": "MLK v3 mastering, a karaoke vocal booth, a live multitrack DAW, and forensic IP authorship certification. Built by All N One LLC.",
   "routes": [
     {
       "path": "/",
       "title": "GravelKing Productions — Pro Audio Tools, No Plugins Required",
-      "description": "Professional server-side audio tools: voice removal, stem splitting, and mastering. Upload a file or pick a tool and go — processing runs on our servers.",
+      "description": "Master your tracks with MLK v3, record in the karaoke vocal booth, mix in a live multitrack DAW, and certify your authorship. Free to try — no plugins, no installs.",
       "ogType": "website"
     },
     {
       "path": "/pricing",
       "title": "Pricing — GravelKing Productions Audio Tools & Studio",
-      "description": "Stop paying $200+/track for mastering. GravelKing Studio delivers pro stems, mastering, and a live DAW from $39.99/mo. Compare Starter, Pro, and Node Auditor plans.",
-      "ogType": "website"
-    },
-    {
-      "path": "/voice-removal",
-      "title": "Voice Removal — Extract Instrumentals Online | GravelKing",
-      "description": "Remove lead vocals with center-channel cancellation to extract a full instrumental track. Fast server-side processing with 3 free runs. Stereo files recommended.",
+      "description": "Stop paying $200+/track for mastering. GravelKing Studio delivers MLK v3 mastering, a karaoke vocal booth, and a live DAW from $39.99/mo. Compare Starter, Pro, and Node Auditor plans.",
       "ogType": "website"
     },
     {
