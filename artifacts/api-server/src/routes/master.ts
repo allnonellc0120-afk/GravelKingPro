@@ -10,6 +10,7 @@ import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/aud
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
 import { applyMLKv3Fast } from "../kernel-v3";
+import { logger } from "../lib/logger";
 
 /** Optional denoise stage folded into mastering (applied before the preset). */
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
@@ -122,6 +123,14 @@ masterRouter.post(
   masterConcurrency,
   upload.single("audio"),
   async (req: Request, res: Response) => {
+    // Log the moment the request enters the handler — if a crash happens before
+    // the pino-http completion log fires, this entry at least shows the request
+    // was received and what preset/file was requested.
+    req.log.info(
+      { preset: req.body?.preset, filename: req.file?.originalname, size: req.file?.size },
+      "master request received"
+    );
+
     if (!req.file) {
       res.status(400).json({ success: false, error: "No audio file uploaded." });
       return;
