@@ -21,11 +21,10 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
   const showUpgradeNudge = !tier || tier === "weekly";
 
   const links = [
-    { href: "/voice-removal", label: "Voice Splitter" },
     { href: "/mastering", label: "Mastering" },
-    { href: "/convert", label: "Converter" },
-    { href: "/songwriting", label: "Songwriting Studio" },
-    ...(isPro ? [{ href: "/vocal-booth", label: "Vocal Booth" }] : []),
+    { href: "/vocal-booth", label: "Vocal Booth" },
+    { href: "/studio", label: "DAW" },
+    { href: "/songwriting", label: "Songwriting" },
     { href: "/label", label: "Label" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),

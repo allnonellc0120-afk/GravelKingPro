@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Mic2, Scissors, Wand2, Music2, FileCode2, PenLine, Activity,
+  Wand2, Music2, FileCode2, PenLine, Activity, LayoutDashboard,
   Play, ChevronRight, CheckCircle2, Zap, Download, Mail, Bell,
   X, Crown, ShieldCheck, ArrowRight,
 } from "lucide-react";
@@ -17,44 +17,44 @@ import { useToast } from "@/hooks/use-toast";
 
 const AUDIO_TOOLS = [
   {
-    icon: <Mic2 className="w-5 h-5 text-purple-400" />,
-    title: "Voice Removal",
-    description: "Strip vocals from any track with neural AI separation. Get a clean instrumental in seconds.",
-    badge: "1 Free Use",
-    badgeColor: "border-sky-500/40 text-sky-400",
-    href: "/voice-removal",
-    cta: "Try it free",
-    color: "purple",
-  },
-  {
-    icon: <Scissors className="w-5 h-5 text-emerald-400" />,
-    title: "Stem Splitting",
-    description: "Separate bass, midrange, highs, and vocals. Download each stem as a clean WAV file.",
-    badge: "1 Free Use",
-    badgeColor: "border-sky-500/40 text-sky-400",
-    href: "/studio",
-    cta: "Try it free",
-    color: "emerald",
-  },
-  {
     icon: <Wand2 className="w-5 h-5 text-sky-400" />,
-    title: "Audio Mastering",
-    description: "6 professional presets: Broadcast, Vinyl, Podcast, Club, Film, Normal. One click to a polished master.",
+    title: "MLK v3 Mastering",
+    description: "6 professional presets — Broadcast, Vinyl, Podcast, Club, Film, Normal. One click, studio-quality WAV output.",
     badge: "30s Preview Free",
     badgeColor: "border-emerald-500/40 text-emerald-400",
     href: "/mastering",
-    cta: "Master now",
+    cta: "Master a track",
     color: "sky",
   },
   {
     icon: <Music2 className="w-5 h-5 text-amber-400" />,
     title: "Vocal Booth",
-    description: "Sing over any track with karaoke-style lyric sync, Sing Along Mode, and real-time vocal monitoring.",
+    description: "Sing over any backing track with karaoke-style lyric sync, teleprompter, and real-time vocal monitoring.",
     badge: "Studio",
     badgeColor: "border-amber-500/40 text-amber-400",
     href: "/vocal-booth",
     cta: "Open Booth",
     color: "amber",
+  },
+  {
+    icon: <LayoutDashboard className="w-5 h-5 text-emerald-400" />,
+    title: "Live Multitrack DAW",
+    description: "Mix 8+ stems in real time with EQ, compression, reverb, and per-channel metering — all in the browser.",
+    badge: "Pro",
+    badgeColor: "border-amber-500/40 text-amber-400",
+    href: "/studio",
+    cta: "Open DAW",
+    color: "emerald",
+  },
+  {
+    icon: <PenLine className="w-5 h-5 text-violet-400" />,
+    title: "Songwriting Studio",
+    description: "Document your lyrics, co-writers, and creative timeline. Build an airtight authorship record for every song.",
+    badge: "IP",
+    badgeColor: "border-violet-500/40 text-violet-400",
+    href: "/songwriting",
+    cta: "Open Studio",
+    color: "violet",
   },
 ];
 
@@ -87,7 +87,7 @@ const PLANS = [
     name: "Starter",
     price: "Free",
     color: "border-border/30",
-    features: ["1 free voice removal", "1 mastering preview", "Songwriting Studio (basic)", "Live vocal monitoring"],
+    features: ["Mastering 30s preview", "Songwriting Studio (basic)", "Vocal Booth access", "Live vocal monitoring"],
   },
   {
     name: "GravelKing Pro",
@@ -97,7 +97,7 @@ const PLANS = [
     highlight: true,
     badge: "Most Popular",
     badgeColor: "bg-amber-500 text-black",
-    features: ["Unlimited voice removal", "Unlimited 5-stem splits", "All mastering presets", "IP Embed Code + authorship cert", "WAV downloads for all stems", "Processing history"],
+    features: ["Full MLK v3 mastering suite", "Unlimited WAV exports", "IP Embed Code + authorship cert", "Vocal Booth + karaoke DAW", "PDF mastering certificates", "Processing history"],
   },
   {
     name: "Node Auditor",
@@ -224,7 +224,7 @@ export default function Home() {
           <div className="relative z-10 space-y-6">
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 rounded-full px-4 py-1.5 text-xs font-medium text-amber-400">
-                <Zap className="w-3.5 h-3.5" /> Server-side AI audio processing
+                <Zap className="w-3.5 h-3.5" /> MLK v3 Mastering Engine
               </span>
               <span className="inline-flex items-center gap-1.5 bg-violet-500/15 border border-violet-500/25 rounded-full px-4 py-1.5 text-xs font-medium text-violet-400">
                 <ShieldCheck className="w-3.5 h-3.5" /> IP rights certification
@@ -232,24 +232,24 @@ export default function Home() {
             </div>
 
             <h1 className="text-5xl font-bold tracking-tight leading-tight">
-              Make music.<br />
-              <span className="text-amber-500">Own it.</span>
+              Master your music.<br />
+              <span className="text-amber-500">Own your IP.</span>
             </h1>
 
             <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed">
-              GravelKing Pro separates vocals, masters your tracks, and certifies your authorship —
-              the only platform that combines professional audio tools with IP rights documentation.
+              GravelKing Pro masters your tracks with MLK v3, lets you record in a karaoke-style vocal booth,
+              and certifies your authorship — the only platform built around IP, mastering, and performance.
             </p>
 
             <div className="flex items-center justify-center gap-3 flex-wrap">
-              <Link href="/voice-removal">
+              <Link href="/mastering">
                 <Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-12 px-8 text-base shadow-lg shadow-amber-500/25">
-                  <Play className="w-4 h-4 mr-2 fill-current" /> Try Voice Removal — Free
+                  <Play className="w-4 h-4 mr-2 fill-current" /> Master a Track — Free Preview
                 </Button>
               </Link>
               <Link href="/songwriting">
                 <Button variant="outline" className="h-12 px-8 text-base border-violet-500/40 text-violet-300 hover:bg-violet-500/10 hover:border-violet-500/60">
-                  <ShieldCheck className="w-4 h-4 mr-2" /> Protect Your IP
+                  <ShieldCheck className="w-4 h-4 mr-2" /> Certify Your IP
                 </Button>
               </Link>
             </div>
@@ -263,10 +263,10 @@ export default function Home() {
             {/* Two-pillar stat strip */}
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl mx-auto">
               {[
-                { val: "5", label: "Stem types" },
                 { val: "6", label: "Master presets" },
                 { val: "IP", label: "Rights certified" },
                 { val: "WAV", label: "Lossless output" },
+                { val: "DAW", label: "Live multitrack" },
               ].map((s) => (
                 <div key={s.label} className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-sm py-3 px-2 text-center">
                   <div className="text-xl font-bold text-amber-400">{s.val}</div>
@@ -281,8 +281,8 @@ export default function Home() {
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold">Audio Production Tools</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">AI-powered separation, mastering, and performance — all server-side.</p>
+              <h2 className="text-xl font-bold">Studio Tools</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Mastering, vocal performance, multitrack DAW, and IP certification — all in one platform.</p>
             </div>
             <Link href="/studio" className="text-xs text-amber-500 hover:text-amber-400 flex items-center gap-1 shrink-0">
               Open Studio <ChevronRight className="w-3.5 h-3.5" />

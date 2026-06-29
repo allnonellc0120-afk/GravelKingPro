@@ -419,10 +419,7 @@ export default function Mastering() {
               <li>Match loudness across an EP or album so every track feels consistent</li>
               <li>Get broadcast-compliant levels for a podcast episode or radio submission</li>
               <li>Add warmth and analog character to a digital beat or sample-based track</li>
-              <li>Master an{" "}
-                <Link href="/voice-removal" className="text-sky-400 hover:underline">extracted instrumental</Link>{" "}
-                from the Voice Removal tool for release or sync licensing
-              </li>
+              <li>Master a backing track from the <Link href="/vocal-booth" className="text-sky-400 hover:underline">Vocal Booth</Link> for release or sync licensing</li>
               <li>Run a quick loudness check before submitting to a label or sync library</li>
             </ul>
           </section>
@@ -476,9 +473,9 @@ export default function Mastering() {
             <h2 className="text-base font-semibold text-foreground/90">Related tools</h2>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "Voice Removal", href: "/voice-removal" },
-                { label: "Studio (Stem Splitting)", href: "/studio" },
-                { label: "Download", href: "/download" },
+                { label: "Vocal Booth", href: "/vocal-booth" },
+                { label: "Live DAW", href: "/studio" },
+                { label: "Songwriting Studio", href: "/songwriting" },
                 { label: "Pricing", href: "/pricing" },
               ].map(({ label, href }) => (
                 <Link key={href} href={href}>

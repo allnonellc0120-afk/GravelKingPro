@@ -759,7 +759,7 @@ export default function Studio() {
             className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
             <div className="flex items-center gap-2.5 text-sm">
               <Lock className="w-4 h-4 text-amber-500 shrink-0" />
-              <span className="text-amber-400/90">You're on <strong>GravelKing Weekly</strong> — unlimited voice removal, stem splitting and preset masters. Upgrade to Studio (monthly) for the adjustable mastering kernel and live DAW.</span>
+              <span className="text-amber-400/90">You're on <strong>GravelKing Weekly</strong> — full MLK v3 mastering + Vocal Booth. Upgrade to Studio (monthly) for the adjustable mastering kernel and full live DAW.</span>
             </div>
             <Link href="/pricing">
               <Button size="sm" variant="outline" className="shrink-0 border-amber-500/30 text-amber-500 h-8 text-xs">
@@ -1434,9 +1434,7 @@ export default function Studio() {
                   <h3 className="text-base font-bold text-white">
                     {paywall.code === "UPGRADE_REQUIRED"
                       ? "Studio subscription required"
-                      : paywall.feature === "voice_remove" ? "Free voice removals used"
-                      : paywall.feature === "stem_split" ? "Free stem split used"
-                      : "Free master used"}
+                      : "Upgrade for full access"}
                   </h3>
                 </div>
               </div>
@@ -1450,7 +1448,7 @@ export default function Studio() {
                     <button className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer text-left">
                       <div>
                         <div className="text-sm font-bold text-amber-300">GravelKing Weekly</div>
-                        <div className="text-[11px] text-muted-foreground">Unlimited voice removal, stem splitting & preset masters</div>
+                        <div className="text-[11px] text-muted-foreground">Full MLK v3 mastering + Vocal Booth + WAV exports</div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-bold text-white">$9.99</div>

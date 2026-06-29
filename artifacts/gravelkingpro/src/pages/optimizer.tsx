@@ -97,7 +97,7 @@ export default function Optimizer() {
     : "Free";
 
   const formatLabel = hasSplits ? "WAV · lossless 44.1 kHz" : "MP3 · 320 kbps";
-  const limitLabel = hasSplits ? "Unlimited runs" : "3 free voice removals";
+  const limitLabel = hasSplits ? "Unlimited runs" : "Free mastering preview";
 
   function runOptimize() {
     setDevice(detectDevice());
