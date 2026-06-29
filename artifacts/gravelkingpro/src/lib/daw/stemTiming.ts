@@ -43,6 +43,7 @@ export async function splitSong(file: File): Promise<SplitResult> {
   form.append("mode", "stem_split");
   form.append("source", "studio");
   form.append("multiplier", "0.75");
+  form.append("stemsOnly", "primary"); // only vocals + instrumental — prevents iOS OOM on large ZIPs
 
   const resp = await fetch("/api/kernel/process-audio", {
     method: "POST",

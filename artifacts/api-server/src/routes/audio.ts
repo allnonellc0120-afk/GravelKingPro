@@ -302,6 +302,10 @@ audioRouter.post(
     const sliceSize = parseInt((req.body.slice_size as string) ?? "2");
     const mode: ProcessMode = (req.body.mode as ProcessMode) ?? "standard";
     const source = (req.body.source as string) ?? "";
+    const stemsOnly = (req.body.stemsOnly as string) ?? "";
+    // Only render vocals + instrumental when the caller doesn't need all 5 stems
+    // (voice splitter, vocal booth). Avoids 250 MB+ ZIP OOM on iOS.
+    const primaryStemsOnly = source !== "studio" || stemsOnly === "primary";
     const tempo = Math.min(2.5, Math.max(0.25, parseFloat((req.body.tempo as string) ?? "1.0")));
     const semitones = Math.min(12, Math.max(-12, parseFloat((req.body.semitones as string) ?? "0")));
 
@@ -563,7 +567,7 @@ audioRouter.post(
         if (isDemucsConfigured()) {
           // Primary: Cloud Run Demucs htdemucs — real neural 4-stem separation.
           try {
-            stemResult = await demucsStemSplit(filePath, multiplier);
+            stemResult = await demucsStemSplit(filePath, multiplier, primaryStemsOnly);
             stemRouting = "remote";
             stemSeparatorLabel = "Demucs_htdemucs";
             stemModelLabel = stemResult.model;
@@ -574,12 +578,12 @@ audioRouter.post(
               { err: demucsErr?.message },
               "Cloud Run Demucs stem_split failed; falling back to DSP",
             );
-            stemResult = await mlkStemSplit(filePath, ext, channels, multiplier);
+            stemResult = await mlkStemSplit(filePath, ext, channels, multiplier, primaryStemsOnly);
             req.log.info({ separator: "MLK_v3_DSP" }, "stem_split DSP fallback");
           }
         } else {
           // No Cloud Run Demucs configured — instant DSP band/spatial split.
-          stemResult = await mlkStemSplit(filePath, ext, channels, multiplier);
+          stemResult = await mlkStemSplit(filePath, ext, channels, multiplier, primaryStemsOnly);
           req.log.info({ separator: "MLK_v3_DSP" }, "stem_split via DSP (no Cloud Run)");
         }
 

@@ -278,10 +278,11 @@ export async function uvrVocalRemoval(
  * ~580 MB RAM for a 3-minute song.
  */
 export async function mlkStemSplit(
-  filePath:   string,
-  ext:        string,
-  channels:   number,
-  multiplier: number = 0.75,
+  filePath:         string,
+  ext:              string,
+  channels:         number,
+  multiplier:       number  = 0.75,
+  onlyPrimaryStems: boolean = false,
 ): Promise<GNSResult> {
   const id       = randomUUID();
   const isStereo = channels >= 2;
@@ -318,6 +319,12 @@ export async function mlkStemSplit(
     { name: "other",        extract: "highpass=f=2500",               ch: channels,                   outPath: `${stemDir}/GKP_other.wav`        },
     { name: "instrumental", extract: instrExtract,                    ch: isStereo ? 2 : channels,    outPath: `${stemDir}/GKP_instrumental.wav`  },
   ];
+  // Public voice splitter only needs vocals + instrumental; skipping the other
+  // 3 stems cuts the ZIP from ~250 MB to ~85 MB for a typical long song and
+  // prevents iOS from OOM-crashing on resp.arrayBuffer().
+  const activeStemDefs = onlyPrimaryStems
+    ? stemDefs.filter(s => s.name === "vocals" || s.name === "instrumental")
+    : stemDefs;
 
   // Render a single stem in its own ffmpeg process: [source] → extraction →
   // MLK v3 → disk. Errors are tagged with the stem name so the caller knows
@@ -343,9 +350,9 @@ export async function mlkStemSplit(
     // Render every stem as its own parallel ffmpeg process. allSettled so one
     // stem's failure doesn't cancel the others — we collect ALL failures and
     // report exactly which stems broke.
-    const results = await Promise.allSettled(stemDefs.map(renderStem));
+    const results = await Promise.allSettled(activeStemDefs.map(renderStem));
     const failures = results
-      .map((r, i) => (r.status === "rejected" ? { stem: stemDefs[i].name, reason: r.reason } : null))
+      .map((r, i) => (r.status === "rejected" ? { stem: activeStemDefs[i].name, reason: r.reason } : null))
       .filter((f): f is { stem: string; reason: unknown } => f !== null);
 
     if (failures.length > 0) {
@@ -359,7 +366,7 @@ export async function mlkStemSplit(
     // to avoid spiking RAM; each entry is freed once zipSync compresses the set.
     const zipInput: Record<string, Uint8Array> = {};
     const stemNames: string[] = [];
-    for (const stem of stemDefs) {
+    for (const stem of activeStemDefs) {
       zipInput[`GKP_${stem.name}.wav`] = new Uint8Array(await readFile(stem.outPath));
       stemNames.push(stem.name);
     }

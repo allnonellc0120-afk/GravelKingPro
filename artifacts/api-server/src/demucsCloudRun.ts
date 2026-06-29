@@ -124,8 +124,9 @@ export async function demucsVoiceRemove(
  * post-processed through MLK v3.
  */
 export async function demucsStemSplit(
-  filePath:   string,
-  multiplier: number = 0.75,
+  filePath:         string,
+  multiplier:       number  = 0.75,
+  onlyPrimaryStems: boolean = false,
 ): Promise<GNSResult> {
   const { wavPath, cleanup } = await toWav(filePath);
   try {
@@ -162,6 +163,7 @@ export async function demucsStemSplit(
     let   kernelParity        = "MLK_V3_VALIDATED";
 
     for (const [name, b64] of Object.entries(json.stems)) {
+      if (onlyPrimaryStems && name !== "vocals" && name !== "instrumental") continue;
       const rawBuf          = Buffer.from(b64, "base64");
       const { buf, parity } = await applyMLKv3Fast(rawBuf, multiplier);
       if (parity !== "MLK_V3_VALIDATED") kernelParity = parity;
