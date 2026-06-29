@@ -447,6 +447,75 @@ export default function SongwritingStudio() {
     setAuthorshipScore(levenshteinPercent(aiDraft, currentText));
   }, [lines, aiDraft]);
 
+  // ── Draft persistence key ─────────────────────────────────────────────────
+  const DRAFT_KEY = "gk:songwriting:draft";
+
+  // ── Restore draft on mount ────────────────────────────────────────────────
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as {
+        lyricsMode?: "simple" | "advanced";
+        story?: string; genre?: string; bpm?: string;
+        advKey?: string; advVocalType?: string;
+        timelineBlocks?: TimelineBlock[];
+        styleInput?: string; convertedStyle?: string; stylePrompt?: string;
+        aiDraft?: string; lines?: LineState[];
+        projectId?: string | null; generationCount?: number;
+        savedAt?: string;
+      };
+      if (!d.aiDraft || !d.lines?.length) return;
+      if (d.lyricsMode) setLyricsMode(d.lyricsMode);
+      if (d.story !== undefined) setStory(d.story);
+      if (d.genre) setGenre(d.genre);
+      if (d.bpm !== undefined) setBpm(d.bpm);
+      if (d.advKey) setAdvKey(d.advKey);
+      if (d.advVocalType) setAdvVocalType(d.advVocalType);
+      if (d.timelineBlocks?.length) setTimelineBlocks(d.timelineBlocks);
+      if (d.styleInput !== undefined) setStyleInput(d.styleInput);
+      if (d.convertedStyle !== undefined) setConvertedStyle(d.convertedStyle);
+      if (d.stylePrompt !== undefined) setStylePrompt(d.stylePrompt);
+      setAiDraft(d.aiDraft);
+      setLines(d.lines);
+      if (d.projectId) setProjectId(d.projectId);
+      if (d.generationCount !== undefined) setGenerationCount(d.generationCount);
+      const when = d.savedAt
+        ? new Date(d.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : "earlier";
+      toast({ title: "Draft restored", description: `Your last session from ${when} was recovered.` });
+    } catch {
+      // Non-critical — malformed or absent draft
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-save draft to localStorage whenever content changes ─────────────
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!aiDraft) return; // nothing worth saving yet
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          lyricsMode, story, genre, bpm,
+          advKey, advVocalType, timelineBlocks,
+          styleInput, convertedStyle, stylePrompt,
+          aiDraft, lines,
+          projectId, generationCount,
+          savedAt: new Date().toISOString(),
+        }));
+      } catch {
+        // Storage full or unavailable — silent
+      }
+    }, 800);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [aiDraft, lines, story, genre, bpm, lyricsMode, advKey, advVocalType,
+      timelineBlocks, styleInput, convertedStyle, stylePrompt,
+      projectId, generationCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Voice Splitter prefill — load lyrics sent from the split page ──────────
   useEffect(() => {
     try {
@@ -728,6 +797,7 @@ export default function SongwritingStudio() {
     setAiDraft(""); setLines([]); setStylePrompt(""); setAuthorshipScore(0);
     setEditingLineId(null); setRemixLineId(null); setProjectId(null);
     setRhymes([]); setRhymeWord("");
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* non-critical */ }
   };
 
   const downloadCertificate = async () => {
