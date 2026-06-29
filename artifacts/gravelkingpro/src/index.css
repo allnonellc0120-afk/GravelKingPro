@@ -240,10 +240,35 @@
 @layer base {
   * {
     @apply border-border;
+    /* Remove blue tap flash on Android / Samsung Internet */
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* iOS momentum scroll on the root */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent iOS Safari from auto-zooming into inputs — 16 px floor */
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: max(1rem, 1em);
+  }
+
+  /* Eliminate the 300 ms tap delay on tappable elements */
+  a, button, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Respect iPhone / Galaxy fold notch / home-bar */
+  header {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  footer {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
