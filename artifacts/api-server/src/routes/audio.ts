@@ -3,7 +3,7 @@ import { createAudioJob, completeAudioJob } from "../lib/firestore";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { writeFile, readFile, unlink } from "fs/promises";
+import { writeFile, readFile, unlink, stat } from "fs/promises";
 import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
 import { telemetryBus, type TelemetryEvent } from "../lib/telemetry";
@@ -559,6 +559,25 @@ audioRouter.post(
 
     // ── Stem splitting — Morris Law Kernel v3 (fast local) ───────────────────
     if (mode === "stem_split") {
+      // Pre-compress: files > 15 MB are re-encoded to 22050 Hz stereo so Cloud
+      // Run can accept them (it rejects > 20 MB). Also makes Replicate faster.
+      try {
+        const { size } = await stat(filePath);
+        if (size > 15 * 1024 * 1024) {
+          const compPath = `/tmp/gk_comp_${randomUUID()}.wav`;
+          await execFileAsync("ffmpeg", [
+            "-y", "-i", filePath, "-vn",
+            "-acodec", "pcm_s16le", "-ar", "22050", "-ac", "2",
+            compPath,
+          ], { timeout: 60_000 });
+          await unlink(filePath).catch(() => {});
+          filePath = compPath;
+          req.log.info({ originalBytes: size }, "stem_split: pre-compressed to 22050 Hz");
+        }
+      } catch {
+        // Non-fatal — continue with original file
+      }
+
       try {
         const { channels } = await getAudioInfo(filePath);
         type StemResultShape = Awaited<ReturnType<typeof mlkStemSplit>>;

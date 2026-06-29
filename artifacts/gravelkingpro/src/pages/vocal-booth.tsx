@@ -5,9 +5,10 @@ import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock } from "lucide-react";
+import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock, CheckCircle2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
-import { splitSong, analyzeGuideTiming, SplitError, type TimedLine } from "@/lib/daw/stemTiming";
+import { splitSong, analyzeGuideTiming, SplitError, type TimedLine, type SplitProgress } from "@/lib/daw/stemTiming";
 import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
 import { downloadBlob } from "@/lib/download";
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
@@ -250,6 +251,8 @@ function VocalBoothInner() {
 
   // ── split-your-own-song → guide vocal + energy-based line timing ──
   const [splitting, setSplitting] = useState(false);
+  const [splitStage, setSplitStage] = useState<SplitProgress["stage"] | null>(null);
+  const [splitPct, setSplitPct] = useState(0);
   const [guideVocalBlob, setGuideVocalBlob] = useState<Blob | null>(null);
   const [guideVocalUrl, setGuideVocalUrl] = useState<string | null>(null);
   const [guideEnabled, setGuideEnabled] = useState(true);
@@ -610,8 +613,13 @@ function VocalBoothInner() {
     recorder.reset();
     resetGuide();
     setSplitting(true);
+    setSplitStage("uploading");
+    setSplitPct(0);
     try {
-      const { instrumental, vocals } = await splitSong(file);
+      const { instrumental, vocals } = await splitSong(file, (p) => {
+        setSplitStage(p.stage);
+        setSplitPct("pct" in p ? p.pct : 0);
+      });
       const baseName = file.name.replace(/\.[^.]+$/, "") || "song";
       setBackingFile(new File([instrumental], `${baseName} (instrumental).wav`, { type: "audio/wav" }));
       setProgress(0);
@@ -632,6 +640,8 @@ function VocalBoothInner() {
       });
     } finally {
       setSplitting(false);
+      setSplitStage(null);
+      setSplitPct(0);
     }
   }, [recorder, resetGuide, runTiming, lyrics, toast]);
 
@@ -1092,10 +1102,37 @@ function VocalBoothInner() {
               />
               {!backingFile ? (
                 splitting ? (
-                  <div className="w-full flex flex-col items-center justify-center gap-2 py-8 text-amber-400">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-sm">Splitting your song…</span>
-                    <span className="text-[10px] text-muted-foreground text-center px-4">Separating vocals from the instrumental — this usually takes 30–90 seconds. Please keep this page open.</span>
+                  <div className="w-full flex flex-col gap-3 py-5 px-4">
+                    {(
+                      [
+                        { id: "uploading",   label: "Uploading",         sub: splitPct > 0 ? `${splitPct}%` : "Sending file…" },
+                        { id: "compressing", label: "Compressing audio",  sub: "Optimising for AI…" },
+                        { id: "separating",  label: "Separating stems",   sub: "Cloud AI running — keep this page open" },
+                        { id: "finishing",   label: "Finishing up",       sub: "Packaging stems…" },
+                      ] as const
+                    ).map(({ id, label, sub }, idx, arr) => {
+                      const stageOrder = arr.map(s => s.id);
+                      const currentIdx = stageOrder.indexOf(splitStage ?? "uploading");
+                      const thisIdx = idx;
+                      const done   = thisIdx < currentIdx;
+                      const active = thisIdx === currentIdx;
+                      return (
+                        <div key={id} className={`flex items-start gap-3 transition-opacity duration-300 ${done ? "opacity-50" : active ? "opacity-100 text-amber-400" : "opacity-25"}`}>
+                          <div className="mt-0.5 shrink-0">
+                            {done   ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                    : active ? <Loader2 className="w-4 h-4 animate-spin" />
+                                    : <div className="w-4 h-4 rounded-full border border-current" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium leading-tight">{label}</div>
+                            {active && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {(splitStage === "uploading" || splitStage === "separating") && (
+                      <Progress value={splitPct} className="h-1 mt-1" />
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2">
