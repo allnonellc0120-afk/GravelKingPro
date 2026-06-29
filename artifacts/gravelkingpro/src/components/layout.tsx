@@ -49,8 +49,8 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
             <span className="font-bold text-base tracking-tight uppercase sm:hidden">GKP</span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-5">
+          {/* Desktop nav — shown only at lg (1024 px+); tablets get the hamburger */}
+          <nav className="hidden lg:flex items-center gap-5">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -117,9 +117,9 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
             )}
           </nav>
 
-          {/* Mobile hamburger */}
+          {/* Mobile / tablet hamburger */}
           <button
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="lg:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => setMobileOpen((o) => !o)}
             aria-label="Toggle menu"
           >
@@ -129,7 +129,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-border/40 bg-card/95 backdrop-blur-sm">
+          <div className="lg:hidden border-t border-border/40 bg-card/95 backdrop-blur-sm">
             <nav className="container mx-auto px-4 py-3 flex flex-col gap-1">
               {links.map((link) => (
                 <Link
@@ -205,7 +205,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
               {new Date(__APP_BUILD__).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           </span>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 justify-center sm:justify-end">
             <Link href="/label" className="hover:text-amber-500 transition-colors">Label</Link>
             <Link href="/library" className="hover:text-amber-500 transition-colors">Library</Link>
             <Link href="/pitch" className="hover:text-amber-500 transition-colors">IP Embed</Link>
