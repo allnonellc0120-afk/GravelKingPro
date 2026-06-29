@@ -458,12 +458,17 @@ function VocalBoothInner() {
   }, [toast]);
 
   // ── Whisper transcription ──────────────────────────────────────────────────
-  const transcribeVocals = useCallback(async () => {
-    if (!backingFile) return;
+  // Pass a blob override to transcribe a specific audio blob immediately
+  // (e.g. right after a split before React state has updated).
+  // Falls back to guideVocalBlob (split vocals) then backingFile.
+  const transcribeVocals = useCallback(async (overrideBlob?: Blob | File | null) => {
+    const target: Blob | File | null = overrideBlob ?? guideVocalBlob ?? backingFile;
+    if (!target) return;
     setTranscribing(true);
     try {
       const fd = new FormData();
-      fd.append("audio", backingFile, backingFile.name);
+      const filename = target instanceof File ? target.name : "vocals.wav";
+      fd.append("audio", target, filename);
       const r = await fetch("/api/audio/transcribe", { method: "POST", body: fd, credentials: "include" });
       if (!r.ok) {
         const d = (await r.json().catch(() => ({}))) as { error?: string };
@@ -513,7 +518,6 @@ function VocalBoothInner() {
         description: `${lines.length} lines detected with precise timing.`,
       });
     } catch (err: unknown) {
-      // Auto-transcribe is a convenience; Tap-to-Time is the always-available path.
       toast({
         title: "Auto-transcribe unavailable",
         description:
@@ -523,7 +527,7 @@ function VocalBoothInner() {
     } finally {
       setTranscribing(false);
     }
-  }, [backingFile, toast]);
+  }, [guideVocalBlob, backingFile, toast]);
 
   // ── Tap-to-time ────────────────────────────────────────────────────────────
   const startTapTiming = useCallback(() => {
@@ -614,8 +618,11 @@ function VocalBoothInner() {
       setPosition(0);
       setBackingPlaying(false);
       setGuideVocalBlob(vocals);
-      toast({ title: "Song split", description: "Instrumental loaded as your backing track; vocals added as a guide." });
+      toast({ title: "Song split", description: "Instrumental loaded as backing track; transcribing vocals…" });
+      // Run energy-timing AND Whisper transcription in parallel on the vocal stem.
+      // Pass vocals directly — React state hasn't updated yet at this point.
       void runTiming(vocals, lyrics);
+      void transcribeVocals(vocals);
     } catch (e) {
       const err = e as SplitError;
       toast({
@@ -886,27 +893,55 @@ function VocalBoothInner() {
               )}
             </div>
 
-            {/* ── Whisper auto-transcription (Smule-style timed lyric detection) ── */}
-            {backingFile && (
+            {/* ── Whisper auto-transcription ── */}
+            {(backingFile || guideVocalBlob) && (
               <div className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2">
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Auto-detect vocals</div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[11px] text-muted-foreground leading-snug">
-                    {timingSource === "lrc" && lyricSource === "whisper"
-                      ? "Lyrics and timing were auto-detected from the track."
-                      : "Transcribe vocals from the loaded track with precise timestamps."}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5 shrink-0"
-                    disabled={transcribing}
-                    onClick={() => void transcribeVocals()}
-                  >
-                    {transcribing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                    {transcribing ? "Transcribing…" : timedLines && lyricSource === "whisper" ? "Re-transcribe" : "Transcribe Vocals"}
-                  </Button>
-                </div>
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Auto-transcribe vocals</div>
+                {guideVocalBlob ? (
+                  /* After a split: transcribe the extracted vocal stem */
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      {transcribing
+                        ? "Transcribing the extracted vocals — lyrics and timing will appear automatically."
+                        : timingSource === "lrc" && lyricSource === "whisper"
+                          ? "Lyrics and timing auto-detected from the extracted vocal stem."
+                          : "Transcribe the extracted vocal stem to get timed lyrics automatically."}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5 shrink-0"
+                      disabled={transcribing}
+                      onClick={() => void transcribeVocals()}
+                    >
+                      {transcribing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                      {transcribing ? "Transcribing…" : timedLines && lyricSource === "whisper" ? "Re-transcribe" : "Transcribe Vocals"}
+                    </Button>
+                  </div>
+                ) : (
+                  /* No split done: let the user upload a separate vocals file */
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Upload a vocals-only file (a cappella, isolated vocal stem) to auto-detect lyrics with precise timestamps.
+                      Or, split your full song above to extract vocals automatically.
+                    </p>
+                    <label className="flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 transition-colors cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".wav,.mp3,.m4a,.aac,.flac,.ogg,.oga,.weba"
+                        className="sr-only"
+                        disabled={transcribing}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void transcribeVocals(f);
+                          if (e.target) e.target.value = "";
+                        }}
+                      />
+                      {transcribing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                      {transcribing ? "Transcribing…" : "Upload vocals to transcribe"}
+                    </label>
+                  </div>
+                )}
               </div>
             )}
 
