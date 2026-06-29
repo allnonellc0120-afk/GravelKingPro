@@ -197,10 +197,42 @@ export async function mlkVocalRemoval(
   channels:   number,
   multiplier: number = 0.75,
 ): Promise<GNSVocalResult> {
-  const filter = channels >= 2
-    ? "pan=stereo|c0=c0-c1|c1=c0-c1"
-    : "equalizer=f=2500:t=q:w=2:g=-9";
-  const rawBuf = await ffmpegFilterToWav(filePath, filter, channels >= 2 ? 2 : 1);
+  let rawBuf: Buffer;
+
+  if (channels >= 2) {
+    // Frequency-selective center-cancel: only subtract L-R in the vocal
+    // presence band (200–5000 Hz). Bass (< 200 Hz) and highs (> 5000 Hz)
+    // pass through completely unchanged, so kick drum, bass, and cymbals
+    // remain fully audible in the instrumental output.
+    // The old pure L-R filter (pan=stereo|c0=c0-c1|c1=c0-c1) silenced
+    // anything center-panned — including most instruments on commercial mixes.
+    const id      = randomUUID();
+    const outPath = `/tmp/mlk_vr_${id}.wav`;
+    const filterComplex = [
+      "asplit=3[lo][mid][hi]",
+      "[lo]lowpass=f=200[lo_out]",
+      "[mid]highpass=f=200,lowpass=f=5000,pan=stereo|c0=c0-c1|c1=c0-c1[mid_out]",
+      "[hi]highpass=f=5000[hi_out]",
+      "[lo_out][mid_out][hi_out]amix=inputs=3:normalize=0[vr_out]",
+    ].join(";");
+    try {
+      await execFileAsync("ffmpeg", [
+        "-y", "-i", filePath,
+        "-filter_complex", filterComplex,
+        "-map", "[vr_out]",
+        "-ac", "2",
+        "-acodec", "pcm_s16le",
+        outPath,
+      ], { maxBuffer: 200 * 1024 * 1024, timeout: 120_000 });
+      rawBuf = await readFile(outPath);
+    } finally {
+      await unlink(outPath).catch(() => {});
+    }
+  } else {
+    // Mono: attenuate the vocal presence band with an equalizer notch.
+    rawBuf = await ffmpegFilterToWav(filePath, "equalizer=f=2500:t=q:w=2:g=-9", 1);
+  }
+
   const { buf, parity } = await applyMLKv3Fast(rawBuf, multiplier);
   return {
     instrumental: buf,
@@ -308,28 +340,25 @@ export async function mlkStemSplit(
   const vocalExtract = isStereo
     ? "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=180,lowpass=f=5000"
     : "highpass=f=180,lowpass=f=5000";
-  const instrExtract = isStereo ? "pan=stereo|c0=c0-c1|c1=c0-c1" : "aecho=0.8:0.88:6:0.4";
 
-  // One entry per stem: extraction filter + output channel count. Each becomes
-  // an independent ffmpeg process so failures isolate to a single stem.
-  const stemDefs = [
-    { name: "vocals",       extract: vocalExtract,                    ch: 1,                          outPath: `${stemDir}/GKP_vocals.wav`       },
-    { name: "drums",        extract: "highpass=f=200,lowpass=f=2500", ch: channels,                   outPath: `${stemDir}/GKP_drums.wav`        },
-    { name: "bass",         extract: "lowpass=f=250",                 ch: channels,                   outPath: `${stemDir}/GKP_bass.wav`         },
-    { name: "other",        extract: "highpass=f=2500",               ch: channels,                   outPath: `${stemDir}/GKP_other.wav`        },
-    { name: "instrumental", extract: instrExtract,                    ch: isStereo ? 2 : channels,    outPath: `${stemDir}/GKP_instrumental.wav`  },
+  // Core stems extracted by frequency range — NOT center-cancel. Frequency
+  // filtering preserves center-panned instruments (kick drum, bass, lead
+  // synths) which center-cancel would otherwise erase. The instrumental is
+  // synthesized by mixing these three after rendering (see below).
+  const coreStemDefs = [
+    { name: "vocals", extract: vocalExtract,                    ch: 1,        outPath: `${stemDir}/GKP_vocals.wav` },
+    { name: "drums",  extract: "highpass=f=200,lowpass=f=2500", ch: channels, outPath: `${stemDir}/GKP_drums.wav`  },
+    { name: "bass",   extract: "lowpass=f=250",                 ch: channels, outPath: `${stemDir}/GKP_bass.wav`   },
+    { name: "other",  extract: "highpass=f=2500",               ch: channels, outPath: `${stemDir}/GKP_other.wav` },
   ];
-  // Public voice splitter only needs vocals + instrumental; skipping the other
-  // 3 stems cuts the ZIP from ~250 MB to ~85 MB for a typical long song and
-  // prevents iOS from OOM-crashing on resp.arrayBuffer().
-  const activeStemDefs = onlyPrimaryStems
-    ? stemDefs.filter(s => s.name === "vocals" || s.name === "instrumental")
-    : stemDefs;
+  // Always render all 4 core stems — even in onlyPrimaryStems mode — because
+  // the instrumental is built from drums+bass+other rather than center-cancel.
+  const activeStemDefs = coreStemDefs;
 
   // Render a single stem in its own ffmpeg process: [source] → extraction →
   // MLK v3 → disk. Errors are tagged with the stem name so the caller knows
   // exactly which stem failed.
-  async function renderStem(stem: typeof stemDefs[number]): Promise<void> {
+  async function renderStem(stem: typeof coreStemDefs[number]): Promise<void> {
     const filterComplex = `[0:a]${stem.extract}[x];[x]${mlkChain}`;
     try {
       await execFileAsync("ffmpeg", [
@@ -347,9 +376,8 @@ export async function mlkStemSplit(
   }
 
   try {
-    // Render every stem as its own parallel ffmpeg process. allSettled so one
-    // stem's failure doesn't cancel the others — we collect ALL failures and
-    // report exactly which stems broke.
+    // Render all core stems in parallel. allSettled so one failure doesn't
+    // cancel the others — collect ALL failures and report which broke.
     const results = await Promise.allSettled(activeStemDefs.map(renderStem));
     const failures = results
       .map((r, i) => (r.status === "rejected" ? { stem: activeStemDefs[i].name, reason: r.reason } : null))
@@ -362,14 +390,34 @@ export async function mlkStemSplit(
       throw new Error(`MLK stem split failed for ${failures.length} stem(s): ${names}. First error: ${detail}`);
     }
 
-    // Read processed stems from disk and build zip. Files are read sequentially
-    // to avoid spiking RAM; each entry is freed once zipSync compresses the set.
+    // Synthesize the instrumental by mixing the frequency-separated drums, bass,
+    // and other stems. Each of those was extracted by frequency range so
+    // center-panned instruments (kick drum, bass, leads) are preserved. This
+    // replaces the old center-cancel approach, which silenced anything that was
+    // identical on L and R — i.e. most of a typical commercial mix.
+    const instBuf = await mixStemsToInstrumental([
+      `${stemDir}/GKP_drums.wav`,
+      `${stemDir}/GKP_bass.wav`,
+      `${stemDir}/GKP_other.wav`,
+    ]);
+
+    // Build the ZIP. onlyPrimaryStems mode (public voice splitter) includes
+    // only vocals + instrumental to keep the ZIP small; full mode (DAW)
+    // includes all 5 stems.
     const zipInput: Record<string, Uint8Array> = {};
     const stemNames: string[] = [];
-    for (const stem of activeStemDefs) {
+
+    const zipStems = onlyPrimaryStems
+      ? coreStemDefs.filter(s => s.name === "vocals")
+      : coreStemDefs;
+
+    for (const stem of zipStems) {
       zipInput[`GKP_${stem.name}.wav`] = new Uint8Array(await readFile(stem.outPath));
       stemNames.push(stem.name);
     }
+
+    zipInput["GKP_instrumental.wav"] = new Uint8Array(instBuf);
+    stemNames.push("instrumental");
 
     return {
       zipBuffer:    Buffer.from(zipSync(zipInput)),
