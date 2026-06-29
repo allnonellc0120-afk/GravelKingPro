@@ -5,10 +5,9 @@ import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Scissors, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock, CheckCircle2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock } from "lucide-react";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
-import { splitSong, analyzeGuideTiming, SplitError, type TimedLine, type SplitProgress } from "@/lib/daw/stemTiming";
+import { analyzeGuideTiming, type TimedLine } from "@/lib/daw/stemTiming";
 import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
 import { downloadBlob } from "@/lib/download";
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
@@ -249,10 +248,8 @@ function VocalBoothInner() {
   // ── mixdown ──
   const [mixing, setMixing] = useState(false);
 
-  // ── split-your-own-song → guide vocal + energy-based line timing ──
-  const [splitting, setSplitting] = useState(false);
-  const [splitStage, setSplitStage] = useState<SplitProgress["stage"] | null>(null);
-  const [splitPct, setSplitPct] = useState(0);
+  // ── backing track mastering state ────────────────────────────────────────────
+  const [mastering, setMastering] = useState(false);
   const [guideVocalBlob, setGuideVocalBlob] = useState<Blob | null>(null);
   const [guideVocalUrl, setGuideVocalUrl] = useState<string | null>(null);
   const [guideEnabled, setGuideEnabled] = useState(true);
@@ -268,7 +265,6 @@ function VocalBoothInner() {
   const vocalPlaybackRef = useRef<HTMLAudioElement | null>(null);
   const guideVocalRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const splitInputRef = useRef<HTMLInputElement>(null);
   const teleprompterRef = useRef<HTMLDivElement | null>(null);
   const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const rafRef = useRef<number | null>(null);
@@ -589,7 +585,7 @@ function VocalBoothInner() {
     }
   }, []);
 
-  const handleFile = useCallback((file: File | null) => {
+  const handleFile = useCallback(async (file: File | null) => {
     if (!file) return;
     if (!isAudioLike(file)) {
       toast({ title: "Not an audio file", description: file.name, variant: "destructive" });
@@ -597,53 +593,33 @@ function VocalBoothInner() {
     }
     recorder.reset();
     resetGuide();
-    setBackingFile(file);
-    setProgress(0);
-    setPosition(0);
-    setBackingPlaying(false);
-  }, [recorder, resetGuide, toast]);
-
-  // Split a full song → instrumental becomes the backing track, vocals the guide.
-  const handleSplitFile = useCallback(async (file: File | null) => {
-    if (!file) return;
-    if (!isAudioLike(file)) {
-      toast({ title: "Not an audio file", description: file.name, variant: "destructive" });
-      return;
-    }
-    recorder.reset();
-    resetGuide();
-    setSplitting(true);
-    setSplitStage("uploading");
-    setSplitPct(0);
+    setMastering(true);
     try {
-      const { instrumental, vocals } = await splitSong(file, (p) => {
-        setSplitStage(p.stage);
-        setSplitPct("pct" in p ? p.pct : 0);
-      });
-      const baseName = file.name.replace(/\.[^.]+$/, "") || "song";
-      setBackingFile(new File([instrumental], `${baseName} (instrumental).wav`, { type: "audio/wav" }));
+      const fd = new FormData();
+      fd.append("audio", file);
+      fd.append("mode", "master");
+      fd.append("preset", "normal");
+      const resp = await fetch("/api/kernel/master", { method: "POST", body: fd, credentials: "include" });
+      if (!resp.ok) {
+        const d = await resp.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Mastering failed");
+      }
+      const blob = await resp.blob();
+      const baseName = file.name.replace(/\.[^.]+$/, "") || "track";
+      setBackingFile(new File([blob], `${baseName} (mastered).wav`, { type: "audio/wav" }));
+    } catch (err: unknown) {
+      // If mastering fails for any reason, use the original file directly
+      setBackingFile(file);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast({ title: "Mastering skipped", description: msg + " — using original file.", variant: "destructive" });
+    } finally {
+      setMastering(false);
       setProgress(0);
       setPosition(0);
       setBackingPlaying(false);
-      setGuideVocalBlob(vocals);
-      toast({ title: "Song split", description: "Instrumental loaded as backing track; transcribing vocals…" });
-      // Run energy-timing AND Whisper transcription in parallel on the vocal stem.
-      // Pass vocals directly — React state hasn't updated yet at this point.
-      void runTiming(vocals, lyrics);
-      void transcribeVocals(vocals);
-    } catch (e) {
-      const err = e as SplitError;
-      toast({
-        title: err?.paywall ? "Pro required" : "Couldn't split song",
-        description: err?.message ?? "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setSplitting(false);
-      setSplitStage(null);
-      setSplitPct(0);
     }
-  }, [recorder, resetGuide, runTiming, lyrics, toast]);
+  }, [recorder, resetGuide, toast]);
+
 
   // Prepare + start the guide vocal in lockstep with the backing track. Returns
   // the play() promise (or null) so callers can kick it off inside the SAME user
@@ -816,7 +792,7 @@ function VocalBoothInner() {
               title="Vocal Booth"
               summary="Sing over a backing track with a scrolling teleprompter, record your take, and mix it down with the instrumental."
               steps={[
-                "Load a backing track, or split one of your own songs into instrumental + guide vocal.",
+                "Upload a backing track — MLK v3 mastering is applied automatically.",
                 "Paste or pick lyrics; toggle the guide vocal to hear the melody.",
                 "Record your take, then mix down to instrumental + your vocal.",
               ]}
@@ -929,11 +905,10 @@ function VocalBoothInner() {
                     </Button>
                   </div>
                 ) : (
-                  /* No split done: let the user upload a separate vocals file */
+                  /* No guide vocal: let the user upload a separate vocals file */
                   <div className="space-y-2">
                     <p className="text-[11px] text-muted-foreground leading-snug">
                       Upload a vocals-only file (a cappella, isolated vocal stem) to auto-detect lyrics with precise timestamps.
-                      Or, split your full song above to extract vocals automatically.
                     </p>
                     <label className="flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 transition-colors cursor-pointer">
                       <input
@@ -1093,71 +1068,22 @@ function VocalBoothInner() {
                 style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
                 onChange={(e) => { handleFile(e.target.files?.[0] ?? null); if (e.target) e.target.value = ""; }}
               />
-              <input
-                ref={splitInputRef}
-                type="file"
-                accept=".wav,.mp3,.m4a,.aac,.flac,.ogg,.oga,.weba,.aiff,.au,.snd,.wma"
-                style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
-                onChange={(e) => { handleSplitFile(e.target.files?.[0] ?? null); if (e.target) e.target.value = ""; }}
-              />
               {!backingFile ? (
-                splitting ? (
-                  <div className="w-full flex flex-col gap-3 py-5 px-4">
-                    {(
-                      [
-                        { id: "uploading",   label: "Uploading",         sub: splitPct > 0 ? `${splitPct}%` : "Sending file…" },
-                        { id: "compressing", label: "Compressing audio",  sub: "Optimising for AI…" },
-                        { id: "separating",  label: "Separating stems",   sub: "Cloud AI running — keep this page open" },
-                        { id: "finishing",   label: "Finishing up",       sub: "Packaging stems…" },
-                      ] as const
-                    ).map(({ id, label, sub }, idx, arr) => {
-                      const stageOrder = arr.map(s => s.id);
-                      const currentIdx = stageOrder.indexOf(splitStage ?? "uploading");
-                      const thisIdx = idx;
-                      const done   = thisIdx < currentIdx;
-                      const active = thisIdx === currentIdx;
-                      return (
-                        <div key={id} className={`flex items-start gap-3 transition-opacity duration-300 ${done ? "opacity-50" : active ? "opacity-100 text-amber-400" : "opacity-25"}`}>
-                          <div className="mt-0.5 shrink-0">
-                            {done   ? <CheckCircle2 className="w-4 h-4 text-green-400" />
-                                    : active ? <Loader2 className="w-4 h-4 animate-spin" />
-                                    : <div className="w-4 h-4 rounded-full border border-current" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium leading-tight">{label}</div>
-                            {active && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {(splitStage === "uploading" || splitStage === "separating") && (
-                      <Progress value={splitPct} className="h-1 mt-1" />
-                    )}
+                mastering ? (
+                  <div className="w-full flex flex-col items-center justify-center gap-2 py-8 text-amber-400">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm font-medium">Mastering your track…</span>
+                    <span className="text-[10px] text-muted-foreground">Running MLK v3 locally — takes a few seconds</span>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-lg border-2 border-dashed border-border/30 text-muted-foreground hover:text-white hover:border-amber-500/40 transition-colors"
-                    >
-                      <Upload className="w-5 h-5" />
-                      <span className="text-sm">Upload an instrumental</span>
-                    </button>
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      <div className="h-px flex-1 bg-border/40" /> or <div className="h-px flex-1 bg-border/40" />
-                    </div>
-                    <button
-                      onClick={() => splitInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 hover:bg-amber-500/10 transition-colors"
-                    >
-                      <Scissors className="w-4 h-4" />
-                      <span className="text-sm font-medium">Split your own song</span>
-                    </button>
-                    <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-                      Upload a full track — we'll split it into a backing instrumental plus an
-                      approximate guide vocal to sing along to.
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex flex-col items-center justify-center gap-2 py-8 rounded-lg border-2 border-dashed border-border/30 text-muted-foreground hover:text-white hover:border-amber-500/40 transition-colors"
+                  >
+                    <Upload className="w-5 h-5" />
+                    <span className="text-sm">Upload a backing track</span>
+                    <span className="text-[10px]">MLK v3 mastering applied automatically</span>
+                  </button>
                 )
               ) : (
                 <>
