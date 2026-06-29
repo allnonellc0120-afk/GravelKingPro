@@ -474,6 +474,119 @@ export default function VoiceRemoval() {
             ))}
           </div>
         )}
+        {/* ── SEO content — always rendered ── */}
+        <div className="mt-12 border-t border-border/20 pt-8 space-y-10 text-sm">
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground/90">How voice removal works</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              GravelKing Pro uses{" "}
+              <strong className="text-foreground/70">Demucs htdemucs</strong>, a neural source-separation
+              model trained on thousands of commercial tracks, to split your audio into two stems: an
+              isolated vocal track and a clean instrumental. The model runs server-side — you upload
+              the file, and we return both stems as 16-bit stereo WAV files with the MLK v3 kernel
+              applied for phase and transient correction. No plug-ins, no installs, no latency on your device.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              The separation is strongest on tracks recorded with a center-panned lead vocal and
+              a stereo instrumental bed — typical for pop, R&B, hip-hop, and country. Tracks with
+              heavy vocal reverb, multi-layered harmonics, or wide-panned doubling will separate
+              with some bleed, which is normal for any stem-separation tool.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground/90">Supported file types and limits</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Upload any common audio format: <strong className="text-foreground/70">MP3, WAV, FLAC, M4A, AAC, OGG, AIFF, OPUS</strong>.
+              Video files (MP4, MOV) are also accepted — the audio stream is extracted automatically
+              before processing. Maximum track length is 10 minutes. Files are processed on our
+              servers and deleted after your session; nothing is stored long-term.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Output is always a standard 16-bit stereo WAV at 44.1 kHz — compatible with every DAW,
+              sampler, and audio editor. Free-tier users get one voice removal run; upgrading to{" "}
+              <Link href="/pricing" className="text-purple-400 hover:underline">GravelKing Pro</Link>{" "}
+              unlocks unlimited runs and WAV downloads for every stem.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground/90">Common use cases</h2>
+            <ul className="text-muted-foreground space-y-1.5 list-disc list-inside leading-relaxed">
+              <li>Create karaoke or practice-along versions of any song</li>
+              <li>Extract an instrumental for sampling, remixing, or a cover track</li>
+              <li>Isolate vocals for a cappella mashups or vocal chops</li>
+              <li>Remove distracting background music from a podcast or interview recording</li>
+              <li>Prep stems for re-mixing or re-mastering in your DAW</li>
+              <li>Feed the isolated vocal into the <Link href="/vocal-booth" className="text-purple-400 hover:underline">Vocal Booth</Link> as a guide track</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-foreground/90">Frequently asked questions</h2>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">Does the output preserve stereo imaging?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Yes. Both the vocal and instrumental stems are returned as stereo WAV files. The
+                spatial relationship between left, center, and right channels is maintained through
+                the MLK v3 post-processing pass.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">Is one free use really free — no card required?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Yes. Your first voice removal run is free and requires no payment method. The
+                server tracks usage by session, not by account, so you can try it immediately after
+                uploading a file. After your free run, you can{" "}
+                <Link href="/pricing" className="text-purple-400 hover:underline">upgrade to Pro</Link>{" "}
+                for unlimited access.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">How does this compare to stem splitting?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Voice removal returns two stems: vocals and instrumental. Stem splitting goes further
+                and separates the track into up to five distinct layers — vocals, bass, drums, midrange,
+                and a full instrumental mix. If you need individual instrument stems for remixing,{" "}
+                <Link href="/studio" className="text-purple-400 hover:underline">use the Studio's stem split mode</Link>{" "}
+                instead.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-medium text-foreground/80">Can I master the instrumental after removing vocals?</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Absolutely. Download the instrumental WAV and drop it straight into the{" "}
+                <Link href="/mastering" className="text-purple-400 hover:underline">Audio Mastering</Link>{" "}
+                tool to apply a platform-specific loudness target. Broadcast, YouTube, Spotify, and
+                Vinyl presets are all available.
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-base font-semibold text-foreground/90">Related tools</h2>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "Audio Mastering", href: "/mastering" },
+                { label: "Studio (5-Stem Split)", href: "/studio" },
+                { label: "Vocal Booth", href: "/vocal-booth" },
+                { label: "Pricing", href: "/pricing" },
+              ].map(({ label, href }) => (
+                <Link key={href} href={href}>
+                  <span className="inline-flex items-center rounded-md border border-border/30 px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-border/60 transition-colors">
+                    {label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+        </div>
       </div>
     </Layout>
   );
