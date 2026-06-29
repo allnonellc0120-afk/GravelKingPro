@@ -200,7 +200,7 @@ export default function Mastering() {
                 </Button>
               </CardContent>
             </Card>
-            <input ref={fileInputRef} type="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aiff,.aac" className="hidden" onChange={(e) => handleFile(e.target.files)} />
+            <input ref={fileInputRef} type="file" accept=".mp3,.wav,.flac,.m4a,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.ogg,.aiff,.aac" className="hidden" onChange={(e) => handleFile(e.target.files)} />
           </motion.div>
         ) : null}
 
