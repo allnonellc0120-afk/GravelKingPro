@@ -22,7 +22,7 @@ const upload = multer({
       cb(null, `gk_master_${randomUUID()}.${sanitizeExt(file.originalname)}`);
     },
   }),
-  limits: { fileSize: 200 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB matches the audio route; 200 MB was unnecessarily large
 });
 
 // Clean up uploaded file after processing
