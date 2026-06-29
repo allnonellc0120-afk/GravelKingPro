@@ -12,6 +12,16 @@ import { storage } from "../storage";
  */
 export type Tier = "free" | "weekly" | "monthly" | "node_auditor";
 
+/**
+ * Lifetime-access emails. Any authenticated user whose verified OIDC email
+ * matches an entry here immediately gets node_auditor tier — no Stripe check,
+ * no DB tier column required. Must stay in sync with LIFETIME_GRANTS in auth.ts.
+ */
+const LIFETIME_EMAILS = new Set([
+  "allnonellc0120@gmail.com",
+  "hopelaborde66@gmail.com",
+]);
+
 const TIER_RANK: Record<Tier, number> = {
   free: 0,
   weekly: 1,
@@ -52,6 +62,12 @@ export async function resolveTier(req: Request): Promise<Tier> {
       .select()
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id));
+
+    // Lifetime email bypass — no Stripe check needed, no stale DB tier.
+    if (dbUser?.email && LIFETIME_EMAILS.has(dbUser.email.toLowerCase().trim())) {
+      return "node_auditor";
+    }
+
     const t = normalizeTier(dbUser?.subscriptionTier);
     if (TIER_RANK[t] > TIER_RANK[best]) best = t;
   }
@@ -60,6 +76,10 @@ export async function resolveTier(req: Request): Promise<Tier> {
   if (sessionId) {
     const user = await storage.getUserBySession(sessionId);
     if (user) {
+      // Lifetime email bypass for session-cookie path too.
+      if (user.email && LIFETIME_EMAILS.has(user.email.toLowerCase().trim())) {
+        return "node_auditor";
+      }
       const status = await storage.getUserSubscriptionStatus(user);
       const t = normalizeTier(status.tier);
       if (TIER_RANK[t] > TIER_RANK[best]) best = t;

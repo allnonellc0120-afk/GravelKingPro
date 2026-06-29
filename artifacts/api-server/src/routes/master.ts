@@ -6,7 +6,7 @@ import { promisify } from "util";
 import { randomUUID } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
-import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
+import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
 import { applyMLKv3Fast } from "../kernel-v3";
@@ -159,10 +159,18 @@ masterRouter.post(
       isSample = usedMaster >= FREE_LIMITS.freeMasterDownloads;
     }
 
-    const filePath = req.file.path;
+    const uploadedPath = req.file.path;
+    let filePath = uploadedPath;
+    let normalizedPath: string | null = null;
     const outPath = `/tmp/gk_master_out_${randomUUID()}.wav`;
 
     try {
+      // Normalize any format (m4a, mp4, mov, ogg, webm…) → WAV before the
+      // preset chain. ffmpeg auto-detects the container so the user can drop
+      // anything from their photo library and have it just work.
+      normalizedPath = await normalizeToWav(uploadedPath);
+      filePath = normalizedPath;
+
       // Duration guard
       const duration = await probeFileDuration(filePath);
       if (duration > MAX_AUDIO_DURATION_S) {
@@ -222,7 +230,8 @@ masterRouter.post(
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });
     } finally {
       await Promise.all([
-        unlink(filePath).catch(() => {}),
+        unlink(uploadedPath).catch(() => {}),
+        normalizedPath ? unlink(normalizedPath).catch(() => {}) : Promise.resolve(),
         unlink(outPath).catch(() => {}),
       ]);
     }
