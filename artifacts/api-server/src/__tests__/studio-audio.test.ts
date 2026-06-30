@@ -198,6 +198,38 @@ async function main(): Promise<void> {
       const body = (await res.json().catch(() => ({}))) as { code?: string };
       check("studio-mix (no session): code STUDIO_REQUIRED", body?.code === "STUDIO_REQUIRED", JSON.stringify(body));
     }
+
+    // ── 5. Transcription endpoint stable behaviour ──────────────────────────────
+    // The endpoint must NOT use Replicate Whisper as a fallback. It either returns
+    // 200 (Gemini available + succeeds) or 502 with fallback:"tap-timing" (not
+    // configured or provider error). It must never return 500.
+    console.log("\n[5] POST /api/audio/transcribe — stable behaviour (no Replicate)");
+    {
+      // 5a. No file → 400
+      const noFile = await fetch(`${base}/api/audio/transcribe`, { method: "POST" });
+      check("transcribe (no file): HTTP 400", noFile.status === 400, `got ${noFile.status}`);
+    }
+    {
+      // 5b. Valid audio → 200 (Gemini) or 502 (tap-timing), never 500
+      const res = await fetch(`${base}/api/audio/transcribe`, {
+        method: "POST",
+        body: buildForm({}, [
+          { field: "audio", name: "vocal.wav", type: "audio/wav", buf: stereoWav },
+        ]),
+      });
+      const isOk = res.status === 200 || res.status === 502;
+      check("transcribe (valid audio): 200 or 502, never 500", isOk, `got ${res.status}`);
+      if (res.status === 200) {
+        const body = (await res.json().catch(() => ({}))) as { segments?: unknown[]; fullText?: string };
+        check("transcribe 200: has segments array", Array.isArray(body.segments), JSON.stringify(body));
+      } else if (res.status === 502) {
+        const body = (await res.json().catch(() => ({}))) as { fallback?: string; error?: string };
+        check("transcribe 502: fallback=tap-timing", body.fallback === "tap-timing", JSON.stringify(body));
+        // Must not mention Replicate in the user-facing error
+        const noReplicate = !String(body.error ?? "").toLowerCase().includes("replicate");
+        check("transcribe 502: error does not mention Replicate", noReplicate, body.error ?? "");
+      }
+    }
   } finally {
     // ── Cleanup: children (process_runs) → sessions → users ────────────────────
     await db.delete(processRunsTable).where(eq(processRunsTable.userId, userId)).catch(() => {});

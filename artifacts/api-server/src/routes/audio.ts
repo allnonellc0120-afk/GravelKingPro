@@ -20,7 +20,6 @@ import {
   UVR_STACK,
 } from "../gkp-separator";
 import { transcribeWithGemini, isGeminiConfigured } from "../geminiTranscribe";
-import { transcribeAudio as transcribeWithWhisper, isConfigured as isWhisperConfigured } from "../replicateWhisper";
 import {
   demucsVoiceRemove,
   demucsStemSplit,
@@ -752,8 +751,10 @@ audioRouter.post(
 
 // ── Vocal transcription ────────────────────────────────────────────────────────
 // POST /api/audio/transcribe — accepts audio, returns { segments, fullText }.
-// Tries Gemini (Vertex AI) first when configured; falls back to Replicate
-// Whisper so the feature works even if one provider is unavailable.
+// Provider: Gemini Vertex AI (GCP_SERVICE_ACCOUNT). No Replicate fallback —
+// when Gemini is unavailable the client falls back to manual tap-to-time.
+// For known songs, prefer lrclib synced lyrics on the client before calling
+// this endpoint.
 audioRouter.post(
   "/audio/transcribe",
   audioRateLimit,
@@ -765,28 +766,10 @@ audioRouter.post(
     }
     const filePath = req.file.path;
     try {
-      let result: { segments: unknown[]; fullText: string } | undefined;
-
-      // Primary: Gemini Vertex AI (GCP_SERVICE_ACCOUNT)
-      if (isGeminiConfigured()) {
-        try {
-          result = await transcribeWithGemini(filePath);
-        } catch (geminiErr: any) {
-          req.log.warn(
-            { err: String(geminiErr?.message ?? "") },
-            "Gemini transcription failed; trying Replicate Whisper",
-          );
-        }
+      if (!isGeminiConfigured()) {
+        throw new Error("Transcription provider not configured");
       }
-
-      // Fallback: Replicate Whisper (REPLICATE_API_TOKEN)
-      if (!result) {
-        if (!isWhisperConfigured()) {
-          throw new Error("No transcription provider available — configure GCP_SERVICE_ACCOUNT or REPLICATE_API_TOKEN");
-        }
-        result = await transcribeWithWhisper(filePath);
-      }
-
+      const result = await transcribeWithGemini(filePath);
       res.json(result);
     } catch (err: any) {
       const raw = String(err?.message ?? "");

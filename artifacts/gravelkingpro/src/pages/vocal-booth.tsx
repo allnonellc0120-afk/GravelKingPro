@@ -439,6 +439,37 @@ function VocalBoothInner() {
     }
   }, [lrcQuery, toast]);
 
+  const autoSearchLrclib = useCallback(async (file: File) => {
+    if (lyrics.trim()) return;
+    const name = file.name.replace(/\.[^.]+$/, "");
+    if (!name.includes(" - ")) return;
+    const dashIdx = name.indexOf(" - ");
+    const artistPart = name.slice(0, dashIdx).trim();
+    const titlePart = name.slice(dashIdx + 3).trim();
+    if (!artistPart || !titlePart) return;
+    try {
+      const results = await searchLyrics(`${artistPart} ${titlePart}`);
+      const best = results.find((r) => r.syncedLyrics) ?? results.find((r) => r.plainLyrics);
+      if (!best) return;
+      if (best.syncedLyrics) {
+        const lrcLines = parseLrc(best.syncedLyrics).filter((l) => l.text.trim());
+        setLyrics(lrcLines.map((l) => l.text).join("\n"));
+        setTimedLines(lrcLines.map((l, i) => ({ idx: i, t: l.timeMs / 1000 })));
+        setTimingSource("lrc");
+        setLyricSource(`lrc:${best.id}`);
+        toast({ title: "Lyrics loaded", description: `${best.trackName} — synced timing from lrclib.net` });
+      } else if (best.plainLyrics) {
+        setLyrics(best.plainLyrics);
+        setTimedLines(null);
+        setTimingSource(null);
+        setLyricSource(`lrc:${best.id}`);
+        toast({ title: "Lyrics loaded", description: `${best.trackName} — lyrics from lrclib.net` });
+      }
+    } catch {
+      // Non-fatal — user can still search manually
+    }
+  }, [lyrics, toast]);
+
   const pickLrcTrack = useCallback((track: LrclibTrack) => {
     setLrcResults(null);
     setLrcQuery("");
@@ -630,8 +661,9 @@ function VocalBoothInner() {
       setProgress(0);
       setPosition(0);
       setBackingPlaying(false);
+      void autoSearchLrclib(file);
     }
-  }, [recorder, resetGuide, toast]);
+  }, [recorder, resetGuide, toast, autoSearchLrclib]);
 
 
   // Prepare + start the guide vocal in lockstep with the backing track. Returns
