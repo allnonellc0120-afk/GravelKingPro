@@ -746,7 +746,7 @@ function VocalBoothInner() {
       recorder.stop();
       toast({ title: "Playback blocked", description: "Tap play once, then try recording again.", variant: "destructive" });
     }
-  }, [backingFile, setupAudioGraph, recorder, startGuide, toast]);
+  }, [backingFile, setupAudioGraph, recorder, startGuide, toast, monitorPreset]);
 
   const stopTake = useCallback(() => {
     recorder.stop();
