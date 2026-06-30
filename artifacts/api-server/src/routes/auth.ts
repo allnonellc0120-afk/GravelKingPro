@@ -59,6 +59,14 @@ function getSafeReturnTo(value: unknown): string {
 }
 
 /**
+ * Accounts permanently banned from the platform. Checked at every OIDC login
+ * callback before any DB upsert or session creation.
+ */
+const BANNED_EMAILS = new Set([
+  "hopelaborde66@gmail.com",
+]);
+
+/**
  * Owner accounts that always receive full lifetime access on sign-in, regardless
  * of Stripe state or which database (dev/prod) the server is connected to. Keyed
  * by verified OIDC email (lower-cased) so the grant survives an OIDC sub vs. legacy
@@ -67,7 +75,6 @@ function getSafeReturnTo(value: unknown): string {
  */
 const LIFETIME_GRANTS: Record<string, { tier: string; isDeveloper: boolean }> = {
   "allnonellc0120@gmail.com": { tier: "node_auditor", isDeveloper: true },
-  "hopelaborde66@gmail.com": { tier: "node_auditor", isDeveloper: false },
 };
 
 async function upsertUser(claims: Record<string, unknown>) {
@@ -230,6 +237,12 @@ router.get("/callback", async (req: Request, res: Response) => {
     return;
   }
 
+  const claimedEmail = ((claims.email as string) || "").toLowerCase().trim();
+  if (claimedEmail && BANNED_EMAILS.has(claimedEmail)) {
+    res.redirect("/?error=account_banned");
+    return;
+  }
+
   const dbUser = await upsertUser(
     claims as unknown as Record<string, unknown>,
   );
@@ -297,6 +310,12 @@ router.post(
       const claims = tokens.claims();
       if (!claims) {
         res.status(401).json({ error: "No claims in ID token" });
+        return;
+      }
+
+      const claimedEmailMobile = ((claims.email as string) || "").toLowerCase().trim();
+      if (claimedEmailMobile && BANNED_EMAILS.has(claimedEmailMobile)) {
+        res.status(403).json({ error: "Account access denied." });
         return;
       }
 

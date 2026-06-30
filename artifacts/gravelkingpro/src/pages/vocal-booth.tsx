@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock } from "lucide-react";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
+import { type VocalPreset } from "@/lib/daw/vocalPresets";
 import { analyzeGuideTiming, type TimedLine } from "@/lib/daw/stemTiming";
 import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
 import { downloadBlob } from "@/lib/download";
@@ -244,6 +245,9 @@ function VocalBoothInner() {
   const [progress, setProgress] = useState(0); // 0..1
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
+
+  // ── vocal monitoring preset (lifted so recorder can bake it in) ──
+  const [monitorPreset, setMonitorPreset] = useState<VocalPreset | null>(null);
 
   // ── mixdown ──
   const [mixing, setMixing] = useState(false);
@@ -511,7 +515,7 @@ function VocalBoothInner() {
       setLyrics(lines.join("\n"));
       setTimedLines(times);
       setTimingSource("lrc");
-      setLyricSource("whisper");
+      setLyricSource("auto");
       toast({
         title: "Vocals transcribed!",
         description: `${lines.length} lines detected with precise timing.`,
@@ -601,6 +605,15 @@ function VocalBoothInner() {
       fd.append("preset", "normal");
       const resp = await fetch("/api/kernel/master", { method: "POST", body: fd, credentials: "include" });
       if (!resp.ok) {
+        if (resp.status === 402) {
+          // Free-master limit reached — use original file, show a clear upgrade hint.
+          setBackingFile(file);
+          toast({
+            title: "Free master used",
+            description: "Subscribe to unlock unlimited mastering. Your original track is loaded.",
+          });
+          return;
+        }
         const d = await resp.json().catch(() => ({})) as { error?: string };
         throw new Error(d.error ?? "Mastering failed");
       }
@@ -692,7 +705,7 @@ function VocalBoothInner() {
     setupAudioGraph();
     recorder.reset();
     a.currentTime = 0;
-    const ok = await recorder.start();
+    const ok = await recorder.start(undefined, monitorPreset ?? undefined);
     if (!ok) return;
     // Start backing + guide together so the guide isn't blocked by autoplay.
     const guidePlay = startGuide();
@@ -755,7 +768,7 @@ function VocalBoothInner() {
       form.append("arrangement", "layer");
       const r = await fetch("/api/kernel/studio-mix", { method: "POST", body: form, credentials: "include" });
       if (r.status === 403) {
-        toast({ title: "Pro required", description: "Mixing down is a GravelKing Pro feature.", variant: "destructive" });
+        toast({ title: "Studio subscription required", description: "Mix-down requires a Studio (monthly) plan. Upgrade at /pricing.", variant: "destructive" });
         return;
       }
       if (!r.ok) {
@@ -889,7 +902,7 @@ function VocalBoothInner() {
                     <p className="text-[11px] text-muted-foreground leading-snug">
                       {transcribing
                         ? "Transcribing the extracted vocals — lyrics and timing will appear automatically."
-                        : timingSource === "lrc" && lyricSource === "whisper"
+                        : timingSource === "lrc" && lyricSource === "auto"
                           ? "Lyrics and timing auto-detected from the extracted vocal stem."
                           : "Transcribe the extracted vocal stem to get timed lyrics automatically."}
                     </p>
@@ -901,7 +914,7 @@ function VocalBoothInner() {
                       onClick={() => void transcribeVocals()}
                     >
                       {transcribing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                      {transcribing ? "Transcribing…" : timedLines && lyricSource === "whisper" ? "Re-transcribe" : "Transcribe Vocals"}
+                      {transcribing ? "Transcribing…" : timedLines && lyricSource === "auto" ? "Re-transcribe" : "Transcribe Vocals"}
                     </Button>
                   </div>
                 ) : (
@@ -936,8 +949,8 @@ function VocalBoothInner() {
                 <span className="text-[11px] text-muted-foreground leading-snug">
                   {timedLines
                     ? timingSource === "lrc"
-                      ? lyricSource === "whisper"
-                        ? "Precise timing auto-detected via Whisper."
+                      ? lyricSource === "auto"
+                        ? "Precise timing auto-detected from the vocal stem."
                         : "Precise synced timing from lrclib.net."
                       : "Lyrics timed to the guide vocal — energy-based & approximate."
                     : "Time your lyric lines to the guide vocal (approximate)."}
@@ -1148,9 +1161,9 @@ function VocalBoothInner() {
             <div className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Live Monitoring</div>
               <p className="text-[10px] text-muted-foreground leading-snug">
-                Pick a preset to hear your voice live through effects while you sing. Tap again to stop.
+                Pick a preset to hear your voice live through effects. The active preset will also be <strong className="text-white/70">baked into your recording</strong> — use headphones to avoid feedback.
               </p>
-              <LiveVocalMonitor />
+              <LiveVocalMonitor onPresetChange={setMonitorPreset} />
             </div>
 
             {/* Recorder */}

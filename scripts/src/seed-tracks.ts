@@ -173,10 +173,6 @@ const DEMO_TRACKS: DemoTrack[] = [
   { artistName: "Founder", title: "Morris Law Theme",    audioFullDuration: 5, audioPreviewDuration: 2, coverR: 160, coverG: 90,  coverB: 10 },
   { artistName: "Founder", title: "Node 1T",             audioFullDuration: 5, audioPreviewDuration: 2, coverR: 200, coverG: 150, coverB: 30 },
   { artistName: "Founder", title: "Benchmark Session",   audioFullDuration: 5, audioPreviewDuration: 2, coverR: 140, coverG: 80,  coverB: 0  },
-  // Hope LaBorde — teal cover
-  { artistName: "Hope LaBorde", title: "Signal Path",    audioFullDuration: 4, audioPreviewDuration: 2, coverR: 20,  coverG: 150, coverB: 160 },
-  { artistName: "Hope LaBorde", title: "Carve the Noise",audioFullDuration: 4, audioPreviewDuration: 2, coverR: 10,  coverG: 130, coverB: 140 },
-  { artistName: "Hope LaBorde", title: "Stem Split",     audioFullDuration: 4, audioPreviewDuration: 2, coverR: 30,  coverG: 170, coverB: 180 },
 ];
 
 // ── Main ──────────────────────────────────────────────────────────────────────

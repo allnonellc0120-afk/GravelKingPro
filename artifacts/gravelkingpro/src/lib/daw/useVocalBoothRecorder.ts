@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { audioBufferToWav } from "@/lib/audioKernel";
+import { type VocalPreset, buildEffectChain } from "./vocalPresets";
 
 export type BoothRecorderStatus = "idle" | "recording" | "recorded" | "error";
 
@@ -14,8 +15,13 @@ export interface VocalBoothRecorder {
   /** Object URL for previewing the vocal take. Revoked on reset/unmount. */
   vocalUrl: string | null;
   errorMsg: string | null;
-  /** Begins capture. Must be called from a user gesture (iOS). */
-  start: (deviceId?: string) => Promise<boolean>;
+  /**
+   * Begins capture. Must be called from a user gesture (iOS).
+   * When `preset` is provided (and not "raw"), the selected effect chain is
+   * baked into the recorded take via a MediaStreamAudioDestinationNode.
+   * What you hear in the monitor is what ends up in the file.
+   */
+  start: (deviceId?: string, preset?: VocalPreset) => Promise<boolean>;
   stop: () => void;
   reset: () => void;
   listInputDevices: () => Promise<MediaDeviceInfo[]>;
@@ -113,7 +119,7 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
   }, []);
 
   const start = useCallback(
-    async (deviceId?: string): Promise<boolean> => {
+    async (deviceId?: string, preset?: VocalPreset): Promise<boolean> => {
       if (recorderRef.current) return false;
       setErrorMsg(null);
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -148,18 +154,33 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
         streamRef.current = stream;
         chunksRef.current = [];
 
-        // Live meter — analyser only, never connected to destination (no feedback).
+        // Build the AudioContext. When a non-raw preset is active, route the mic
+        // through the shared effect chain to a MediaStreamAudioDestinationNode so
+        // effects are baked into the recording (what you hear in the monitor is
+        // what ends up in the file). The chain never connects to ctx.destination —
+        // no speaker feedback from this context; LiveVocalMonitor handles that.
+        let recordStream: MediaStream = stream;
         const Ctor = getAudioContextCtor();
         if (Ctor) {
           const ctx = new Ctor();
           if (ctx.state === "suspended") await ctx.resume();
           const src = ctx.createMediaStreamSource(stream);
-          const analyser = ctx.createAnalyser();
-          analyser.fftSize = 1024;
-          src.connect(analyser);
-          ctxRef.current = ctx;
-          analyserRef.current = analyser;
-          runMeter();
+          if (preset && preset.id !== "raw") {
+            const destNode = ctx.createMediaStreamDestination();
+            const analyser = buildEffectChain(ctx, src, preset, destNode);
+            ctxRef.current = ctx;
+            analyserRef.current = analyser;
+            runMeter();
+            recordStream = destNode.stream;
+          } else {
+            // Raw path: analyser only — no effects, no speaker output.
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 1024;
+            src.connect(analyser);
+            ctxRef.current = ctx;
+            analyserRef.current = analyser;
+            runMeter();
+          }
         }
 
         const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -167,7 +188,7 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
           : MediaRecorder.isTypeSupported("audio/webm")
             ? "audio/webm"
             : "";
-        const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        const recorder = mime ? new MediaRecorder(recordStream, { mimeType: mime }) : new MediaRecorder(recordStream);
         recorderRef.current = recorder;
 
         recorder.ondataavailable = (e) => {

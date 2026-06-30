@@ -1,184 +1,68 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, MicOff, CheckCircle2 } from "lucide-react";
+import { Mic, MicOff, CheckCircle2, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  VOCAL_PRESETS,
+  buildEffectChain,
+  type VocalPresetId,
+  type VocalPreset,
+} from "@/lib/daw/vocalPresets";
 
-type VocalPresetId = "raw" | "warm" | "broadcast" | "space" | "echo" | "studio";
-
-interface VocalPreset {
-  id: VocalPresetId;
-  label: string;
-  emoji: string;
-  description: string;
-  accent: string;
-  glow: string;
-  bg: string;
-  lowGain: number;
-  midGain: number;
-  highGain: number;
-  compThreshold: number;
-  compRatio: number;
-  reverbMix: number;
-  echoDelay: number;
-  echoMix: number;
+interface Props {
+  /**
+   * Called whenever the active preset changes.
+   * Receives the active VocalPreset when monitoring starts, null when it stops.
+   * The parent can forward this to the recorder so the same preset is baked
+   * into the recording.
+   */
+  onPresetChange?: (preset: VocalPreset | null) => void;
 }
 
-const VOCAL_PRESETS: VocalPreset[] = [
-  {
-    id: "raw", label: "Raw", emoji: "🎤",
-    description: "Clean pass-through — no processing",
-    accent: "#94a3b8", glow: "rgba(148,163,184,0.2)", bg: "linear-gradient(135deg,#1e293b,#0f172a)",
-    lowGain: 0, midGain: 0, highGain: 0,
-    compThreshold: -3, compRatio: 1.05,
-    reverbMix: 0, echoDelay: 0, echoMix: 0,
-  },
-  {
-    id: "warm", label: "Warm", emoji: "🔥",
-    description: "Gentle compression + low-end warmth",
-    accent: "#f59e0b", glow: "rgba(245,158,11,0.2)", bg: "linear-gradient(135deg,#451a03,#1c0a00)",
-    lowGain: 4, midGain: 0, highGain: -1,
-    compThreshold: -20, compRatio: 3,
-    reverbMix: 0.05, echoDelay: 0, echoMix: 0,
-  },
-  {
-    id: "broadcast", label: "Broadcast", emoji: "📡",
-    description: "Tight compression + presence boost",
-    accent: "#3b82f6", glow: "rgba(59,130,246,0.2)", bg: "linear-gradient(135deg,#1e3a5f,#0c1a2e)",
-    lowGain: -2, midGain: 2, highGain: 1,
-    compThreshold: -15, compRatio: 6,
-    reverbMix: 0.03, echoDelay: 0, echoMix: 0,
-  },
-  {
-    id: "space", label: "Space", emoji: "🌌",
-    description: "Airy reverb + air EQ boost",
-    accent: "#8b5cf6", glow: "rgba(139,92,246,0.2)", bg: "linear-gradient(135deg,#2e1065,#13043a)",
-    lowGain: 0, midGain: 0, highGain: 3,
-    compThreshold: -18, compRatio: 3,
-    reverbMix: 0.45, echoDelay: 0, echoMix: 0,
-  },
-  {
-    id: "echo", label: "Echo", emoji: "🔁",
-    description: "Slapback delay + lush reverb",
-    accent: "#06b6d4", glow: "rgba(6,182,212,0.2)", bg: "linear-gradient(135deg,#083344,#021726)",
-    lowGain: 0, midGain: 1, highGain: 1,
-    compThreshold: -18, compRatio: 3,
-    reverbMix: 0.3, echoDelay: 0.22, echoMix: 0.35,
-  },
-  {
-    id: "studio", label: "Studio", emoji: "🎚️",
-    description: "Full chain: EQ + comp + presence reverb",
-    accent: "#22c55e", glow: "rgba(34,197,94,0.2)", bg: "linear-gradient(135deg,#052e16,#021a0d)",
-    lowGain: 2, midGain: -1, highGain: 4,
-    compThreshold: -12, compRatio: 8,
-    reverbMix: 0.12, echoDelay: 0, echoMix: 0,
-  },
-];
-
-export function LiveVocalMonitor() {
+export function LiveVocalMonitor({ onPresetChange }: Props) {
   const [active, setActive] = useState(false);
   const [preset, setPreset] = useState<VocalPresetId>("raw");
   const [error, setError] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
 
-  const ctxRef   = useRef<AudioContext | null>(null);
+  const ctxRef    = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const rafRef   = useRef<number>(0);
+  const rafRef    = useRef<number>(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const buildChain = useCallback((ctx: AudioContext, source: MediaStreamAudioSourceNode, p: VocalPreset) => {
-    // 3-band EQ
-    const low  = ctx.createBiquadFilter(); low.type  = "lowshelf";  low.frequency.value  = 200;  low.gain.value  = p.lowGain;
-    const mid  = ctx.createBiquadFilter(); mid.type  = "peaking";   mid.frequency.value  = 2000; mid.Q.value     = 1.4; mid.gain.value = p.midGain;
-    const high = ctx.createBiquadFilter(); high.type = "highshelf"; high.frequency.value = 8000; high.gain.value = p.highGain;
-
-    // Compressor
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = p.compThreshold;
-    comp.ratio.value     = p.compRatio;
-    comp.knee.value      = 6;
-    comp.attack.value    = 0.003;
-    comp.release.value   = 0.15;
-
-    // Limiter
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -1;
-    limiter.ratio.value     = 20;
-    limiter.knee.value      = 0;
-    limiter.attack.value    = 0.001;
-    limiter.release.value   = 0.05;
-
-    // Analyser for metering
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 256;
-    analyserRef.current = analyser;
-
-    // Output gain
-    const outGain = ctx.createGain();
-    outGain.gain.value = 0.85;
-
-    // Echo / delay
-    if (p.echoDelay > 0 && p.echoMix > 0) {
-      const delay  = ctx.createDelay(1.0);
-      delay.delayTime.value = p.echoDelay;
-      const dryGain  = ctx.createGain(); dryGain.gain.value  = 1 - p.echoMix;
-      const wetGain  = ctx.createGain(); wetGain.gain.value  = p.echoMix;
-      source.connect(low).connect(mid).connect(high).connect(comp);
-      comp.connect(dryGain); comp.connect(delay); delay.connect(wetGain);
-      dryGain.connect(limiter); wetGain.connect(limiter);
-      limiter.connect(analyser); analyser.connect(outGain); outGain.connect(ctx.destination);
-      return;
-    }
-
-    // Reverb (convolution)
-    if (p.reverbMix > 0) {
-      const irLength  = Math.floor(ctx.sampleRate * 2.5);
-      const irBuffer  = ctx.createBuffer(2, irLength, ctx.sampleRate);
-      for (let ch = 0; ch < 2; ch++) {
-        const d = irBuffer.getChannelData(ch);
-        for (let i = 0; i < irLength; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLength, 2.5);
-      }
-      const convolver = ctx.createConvolver(); convolver.buffer = irBuffer;
-      const dryGain   = ctx.createGain(); dryGain.gain.value   = 1 - p.reverbMix;
-      const wetGain   = ctx.createGain(); wetGain.gain.value   = p.reverbMix;
-      source.connect(low).connect(mid).connect(high).connect(comp);
-      comp.connect(dryGain); comp.connect(convolver); convolver.connect(wetGain);
-      dryGain.connect(limiter); wetGain.connect(limiter);
-      limiter.connect(analyser); analyser.connect(outGain); outGain.connect(ctx.destination);
-      return;
-    }
-
-    // Dry path
-    source.connect(low).connect(mid).connect(high).connect(comp).connect(limiter).connect(analyser);
-    analyser.connect(outGain).connect(ctx.destination);
-  }, []);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
 
   const stopMonitor = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
     ctxRef.current?.close();
     streamRef.current = null;
-    ctxRef.current   = null;
+    ctxRef.current    = null;
     analyserRef.current = null;
     setActive(false);
     setLevel(0);
-  }, []);
+    onPresetChange?.(null);
+  }, [onPresetChange]);
 
   const startMonitor = useCallback(async (presetId: VocalPresetId) => {
     stopMonitor();
     setError(null);
     const p = VOCAL_PRESETS.find(v => v.id === presetId)!;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
       streamRef.current = stream;
       const ctx = new AudioContext();
       ctxRef.current = ctx;
       const source = ctx.createMediaStreamSource(stream);
-      buildChain(ctx, source, p);
+      // Route through shared effect chain to speakers (ctx.destination).
+      const analyser = buildEffectChain(ctx, source, p, ctx.destination);
+      analyserRef.current = analyser;
       setActive(true);
+      onPresetChange?.(p);
 
-      // Level meter RAF
-      const data = new Uint8Array(analyserRef.current!.frequencyBinCount);
+      // Level meter + canvas RAF
+      const data = new Uint8Array(analyser.frequencyBinCount);
       const draw = () => {
         rafRef.current = requestAnimationFrame(draw);
         analyserRef.current?.getByteTimeDomainData(data);
@@ -186,7 +70,6 @@ export function LiveVocalMonitor() {
         for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
         setLevel(Math.min(1, Math.sqrt(sum / data.length) * 8));
 
-        // Canvas waveform
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx2d = canvas.getContext("2d")!;
@@ -203,10 +86,13 @@ export function LiveVocalMonitor() {
         ctx2d.stroke();
       };
       draw();
-    } catch (e: any) {
-      setError(e.name === "NotAllowedError" ? "Microphone access denied — allow it in your browser settings." : e.message);
+    } catch (e: unknown) {
+      const name = (e as { name?: string })?.name;
+      const msg  = (e as { message?: string })?.message ?? "Unknown error";
+      setError(name === "NotAllowedError" ? "Microphone access denied — allow it in your browser settings." : msg);
+      onPresetChange?.(null);
     }
-  }, [buildChain, stopMonitor]);
+  }, [stopMonitor, onPresetChange]);
 
   const handleToggle = useCallback(async (presetId: VocalPresetId) => {
     if (active && preset === presetId) { stopMonitor(); return; }
@@ -220,18 +106,32 @@ export function LiveVocalMonitor() {
 
   return (
     <div className="space-y-3">
-      {/* Level bar */}
+      {/* Active indicator + waveform canvas */}
       <AnimatePresence>
         {active && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
-            <div className="flex items-center gap-2">
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-2"
+          >
+            <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live
+                Live · {p.label}
               </span>
-              <span className="text-[10px] text-muted-foreground">{p.label} preset active — sing or speak into your mic</span>
+              <span className="flex items-center gap-1 text-[10px] text-amber-400/80">
+                <Headphones className="w-3 h-3" />
+                Baked into recording
+              </span>
             </div>
-            <canvas ref={canvasRef} width={320} height={40} className="w-full rounded-lg bg-black/40 border border-border/20" style={{ height: 40 }} />
+            <canvas
+              ref={canvasRef}
+              width={320}
+              height={40}
+              className="w-full rounded-lg bg-black/40 border border-border/20"
+              style={{ height: 40 }}
+            />
             <div className="flex gap-0.5 items-end h-2">
               {Array.from({ length: 24 }).map((_, i) => (
                 <div
@@ -249,42 +149,58 @@ export function LiveVocalMonitor() {
         )}
       </AnimatePresence>
 
-      {error && (
-        <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{error}</div>
-      )}
-
       {/* Preset grid */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         {VOCAL_PRESETS.map((vp) => {
-          const on = active && preset === vp.id;
+          const isActive = active && preset === vp.id;
           return (
             <button
               key={vp.id}
-              onClick={() => handleToggle(vp.id)}
-              style={{
-                background: on ? vp.bg : "linear-gradient(135deg,#1e293b,#0f172a)",
-                borderColor: on ? vp.accent : `${vp.accent}33`,
-                boxShadow: on ? `0 0 18px ${vp.glow}, inset 0 1px 0 rgba(255,255,255,0.06)` : undefined,
-              }}
-              className="relative overflow-hidden flex items-center gap-2.5 text-left px-3 py-2.5 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group"
+              onClick={() => void handleToggle(vp.id)}
+              className={`relative flex flex-col items-center gap-0.5 rounded-xl p-2.5 border text-[11px] font-medium transition-all ${
+                isActive
+                  ? "border-transparent text-white scale-[1.02]"
+                  : "border-border/40 text-muted-foreground hover:border-white/20 hover:text-white"
+              }`}
+              style={isActive ? { background: vp.bg, boxShadow: `0 0 12px ${vp.glow}` } : {}}
+              title={vp.description}
             >
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xl shrink-0" style={{ background: `${vp.accent}22`, border: `1px solid ${vp.accent}44` }}>
-                {on ? <Mic className="w-4 h-4 animate-pulse" style={{ color: vp.accent }} /> : <span>{vp.emoji}</span>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold leading-tight" style={{ color: on ? vp.accent : "#f1f5f9" }}>{vp.label}</div>
-                <div className="text-[9px] text-muted-foreground mt-0.5 leading-snug">{vp.description}</div>
-              </div>
-              {on && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: vp.accent }} />}
+              {isActive && (
+                <CheckCircle2 className="absolute top-1.5 right-1.5 w-3 h-3" style={{ color: vp.accent }} />
+              )}
+              <span className="text-base leading-none">{vp.emoji}</span>
+              <span>{vp.label}</span>
             </button>
           );
         })}
       </div>
 
+      {/* Active monitoring controls */}
       {active && (
-        <Button variant="outline" size="sm" className="w-full gap-2 text-xs border-destructive/30 text-destructive hover:bg-destructive/10" onClick={stopMonitor}>
-          <MicOff className="w-3.5 h-3.5" /> Stop Monitoring
-        </Button>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] text-muted-foreground">
+            Use headphones to avoid feedback. Effect will be baked into your take.
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={stopMonitor}
+            className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-white"
+          >
+            <MicOff className="w-3 h-3" /> Stop
+          </Button>
+        </div>
+      )}
+
+      {!active && (
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <Mic className="w-3 h-3 shrink-0" />
+          <span>Pick a preset to hear yourself live. The selected effect will be baked into your recording.</span>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-[10px] text-red-400 bg-red-500/10 rounded-lg px-2.5 py-2">{error}</p>
       )}
     </div>
   );

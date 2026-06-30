@@ -6,8 +6,8 @@ import {
   isDeveloperAuthenticated,
   requireAdmin,
 } from "../lib/adminAuth";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, tracksTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 
 const adminAuthRouter = Router();
 
@@ -128,6 +128,63 @@ adminAuthRouter.post("/admin/grant-access", async (req: Request, res: Response) 
       .returning(returning);
 
     res.json({ ok: true, user: row, action: "inserted" });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
+  }
+});
+
+/**
+ * POST /api/admin/purge-user
+ * Hard-delete a user and all their associated data (tracks, process_runs, purchased_tracks).
+ * Body: { email: string }
+ */
+adminAuthRouter.post("/admin/purge-user", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+
+  const { email } = (req.body ?? {}) as { email?: string };
+  const normalised = email?.toLowerCase().trim();
+  if (!normalised) {
+    res.status(400).json({ error: "email required" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.email, normalised));
+
+    if (!user) {
+      res.json({ ok: true, deleted: false, message: "No user found with that email." });
+      return;
+    }
+
+    const userId = user.id;
+
+    // Find tracks submitted by or owned by this user
+    const ownedTracks = await db
+      .select({ id: tracksTable.id })
+      .from(tracksTable)
+      .where(eq(tracksTable.submittedByUserId, userId));
+    const ownedIds = ownedTracks.map((t) => t.id);
+
+    // Delete in FK-safe order
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`DELETE FROM process_runs WHERE user_id = ${userId}`);
+
+    if (ownedIds.length > 0) {
+      await db.delete(tracksTable).where(inArray(tracksTable.id, ownedIds));
+    }
+
+    await db.delete(usersTable).where(eq(usersTable.id, userId));
+
+    res.json({
+      ok: true,
+      deleted: true,
+      userId,
+      email: user.email,
+      tracksRemoved: ownedIds.length,
+    });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
   }
