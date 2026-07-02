@@ -15,7 +15,9 @@ export type Results = {
 
 export type SubscriptionTier = "weekly" | "monthly" | "node_auditor" | null;
 
-const PROMO_CODES: Record<string, SubscriptionTier> = {};
+const PROMO_CODES: Record<string, SubscriptionTier> = {
+  iliveforhope: "node_auditor",
+};
 const PROMO_STORAGE_KEY = "gkp_promo_code";
 
 const SEP_STRENGTH_KEY = "gkp_sep_strength";

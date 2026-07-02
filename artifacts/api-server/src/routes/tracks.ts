@@ -587,6 +587,15 @@ router.post("/admin/tracks/seed", async (req: Request, res: Response) => {
       price: 9.99,
       status: "accepted" as const,
     },
+    {
+      title: "I Wanna Recognize Me",
+      artistName: "Hope Of The Free World",
+      audioFullKey: "private/releases/hope-of-the-free-world/i-wanna-recognize-me-full.wav",
+      audioPreviewKey: "releases/hope-of-the-free-world/i-wanna-recognize-me-preview.wav",
+      coverArtKey: "releases/hope-of-the-free-world/i-wanna-recognize-me-cover.jpg",
+      price: 9.99,
+      status: "accepted" as const,
+    },
   ];
 
   const inserted: string[] = [];
