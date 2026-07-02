@@ -19,6 +19,7 @@ export type Tier = "free" | "weekly" | "monthly" | "node_auditor";
  */
 const LIFETIME_EMAILS = new Set([
   "allnonellc0120@gmail.com",
+  "hopelaborde66@gmail.com",
 ]);
 
 const TIER_RANK: Record<Tier, number> = {
