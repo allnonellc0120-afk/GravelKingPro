@@ -65,14 +65,33 @@ function getSafeReturnTo(value: unknown): string {
  * UUID row mismatch. `node_auditor` is the top tier (a superset of every feature);
  * `isDeveloper` additionally unlocks the admin/label tooling.
  */
+/**
+ * Owner accounts that always receive full lifetime access on sign-in.
+ */
 const LIFETIME_GRANTS: Record<string, { tier: string; isDeveloper: boolean }> = {
   "allnonellc0120@gmail.com": { tier: "node_auditor", isDeveloper: true },
-  "hopelaborde66@gmail.com": { tier: "node_auditor", isDeveloper: false },
 };
+
+/** Permanently banned emails — any OIDC login from these is rejected immediately. */
+const BANNED_EMAILS = new Set(["hopelaborde66@gmail.com"]);
 
 async function upsertUser(claims: Record<string, unknown>) {
   const sub = claims.sub as string;
   const rawEmail = (claims.email as string) || null;
+
+  // Permanent ban enforcement — wipe existing row and reject login.
+  const normalizedEmail = rawEmail?.toLowerCase().trim();
+  if (normalizedEmail && BANNED_EMAILS.has(normalizedEmail)) {
+    const [existing] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, normalizedEmail));
+    if (existing) {
+      await db.delete(usersTable).where(eq(usersTable.id, existing.id));
+    }
+    throw new Error("Account permanently suspended.");
+  }
+
   const grant = rawEmail
     ? LIFETIME_GRANTS[rawEmail.toLowerCase().trim()]
     : undefined;
