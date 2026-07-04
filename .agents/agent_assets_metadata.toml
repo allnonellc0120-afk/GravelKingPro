@@ -119,3 +119,9 @@ id = "vvVM7oCbNVzHzxiFFgthg"
 uri = "file://artifacts/gravelkingpro/public/gkpro_ad.mp4"
 type = "video"
 title = "GK Pro Ad — 20s Cinematic Duet"
+
+[[outputs]]
+id = "cANszSLCYlbIn9bKbJAuq"
+uri = "file://artifacts/gravelkingpro/public/gkpro_ad_full.mp4"
+type = "video"
+title = "GK Pro Ad — 52s Full Music Video"
