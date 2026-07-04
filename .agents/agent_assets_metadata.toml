@@ -113,3 +113,9 @@ id = "xyH87XyRsCayoHj1HwdwC"
 uri = "file://exports/GravelKingPro-WhitePaper.pdf"
 type = "pdf"
 title = "GravelKing Pro — Technical White Paper (PDF)"
+
+[[outputs]]
+id = "vvVM7oCbNVzHzxiFFgthg"
+uri = "file://artifacts/gravelkingpro/public/gkpro_ad.mp4"
+type = "video"
+title = "GK Pro Ad — 20s Cinematic Duet"
