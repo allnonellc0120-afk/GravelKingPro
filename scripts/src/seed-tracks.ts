@@ -173,8 +173,6 @@ const DEMO_TRACKS: DemoTrack[] = [
   { artistName: "Founder", title: "Morris Law Theme",    audioFullDuration: 5, audioPreviewDuration: 2, coverR: 160, coverG: 90,  coverB: 10 },
   { artistName: "Founder", title: "Node 1T",             audioFullDuration: 5, audioPreviewDuration: 2, coverR: 200, coverG: 150, coverB: 30 },
   { artistName: "Founder", title: "Benchmark Session",   audioFullDuration: 5, audioPreviewDuration: 2, coverR: 140, coverG: 80,  coverB: 0  },
-  // Hope LaBorde — personal song
-  { artistName: "Hope Of The Free World", title: "I Wanna Recognize Me", audioFullDuration: 5, audioPreviewDuration: 2, coverR: 120, coverG: 200, coverB: 180 },
 ];
 
 // ── Main ──────────────────────────────────────────────────────────────────────

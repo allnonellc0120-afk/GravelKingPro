@@ -19,8 +19,10 @@ export type Tier = "free" | "weekly" | "monthly" | "node_auditor";
  */
 const LIFETIME_EMAILS = new Set([
   "allnonellc0120@gmail.com",
-  "hopelaborde66@gmail.com",
 ]);
+
+/** Permanently banned emails — any authenticated user matching is forced to free tier. */
+const BANNED_EMAILS = new Set(["hopelaborde66@gmail.com"]);
 
 const TIER_RANK: Record<Tier, number> = {
   free: 0,
@@ -63,6 +65,11 @@ export async function resolveTier(req: Request): Promise<Tier> {
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id));
 
+    // Permanent ban enforcement — force free tier, ignore any stored tier.
+    if (dbUser?.email && BANNED_EMAILS.has(dbUser.email.toLowerCase().trim())) {
+      return "free";
+    }
+
     // Lifetime email bypass — no Stripe check needed, no stale DB tier.
     if (dbUser?.email && LIFETIME_EMAILS.has(dbUser.email.toLowerCase().trim())) {
       return "node_auditor";
@@ -76,6 +83,10 @@ export async function resolveTier(req: Request): Promise<Tier> {
   if (sessionId) {
     const user = await storage.getUserBySession(sessionId);
     if (user) {
+      // Permanent ban enforcement for session-cookie path too.
+      if (user.email && BANNED_EMAILS.has(user.email.toLowerCase().trim())) {
+        return "free";
+      }
       // Lifetime email bypass for session-cookie path too.
       if (user.email && LIFETIME_EMAILS.has(user.email.toLowerCase().trim())) {
         return "node_auditor";
