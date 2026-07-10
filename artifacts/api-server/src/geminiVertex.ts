@@ -1,0 +1,130 @@
+/**
+ * GravelKing Productions — Vertex AI (Gemini) shared client.
+ *
+ * Authenticates via GCP_SERVICE_ACCOUNT (the same service account used for
+ * Firestore and audio transcription). Bills Google Cloud credits directly —
+ * NOT the Replit AI Integrations proxy, which is a dev-only sidecar and is
+ * rejected in production ("ApiKey not approved").
+ *
+ * Both text generation (lyrics/songwriter) and audio transcription share the
+ * auth + token cache here so there is a single, proven code path to Google.
+ */
+
+import { GoogleAuth } from "google-auth-library";
+
+interface GcpCredentials {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+}
+
+export function getGcpCredentials(): GcpCredentials {
+  const raw = process.env["GCP_SERVICE_ACCOUNT"];
+  if (!raw) throw new Error("GCP_SERVICE_ACCOUNT not configured");
+  return JSON.parse(raw) as GcpCredentials;
+}
+
+/**
+ * True only when GCP_SERVICE_ACCOUNT holds a real service-account JSON. In dev
+ * the value is a placeholder token (not JSON), so this returns false and callers
+ * degrade gracefully instead of throwing on every request.
+ */
+export function isVertexConfigured(): boolean {
+  const raw = process.env["GCP_SERVICE_ACCOUNT"];
+  if (!raw) return false;
+  try {
+    const creds = JSON.parse(raw) as Partial<GcpCredentials>;
+    return Boolean(creds.project_id && creds.client_email && creds.private_key);
+  } catch {
+    return false;
+  }
+}
+
+export const VERTEX_LOCATION = "us-central1";
+export const VERTEX_MODEL = "gemini-2.0-flash";
+
+let _cachedToken: { token: string; expiry: number } | null = null;
+
+export async function getVertexAccessToken(): Promise<string> {
+  if (_cachedToken && Date.now() < _cachedToken.expiry - 60_000) {
+    return _cachedToken.token;
+  }
+  const creds = getGcpCredentials();
+  const auth = new GoogleAuth({
+    credentials: {
+      client_email: creds.client_email,
+      private_key: creds.private_key,
+    },
+    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+  });
+  const client = await auth.getClient();
+  const resp = await client.getAccessToken();
+  if (!resp.token) throw new Error("Failed to obtain Vertex AI access token from service account");
+  const expiry =
+    (resp.res?.data as { expiry_date?: number })?.expiry_date ?? Date.now() + 3_600_000;
+  _cachedToken = { token: resp.token, expiry };
+  return resp.token;
+}
+
+type VertexPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
+interface GenerationConfig {
+  maxOutputTokens?: number;
+  temperature?: number;
+  responseMimeType?: string;
+}
+
+interface VertexResponse {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+}
+
+/**
+ * Low-level Vertex AI generateContent call. Returns the first candidate's text.
+ * Reads the response as text first so a chunked / non-JSON Vertex error body
+ * never crashes res.json() before the caller's own error handling runs.
+ */
+export async function generateVertexContent(
+  parts: VertexPart[],
+  generationConfig: GenerationConfig = {},
+  timeoutMs = 60_000,
+): Promise<string> {
+  const creds = getGcpCredentials();
+  const token = await getVertexAccessToken();
+  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts }],
+      generationConfig: { maxOutputTokens: 8192, ...generationConfig },
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  const bodyText = await res.text().catch(() => "");
+  if (!res.ok) {
+    throw new Error(`Vertex AI Gemini ${res.status}: ${bodyText.slice(0, 400)}`);
+  }
+
+  let result: VertexResponse = {};
+  try {
+    result = JSON.parse(bodyText) as VertexResponse;
+  } catch {
+    throw new Error(`Vertex AI returned non-JSON: ${bodyText.slice(0, 200)}`);
+  }
+  return result.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+}
+
+/** Convenience helper for plain text-in / text-out prompts (lyrics, rhymes, etc). */
+export async function generateVertexText(
+  prompt: string,
+  generationConfig: GenerationConfig = {},
+): Promise<string> {
+  return generateVertexContent([{ text: prompt }], generationConfig);
+}

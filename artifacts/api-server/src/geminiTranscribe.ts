@@ -4,50 +4,21 @@
  * Bills Google Cloud credits, not Replit proxy.
  */
 
-import { GoogleAuth } from "google-auth-library";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
+import {
+  getGcpCredentials,
+  getVertexAccessToken,
+  isVertexConfigured,
+  VERTEX_LOCATION,
+} from "./geminiVertex";
 
 const execFileAsync = promisify(execFile);
 
-interface GcpCredentials {
-  project_id: string;
-  client_email: string;
-  private_key: string;
-}
-
-function getGcpCredentials(): GcpCredentials {
-  const raw = process.env["GCP_SERVICE_ACCOUNT"];
-  if (!raw) throw new Error("GCP_SERVICE_ACCOUNT not configured");
-  return JSON.parse(raw) as GcpCredentials;
-}
-
 export function isGeminiConfigured(): boolean {
-  return !!process.env["GCP_SERVICE_ACCOUNT"];
-}
-
-let _cachedToken: { token: string; expiry: number } | null = null;
-
-async function getAccessToken(): Promise<string> {
-  if (_cachedToken && Date.now() < _cachedToken.expiry - 60_000) {
-    return _cachedToken.token;
-  }
-  const creds = getGcpCredentials();
-  const auth = new GoogleAuth({
-    credentials: {
-      client_email: creds.client_email,
-      private_key:  creds.private_key,
-    },
-    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-  });
-  const client = await auth.getClient();
-  const resp   = await client.getAccessToken();
-  if (!resp.token) throw new Error("Failed to obtain Vertex AI access token from service account");
-  const expiry = (resp.res?.data as { expiry_date?: number })?.expiry_date ?? (Date.now() + 3_600_000);
-  _cachedToken = { token: resp.token, expiry };
-  return resp.token;
+  return isVertexConfigured();
 }
 
 /**
@@ -89,11 +60,11 @@ export async function transcribeWithGemini(
   filePath: string,
 ): Promise<{ segments: TranscriptSegment[]; fullText: string }> {
   const creds    = getGcpCredentials();
-  const token    = await getAccessToken();
+  const token    = await getVertexAccessToken();
   const { data, mimeType } = await compressForGemini(filePath);
 
   const project  = creds.project_id;
-  const location = "us-central1";
+  const location = VERTEX_LOCATION;
   const model    = "gemini-2.0-flash";
 
   const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
