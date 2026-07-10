@@ -208,6 +208,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
             <Link href="/label" className="hover:text-amber-500 transition-colors">Label</Link>
             <Link href="/library" className="hover:text-amber-500 transition-colors">Library</Link>
             <Link href="/pitch" className="hover:text-amber-500 transition-colors">IP Embed</Link>
+            <Link href="/protected-lyrics" className="hover:text-amber-500 transition-colors">My Lyrics</Link>
             <Link href="/contact" className="hover:text-amber-500 transition-colors">Contact</Link>
             <Link href="/download" className="hover:text-amber-500 transition-colors">Download</Link>
             <Link href="/pricing" className="hover:text-amber-500 transition-colors">Pricing</Link>

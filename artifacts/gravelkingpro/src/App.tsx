@@ -23,6 +23,7 @@ import LibraryPage from "@/pages/library";
 import SubmitTrackPage from "@/pages/submit-track";
 import ConvertPage from "@/pages/convert";
 import SongwritingStudio from "@/pages/songwriting";
+import ProtectedLyrics from "@/pages/protected-lyrics";
 import VocalBooth from "@/pages/vocal-booth";
 import AdminLabel from "@/pages/admin-label";
 import AdminOps from "@/pages/admin-ops";
@@ -57,6 +58,7 @@ function Router() {
       <Route path="/submit" component={SubmitTrackPage} />
       <Route path="/convert" component={ConvertPage} />
       <Route path="/songwriting" component={SongwritingStudio} />
+      <Route path="/protected-lyrics" component={ProtectedLyrics} />
       <Route path="/vocal-booth" component={VocalBooth} />
       <Route path="/pitch" component={PitchPage} />
       <Route component={NotFound} />

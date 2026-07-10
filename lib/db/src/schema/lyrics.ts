@@ -120,9 +120,42 @@ export const lyricForensicLedgerTable = pgTable("lyric_forensic_ledger", {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// lyric_imports — user-imported, self-authored lyrics stamped for IP possession.
+// One row per import (users may stamp many over time — never overwritten).
+// Additive: fully independent of the AI-generated lyric_projects flow.
+// ─────────────────────────────────────────────────────────────────────────────
+export const lyricImportsTable = pgTable("lyric_imports", {
+  id: text("id").primaryKey(),
+
+  // ── Identity ──────────────────────────────────────────────────────────────
+  sessionId: text("session_id"),                 // gk_session cookie value at stamp time
+  userId: text("user_id"),                        // resolved users.id (OIDC or session-backed)
+
+  // ── Cryptographic possession stamp ────────────────────────────────────────
+  contentHash: text("content_hash").notNull(),                    // SHA-256 hex of normalized text
+  hashAlgorithm: text("hash_algorithm").notNull().default("sha256"),
+  importedText: text("imported_text").notNull(),                  // exact plaintext retained at rest
+  charCount: integer("char_count").notNull().default(0),
+
+  // ── Classification ────────────────────────────────────────────────────────
+  // Explicitly marks these as fully-human imports, distinct from the AI-collab
+  // lyric_projects flow (which is scored, not hash-stamped). Never overlaps.
+  stampType: text("stamp_type").notNull().default("imported_human_original"),
+
+  // ── Human-authorship certification ────────────────────────────────────────
+  certifiedHumanAuthor: boolean("certified_human_author").notNull().default(false),
+  certificationText: text("certification_text"),                  // exact statement the user agreed to
+
+  // ── Timestamps ────────────────────────────────────────────────────────────
+  stampedAt: timestamp("stamped_at", { withTimezone: true }).notNull().defaultNow(), // official IP timestamp
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // TypeScript types
 // ─────────────────────────────────────────────────────────────────────────────
 export type LyricProject = typeof lyricProjectsTable.$inferSelect;
+export type LyricImport = typeof lyricImportsTable.$inferSelect;
 export type LyricTimelineBlock = typeof lyricTimelineBlocksTable.$inferSelect;
 export type LyricRevision = typeof lyricRevisionsTable.$inferSelect;
 export type LyricForensicEntry = typeof lyricForensicLedgerTable.$inferSelect;

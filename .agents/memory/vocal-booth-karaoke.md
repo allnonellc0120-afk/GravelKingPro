@@ -20,11 +20,22 @@ honesty boundary, not just an implementation detail.
 **How to apply:** when touching the mixdown path, verify the guide blob/url/ref is
 absent from the export FormData. Only backingFile + recorder.vocalBlob go in.
 
-## Lyric timing is energy-based & APPROXIMATE — never claim alignment
-Line timing is computed from short-time RMS energy of the guide vocal (voiced-region
-detection), then lyric lines are distributed across onsets. There is NO transcription
-or forced alignment. All UI copy must say "energy-based" / "approximate" and the
-stem split is labeled as bleeding/approximate too.
-**Why:** the project's honesty ethos forbids over-claiming AI accuracy.
-**How to apply:** keep the approximate labeling on any new timing/sync UI; don't add
-"synced lyrics"/"word-perfect"/"transcribed" language.
+## Lyric timing — three sources; label each honestly
+Timing can come from three places, most to least accurate:
+1. **lrclib.net synced LRC** (`searchLyrics`/`parseLrc`, `timingSource="lrc"`) —
+   ms-accurate; label "Precise synced timing".
+2. **AI transcription** via `POST /api/audio/transcribe` (`transcribeVocals`,
+   `lyricSource="auto"`) — backend is **Vertex AI Gemini** (`transcribeWithGemini`),
+   even though the Vocal Booth UI still labels it "Whisper". No Replicate fallback; if
+   Gemini is unavailable it degrades to manual tap-to-time.
+3. **Energy-based** RMS onset distribution (`analyzeGuideTiming`, `timingSource="energy"`)
+   — approximate, no transcription; must stay labeled "energy-based"/"approximate".
+
+Manual timing is **Tap-to-Time** (`startTapTiming`/`handleTapTime`, the "▶ Now"
+button) — a click button, NOT a spacebar binding (the only keydown handler is
+Escape-to-exit fullscreen).
+**Why:** the honesty ethos forbids over-claiming on the energy path; and the "Whisper"
+label is misleading — future work must not try to "swap in Gemini" (it already is
+Gemini) nor claim a spacebar shortcut that doesn't exist.
+**How to apply:** keep approximate labeling on the energy path; the transcription
+engine is Gemini; add a real spacebar binding only if the user explicitly asks.

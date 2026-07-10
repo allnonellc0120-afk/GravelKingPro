@@ -11,8 +11,10 @@ import {
   Sparkles, Music2, Edit3, Lock, Copy, ExternalLink,
   CheckCircle2, AlertTriangle, Loader2, RotateCcw,
   FileText, Clock, Wand2, Check, RefreshCw, Plus, Trash2,
-  ChevronRight, Mic, X, Share2, Shield,
+  ChevronRight, Mic, X, Share2, Shield, ShieldCheck, Fingerprint, ArrowRight,
 } from "lucide-react";
+import { Link } from "wouter";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -409,6 +411,12 @@ export default function SongwritingStudio() {
   const [stylePrompt, setStylePrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationCount, setGenerationCount] = useState(0);
+
+  // ── Import custom (self-authored) lyrics ───────────────────────────────────
+  const [importText, setImportText] = useState("");
+  const [importCertified, setImportCertified] = useState(false);
+  const [isStamping, setIsStamping] = useState(false);
+  const [lastStampAt, setLastStampAt] = useState<string | null>(null);
 
   // ── Authorship ────────────────────────────────────────────────────────────
   const [authorshipScore, setAuthorshipScore] = useState(0);
@@ -873,6 +881,40 @@ export default function SongwritingStudio() {
   const effectiveStyle = convertedStyle || styleInput || stylePrompt;
   const generationLimitReached = generationCount >= 2 && !isPro;
 
+  const handleStampImport = useCallback(async () => {
+    if (importText.trim().length < 5 || !importCertified) return;
+    setIsStamping(true);
+    try {
+      const res = await fetch("/api/lyrics/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          text: importText,
+          certifiedHumanAuthor: importCertified,
+          certificationText: "I certify these lyrics are my original human work and were NOT produced by an AI.",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to stamp lyrics");
+      setImportText("");
+      setImportCertified(false);
+      setLastStampAt(data.import?.stampedAt ?? new Date().toISOString());
+      toast({
+        title: "Lyrics stamped ✓",
+        description: "SHA-256 possession stamp saved to My Protected Lyrics.",
+      });
+    } catch (err) {
+      toast({
+        title: "Stamp failed",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStamping(false);
+    }
+  }, [importText, importCertified, toast]);
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
@@ -1002,6 +1044,61 @@ export default function SongwritingStudio() {
               {2 - generationCount} free generation{2 - generationCount !== 1 ? "s" : ""} remaining
             </p>
           )}
+        </div>
+
+        {/* ── Import your own lyrics (IP possession stamp) ── */}
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-amber-500" />
+            <h2 className="text-sm font-bold tracking-wide uppercase text-amber-500">Import Your Own Lyrics</h2>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Already wrote lyrics yourself? Stamp them to lock in a cryptographic, timestamped
+            record of your authorship — kept separate from AI drafts.
+          </p>
+          <Textarea
+            placeholder="Paste the lyrics you wrote yourself…"
+            className="min-h-[140px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50 font-mono text-sm"
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            maxLength={20000}
+            data-testid="input-import-lyrics"
+          />
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <Checkbox
+              checked={importCertified}
+              onCheckedChange={(v) => setImportCertified(v === true)}
+              className="mt-0.5 border-amber-500/50 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+              data-testid="checkbox-certify-author"
+            />
+            <span className="text-xs text-muted-foreground leading-relaxed">
+              I certify these lyrics are my original human work and were <span className="font-bold text-amber-400">NOT produced by an AI</span>.
+            </span>
+          </label>
+          <Button
+            onClick={handleStampImport}
+            disabled={isStamping || importText.trim().length < 5 || !importCertified}
+            className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold py-3 disabled:opacity-50"
+            data-testid="button-stamp-import"
+          >
+            {isStamping
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Stamping…</>
+              : <><Fingerprint className="w-4 h-4 mr-2" />Stamp My Lyrics</>}
+          </Button>
+          {lastStampAt && (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="text-xs text-emerald-400 font-medium">
+                Stamped {new Date(lastStampAt).toLocaleString()}
+              </span>
+            </div>
+          )}
+          <Link
+            href="/protected-lyrics"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            View My Protected Lyrics <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
 
         {/* ── STEP 2: Style ── */}
