@@ -25,6 +25,7 @@ import ConvertPage from "@/pages/convert";
 import SongwritingStudio from "@/pages/songwriting";
 import VocalBooth from "@/pages/vocal-booth";
 import AdminLabel from "@/pages/admin-label";
+import AdminOps from "@/pages/admin-ops";
 import PitchPage from "@/pages/pitch";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/admin/waitlist" component={AdminWaitlist} />
       <Route path="/admin/tracks" component={AdminTracks} />
       <Route path="/admin/label" component={AdminLabel} />
+      <Route path="/admin/ops" component={AdminOps} />
       <Route path="/optimizer" component={Optimizer} />
       <Route path="/label" component={LabelPage} />
       <Route path="/label/:artist" component={LabelArtistPage} />

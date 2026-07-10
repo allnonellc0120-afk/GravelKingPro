@@ -85,6 +85,7 @@ function AnalyticsDashboard() {
     { href: "/admin", label: "Analytics" },
     { href: "/admin/tracks", label: "Tracks" },
     { href: "/admin/waitlist", label: "Waitlist" },
+    { href: "/admin/ops", label: "Ops" },
   ];
 
   return (

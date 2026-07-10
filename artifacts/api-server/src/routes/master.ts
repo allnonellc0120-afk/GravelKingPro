@@ -11,6 +11,8 @@ import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
 import { applyMLKv3Fast } from "../kernel-v3";
 import { logger } from "../lib/logger";
+import { logToolError } from "../lib/errorTracker";
+import { recordActivity } from "../lib/activityTracker";
 
 /** Optional denoise stage folded into mastering (applied before the preset). */
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
@@ -130,6 +132,7 @@ masterRouter.post(
       { preset: req.body?.preset, filename: req.file?.originalname, size: req.file?.size },
       "master request received"
     );
+    recordActivity((req.cookies as Record<string, string>)?.["gk_session"], "Mastering Tool");
 
     if (!req.file) {
       res.status(400).json({ success: false, error: "No audio file uploaded." });
@@ -227,6 +230,7 @@ masterRouter.post(
       res.setHeader("X-GK-Parity", parity);
       res.send(carvedBuffer);
     } catch (err: any) {
+      void logToolError("Mastering Tool", "MASTERING", err);
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });
     } finally {
       await Promise.all([
