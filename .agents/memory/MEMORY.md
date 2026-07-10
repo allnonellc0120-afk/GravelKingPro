@@ -47,4 +47,5 @@
 - [GravelKingPro product focus](product-focus.md) — 4 pillars only (IP, Mastering, Vocal Booth, karaoke DAW); cloud-AI/Replicate/splitter/voice-removal deprecated, don't reintroduce in code or public copy
 - [Splitter state persistence](splitter-state-persistence.md) — heavy audio tool state+processing must live above the router + mirror result to IndexedDB (iPad nav/backgrounding wipes component useState); needs runId+AbortController race guards
 - [Stem ZIP size (iOS OOM)](stem-zip-size.md) — stemsOnly=primary body param → server returns 2 stems only; Studio (source=studio, no stemsOnly) still gets all 5; vocal booth keeps source=studio for Pro auth but adds stemsOnly=primary
+- [Authorship scoring](authorship-scoring.md) — shared @workspace/authorship lib (diff-match-patch); score MUST stay 0–100 to preserve >=25 copyright gate; delete+retype-same=0 credit; client import aliased to avoid state-var collision
 - [Admin Ops diagnostics pattern](admin-ops-diagnostics.md) — logToolError/recordActivity conventions, admin_settings-backed kill switch (bypasses via isAdminAuthenticated not requireAdmin), /tmp-scoped cache purge

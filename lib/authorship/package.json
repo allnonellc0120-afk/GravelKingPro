@@ -1,0 +1,15 @@
+{
+  "name": "@workspace/authorship",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "diff-match-patch": "^1.0.5"
+  },
+  "devDependencies": {
+    "@types/diff-match-patch": "^1.0.36"
+  }
+}
