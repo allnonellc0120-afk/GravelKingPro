@@ -24,22 +24,6 @@ export function getGcpCredentials(): GcpCredentials {
   return JSON.parse(raw) as GcpCredentials;
 }
 
-/**
- * True only when GCP_SERVICE_ACCOUNT holds a real service-account JSON. In dev
- * the value is a placeholder token (not JSON), so this returns false and callers
- * degrade gracefully instead of throwing on every request.
- */
-export function isVertexConfigured(): boolean {
-  const raw = process.env["GCP_SERVICE_ACCOUNT"];
-  if (!raw) return false;
-  try {
-    const creds = JSON.parse(raw) as Partial<GcpCredentials>;
-    return Boolean(creds.project_id && creds.client_email && creds.private_key);
-  } catch {
-    return false;
-  }
-}
-
 export const VERTEX_LOCATION = "us-central1";
 export const VERTEX_MODEL = "gemini-2.0-flash";
 
