@@ -776,8 +776,15 @@ audioRouter.post(
       const result = await transcribeWithGemini(filePath);
       res.json(result);
     } catch (err: any) {
-      req.log.error({ err: err?.message ?? "" }, "Transcription failed");
-      res.status(500).json({ error: "Transcription failed. Please try again." });
+      const raw = String(err?.message ?? "");
+      const busy = /quota|limit|429|throttl/i.test(raw);
+      req.log.warn({ err: raw }, "Transcription unavailable; client falls back to tap-to-time");
+      res.status(502).json({
+        error: busy
+          ? "Auto-transcribe is busy right now. Use Tap-to-Time below to sync your lyrics."
+          : "Couldn't auto-transcribe this track. Use Tap-to-Time below to sync your lyrics.",
+        fallback: "tap-timing",
+      });
     } finally {
       await unlink(filePath).catch(() => {});
     }

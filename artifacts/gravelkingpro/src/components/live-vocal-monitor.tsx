@@ -17,9 +17,17 @@ interface Props {
    * into the recording.
    */
   onPresetChange?: (preset: VocalPreset | null) => void;
+  /**
+   * Bump this (e.g. increment a counter) right before a take starts to force
+   * this preview stream closed. The recorder opens its own mic stream for the
+   * take, and some browsers (notably iOS Safari) get flaky with two
+   * concurrent getUserMedia streams on the same device — closing the preview
+   * first avoids that contention. Safe to call even if already inactive.
+   */
+  stopSignal?: number;
 }
 
-export function LiveVocalMonitor({ onPresetChange }: Props) {
+export function LiveVocalMonitor({ onPresetChange, stopSignal }: Props) {
   const [active, setActive] = useState(false);
   const [preset, setPreset] = useState<VocalPresetId>("raw");
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +109,15 @@ export function LiveVocalMonitor({ onPresetChange }: Props) {
   }, [active, preset, startMonitor, stopMonitor]);
 
   useEffect(() => () => stopMonitor(), [stopMonitor]);
+
+  // A take is about to start — release this preview stream so the recorder's
+  // own mic capture doesn't contend with it (see stopSignal doc above).
+  const firstStopSignal = useRef(true);
+  useEffect(() => {
+    if (firstStopSignal.current) { firstStopSignal.current = false; return; }
+    stopMonitor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopSignal]);
 
   const p = VOCAL_PRESETS.find(v => v.id === preset)!;
 
