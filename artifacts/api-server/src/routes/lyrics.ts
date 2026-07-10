@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { saveSongDraft, updateSongDraft, queryLibraryBySession } from "../lib/firestore";
 import { hasStudio } from "../lib/entitlement";
+import { getUsageUser } from "../lib/usage";
 import { rateLimit } from "../lib/rateLimiter";
 import {
   db,
@@ -9,9 +10,10 @@ import {
   lyricRevisionsTable,
   lyricForensicLedgerTable,
   lyricTimelineBlocksTable,
+  lyricImportsTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { randomUUID, createHmac } from "crypto";
+import { eq, desc } from "drizzle-orm";
+import { randomUUID, createHmac, createHash } from "crypto";
 import type { LineState } from "@workspace/db";
 import { generateVertexText, isVertexConfigured } from "../geminiVertex";
 import { generateProxyText } from "../geminiProxy";
@@ -60,6 +62,24 @@ async function geminiGenerate(prompt: string): Promise<string> {
     throw new Error("Gemini returned empty lyric output");
   }
   return proxyText;
+}
+
+const DEFAULT_CERTIFICATION = "I certify these lyrics are my original human work and were NOT produced by an AI.";
+
+/** Serialize a lyric_imports row for the client (ISO timestamps). */
+function serializeImport(row: typeof lyricImportsTable.$inferSelect) {
+  return {
+    id: row.id,
+    contentHash: row.contentHash,
+    hashAlgorithm: row.hashAlgorithm,
+    stampType: row.stampType,
+    importedText: row.importedText,
+    charCount: row.charCount,
+    certifiedHumanAuthor: row.certifiedHumanAuthor,
+    certificationText: row.certificationText,
+    stampedAt: row.stampedAt instanceof Date ? row.stampedAt.toISOString() : row.stampedAt,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+  };
 }
 
 function levenshteinPercent(a: string, b: string): number {
@@ -391,6 +411,83 @@ Output the style tags only:`;
     req.log.error({ err }, "Gemini style conversion failed");
     void logToolError("Lyric Generator", "LYRIC_STYLE", err);
     res.status(500).json({ error: "Style conversion failed." });
+  }
+});
+
+// ─── POST /api/lyrics/import ──────────────────────────────────────────────────
+// Stamp user-imported, self-authored lyrics: SHA-256 possession hash + plaintext
+// + a server-authoritative timestamp. Additive — independent of AI generation.
+lyricsRouter.post("/lyrics/import", lyricsAiRateLimit, async (req: Request, res: Response) => {
+  const { text, certifiedHumanAuthor } = req.body as {
+    text?: string;
+    certifiedHumanAuthor?: boolean;
+  };
+
+  // Normalize CRLF→LF and strip trailing spaces so the hash is stable and
+  // reproducible from the retained plaintext.
+  const normalized = (text ?? "").replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
+  if (normalized.length < 5) {
+    res.status(400).json({ error: "Lyrics text is required (min 5 characters)." });
+    return;
+  }
+  // Certification is a hard server-side gate — the UI checkbox alone is bypassable.
+  if (certifiedHumanAuthor !== true) {
+    res.status(400).json({ error: "You must certify you are the original human author before stamping." });
+    return;
+  }
+
+  const contentHash = createHash("sha256").update(normalized, "utf8").digest("hex");
+
+  try {
+    const usageUser = await getUsageUser(req, res);
+    const sessionId = (req.cookies as Record<string, string> | undefined)?.["gk_session"] ?? null;
+    const [row] = await db
+      .insert(lyricImportsTable)
+      .values({
+        id: randomUUID(),
+        sessionId,
+        userId: usageUser.id,
+        contentHash,
+        hashAlgorithm: "sha256",
+        stampType: "imported_human_original",
+        importedText: normalized,
+        charCount: normalized.length,
+        certifiedHumanAuthor: true,
+        // Canonical statement is always stored server-side; the client value is
+        // ignored so the recorded certification can't be forged by a crafted client.
+        certificationText: DEFAULT_CERTIFICATION,
+      })
+      .returning();
+
+    recordActivity(sessionId, "Lyric Import");
+    res.json({ import: serializeImport(row!) });
+  } catch (err) {
+    req.log.error({ err }, "Lyric import stamp failed");
+    void logToolError("Lyric Import", "IMPORT_STAMP", err);
+    res.status(500).json({ error: "Could not stamp your lyrics. Please try again." });
+  }
+});
+
+// ─── GET /api/lyrics/imports ──────────────────────────────────────────────────
+// List every possession stamp owned by the caller (OIDC id or gk_session id),
+// newest first. Read-only. Does not create an identity for cookieless callers.
+lyricsRouter.get("/lyrics/imports", async (req: Request, res: Response) => {
+  const hasSession = Boolean((req.cookies as Record<string, string> | undefined)?.["gk_session"]);
+  if (!req.isAuthenticated() && !hasSession) {
+    res.json({ imports: [] });
+    return;
+  }
+  try {
+    const usageUser = await getUsageUser(req, res);
+    const rows = await db
+      .select()
+      .from(lyricImportsTable)
+      .where(eq(lyricImportsTable.userId, usageUser.id))
+      .orderBy(desc(lyricImportsTable.stampedAt));
+    res.json({ imports: rows.map(serializeImport) });
+  } catch (err) {
+    req.log.error({ err }, "Lyric imports list failed");
+    res.status(500).json({ error: "Could not load your protected lyrics." });
   }
 });
 
