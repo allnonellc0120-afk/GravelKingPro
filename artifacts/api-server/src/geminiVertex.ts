@@ -24,6 +24,23 @@ export function getGcpCredentials(): GcpCredentials {
   return JSON.parse(raw) as GcpCredentials;
 }
 
+/**
+ * True only when GCP_SERVICE_ACCOUNT holds a valid service-account JSON
+ * credential (project_id + client_email + private_key). A missing secret or a
+ * placeholder token returns false so callers can fall back to another provider
+ * instead of throwing on JSON.parse.
+ */
+export function isVertexConfigured(): boolean {
+  const raw = process.env["GCP_SERVICE_ACCOUNT"];
+  if (!raw) return false;
+  try {
+    const c = JSON.parse(raw) as Partial<GcpCredentials>;
+    return Boolean(c.project_id && c.client_email && c.private_key);
+  } catch {
+    return false;
+  }
+}
+
 export const VERTEX_LOCATION = "us-central1";
 export const VERTEX_MODEL = "gemini-2.0-flash";
 
