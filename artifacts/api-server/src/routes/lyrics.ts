@@ -13,7 +13,9 @@ import {
 import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import type { LineState } from "@workspace/db";
-import { generateVertexText } from "../geminiVertex";
+import { generateVertexText, isVertexConfigured } from "../geminiVertex";
+import { generateProxyText } from "../geminiProxy";
+import { logger } from "../lib/logger";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 
@@ -32,17 +34,32 @@ function verifyEmbedToken(projectId: string, authorshipScore: number, token: str
 }
 
 /**
- * Lyric/songwriter generation — ALWAYS uses the user's own Google Cloud
- * Vertex AI (GCP_SERVICE_ACCOUNT). Never falls back to Replit's proxy.
- * If the credential is bad or Vertex errors, it throws and the route
- * handler returns 500 so the user knows it's broken, not a fake result.
+ * Lyric/songwriter generation — resilient dual-provider.
+ *
+ * Prefers the user's own Google Cloud Vertex AI when GCP_SERVICE_ACCOUNT holds
+ * a valid service-account credential. If that credential is absent/invalid, or
+ * the Vertex call errors or returns nothing, it falls back to Replit's managed
+ * Gemini proxy so the songwriter keeps working. Only if the active provider(s)
+ * fail does it throw, so the route returns a 500 instead of a fake result.
  */
 async function geminiGenerate(prompt: string): Promise<string> {
-  const text = await generateVertexText(prompt, { maxOutputTokens: 8192 });
-  if (!text.trim()) {
-    throw new Error("Vertex AI returned empty lyric output");
+  const cfg = { maxOutputTokens: 8192 };
+
+  if (isVertexConfigured()) {
+    try {
+      const text = await generateVertexText(prompt, cfg);
+      if (text.trim()) return text;
+      logger.warn("Vertex AI returned empty lyric output; falling back to Gemini proxy");
+    } catch (err) {
+      logger.warn({ err }, "Vertex AI lyric generation failed; falling back to Gemini proxy");
+    }
   }
-  return text;
+
+  const proxyText = await generateProxyText(prompt, cfg);
+  if (!proxyText.trim()) {
+    throw new Error("Gemini returned empty lyric output");
+  }
+  return proxyText;
 }
 
 function levenshteinPercent(a: string, b: string): number {
