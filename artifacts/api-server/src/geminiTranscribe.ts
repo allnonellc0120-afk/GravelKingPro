@@ -11,15 +11,10 @@ import { randomUUID } from "crypto";
 import {
   getGcpCredentials,
   getVertexAccessToken,
-  isVertexConfigured,
   VERTEX_LOCATION,
 } from "./geminiVertex";
 
 const execFileAsync = promisify(execFile);
-
-export function isGeminiConfigured(): boolean {
-  return isVertexConfigured();
-}
 
 /**
  * Compress audio to mono 16kHz 32kbps MP3 so it fits Vertex AI's 8 MB inline limit.

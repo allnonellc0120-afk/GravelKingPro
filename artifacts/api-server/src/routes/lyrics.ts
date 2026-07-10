@@ -13,8 +13,7 @@ import {
 import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import type { LineState } from "@workspace/db";
-import { generateVertexText, isVertexConfigured } from "../geminiVertex";
-import { logger } from "../lib/logger";
+import { generateVertexText } from "../geminiVertex";
 
 const EMBED_SECRET = process.env["SESSION_SECRET"] ?? "gravelking-embed-secret";
 
@@ -30,61 +29,18 @@ function verifyEmbedToken(projectId: string, authorshipScore: number, token: str
   return expected === token;
 }
 
-const GEMINI_BASE = process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"] ?? "";
-const GEMINI_KEY  = process.env["AI_INTEGRATIONS_GEMINI_API_KEY"]  ?? "";
-
-// Fallback provider: the Replit AI Integrations Gemini proxy. Works when the
-// managed integration is provisioned; historically has returned intermittent
-// 401 "ApiKey not approved" in the deployed app, so it is not relied on alone.
-async function geminiViaProxy(prompt: string): Promise<string> {
-  if (!GEMINI_BASE || !GEMINI_KEY) {
-    throw new Error("No Gemini provider configured (neither GCP_SERVICE_ACCOUNT nor Replit AI proxy)");
-  }
-  const res = await fetch(
-    `${GEMINI_BASE}/models/gemini-3-flash-preview:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 8192 },
-      }),
-    }
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Gemini proxy error ${res.status}: ${body}`);
-  }
-  const data = await res.json() as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-}
-
-// Lyric/songwriter generation prefers the user's OWN Google Cloud (Vertex AI via
-// GCP_SERVICE_ACCOUNT — same service account used for transcription/Firestore),
-// which is the connection the product is meant to use. When that credential is
-// absent or not a valid service-account key (currently the case in both dev and
-// prod, where GCP_SERVICE_ACCOUNT holds a placeholder token), it transparently
-// falls back to the Replit AI proxy so the feature keeps working. Supplying a
-// real service-account JSON automatically routes generation to Google Cloud.
+/**
+ * Lyric/songwriter generation — ALWAYS uses the user's own Google Cloud
+ * Vertex AI (GCP_SERVICE_ACCOUNT). Never falls back to Replit's proxy.
+ * If the credential is bad or Vertex errors, it throws and the route
+ * handler returns 500 so the user knows it's broken, not a fake result.
+ */
 async function geminiGenerate(prompt: string): Promise<string> {
-  if (isVertexConfigured()) {
-    try {
-      const text = await generateVertexText(prompt, { maxOutputTokens: 8192 });
-      // An empty/whitespace result (e.g. a safety block or truncated response)
-      // is a failure, not a valid song — fall through to the proxy instead of
-      // returning an empty result to the user.
-      if (text.trim()) return text;
-      logger.warn("Vertex AI returned empty lyric output; falling back to Replit AI proxy");
-    } catch (err) {
-      logger.warn(
-        { err: err instanceof Error ? err.message : String(err) },
-        "Vertex AI lyric generation failed; falling back to Replit AI proxy",
-      );
-    }
+  const text = await generateVertexText(prompt, { maxOutputTokens: 8192 });
+  if (!text.trim()) {
+    throw new Error("Vertex AI returned empty lyric output");
   }
-  return geminiViaProxy(prompt);
+  return text;
 }
 
 function levenshteinPercent(a: string, b: string): number {
