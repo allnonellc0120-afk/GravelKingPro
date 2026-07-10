@@ -6,8 +6,11 @@ import {
   isDeveloperAuthenticated,
   requireAdmin,
 } from "../lib/adminAuth";
-import { db, usersTable, tracksTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { db, usersTable, tracksTable, toolErrorsTable } from "@workspace/db";
+import { eq, inArray, desc } from "drizzle-orm";
+import { setMaintenanceMode, isMaintenanceModeOn } from "../middlewares/maintenanceMode";
+import { getActiveSessions } from "../lib/activityTracker";
+import { purgeTempAudioCache } from "../lib/cachePurge";
 
 const adminAuthRouter = Router();
 
@@ -185,6 +188,106 @@ adminAuthRouter.post("/admin/purge-user", async (req: Request, res: Response) =>
       email: user.email,
       tracksRemoved: ownedIds.length,
     });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
+  }
+});
+
+/**
+ * GET /api/admin/tool-errors
+ * Recent structured error log entries (Timestamp, Tool, Stage, Raw Message) for
+ * the Admin Diagnostics panel. Newest first, capped at 100 rows.
+ */
+adminAuthRouter.get("/admin/tool-errors", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  try {
+    const rows = await db
+      .select()
+      .from(toolErrorsTable)
+      .orderBy(desc(toolErrorsTable.createdAt))
+      .limit(100);
+    res.json({ ok: true, errors: rows });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
+  }
+});
+
+/**
+ * GET /api/admin/integrity-check
+ * Lightweight real-time status of the Google Cloud Run / Vertex AI routing path,
+ * so an admin can audit connectivity instantly without digging through logs.
+ */
+adminAuthRouter.get("/admin/integrity-check", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+
+  const gcpConfigured = Boolean(process.env.GCP_SERVICE_ACCOUNT?.trim());
+  const demucsUrl = process.env.DEMUCS_URL?.trim() ?? "";
+  let demucsReachable: boolean | null = null;
+
+  if (demucsUrl) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      const r = await fetch(demucsUrl, { method: "GET", signal: controller.signal }).catch(() => null);
+      clearTimeout(timeout);
+      demucsReachable = r != null;
+    } catch {
+      demucsReachable = false;
+    }
+  }
+
+  res.json({
+    ok: true,
+    gcpServiceAccountConfigured: gcpConfigured,
+    demucsUrlConfigured: Boolean(demucsUrl),
+    demucsReachable,
+    checkedAt: new Date().toISOString(),
+  });
+});
+
+/**
+ * GET /api/admin/maintenance — current kill switch state.
+ * POST /api/admin/maintenance — body { on: boolean }, toggles it.
+ */
+adminAuthRouter.get("/admin/maintenance", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  res.json({ ok: true, on: await isMaintenanceModeOn() });
+});
+
+adminAuthRouter.post("/admin/maintenance", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  const { on } = (req.body ?? {}) as { on?: boolean };
+  if (typeof on !== "boolean") {
+    res.status(400).json({ error: "on (boolean) required" });
+    return;
+  }
+  try {
+    await setMaintenanceMode(on);
+    res.json({ ok: true, on });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
+  }
+});
+
+/**
+ * GET /api/admin/activity
+ * Live Activity Monitor — sessions active within the last 5 minutes and which
+ * tool they last touched. In-memory snapshot, not persisted.
+ */
+adminAuthRouter.get("/admin/activity", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  res.json({ ok: true, sessions: getActiveSessions() });
+});
+
+/**
+ * POST /api/admin/cache-purge
+ * Deletes this app's own /tmp scratch audio files. Never touches the database.
+ */
+adminAuthRouter.post("/admin/cache-purge", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  try {
+    const result = await purgeTempAudioCache();
+    res.json({ ok: true, ...result });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
   }

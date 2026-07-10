@@ -34,6 +34,8 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio, hasUnlimitedSplits, resolveTier } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS, type UsageField } from "../lib/usage";
+import { logToolError } from "../lib/errorTracker";
+import { recordActivity } from "../lib/activityTracker";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({
@@ -403,6 +405,8 @@ audioRouter.post(
         const useNeural = tier === "node_auditor";
         const { channels } = await getAudioInfo(filePath);
 
+        recordActivity((req.cookies as Record<string, string>)?.["gk_session"], "Singing Booth");
+
         fsJobId = createAudioJob({
           fileName: req.file.originalname,
           mode: "voice_remove",
@@ -550,6 +554,7 @@ audioRouter.post(
         return;
       } catch (err: any) {
         if (fsJobId) completeAudioJob(fsJobId, { status: "ERROR", errorMessage: err.message });
+        void logToolError("Singing Booth", "VOICE_REMOVE", err);
         await unlink(filePath).catch(() => {});
         res.status(500).json({ success: false, error: err.message });
         return;
@@ -558,6 +563,7 @@ audioRouter.post(
 
     // ── Stem splitting — Morris Law Kernel v3 (fast local) ───────────────────
     if (mode === "stem_split") {
+      recordActivity((req.cookies as Record<string, string>)?.["gk_session"], "Singing Booth");
       // Pre-compress: files > 15 MB are re-encoded to 22050 Hz stereo so Cloud
       // Run can accept them (it rejects > 20 MB). Also makes Replicate faster.
       try {
@@ -683,6 +689,7 @@ audioRouter.post(
         return;
       } catch (err: any) {
         req.log.error({ err: err?.message ?? String(err) }, "stem_split failed");
+        void logToolError("Singing Booth", "STEM_SPLIT", err);
         await unlink(filePath).catch(() => {});
         res.status(500).json({
           success: false,

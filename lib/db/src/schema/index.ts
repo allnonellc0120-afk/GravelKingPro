@@ -9,3 +9,5 @@ export * from "./email_capture";
 export * from "./conversations";
 export * from "./messages";
 export * from "./lyrics";
+export * from "./admin_settings";
+export * from "./tool_errors";

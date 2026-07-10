@@ -14,6 +14,8 @@ import { eq } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import type { LineState } from "@workspace/db";
 import { generateVertexText } from "../geminiVertex";
+import { logToolError } from "../lib/errorTracker";
+import { recordActivity } from "../lib/activityTracker";
 
 const EMBED_SECRET = process.env["SESSION_SECRET"] ?? "gravelking-embed-secret";
 
@@ -117,6 +119,7 @@ function ownershipMismatch(req: Request, projectSessionId: string | null | undef
 // ─── POST /api/lyrics/generate ───────────────────────────────────────────────
 // Supports both simple (story prompt) and advanced (timeline canvas) modes.
 lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, res: Response) => {
+  recordActivity((req.cookies as Record<string, string> | undefined)?.["gk_session"], "Lyric Generator");
   const {
     story, genre, bpm, mode,
     key, vocalType, genreTags,
@@ -206,6 +209,7 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
     res.json({ lyrics, stylePrompt, lines });
   } catch (err) {
     req.log.error({ err }, "Gemini lyric generation failed");
+    void logToolError("Lyric Generator", "AI_GENERATION", err);
     res.status(500).json({ error: "Lyric generation failed. Please try again." });
   }
 });
@@ -247,6 +251,7 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
     res.json({ lyrics, stylePrompt, lines });
   } catch (err) {
     req.log.error({ err }, "Gemini expand failed");
+    void logToolError("Lyric Generator", "LYRIC_EXPAND", err);
     res.status(500).json({ error: "Expansion failed. Please try again." });
   }
 });
@@ -304,6 +309,7 @@ VARIATION_3: [line here]`;
     res.json({ variations });
   } catch (err) {
     req.log.error({ err }, "Gemini line regen failed");
+    void logToolError("Lyric Generator", "LYRIC_REGENERATE", err);
     res.status(500).json({ error: "Line regeneration failed. Please try again." });
   }
 });
@@ -335,6 +341,7 @@ Rules:
     res.json({ rhymes });
   } catch (err) {
     req.log.error({ err }, "Gemini rhymes failed");
+    void logToolError("Lyric Generator", "LYRIC_RHYMES", err);
     res.status(500).json({ error: "Rhyme generation failed." });
   }
 });
@@ -365,6 +372,7 @@ Output the style tags only:`;
     res.json({ styleTags: tags });
   } catch (err) {
     req.log.error({ err }, "Gemini style conversion failed");
+    void logToolError("Lyric Generator", "LYRIC_STYLE", err);
     res.status(500).json({ error: "Style conversion failed." });
   }
 });

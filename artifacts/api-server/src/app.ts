@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { maintenanceModeMiddleware } from "./middlewares/maintenanceMode";
 import { WebhookHandlers } from "./webhookHandlers";
 
 // Log crashes before the process dies — helps diagnose production "Processing failed" with no log entry.
@@ -86,6 +87,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
+app.use(maintenanceModeMiddleware);
 
 app.use("/api", router);
 
