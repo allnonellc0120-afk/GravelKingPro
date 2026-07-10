@@ -54,10 +54,10 @@ export default function VocalBooth() {
           <h1 className="text-2xl font-bold">Vocal Booth</h1>
           <p className="text-muted-foreground text-sm">
             Sing over any backing track with a scrolling-lyrics teleprompter, record your vocal,
-            and mix it down through the Morris Law kernel — all part of GravelKing Pro.
+            and mix it down through the Morris Law kernel — part of the GravelKing Pro Plus (Studio) plan.
           </p>
           <a href="/pricing" className="inline-block mt-2">
-            <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro</button>
+            <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro Plus</button>
           </a>
           <button
             onClick={() => { localStorage.setItem(DEV_BYPASS_KEY, "1"); setDevBypass(true); }}
@@ -248,6 +248,7 @@ function VocalBoothInner() {
 
   // ── vocal monitoring preset (lifted so recorder can bake it in) ──
   const [monitorPreset, setMonitorPreset] = useState<VocalPreset | null>(null);
+  const [monitorStopSignal, setMonitorStopSignal] = useState(0);
 
   // ── mixdown ──
   const [mixing, setMixing] = useState(false);
@@ -736,6 +737,7 @@ function VocalBoothInner() {
     if (!a) return;
     setupAudioGraph();
     recorder.reset();
+    setMonitorStopSignal((n) => n + 1); // release the live-preview mic before the recorder opens its own
     a.currentTime = 0;
     const ok = await recorder.start(undefined, monitorPreset ?? undefined);
     if (!ok) return;
@@ -1195,7 +1197,7 @@ function VocalBoothInner() {
               <p className="text-[10px] text-muted-foreground leading-snug">
                 Pick a preset to hear your voice live through effects. The active preset will also be <strong className="text-white/70">baked into your recording</strong> — use headphones to avoid feedback.
               </p>
-              <LiveVocalMonitor onPresetChange={setMonitorPreset} />
+              <LiveVocalMonitor onPresetChange={setMonitorPreset} stopSignal={monitorStopSignal} />
             </div>
 
             {/* Recorder */}
