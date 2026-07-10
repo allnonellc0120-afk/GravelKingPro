@@ -492,7 +492,7 @@ function VocalBoothInner() {
     }
   }, [toast]);
 
-  // ── Whisper transcription ──────────────────────────────────────────────────
+  // ── Gemini AI transcription ────────────────────────────────────────────────
   // Pass a blob override to transcribe a specific audio blob immediately
   // (e.g. right after a split before React state has updated).
   // Falls back to guideVocalBlob (split vocals) then backingFile.
@@ -520,7 +520,7 @@ function VocalBoothInner() {
         });
         return;
       }
-      // Group Whisper segments into lyric lines (new line on 1 s+ gap or 55+ chars).
+      // Group Gemini AI segments into lyric lines (new line on 1 s+ gap or 55+ chars).
       const lines: string[] = [];
       const times: TimedLine[] = [];
       let currentLine = "";
@@ -596,6 +596,23 @@ function VocalBoothInner() {
     setTapTimingActive(false);
     setTapTimes([]);
   }, []);
+
+  // Spacebar acts as the "▶ Now" tap while tap-timing is active. Only listens
+  // during tap timing, ignores spaces typed into inputs, and prevents the page
+  // from scrolling on space.
+  useEffect(() => {
+    if (!tapTimingActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" && e.key !== " ") return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) return;
+      e.preventDefault();
+      handleTapTime();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tapTimingActive, handleTapTime]);
 
   const resetGuide = useCallback(() => {
     setGuideVocalBlob(null);
@@ -926,10 +943,10 @@ function VocalBoothInner() {
               )}
             </div>
 
-            {/* ── Whisper auto-transcription ── */}
+            {/* ── Gemini AI auto-transcription ── */}
             {(backingFile || guideVocalBlob) && (
               <div className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2">
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Auto-transcribe vocals</div>
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Gemini AI transcription</div>
                 {guideVocalBlob ? (
                   /* After a split: transcribe the extracted vocal stem */
                   <div className="flex items-center justify-between gap-3">
@@ -948,7 +965,7 @@ function VocalBoothInner() {
                       onClick={() => void transcribeVocals()}
                     >
                       {transcribing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                      {transcribing ? "Transcribing…" : timedLines && lyricSource === "auto" ? "Re-transcribe" : "Transcribe Vocals"}
+                      {transcribing ? "Transcribing…" : timedLines && lyricSource === "auto" ? "Re-transcribe" : "Transcribe with Gemini AI"}
                     </Button>
                   </div>
                 ) : (
@@ -1075,9 +1092,11 @@ function VocalBoothInner() {
                 >
                   {tapTimingDone ? "✓ All lines timed" : "▶ Now"}
                 </Button>
-                {!backingPlaying && !tapTimingDone && (
+                {!tapTimingDone && (
                   <p className="text-[10px] text-muted-foreground text-center">
-                    Play the track first, then tap ▶ Now each time a lyric line begins.
+                    {backingPlaying
+                      ? "Tap ▶ Now — or press the spacebar — each time a lyric line begins."
+                      : "Play the track first, then tap ▶ Now (or press the spacebar) each time a lyric line begins."}
                   </p>
                 )}
               </div>

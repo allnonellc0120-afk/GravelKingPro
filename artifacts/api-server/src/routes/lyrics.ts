@@ -15,6 +15,7 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { randomUUID, createHmac, createHash } from "crypto";
 import type { LineState } from "@workspace/db";
+import { authorshipScore } from "@workspace/authorship";
 import { generateVertexText, isVertexConfigured } from "../geminiVertex";
 import { generateProxyText } from "../geminiProxy";
 import { logger } from "../lib/logger";
@@ -80,23 +81,6 @@ function serializeImport(row: typeof lyricImportsTable.$inferSelect) {
     stampedAt: row.stampedAt instanceof Date ? row.stampedAt.toISOString() : row.stampedAt,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
   };
-}
-
-function levenshteinPercent(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  if (m === 0) return 100;
-  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = dp[0]!;
-    dp[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const temp = dp[j]!;
-      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j]!, dp[j - 1]!);
-      prev = temp;
-    }
-  }
-  return Math.min(100, Math.round(((dp[n] ?? 0) / m) * 100));
 }
 
 function parseToLines(raw: string): LineState[] {
@@ -651,7 +635,7 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
     return;
   }
 
-  const score = levenshteinPercent(project.aiDraft, content);
+  const score = authorshipScore(project.aiDraft, content);
   const eligible = score >= 25;
 
   await db.insert(lyricRevisionsTable).values({

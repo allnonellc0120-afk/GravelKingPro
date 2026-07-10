@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
+import { authorshipScore as computeAuthorshipScore } from "@workspace/authorship";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,23 +58,6 @@ const VOCAL_TYPES = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function levenshteinPercent(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  if (m === 0) return 100;
-  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = dp[0]!;
-    dp[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const temp = dp[j]!;
-      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j]!, dp[j - 1]!);
-      prev = temp;
-    }
-  }
-  return Math.min(100, Math.round(((dp[n] ?? 0) / m) * 100));
-}
 
 function msToTimestamp(ms: number) {
   const m = Math.floor(ms / 60000);
@@ -452,7 +436,7 @@ export default function SongwritingStudio() {
   useEffect(() => {
     if (!aiDraft || lines.length === 0) return;
     const currentText = lyricsFromLines(lines);
-    setAuthorshipScore(levenshteinPercent(aiDraft, currentText));
+    setAuthorshipScore(computeAuthorshipScore(aiDraft, currentText));
   }, [lines, aiDraft]);
 
   // ── Draft persistence key ─────────────────────────────────────────────────
@@ -641,7 +625,7 @@ export default function SongwritingStudio() {
       if (projectId) {
         const currentText = lyricsFromLines(updated);
         const scoreBefore = authorshipScore;
-        const scoreAfter = levenshteinPercent(aiDraft, currentText);
+        const scoreAfter = computeAuthorshipScore(aiDraft, currentText);
         fetch("/api/lyrics/forensic-entry", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -711,7 +695,7 @@ export default function SongwritingStudio() {
     if (projectId) {
       const updated = lines.map((l) => l.id === lineId ? { ...l, text: variation } : l);
       const currentText = lyricsFromLines(updated);
-      const scoreAfter = levenshteinPercent(aiDraft, currentText);
+      const scoreAfter = computeAuthorshipScore(aiDraft, currentText);
       fetch("/api/lyrics/forensic-entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

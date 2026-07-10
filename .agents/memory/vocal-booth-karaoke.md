@@ -25,17 +25,17 @@ Timing can come from three places, most to least accurate:
 1. **lrclib.net synced LRC** (`searchLyrics`/`parseLrc`, `timingSource="lrc"`) —
    ms-accurate; label "Precise synced timing".
 2. **AI transcription** via `POST /api/audio/transcribe` (`transcribeVocals`,
-   `lyricSource="auto"`) — backend is **Vertex AI Gemini** (`transcribeWithGemini`),
-   even though the Vocal Booth UI still labels it "Whisper". No Replicate fallback; if
-   Gemini is unavailable it degrades to manual tap-to-time.
+   `lyricSource="auto"`) — backend is **Vertex AI Gemini** (`transcribeWithGemini`);
+   the Vocal Booth UI now labels it honestly as "Gemini AI transcription". No Replicate
+   fallback; if Gemini is unavailable it degrades to manual tap-to-time.
 3. **Energy-based** RMS onset distribution (`analyzeGuideTiming`, `timingSource="energy"`)
    — approximate, no transcription; must stay labeled "energy-based"/"approximate".
 
 Manual timing is **Tap-to-Time** (`startTapTiming`/`handleTapTime`, the "▶ Now"
-button) — a click button, NOT a spacebar binding (the only keydown handler is
-Escape-to-exit fullscreen).
-**Why:** the honesty ethos forbids over-claiming on the energy path; and the "Whisper"
-label is misleading — future work must not try to "swap in Gemini" (it already is
-Gemini) nor claim a spacebar shortcut that doesn't exist.
-**How to apply:** keep approximate labeling on the energy path; the transcription
-engine is Gemini; add a real spacebar binding only if the user explicitly asks.
+button). It has BOTH a click button and a **spacebar** binding: a `useEffect` gated on
+`tapTimingActive` listens for Space and calls `handleTapTime` (ignores INPUT/TEXTAREA/
+contentEditable, preventDefaults scroll). Separately, an Escape keydown exits fullscreen.
+**Why:** the honesty ethos forbids over-claiming on the energy path; the transcription
+engine is Gemini (do not "swap in Gemini" — it already is), and the label must reflect that.
+**How to apply:** keep approximate labeling on the energy path; keep the transcription
+label as Gemini; the spacebar-tap shortcut already exists — reuse it, don't re-add.
