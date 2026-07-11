@@ -126,7 +126,7 @@ export default function VideoTemplate({
       <video
         ref={footageRef}
         src={`${import.meta.env.BASE_URL}videos/walkthrough.mp4`}
-        className="absolute inset-0 w-full h-full object-cover z-10"
+        className="absolute inset-0 w-full h-full object-contain z-10"
         style={{ opacity: isFootage ? 1 : 0, transition: 'opacity 0.6s ease' }}
         playsInline
         preload="auto"
