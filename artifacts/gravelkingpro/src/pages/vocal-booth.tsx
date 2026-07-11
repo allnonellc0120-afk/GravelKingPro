@@ -11,6 +11,7 @@ import { type VocalPreset } from "@/lib/daw/vocalPresets";
 import { analyzeGuideTiming, type TimedLine } from "@/lib/daw/stemTiming";
 import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
 import { downloadBlob } from "@/lib/download";
+import { compressAudioFile } from "@/lib/audioCompressor";
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
 
 const DEV_BYPASS_KEY = "gk:dev:studio";
@@ -647,14 +648,31 @@ function VocalBoothInner() {
     recorder.reset();
     resetGuide();
     setMastering(true);
+
+    let uploadFile = file;
+
+    // Compress large files client-side to stay under the ~32 MB proxy limit
+    if (file.size > 32 * 1024 * 1024) {
+      try {
+        uploadFile = await compressAudioFile(file, {
+          targetRate: 22050,
+          mono: true,
+        });
+      } catch (compErr: unknown) {
+        const msg = compErr instanceof Error ? compErr.message : "Compression failed";
+        toast({ title: "Compression failed", description: msg + " — using original file.", variant: "destructive" });
+        // fall through with original file; mastering below may 413
+      }
+    }
+
     try {
       const fd = new FormData();
-      fd.append("audio", file);
+      fd.append("audio", uploadFile);
       fd.append("mode", "master");
       fd.append("preset", "normal");
       const resp = await fetch("/api/kernel/master", { method: "POST", body: fd, credentials: "include" });
       if (resp.status === 413) {
-        throw new Error("File too large — using original track. Keep uploads under 30 MB for auto-mastering.");
+        throw new Error("File too large even after compression. Try a shorter track or the preview file.");
       }
       if (resp.status === 402) {
         // Free-master limit reached — use original file, show a clear upgrade hint.
