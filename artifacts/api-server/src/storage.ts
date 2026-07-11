@@ -161,6 +161,10 @@ export class Storage {
     return result.rows;
   }
 
+  async markTrialUsed(userId: string): Promise<void> {
+    await db.update(usersTable).set({ trialUsed: true }).where(eq(usersTable.id, userId));
+  }
+
   async getPriceIdForProduct(productName: string): Promise<string | null> {
     const result = await db.execute(
       sql`SELECT pr.id FROM stripe.prices pr

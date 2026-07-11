@@ -25,6 +25,15 @@ async function ensurePrice(
   interval: 'week' | 'month' | 'year',
 ) {
   const prices = await stripe.prices.list({ product: product.id, active: true });
+
+  // Archive any active prices for this interval with the wrong amount (old pricing)
+  for (const p of prices.data) {
+    if (p.recurring?.interval === interval && p.unit_amount !== unitAmount) {
+      await stripe.prices.update(p.id, { active: false });
+      console.log(`  Archived old price $${(p.unit_amount ?? 0) / 100}/${interval}: ${p.id}`);
+    }
+  }
+
   const match = prices.data.find(
     p => p.recurring?.interval === interval && p.unit_amount === unitAmount,
   );
@@ -55,14 +64,14 @@ async function createProducts() {
     );
     await ensurePrice(stripe, weekly, 999, 'week');
 
-    // GravelKing Studio — $29.99/month
+    // GravelKing Studio — $24.99/month
     const studio = await ensureProduct(
       stripe,
       'GravelKing Studio',
       'Everything in Weekly plus fully adjustable mastering and the live DAW — multitrack mixing, recording, and per-stem live metrics.',
       'monthly',
     );
-    await ensurePrice(stripe, studio, 2999, 'month');
+    await ensurePrice(stripe, studio, 2499, 'month');
 
     // Node Auditor — $499/month
     const auditor = await ensureProduct(

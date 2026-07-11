@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { streamBuffer } from "../lib/streamResponse";
 import multer from "multer";
 import { unlink } from "fs/promises";
 import { execFile } from "child_process";
@@ -10,6 +11,7 @@ import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } 
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
 import { applyMLKv3Fast } from "../kernel-v3";
+import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
@@ -33,6 +35,7 @@ async function cleanupUpload(path: string | undefined) {
   if (path) await unlink(path).catch(() => {});
 }
 const masterRouter = Router();
+const objectStorage = new ObjectStorageService();
 
 const masterRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
 const masterConcurrency = concurrencyLimit(3);
@@ -220,15 +223,42 @@ masterRouter.post(
       // and never allocates the multi-GB JS arrays the in-process kernel needed.
       const { buf: carvedBuffer, parity } = await applyMLKv3Fast(outPath);
 
-      res.setHeader("Content-Type", "audio/wav");
-      res.setHeader("Content-Disposition", `attachment; filename="gravelking_master_${presetName}.wav"`);
-      res.setHeader("X-GK-Mode", "master");
-      res.setHeader("X-GK-Preset", presetName);
-      res.setHeader("X-GK-Denoise", denoise ? "true" : "false");
-      res.setHeader("X-GK-Sample", isSample ? "true" : "false");
-      res.setHeader("X-GK-Kernel", "MLK_v3");
-      res.setHeader("X-GK-Parity", parity);
-      res.send(carvedBuffer);
+      const filename = `gravelking_mastered_${presetName}.wav`;
+
+      if (isSample) {
+        // Free tier: a 30-second preview. Always well under the Cloud Run ~32 MiB
+        // response cap, so stream it straight back (chunked, no Content-Length).
+        res.setHeader("Content-Type", "audio/wav");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("X-GK-Mode", "master");
+        res.setHeader("X-GK-Preset", presetName);
+        res.setHeader("X-GK-Denoise", denoise ? "true" : "false");
+        res.setHeader("X-GK-Sample", "true");
+        res.setHeader("X-GK-Kernel", "MLK_v3");
+        res.setHeader("X-GK-Parity", parity);
+        streamBuffer(res, carvedBuffer);
+        return;
+      }
+
+      // Full-length master (paid / unlimited tiers only). A 16-bit 44.1 kHz stereo
+      // WAV can exceed the Cloud Run ~32 MiB response limit, which the Google
+      // Frontend rejects with an empty 500 before our body is ever read. Persist the
+      // result to object storage and hand back a signed URL so the browser downloads
+      // straight from GCS — the audio never traverses Cloud Run.
+      const key = `masters/${randomUUID()}.wav`;
+      const url = await objectStorage.saveSignedDownload(key, carvedBuffer, "audio/wav", filename);
+
+      res.json({
+        success: true,
+        url,
+        filename,
+        isSample: false,
+        preset: presetName,
+        denoise,
+        kernel: "MLK_v3",
+        parity,
+        bytes: carvedBuffer.length,
+      });
     } catch (err: any) {
       void logToolError("Mastering Tool", "MASTERING", err);
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });

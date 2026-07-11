@@ -1,12 +1,16 @@
 ---
-name: Stripe session-cookie pattern
-description: How GravelKingPro tracks subscriptions without an auth system
+name: Stripe checkout auth + trial pattern
+description: Checkout requires OIDC auth; trials tracked per account via trialUsed column
 ---
 
-The app has no login system. Subscriptions are tracked via a `gk_session` cookie (UUID).
+**Rule:** `POST /api/checkout` now requires OIDC authentication (`req.isAuthenticated()`). Anonymous requests get HTTP 401 `{ authRequired: true }`. The frontend redirects to `/api/auth/login?return_to=/pricing` on that response (or preemptively if `isSignedIn === false`).
 
-**Rule:** On `POST /api/checkout`, if no cookie exists the backend generates a new UUID session ID, creates a user row, then sets `Set-Cookie: gk_session=<uuid>` in the response. The browser stores it and sends it on all subsequent `/api/subscription/status` requests.
+**Trial logic:** Monthly = 7-day trial, Weekly = 3-day trial. Both are gated by `users.trial_used` (boolean, default false). The trial is marked used at checkout-session creation — not at subscription confirmation — so abandoned checkouts still consume the trial. This prevents re-claiming across plans.
 
-**Why:** Stripe Checkout redirects the user away and back — the cookie persists across that redirect, so the returning user is recognized and their subscription is found via `users.session_id → users.stripe_customer_id → stripe.subscriptions`.
+**Subscription status:** Still dual-path: OIDC users resolved via `req.user.id` (checked first); legacy gk_session cookie as fallback for any grandfathered anonymous users.
 
-**How to apply:** Any new gated feature should call `GET /api/subscription/status` (reads cookie) to check `isPro`. The frontend context already does this on mount and exposes `isPro` + `refreshSubscription()`.
+**Why:** Subscription trials are an account-level benefit. Without auth, a user could claim unlimited trials by clearing cookies. The trialUsed column enforces one-trial-ever per verified identity.
+
+**How to apply:** Any new subscription entrypoint must check `req.isAuthenticated()` before proceeding. The Stripe customer is created/retrieved from the authenticated user's DB row (`req.user.id`), not from a cookie-generated session.
+
+**Pricing (as of July 2026):** $9.99/week (3-day trial), $24.99/month (7-day trial), $499/month Node Auditor.

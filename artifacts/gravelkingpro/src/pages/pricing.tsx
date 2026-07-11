@@ -13,7 +13,7 @@ type PlanId = "weekly" | "monthly" | "node_auditor";
 
 const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
   weekly: "GravelKing Weekly",
-  monthly: "GravelKing Pro Plus",
+  monthly: "GravelKing Studio",
   node_auditor: "Node Auditor",
 };
 
@@ -66,8 +66,16 @@ export default function Pricing() {
   const [promoError, setPromoError] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo>(null);
   const [unseeded, setUnseeded] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [location] = useLocation();
+
+  useEffect(() => {
+    fetch("/api/auth/user", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d: { user?: unknown } | null) => setIsSignedIn(d?.user != null))
+      .catch(() => setIsSignedIn(false));
+  }, []);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -111,6 +119,12 @@ export default function Pricing() {
   }, [location]);
 
   const handleCheckout = async (planId: PlanId) => {
+    // Require sign-in before checkout
+    if (!isSignedIn) {
+      window.location.href = `/api/auth/login?return_to=${encodeURIComponent("/pricing")}`;
+      return;
+    }
+
     setLoadingTier(planId);
     try {
       const productsRes = await fetch("/api/stripe/products", { credentials: "include" });
@@ -140,7 +154,11 @@ export default function Pricing() {
       });
 
       if (!checkoutRes.ok) {
-        const errData = await checkoutRes.json() as { error?: string };
+        const errData = await checkoutRes.json() as { error?: string; authRequired?: boolean };
+        if (errData.authRequired) {
+          window.location.href = `/api/auth/login?return_to=${encodeURIComponent("/pricing")}`;
+          return;
+        }
         throw new Error(errData.error ?? "Checkout failed");
       }
       const { url } = await checkoutRes.json() as { url: string };
@@ -263,10 +281,10 @@ export default function Pricing() {
           transition={{ delay: 0.2 }}
         >
           {[
-            "No credit card required to start",
+            "Sign in to start your free trial",
             "Cancel anytime — 1-click in app",
-            "3-day free trial on Studio",
-            "WAV exports — no watermark",
+            "7-day free trial on Pro Plus",
+            "One trial per account, ever",
           ].map((t) => (
             <span key={t} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground border border-border/30 rounded-full px-3 py-1">
               <Check className="w-3 h-3 text-emerald-500" />{t}
@@ -352,7 +370,7 @@ export default function Pricing() {
                 </div>
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Zap className="w-3 h-3 text-emerald-400" />
-                  <span className="text-xs text-emerald-400 font-medium">Cancel anytime</span>
+                  <span className="text-xs text-emerald-400 font-medium">3-day free trial · Cancel anytime</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
@@ -381,7 +399,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-weekly"
                   >
-                    {loadingTier === "weekly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Get Weekly"}
+                    {loadingTier === "weekly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? "Sign in for 3-day trial" : "Get Weekly"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
@@ -402,9 +420,9 @@ export default function Pricing() {
                 </CardTitle>
                 <CardDescription>Studio tools + the MLK V3.5 Quality Optimizer that tunes your separation settings</CardDescription>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">$39.99</span>
+                  <span className="text-3xl font-bold">$24.99</span>
                   <span className="text-muted-foreground text-sm">/mo</span>
-                  <span className="text-xs text-emerald-400 font-medium ml-1">3-day free trial</span>
+                  <span className="text-xs text-emerald-400 font-medium ml-1">7-day free trial</span>
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500">
@@ -445,7 +463,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-studio"
                   >
-                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Start Free Trial — Get Pro Plus"}
+                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? "Sign in for 7-day trial" : "Start Free Trial — Get Pro Plus"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>

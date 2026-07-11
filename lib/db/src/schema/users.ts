@@ -9,6 +9,7 @@ export const usersTable = pgTable("users", {
   stripeSubscriptionId: text("stripe_subscription_id"),
   isPro: boolean("is_pro").default(false),
   subscriptionTier: text("subscription_tier"),
+  trialUsed: boolean("trial_used").default(false),
   lastSubmissionDate: timestamp("last_submission_date", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

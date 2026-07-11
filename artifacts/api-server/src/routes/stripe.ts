@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
 import { storage } from '../storage';
 import { db, usersTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
@@ -49,9 +48,15 @@ stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
   }
 });
 
-// Create Stripe Checkout Session — session-cookie based, no auth required
+// Create Stripe Checkout Session — requires OIDC authentication
 stripeRouter.post('/checkout', async (req: Request, res: Response) => {
   try {
+    // Auth required — trial eligibility is tracked per account
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: 'Sign in required to subscribe', authRequired: true });
+      return;
+    }
+
     const { priceId, plan } = req.body as { priceId?: string; plan?: string };
 
     if (!priceId) {
@@ -59,16 +64,25 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       return;
     }
 
-    const sessionId: string = (req.cookies as Record<string, string>)?.gk_session ?? randomUUID();
-    const user = await storage.getOrCreateUser(sessionId);
+    // Get the authenticated user's DB row
+    const [dbUser] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id));
 
-    let customerId = user.stripeCustomerId;
+    if (!dbUser) {
+      res.status(404).json({ error: 'User record not found' });
+      return;
+    }
+
+    let customerId = dbUser.stripeCustomerId;
     if (!customerId) {
       const stripe = await getUncachableStripeClient();
       const customer = await stripe.customers.create({
-        metadata: { userId: user.id },
+        email: dbUser.email ?? undefined,
+        metadata: { userId: dbUser.id },
       });
-      await storage.linkStripeCustomer(user.id, customer.id);
+      await storage.linkStripeCustomer(dbUser.id, customer.id);
       customerId = customer.id;
     }
 
@@ -77,9 +91,16 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
 
     const stripe = await getUncachableStripeClient();
 
-    // Grant a 3-day trial on monthly subscriptions
+    // Trial days: monthly = 7 days, weekly = 3 days; only once per account ever
     const price = await stripe.prices.retrieve(priceId);
-    const isMonthly = price.recurring?.interval === 'month';
+    const interval = price.recurring?.interval;
+    const trialDays = dbUser.trialUsed
+      ? 0
+      : interval === 'month'
+        ? 7
+        : interval === 'week'
+          ? 3
+          : 0;
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
@@ -88,27 +109,25 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       mode: 'subscription',
       success_url: `${baseUrl}/pricing?checkout=success${plan ? `&plan=${encodeURIComponent(plan)}` : ''}`,
       cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
-      ...(isMonthly && { subscription_data: { trial_period_days: 3 } }),
+      ...(trialDays > 0 && { subscription_data: { trial_period_days: trialDays } }),
     };
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    // Funnel event — best-effort, must never block checkout.
+    // Mark trial consumed immediately so the user can't claim another one
+    if (trialDays > 0) {
+      await storage.markTrialUsed(dbUser.id);
+    }
+
+    // Funnel event — best-effort, must never block checkout
     const visitorId = (req.cookies as Record<string, string>)?.gk_vid ?? null;
     void recordAnalyticsEvent({
       type: 'checkout_started',
       visitorId,
-      sessionId: user.sessionId ?? user.id,
+      sessionId: dbUser.sessionId ?? dbUser.id,
       path: '/checkout',
       metadata: { priceId },
     }).catch(() => { /* ignore analytics failures */ });
-
-    res.cookie('gk_session', user.sessionId ?? user.id, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 365 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
 
     res.json({ url: session.url });
   } catch (err: unknown) {
@@ -138,7 +157,7 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
       return;
     }
 
-    // 2. Anonymous gk_session cookie (Stripe checkout path).
+    // 2. Anonymous gk_session cookie (legacy path).
     const sessionId = (req.cookies as Record<string, string>)?.gk_session;
     if (!sessionId) {
       res.json({ isPro: false, plan: null });
