@@ -1,118 +1,76 @@
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-
-const steps = [
-  { label: 'Upload Track', icon: '⬆', detail: 'Any format — WAV, MP3, FLAC, M4A' },
-  { label: 'AI Split', icon: '✂', detail: 'Vocal + instrumental separated in seconds' },
-  { label: 'Edit in DAW', icon: '🎚', detail: 'Every layer builds your authorship score' },
-  { label: 'Get IP Certificate', icon: '🏛', detail: 'Hit 25% → locked, timestamped, yours' },
-  { label: 'Drop on Any Platform', icon: '🌐', detail: 'Suno, Udio, DSPs — your proof travels with it' },
-];
+import { motion } from 'framer-motion';
 
 export function Scene5() {
   const [phase, setPhase] = useState(0);
-  const [active, setActive] = useState(-1);
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 400),
-      setTimeout(() => setPhase(2), 1600),
+      setTimeout(() => setPhase(1), 500),  // Panel 1
+      setTimeout(() => setPhase(2), 1500), // Panel 2
+      setTimeout(() => setPhase(3), 2500), // Panel 3
     ];
     return () => timers.forEach(t => clearTimeout(t));
   }, []);
 
-  useEffect(() => {
-    if (phase < 2) return;
-    let i = 0;
-    const interval = setInterval(() => {
-      setActive(i);
-      i++;
-      if (i >= steps.length) clearInterval(interval);
-    }, 1400);
-    return () => clearInterval(interval);
-  }, [phase]);
+  const panels = [
+    {
+      id: 1,
+      title: "Vocal Booth",
+      icon: "🎤",
+      desc: "Record over any track",
+      bg: "radial-gradient(circle at top left, rgba(201,162,39,0.15), transparent)"
+    },
+    {
+      id: 2,
+      title: "IP Certificate",
+      icon: "🛡️",
+      desc: "Certify your authorship\nScore: 82%",
+      bg: "radial-gradient(circle at top center, rgba(16,185,129,0.15), transparent)",
+      active: true
+    },
+    {
+      id: 3,
+      title: "DAW",
+      icon: "🎚️",
+      desc: "Professional mastering presets",
+      bg: "radial-gradient(circle at top right, rgba(201,162,39,0.15), transparent)"
+    }
+  ];
 
   return (
-    <motion.div
-      className="absolute inset-0 flex items-center justify-center overflow-hidden bg-[#06060a]"
-      initial={{ opacity: 0, x: '100vw' }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: '-100vw' }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-    >
-      {/* Subtle grid */}
-      <div className="absolute inset-0 opacity-5"
-        style={{
-          backgroundImage: 'linear-gradient(#c9a22720 1px, transparent 1px), linear-gradient(90deg, #c9a22720 1px, transparent 1px)',
-          backgroundSize: '80px 80px',
-        }}
-      />
-
-      <div className="relative z-10 flex flex-col items-center gap-[3vh] px-[6vw] w-full">
-        <motion.div className="overflow-hidden">
-          <motion.h2
-            className="text-[5vw] font-black uppercase leading-none tracking-tighter text-center"
-            initial={{ y: '110%' }}
-            animate={phase >= 1 ? { y: 0 } : { y: '110%' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+    <motion.div className="absolute inset-0 bg-[#080808] flex items-center justify-center p-[5vw]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      
+      <div className="w-full flex justify-between gap-[3vw] h-[60vh]">
+        {panels.map((panel, i) => (
+          <motion.div
+            key={panel.id}
+            className="flex-1 rounded-2xl border flex flex-col items-center justify-center text-center p-[2vw] relative overflow-hidden"
+            style={{
+              borderColor: panel.active ? '#c9a227' : 'rgba(255,255,255,0.1)',
+              background: '#0a0a0a',
+            }}
+            initial={{ opacity: 0, y: 100 }}
+            animate={phase >= i + 1 ? { opacity: 1, y: 0 } : { opacity: 0, y: 100 }}
+            transition={{ type: "spring", bounce: 0.2, duration: 0.8 }}
           >
-            <span className="text-white">One workflow.</span>{' '}
-            <span className="text-[#c9a227]">Total ownership.</span>
-          </motion.h2>
-        </motion.div>
-
-        <div className="flex items-start justify-center gap-0 w-full mt-[2vh]">
-          {steps.map((step, i) => (
-            <div key={i} className="flex items-center">
-              <motion.div
-                className="flex flex-col items-center gap-[1.5vh] w-[14vw]"
-                initial={{ opacity: 0, y: 30 }}
-                animate={phase >= 2 ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-                transition={{ delay: i * 0.1, duration: 0.5 }}
-              >
-                <motion.div
-                  className="w-[5vw] h-[5vw] rounded-full flex items-center justify-center text-[2.2vw] border-2 transition-all"
-                  animate={
-                    active >= i
-                      ? { borderColor: '#c9a227', backgroundColor: '#c9a22722', scale: 1.1 }
-                      : { borderColor: '#ffffff20', backgroundColor: 'transparent', scale: 1 }
-                  }
-                  transition={{ duration: 0.4 }}
-                >
-                  {step.icon}
-                </motion.div>
-                <motion.div
-                  className="font-black text-[1.4vw] uppercase tracking-wide text-center leading-tight"
-                  animate={{ color: active >= i ? '#c9a227' : '#ffffff60' }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {step.label}
-                </motion.div>
-                <AnimatePresence>
-                  {active >= i && (
-                    <motion.p
-                      className="text-[1.1vw] text-white/50 text-center leading-tight font-medium"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4 }}
-                    >
-                      {step.detail}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-
-              {i < steps.length - 1 && (
-                <motion.div
-                  className="w-[3vw] h-[2px] mb-[5vh]"
-                  animate={{ backgroundColor: active >= i ? '#c9a227' : '#ffffff15' }}
-                  transition={{ duration: 0.3 }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: panel.bg }} />
+            
+            <div className="text-[4vw] mb-[2vh] z-10">{panel.icon}</div>
+            <div className="text-[2vw] font-bold text-white z-10">{panel.title}</div>
+            <div className="text-[1.2vw] text-white/60 mt-[1vh] z-10 whitespace-pre-line">{panel.desc}</div>
+            
+            {panel.active && (
+              <motion.div 
+                className="absolute inset-0 border-2 border-[#c9a227] rounded-2xl"
+                animate={{ opacity: [0.2, 1, 0.2] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+            )}
+          </motion.div>
+        ))}
       </div>
+
     </motion.div>
   );
 }

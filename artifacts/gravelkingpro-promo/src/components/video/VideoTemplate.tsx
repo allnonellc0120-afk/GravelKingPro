@@ -9,12 +9,12 @@ import { Scene5 } from './video_scenes/Scene5';
 import { Scene6 } from './video_scenes/Scene6';
 
 export const SCENE_DURATIONS = {
-  rights_alert: 5000,
-  law_fact:     7000,
-  forensic:     8000,
+  rights_alert: 6000,
+  law_fact:     9000,
+  forensic:     9000,
   ip_embed:    10000,
   workflow:    10000,
-  outro:        5000,
+  outro:        6000,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
