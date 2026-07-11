@@ -10,7 +10,15 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const databaseUrl = new URL(process.env.DATABASE_URL);
+// Silence pg-connection-string v3 SSL mode warnings in production
+if (databaseUrl.searchParams.has("sslmode")) {
+  const mode = databaseUrl.searchParams.get("sslmode");
+  if (mode && mode !== "verify-full") {
+    databaseUrl.searchParams.set("sslmode", "verify-full");
+  }
+}
+export const pool = new Pool({ connectionString: databaseUrl.toString() });
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
