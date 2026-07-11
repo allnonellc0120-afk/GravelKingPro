@@ -355,6 +355,9 @@ export default function Studio() {
           signal: abortController.signal,
         });
         cleanupTimers();
+        if (response.status === 413) {
+          throw new Error("File too large for the server — keep uploads under 30 MB. Try a shorter clip, or use the preview file first.");
+        }
         if (response.status === 402) {
           const err = await response.json().catch(() => null);
           if (err?.code === "LIMIT_REACHED") {
@@ -364,7 +367,8 @@ export default function Studio() {
           }
         }
         if (!response.ok) {
-          const err = await response.json().catch(() => ({ error: "Mastering failed." }));
+          const text = await response.text().catch(() => "");
+          const err = text.startsWith("{") ? JSON.parse(text) : { error: text || "Mastering failed." };
           throw new Error(err.error ?? "Mastering failed.");
         }
         setProgress(95);
@@ -406,6 +410,9 @@ export default function Studio() {
 
       cleanupTimers();
 
+      if (response.status === 413) {
+        throw new Error("File too large for the server — keep uploads under 30 MB. Try a shorter clip.");
+      }
       if (response.status === 402) {
         const err = await response.json().catch(() => null);
         if (err?.code === "LIMIT_REACHED" || err?.code === "UPGRADE_REQUIRED") {
@@ -420,9 +427,9 @@ export default function Studio() {
           return;
         }
       }
-
       if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: "Server error" }));
+        const text = await response.text().catch(() => "");
+        const err = text.startsWith("{") ? JSON.parse(text) : { error: text || "Server error" };
         throw new Error(err.error || "Processing failed");
       }
 

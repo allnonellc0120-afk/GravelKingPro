@@ -84,6 +84,11 @@ export default function Mastering() {
       clearInterval(crawlId);
       setProgress(95);
 
+      if (resp.status === 413) {
+        setState("error");
+        setErrorMsg("File too large for the server — keep uploads under 30 MB. Try the preview file first, or split into shorter segments.");
+        return;
+      }
       if (resp.status === 402) {
         const data = await resp.json() as { error: string };
         setState("error");
@@ -91,7 +96,8 @@ export default function Mastering() {
         return;
       }
       if (!resp.ok) {
-        const data = await resp.json().catch(() => ({})) as { error?: string };
+        const text = await resp.text().catch(() => "");
+        const data = text.startsWith("{") ? (JSON.parse(text) as { error?: string }) : { error: text || "Processing failed" };
         throw new Error(data.error ?? "Processing failed");
       }
 
@@ -193,7 +199,8 @@ export default function Mastering() {
                 </div>
                 <div className="text-center">
                   <p className="font-medium">Drop your track here</p>
-                  <p className="text-xs text-muted-foreground mt-1">MP3, WAV, FLAC · up to 100 MB</p>
+                  <p className="text-xs text-muted-foreground mt-1">MP3, WAV, FLAC · up to 30 MB on server</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">Files over ~30 MB may fail — try shorter clips if needed</p>
                 </div>
                 <Button variant="outline" className="border-sky-500/40 text-sky-400 hover:bg-sky-500/10" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                   Choose File

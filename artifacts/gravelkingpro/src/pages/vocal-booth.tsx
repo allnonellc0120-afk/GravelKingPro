@@ -653,17 +653,21 @@ function VocalBoothInner() {
       fd.append("mode", "master");
       fd.append("preset", "normal");
       const resp = await fetch("/api/kernel/master", { method: "POST", body: fd, credentials: "include" });
+      if (resp.status === 413) {
+        throw new Error("File too large — using original track. Keep uploads under 30 MB for auto-mastering.");
+      }
+      if (resp.status === 402) {
+        // Free-master limit reached — use original file, show a clear upgrade hint.
+        setBackingFile(file);
+        toast({
+          title: "Free master used",
+          description: "Subscribe to unlock unlimited mastering. Your original track is loaded.",
+        });
+        return;
+      }
       if (!resp.ok) {
-        if (resp.status === 402) {
-          // Free-master limit reached — use original file, show a clear upgrade hint.
-          setBackingFile(file);
-          toast({
-            title: "Free master used",
-            description: "Subscribe to unlock unlimited mastering. Your original track is loaded.",
-          });
-          return;
-        }
-        const d = await resp.json().catch(() => ({})) as { error?: string };
+        const text = await resp.text().catch(() => "");
+        const d = text.startsWith("{") ? JSON.parse(text) : { error: text || "Mastering failed" };
         throw new Error(d.error ?? "Mastering failed");
       }
       const blob = await resp.blob();

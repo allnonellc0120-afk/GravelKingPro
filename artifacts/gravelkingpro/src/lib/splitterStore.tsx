@@ -175,6 +175,12 @@ export function SplitterProvider({ children }: { children: ReactNode }) {
       clearTimers();
       if (runIdRef.current !== myRun) return; // superseded by a newer run / reset
 
+      if (resp.status === 413) {
+        if (runIdRef.current !== myRun) return;
+        setStage("error");
+        setErrorMsg("File too large for the server — keep uploads under 30 MB. Try a shorter clip.");
+        return;
+      }
       if (resp.status === 402) {
         const data = await resp.json() as { error: string };
         if (runIdRef.current !== myRun) return;
@@ -183,7 +189,8 @@ export function SplitterProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!resp.ok) {
-        const data = await resp.json().catch(() => ({})) as { error?: string };
+        const text = await resp.text().catch(() => "");
+        const data = text.startsWith("{") ? JSON.parse(text) : { error: text || "Processing failed" };
         throw new Error(data.error ?? "Processing failed");
       }
 

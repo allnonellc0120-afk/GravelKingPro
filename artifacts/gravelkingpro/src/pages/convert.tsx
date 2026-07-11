@@ -58,8 +58,12 @@ export default function ConvertPage() {
 
       setProgress(85);
 
+      if (resp.status === 413) {
+        throw new Error("File too large for the server — keep uploads under 30 MB.");
+      }
       if (!resp.ok) {
-        const data = await resp.json().catch(() => ({})) as { error?: string };
+        const text = await resp.text().catch(() => "");
+        const data = text.startsWith("{") ? JSON.parse(text) : { error: text || "Conversion failed" };
         throw new Error(data.error ?? "Conversion failed");
       }
 
