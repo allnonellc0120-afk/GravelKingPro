@@ -5,6 +5,7 @@ import { promisify } from "util";
 import { unlink, readFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { sanitizeExt } from "../lib/audioGuards";
+import { streamBuffer } from "../lib/streamResponse";
 
 const execFileAsync = promisify(execFile);
 
@@ -77,7 +78,7 @@ convertRouter.post(
       res.setHeader("Content-Type", MIME[format]);
       res.setHeader("Content-Disposition", `attachment; filename="${baseName}.${format}"`);
       res.setHeader("X-GK-Format", format);
-      res.send(buf);
+      streamBuffer(res, buf);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Conversion failed";
       res.status(500).json({ error: msg });

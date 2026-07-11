@@ -123,8 +123,22 @@ export default function Mastering() {
       const rem = resp.headers.get("X-GK-Free-Remaining");
       if (rem !== null) setRemaining(parseInt(rem));
 
-      const blob = await resp.blob();
-      setResultUrl(URL.createObjectURL(blob));
+      const contentType = resp.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        // Full-length master: the server stored the WAV in object storage and
+        // returned a signed URL so the browser downloads directly from GCS,
+        // bypassing the Cloud Run response-size limit. Playback and download
+        // both use the URL directly (the stored Content-Disposition forces the
+        // download filename cross-origin).
+        const data = (await resp.json()) as { url?: string; remaining?: number };
+        if (typeof data.remaining === "number") setRemaining(data.remaining);
+        if (!data.url) throw new Error("Processing failed");
+        setResultUrl(data.url);
+      } else {
+        // Free preview (30s): small enough to stream back inline as a blob.
+        const blob = await resp.blob();
+        setResultUrl(URL.createObjectURL(blob));
+      }
       setState("done");
       setProgress(100);
     } catch (err: any) {

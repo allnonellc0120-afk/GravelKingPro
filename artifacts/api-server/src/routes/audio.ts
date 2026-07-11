@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { streamBuffer } from "../lib/streamResponse";
 import { createAudioJob, completeAudioJob } from "../lib/firestore";
 import multer from "multer";
 import { execFile } from "child_process";
@@ -531,7 +532,7 @@ audioRouter.post(
             res.setHeader("X-GK-Model", model);
             res.setHeader("X-GK-Protocol", protocol);
             res.setHeader("X-GK-Stack", stack);
-            res.send(mp3Buf);
+            streamBuffer(res, mp3Buf);
           } finally {
             await unlink(mp3InPath).catch(() => {});
             await unlink(mp3OutPath).catch(() => {});
@@ -549,7 +550,7 @@ audioRouter.post(
           res.setHeader("X-GK-Model", model);
           res.setHeader("X-GK-Protocol", protocol);
           res.setHeader("X-GK-Stack", stack);
-          res.send(wavBuffer);
+          streamBuffer(res, wavBuffer);
         }
         return;
       } catch (err: any) {
@@ -685,7 +686,7 @@ audioRouter.post(
         res.setHeader("X-GK-Model", stemModelLabel);
         res.setHeader("X-GK-Protocol", stemProtocolLabel);
         res.setHeader("X-GK-Stack", stemResult.stack);
-        res.send(stemResult.zipBuffer);
+        streamBuffer(res, stemResult.zipBuffer);
         return;
       } catch (err: any) {
         req.log.error({ err: err?.message ?? String(err) }, "stem_split failed");
@@ -748,7 +749,7 @@ audioRouter.post(
       res.setHeader("X-GK-Decay-Rate", decayRate);
       res.setHeader("X-GK-Sample-Count", String(sampleCount));
       res.setHeader("X-GK-Kernel", "MLK_v3");
-      res.send(wavBuffer);
+      streamBuffer(res, wavBuffer);
     } catch (err: any) {
       await unlink(filePath).catch(() => {});
       res.status(500).json({ success: false, error: err.message });

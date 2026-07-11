@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { streamBuffer } from "../lib/streamResponse";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -207,14 +208,13 @@ studioRouter.post(
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_mix.wav"`);
-      res.setHeader("Content-Length", String(carvedWav.length));
       res.setHeader("X-GK-Mode", "studio-mix");
       res.setHeader("X-GK-Routing", "local");
       res.setHeader("X-GK-Track-Count", String(n));
       res.setHeader("X-GK-Arrangement", arrangement);
       res.setHeader("X-GK-Kernel", "MLK_v3");
       res.setHeader("X-GK-Parity", parity);
-      res.send(carvedWav);
+      streamBuffer(res, carvedWav);
     } catch (err: any) {
       if (!res.headersSent) {
         res.status(500).json({ success: false, error: err.message ?? "Studio mix failed." });

@@ -219,6 +219,43 @@ export class ObjectStorageService {
     const { bucketName, objectName } = parseObjectPath(fullPath);
     await objectStorageClient.bucket(bucketName).file(objectName).save(buffer, { contentType });
   }
+
+  /**
+   * Store a generated result (e.g. a mastered WAV) as a PRIVATE object and return
+   * a short-lived signed GET URL the browser can download straight from GCS.
+   *
+   * This exists to bypass the Cloud Run request/response size limit (~32 MiB):
+   * large uncompressed WAVs cannot be sent back through our own server without the
+   * Google Frontend rejecting the buffered response, so we hand the client a URL
+   * and the bytes never traverse Cloud Run at all.
+   *
+   * The object is written with a `Content-Disposition: attachment` so a cross-origin
+   * anchor download lands with a sensible filename (the browser ignores an anchor's
+   * `download` attribute for cross-origin URLs, but honors the stored disposition).
+   * Media elements ignore Content-Disposition, so inline `<audio>` preview still works.
+   */
+  async saveSignedDownload(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+    downloadFilename: string,
+    ttlSec = 3600
+  ): Promise<string> {
+    const privateDir = this.getPrivateObjectDir();
+    const base = privateDir.endsWith("/") ? privateDir.slice(0, -1) : privateDir;
+    const fullPath = `${base}/${key}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    // Strip characters that would break the Content-Disposition header value.
+    const safeName = downloadFilename.replace(/[^\w.\- ]+/g, "_");
+    await objectStorageClient
+      .bucket(bucketName)
+      .file(objectName)
+      .save(buffer, {
+        contentType,
+        metadata: { contentDisposition: `attachment; filename="${safeName}"` },
+      });
+    return signObjectURL({ bucketName, objectName, method: "GET", ttlSec });
+  }
 }
 
 function parseObjectPath(path: string): {
