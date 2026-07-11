@@ -7,11 +7,12 @@ import { Scene3 } from './video_scenes/Scene3';
 import { Scene4 } from './video_scenes/Scene4';
 import { Scene5 } from './video_scenes/Scene5';
 import { Scene6 } from './video_scenes/Scene6';
+import { SceneFootage } from './video_scenes/SceneFootage';
 
 export const SCENE_DURATIONS = {
   rights_alert: 6000,
   law_fact:     9000,
-  forensic:     9000,
+  footage:     58000,
   ip_embed:    10000,
   workflow:    10000,
   outro:        6000,
@@ -20,7 +21,7 @@ export const SCENE_DURATIONS = {
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
   rights_alert: Scene1,
   law_fact:     Scene2,
-  forensic:     Scene3,
+  footage:      SceneFootage,
   ip_embed:     Scene4,
   workflow:     Scene5,
   outro:        Scene6,
@@ -57,19 +58,42 @@ export default function VideoTemplate({
 
   const baseSceneKey = currentSceneKey.replace(/_r[12]$/, '') as keyof typeof SCENE_DURATIONS;
   const SceneComponent = SCENE_COMPONENTS[baseSceneKey];
+  const isFootage = baseSceneKey === 'footage';
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const footageRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    if (isFootage) {
+      audio.pause();
+      return;
+    }
+
     audio.volume = 0.45;
     const targetTime = SCENE_START_SEC[baseSceneKey] ?? 0;
     if (Math.abs(audio.currentTime - targetTime) > AUDIO_SEEK_EPSILON_SEC) {
       audio.currentTime = targetTime;
     }
     audio.play().catch(() => {});
-  }, [currentSceneKey, baseSceneKey, muted]);
+  }, [currentSceneKey, baseSceneKey, muted, isFootage]);
+
+  useEffect(() => {
+    const video = footageRef.current;
+    if (!video) return;
+
+    video.muted = muted;
+
+    if (isFootage) {
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+      video.currentTime = 0;
+    }
+  }, [isFootage, muted]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[#0a0a0a] text-[#f5f5f5]">
@@ -97,6 +121,17 @@ export default function VideoTemplate({
           style={{ width: '50vw', height: '50vw' }}
         />
       </div>
+
+      {/* Real footage video — fills screen during footage scene */}
+      <video
+        ref={footageRef}
+        src={`${import.meta.env.BASE_URL}videos/walkthrough.mp4`}
+        className="absolute inset-0 w-full h-full object-cover z-10"
+        style={{ opacity: isFootage ? 1 : 0, transition: 'opacity 0.6s ease' }}
+        playsInline
+        preload="auto"
+        muted={muted}
+      />
 
       <AnimatePresence mode="popLayout">
         {SceneComponent && <SceneComponent key={currentSceneKey} />}
