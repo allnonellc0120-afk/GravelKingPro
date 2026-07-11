@@ -125,3 +125,9 @@ id = "cANszSLCYlbIn9bKbJAuq"
 uri = "file://artifacts/gravelkingpro/public/gkpro_ad_full.mp4"
 type = "video"
 title = "GK Pro Ad — 52s Full Music Video"
+
+[[outputs]]
+id = "Jr9uNyHF39Cu0uJdfq2rL"
+uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_promo_youtube.mp4"
+type = "video"
+title = "GravelKing Pro — YouTube Promo (99s, 1080p)"
