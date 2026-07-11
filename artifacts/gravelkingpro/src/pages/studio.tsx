@@ -17,11 +17,12 @@ import { useAppState } from "@/lib/context";
 import { Link } from "wouter";
 import { getWaveformPoints } from "@/lib/audioKernel";
 import { downloadBlob } from "@/lib/download";
+import { compressAudioFile } from "@/lib/audioCompressor";
 import { WaveformScrubber, type WaveformScrubberHandle } from "@/components/waveform-scrubber";
 import { StudioPluginRack, DEFAULT_PLUGIN_STATE, type PluginState } from "@/components/studio-plugin-rack";
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
 
-type ProcessState = "idle" | "loading" | "ready" | "processing" | "done";
+type ProcessState = "idle" | "loading" | "ready" | "compressing" | "processing" | "done";
 type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master";
 
 const MASTER_PRESETS_UI = [
@@ -343,9 +344,32 @@ export default function Studio() {
     };
 
     try {
+      let uploadFile = loadedFileRef.current;
+
+      // Compress large files client-side to stay under the ~32 MB proxy limit
+      if (uploadFile.size > 32 * 1024 * 1024) {
+        setState("compressing");
+        setProgress(10);
+        try {
+          const compressed = await compressAudioFile(uploadFile, {
+            targetRate: 22050,
+            mono: true,
+            onProgress: (p) => setProgress(10 + Math.round(p * 80)),
+          });
+          uploadFile = compressed;
+          setProgress(90);
+        } catch (compErr: unknown) {
+          const msg = compErr instanceof Error ? compErr.message : "Compression failed";
+          throw new Error(`${msg} — try a shorter clip, or use the preview file.`);
+        }
+      }
+
+      setState("processing");
+      setProgress(92);
+
       if (mode === "master") {
         const formData = new FormData();
-        formData.append("audio", loadedFileRef.current);
+        formData.append("audio", uploadFile);
         formData.append("preset", masterPreset);
         formData.append("denoise", denoiseOn ? "true" : "false");
         const response = await fetch("/api/kernel/master", {
@@ -356,7 +380,7 @@ export default function Studio() {
         });
         cleanupTimers();
         if (response.status === 413) {
-          throw new Error("File too large for the server — keep uploads under 30 MB. Try a shorter clip, or use the preview file first.");
+          throw new Error("File still too large after compression. Try a shorter clip, or use the preview file first.");
         }
         if (response.status === 402) {
           const err = await response.json().catch(() => null);
@@ -391,7 +415,7 @@ export default function Studio() {
       }
 
       const formData = new FormData();
-      formData.append("audio", loadedFileRef.current);
+      formData.append("audio", uploadFile);
       formData.append("multiplier", String(multiplier[0]));
       formData.append("slice_size", sliceSize);
       formData.append("mode", mode);
@@ -411,7 +435,7 @@ export default function Studio() {
       cleanupTimers();
 
       if (response.status === 413) {
-        throw new Error("File too large for the server — keep uploads under 30 MB. Try a shorter clip.");
+        throw new Error("File still too large after compression. Try a shorter clip.");
       }
       if (response.status === 402) {
         const err = await response.json().catch(() => null);
@@ -817,7 +841,7 @@ export default function Studio() {
                 <Progress value={progress} className="h-1.5" />
               </div>
             )}
-            {(state === "ready" || state === "processing" || state === "done") && (
+            {(state === "ready" || state === "compressing" || state === "processing" || state === "done") && (
               <div className="w-full space-y-2 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <Music className="w-5 h-5 text-amber-500" />
@@ -827,10 +851,11 @@ export default function Studio() {
                 <p className="text-xs text-muted-foreground">
                   {state === "done"
                     ? mode === "stem_split" ? `${stemBlobs.length} stems ready to download` : "Processed — ready to download"
+                    : state === "compressing" ? "Compressing audio locally..."
                     : state === "processing" ? "Sending to GravelKing server..."
                     : "Loaded and ready"}
                 </p>
-                {state !== "processing" && (
+                {state !== "processing" && state !== "compressing" && (
                   <button className="text-xs text-amber-500 hover:underline" onClick={resetState}>
                     Load different file
                   </button>
@@ -867,7 +892,7 @@ export default function Studio() {
                 {/* Processing Mode */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Processing Mode</label>
-                  <Select value={mode} onValueChange={(v) => setMode(v as ProcessMode)} disabled={state === "processing"}>
+                  <Select value={mode} onValueChange={(v) => setMode(v as ProcessMode)} disabled={state === "processing" || state === "compressing"}>
                     <SelectTrigger data-testid="select-mode">
                       <SelectValue />
                     </SelectTrigger>
@@ -1042,12 +1067,12 @@ export default function Studio() {
                         <label className="text-sm font-medium">Signal Strength</label>
                         <span className="text-sm font-mono text-muted-foreground">{multiplier[0].toFixed(2)}</span>
                       </div>
-                      <Slider value={multiplier} onValueChange={(v) => { setMultiplier(v); setSepStrength(v[0]); }} min={0.1} max={2.0} step={0.01} disabled={state === "processing" || !isPro} data-testid="slider-studio-multiplier" />
+                      <Slider value={multiplier} onValueChange={(v) => { setMultiplier(v); setSepStrength(v[0]); }} min={0.1} max={2.0} step={0.01} disabled={state === "processing" || state === "compressing" || !isPro} data-testid="slider-studio-multiplier" />
                       <p className="text-xs text-muted-foreground">Below 1.0 reduces amplitude. Above 1.0 boosts it.</p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Buffer Size</label>
-                      <Select value={sliceSize} onValueChange={setSliceSize} disabled={state === "processing" || !isPro}>
+                      <Select value={sliceSize} onValueChange={setSliceSize} disabled={state === "processing" || state === "compressing" || !isPro}>
                         <SelectTrigger data-testid="select-studio-buffersize"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="1">1 — sample-by-sample</SelectItem>
@@ -1073,7 +1098,7 @@ export default function Studio() {
                         value={tempo}
                         onValueChange={setTempo}
                         min={0.5} max={2.0} step={0.05}
-                        disabled={state === "processing"}
+                        disabled={state === "processing" || state === "compressing"}
                         data-testid="slider-tempo"
                       />
                       <div className="flex justify-between text-[10px] text-muted-foreground">
@@ -1091,7 +1116,7 @@ export default function Studio() {
                         value={semitones}
                         onValueChange={setSemitones}
                         min={-12} max={12} step={1}
-                        disabled={state === "processing"}
+                        disabled={state === "processing" || state === "compressing"}
                         data-testid="slider-semitones"
                       />
                       <div className="flex justify-between text-[10px] text-muted-foreground">
@@ -1112,10 +1137,12 @@ export default function Studio() {
                 <Button
                   className={`w-full font-semibold h-11 ${canProcess ? "bg-amber-500 hover:bg-amber-600 text-black" : "opacity-60 cursor-not-allowed"}`}
                   onClick={handleProcess}
-                  disabled={state === "processing" || state === "loading" || !canProcess}
+                  disabled={state === "processing" || state === "compressing" || state === "loading" || !canProcess}
                   data-testid="button-process"
                 >
-                  {state === "processing"
+                  {state === "compressing"
+                    ? `Compressing... ${progress}%`
+                    : state === "processing"
                     ? `Processing... ${progress}%`
                     : !canProcess
                     ? <><Lock className="w-4 h-4 mr-2" />{mode === "standard" ? "Studio Required" : "Upgrade Required"}</>
@@ -1124,7 +1151,7 @@ export default function Studio() {
                     : mode === "stem_split"   ? <><Scissors className="w-4 h-4 mr-2" />Split into Stems</>
                     : "Process with GravelKing"}
                 </Button>
-                {state === "processing" && <Progress value={progress} className="h-1.5" />}
+                {(state === "compressing" || state === "processing") && <Progress value={progress} className="h-1.5" />}
               </CardContent>
             </Card>
 
@@ -1147,7 +1174,7 @@ export default function Studio() {
                 {state !== "done" && (
                   <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground text-sm">
                     <BarChart2 className="w-8 h-8 mb-3 opacity-30" />
-                    {state === "processing" ? "Server is processing your audio..." : "Hit Process to run"}
+                    {state === "compressing" ? "Compressing audio locally..." : state === "processing" ? "Server is processing your audio..." : "Hit Process to run"}
                   </div>
                 )}
 

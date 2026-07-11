@@ -5,14 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Download, Upload, Wand2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { downloadUrl } from "@/lib/download";
+import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
 import { Link } from "wouter";
 
-type State = "idle" | "processing" | "done" | "error";
+type State = "idle" | "compressing" | "processing" | "done" | "error";
 
 const PRESETS = [
   { id: "baseline",   label: "Baseline",    desc: "Balanced +10% low end, YouTube loudness",   free: true,  accent: "#38bdf8" },
@@ -47,13 +48,36 @@ export default function Mastering() {
 
   const processFile = useCallback(async (file: File, selectedPreset: PresetId, denoise: boolean) => {
     setFileName(file.name);
-    setState("processing");
-    setProgress(15);
     setResultUrl(null);
     setErrorMsg("");
 
+    let uploadFile = file;
+
+    // If the file is large, compress client-side before upload so it sails
+    // through the production proxy limit (~30 MB).
+    if (shouldCompress(file)) {
+      setState("compressing");
+      setProgress(5);
+      try {
+        uploadFile = await compressAudioFile(file, {
+          targetRate: 22050,
+          mono: true,
+          onProgress: (pct) => setProgress(Math.round(pct * 0.4)), // 0–40%
+        });
+      } catch (err: any) {
+        setState("error");
+        const msg = err.message ?? "Compression failed";
+        setErrorMsg(msg);
+        toast({ title: "Pre-processing failed", description: msg, variant: "destructive" });
+        return;
+      }
+    }
+
+    setState("processing");
+    setProgress(40);
+
     const fd = new FormData();
-    fd.append("audio", file);
+    fd.append("audio", uploadFile);
     fd.append("mode", "master");
     fd.append("preset", selectedPreset);
     fd.append("denoise", String(denoise));
@@ -67,7 +91,7 @@ export default function Mastering() {
     // Slow-crawl the progress bar while the server is working so the user
     // knows the page hasn't frozen. Stops at 85 to leave room for the
     // "response received" jump to 95.
-    let crawlValue = 15;
+    let crawlValue = 40;
     const crawlId = setInterval(() => {
       crawlValue = Math.min(85, crawlValue + 1);
       setProgress(crawlValue);
@@ -84,11 +108,6 @@ export default function Mastering() {
       clearInterval(crawlId);
       setProgress(95);
 
-      if (resp.status === 413) {
-        setState("error");
-        setErrorMsg("File too large for the server — keep uploads under 30 MB. Try the preview file first, or split into shorter segments.");
-        return;
-      }
       if (resp.status === 402) {
         const data = await resp.json() as { error: string };
         setState("error");
@@ -153,7 +172,7 @@ export default function Mastering() {
     setPendingFile(null);
   };
 
-  const busy = state === "processing";
+  const busy = state === "compressing" || state === "processing";
   const selectedPreset = PRESETS.find(p => p.id === preset)!;
 
   return (
@@ -271,9 +290,20 @@ export default function Mastering() {
           </motion.div>
         )}
 
-        {/* Processing */}
+        {/* Compressing / Processing */}
         <AnimatePresence>
-          {busy && (
+          {state === "compressing" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Card className="border-amber-500/20 bg-amber-500/5">
+                <CardContent className="py-10 space-y-4 text-center">
+                  <p className="text-sm text-muted-foreground"><FileDown className="w-4 h-4 inline mr-1 text-amber-400" />Compressing for upload…</p>
+                  <p className="text-xs text-muted-foreground/70">{fileName} is large — pre-processing locally so it uploads fast.</p>
+                  <Progress value={progress} className="h-1.5" />
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+          {state === "processing" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <Card className="border-sky-500/20 bg-sky-500/5">
                 <CardContent className="py-10 space-y-4 text-center">
