@@ -41,7 +41,7 @@ const AUDIO_SEEK_EPSILON_SEC = 0.18;
 
 export default function VideoTemplate({
   durations = SCENE_DURATIONS,
-  loop = true,
+  loop = false,
   muted = false,
   onSceneChange,
 }: {
@@ -50,7 +50,7 @@ export default function VideoTemplate({
   muted?: boolean;
   onSceneChange?: (sceneKey: string) => void;
 } = {}) {
-  const { currentSceneKey, currentScene } = useVideoPlayer({ durations, loop });
+  const { currentSceneKey, currentScene, hasEnded } = useVideoPlayer({ durations, loop });
 
   useEffect(() => {
     onSceneChange?.(currentSceneKey);
@@ -67,6 +67,11 @@ export default function VideoTemplate({
     const audio = audioRef.current;
     if (!audio) return;
 
+    if (hasEnded) {
+      audio.pause();
+      return;
+    }
+
     if (isFootage) {
       audio.pause();
       return;
@@ -78,7 +83,7 @@ export default function VideoTemplate({
       audio.currentTime = targetTime;
     }
     audio.play().catch(() => {});
-  }, [currentSceneKey, baseSceneKey, muted, isFootage]);
+  }, [currentSceneKey, baseSceneKey, muted, isFootage, hasEnded]);
 
   useEffect(() => {
     const video = footageRef.current;
