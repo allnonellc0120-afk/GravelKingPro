@@ -11,10 +11,11 @@ if (!process.env.DATABASE_URL) {
 }
 
 const databaseUrl = new URL(process.env.DATABASE_URL);
-// Silence pg-connection-string v3 SSL mode warnings in production
-if (databaseUrl.searchParams.has("sslmode")) {
+// Suppress pg-connection-string v3 SSL mode deprecation warnings in production
+// by forcing sslmode=verify-full; leave dev URLs untouched (dev DB uses sslmode=disable)
+if (process.env.NODE_ENV === "production" && databaseUrl.searchParams.has("sslmode")) {
   const mode = databaseUrl.searchParams.get("sslmode");
-  if (mode && mode !== "verify-full") {
+  if (mode && mode !== "disable" && mode !== "verify-full") {
     databaseUrl.searchParams.set("sslmode", "verify-full");
   }
 }
