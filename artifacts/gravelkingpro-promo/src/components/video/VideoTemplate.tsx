@@ -43,11 +43,13 @@ export default function VideoTemplate({
   durations = SCENE_DURATIONS,
   loop = false,
   muted = false,
+  onVideoEnd,
   onSceneChange,
 }: {
   durations?: Record<string, number>;
   loop?: boolean;
   muted?: boolean;
+  onVideoEnd?: () => void;
   onSceneChange?: (sceneKey: string) => void;
 } = {}) {
   const { currentSceneKey, currentScene, hasEnded } = useVideoPlayer({ durations, loop });
