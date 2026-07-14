@@ -18,6 +18,7 @@ export function Scene2() {
 
   return (
     <motion.div className="absolute inset-0 bg-[#080808] overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-20" src={`${import.meta.env.BASE_URL}videos/mixing_console.mp4`} />
       {/* Fake UI Header */}
       <motion.div
         className="absolute top-0 left-0 right-0 h-[10vh] border-b border-white/10 flex items-center px-[5vw] gap-[4vw]"

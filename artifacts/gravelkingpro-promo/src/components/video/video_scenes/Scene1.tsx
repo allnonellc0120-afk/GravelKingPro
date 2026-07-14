@@ -18,7 +18,12 @@ export function Scene1() {
       className="absolute inset-0 flex items-center justify-center bg-[#080808]"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
     >
-      <div className="text-center px-[10vw]">
+      <video
+        autoPlay loop muted playsInline
+        className="absolute inset-0 w-full h-full object-cover opacity-25"
+        src={`${import.meta.env.BASE_URL}videos/keyboard_play.mp4`}
+      />
+      <div className="text-center px-[10vw] relative z-10">
         <motion.p
           className="text-[4vw] font-bold text-white/70 tracking-tight"
           initial={{ opacity: 0, y: 20 }}

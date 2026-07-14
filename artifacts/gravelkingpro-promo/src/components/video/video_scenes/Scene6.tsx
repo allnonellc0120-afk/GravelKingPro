@@ -16,7 +16,7 @@ export function Scene6() {
 
   return (
     <motion.div className="absolute inset-0 bg-[#080808] flex items-center justify-center overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      
+
       {/* Impact Flash */}
       <AnimatePresence>
         {phase === 1 && (

@@ -18,7 +18,8 @@ export function Scene4() {
   
   return (
     <motion.div className="absolute inset-0 bg-[#080808] flex items-center justify-center overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      
+      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-20" src={`${import.meta.env.BASE_URL}videos/mpc_pads.mp4`} />
+
       {/* Split Line */}
       <motion.div 
         className="absolute top-0 bottom-0 left-1/2 w-[2px] bg-white/10 -translate-x-1/2 z-20"
