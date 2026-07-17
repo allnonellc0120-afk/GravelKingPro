@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, AlertCircle, RefreshCw } from "lucide-react";
+import { Play, Pause, AlertCircle, RefreshCw, Volume2 } from "lucide-react";
 
 type APIResponse = {
   success: boolean;
@@ -150,6 +150,22 @@ export function MLKComparison() {
   const [rawResult, setRawResult] = useState<RunResult | null>(null);
   const [mlkResult, setMlkResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playingBefore, setPlayingBefore] = useState(false);
+  const [playingAfter, setPlayingAfter] = useState(false);
+  const beforeRef = useRef<HTMLAudioElement>(null);
+  const afterRef = useRef<HTMLAudioElement>(null);
+
+  const togglePlay = async (side: "before" | "after") => {
+    const mine = side === "before" ? beforeRef.current : afterRef.current;
+    const other = side === "before" ? afterRef.current : beforeRef.current;
+    if (!mine) return;
+    if (!mine.paused) {
+      mine.pause();
+    } else {
+      other?.pause();
+      await mine.play().catch(() => {});
+    }
+  };
 
   const runSingle = async (mlk: boolean): Promise<RunResult> => {
     const res = await fetch("/api/kernel/process", {
@@ -256,6 +272,36 @@ export function MLKComparison() {
           </button>
         )}
       </div>
+
+      {/* ── Audio demo — hear the difference ── */}
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { label: "Before", sub: "Raw upload", src: "/demo_original.wav", playing: playingBefore, side: "before" as const, accent: "border-border/40 bg-secondary/20", btnCls: "border border-border/40 text-foreground hover:bg-secondary/60" },
+          { label: "After", sub: "MLK v3 Mastered", src: "/demo_mastered.wav", playing: playingAfter, side: "after" as const, accent: "border-amber-500/30 bg-amber-500/5", btnCls: "bg-amber-500 hover:bg-amber-600 text-black" },
+        ].map(({ label, sub, src, playing, side, accent, btnCls }) => (
+          <div key={label} className={`rounded-lg border p-3 space-y-2 ${accent}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold">{label}</p>
+                <p className="text-[10px] text-muted-foreground">{sub}</p>
+              </div>
+              <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
+            </div>
+            <button
+              onClick={() => togglePlay(side)}
+              className={`w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-colors ${btnCls}`}
+            >
+              {playing
+                ? <><Pause className="w-3.5 h-3.5" /> Pause</>
+                : <><Play className="w-3.5 h-3.5 fill-current" /> Play {label}</>}
+            </button>
+          </div>
+        ))}
+      </div>
+      <audio ref={beforeRef} src="/demo_original.wav" preload="none"
+        onPlay={() => setPlayingBefore(true)} onPause={() => setPlayingBefore(false)} onEnded={() => setPlayingBefore(false)} />
+      <audio ref={afterRef} src="/demo_mastered.wav" preload="none"
+        onPlay={() => setPlayingAfter(true)} onPause={() => setPlayingAfter(false)} onEnded={() => setPlayingAfter(false)} />
 
       {/* Initial run prompt */}
       {!hasAny && (
