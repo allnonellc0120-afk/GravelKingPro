@@ -62,7 +62,7 @@ catalog:
   tailwind-merge: ^3.3.1
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
-  vite: ^7.3.2
+  vite: ^7.3.5
   wouter: ^3.3.5
   zod: ^3.25.76
 
@@ -157,7 +157,24 @@ overrides:
   "@expo/ngrok-bin>@expo/ngrok-bin-win32-x64": "-"
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
-  esbuild: "0.27.3"
+  esbuild: "0.27.7"
+  # GHSA-vxpw-j846-p89q / GHSA-p88m-4jfj-68fv / GHSA-35p6-xmwp-9g52 / GHSA-g8m3-5g58-fq7m:
+  # undici<=6.26.0 is vulnerable; 6.27.0 is the first patched release
+  undici: "6.27.0"
+  # GHSA-72gw-mp4g-v24j / GHSA-3p4h-7m6x-2hcm: multer<2.2.0 is vulnerable
+  multer: "2.2.0"
+  # GHSA-6v5v-wf23-fmfq: markdown-it<14.3.0 is vulnerable
+  markdown-it: "14.3.0"
+  # GHSA-22p9-wv53-3rq4: linkify-it@5.0.0 is vulnerable; 5.0.2 is the patched 5.x release
+  linkify-it: "5.0.2"
+  # GHSA-cmwh-pvxp-8882 / GHSA-vxr8-fq34-vvx9: dompurify<3.4.9 is vulnerable
+  dompurify: "3.4.12"
+  # GHSA-h67p-54hq-rp68: js-yaml@3.14.2 and js-yaml@4.1.1 are both vulnerable;
+  # 3.15.0 patches the 3.x branch, 4.3.0 patches the 4.x branch.
+  # Override all js-yaml to 4.3.0 (the latest stable, API-compatible with 4.x).
+  js-yaml: "4.3.0"
+  # GHSA-4x5r-pxfx-6jf8: @babel/core@7.29.0 is vulnerable; 7.29.7 is the patched 7.x release
+  "@babel/core": "7.29.7"
   # GHSA-q8mj-m7cp-5q26: qs>=6.11.1,<=6.15.1 is vulnerable; 6.15.2 is the first patched release
   qs: "6.15.2"
   # GHSA-w5hq-g745-h8pq: uuid<11.1.1 uses Math.random() (not crypto); all of v3/v7 are affected
