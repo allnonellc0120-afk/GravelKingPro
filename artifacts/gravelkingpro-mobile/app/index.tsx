@@ -3,8 +3,7 @@ import { StyleSheet, View, ActivityIndicator, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Update this to your production URL after publishing the web app
-const WEB_APP_URL = "https://gravelking-acquisition--allnonellc0120.replit.app";
+const WEB_APP_URL = "https://gravelkingpro.it.com";
 
 export default function App() {
   const webViewRef = useRef<WebView>(null);
