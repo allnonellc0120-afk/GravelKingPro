@@ -688,9 +688,21 @@ function VocalBoothInner() {
         const d = text.startsWith("{") ? JSON.parse(text) : { error: text || "Mastering failed" };
         throw new Error(d.error ?? "Mastering failed");
       }
-      const blob = await resp.blob();
       const baseName = file.name.replace(/\.[^.]+$/, "") || "track";
-      setBackingFile(new File([blob], `${baseName} (mastered).wav`, { type: "audio/wav" }));
+      // Server returns JSON+signed-URL for full masters (paid / first-free),
+      // or raw audio bytes for the 30-sec free preview. Handle both.
+      const ct = resp.headers.get("content-type") ?? "";
+      let audioBlob: Blob;
+      if (ct.includes("application/json")) {
+        const data = await resp.json() as { url?: string };
+        if (!data.url) throw new Error("Mastering failed — no download URL returned.");
+        const audioResp = await fetch(data.url);
+        if (!audioResp.ok) throw new Error("Could not download mastered file.");
+        audioBlob = await audioResp.blob();
+      } else {
+        audioBlob = await resp.blob();
+      }
+      setBackingFile(new File([audioBlob], `${baseName} (mastered).wav`, { type: "audio/wav" }));
     } catch (err: unknown) {
       // If mastering fails for any reason, use the original file directly
       setBackingFile(file);
