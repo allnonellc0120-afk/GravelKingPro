@@ -210,7 +210,7 @@ export default function PitchPage() {
           </p>
           <pre className="rounded-lg bg-background/80 border border-border/50 p-3 text-xs font-mono text-muted-foreground overflow-x-auto">
 {`<iframe
-  src="https://gravelkingpro.replit.app/api/lyrics/embed/your-project-id?token=TOKEN"
+  src="https://gravelkingpro.it.com/api/lyrics/embed/your-project-id?token=TOKEN"
   width="600" height="400"
   frameborder="0"
   title="IP Certificate"
