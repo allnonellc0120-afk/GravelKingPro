@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { BeforeAfterDemo } from "@/components/before-after-demo";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
@@ -216,6 +217,14 @@ export default function Mastering() {
             Apply a professional mastering chain with optional denoise. Runs locally with MLK v3 — no upload to third parties.
           </p>
         </div>
+
+        {/* Before / After demo */}
+        <BeforeAfterDemo
+          before={{ label: "Before", sub: "Raw mix", src: "/demo_original.wav" }}
+          after={{ label: "After", sub: "MLK v3 Mastered", src: "/demo_mastered.wav" }}
+          heading="Hear what mastering does"
+          sub="Same 30-second clip — raw upload vs MLK v3 processed."
+        />
 
         {/* File drop / file picked */}
         {!pendingFile && !busy && state !== "done" ? (

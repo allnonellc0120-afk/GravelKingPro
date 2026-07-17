@@ -1,143 +1,14 @@
-// Vocal Booth — "split your own song" + energy-based karaoke timing.
+// Vocal Booth — energy-based karaoke lyric timing.
 //
 // Honesty note: the line timing here is ENERGY-BASED and APPROXIMATE. We do NOT
-// transcribe the audio or run forced alignment — we detect where the extracted
-// guide vocal is loud (singing) vs quiet, then distribute the lyric lines across
-// those voiced regions. Treat every timestamp as a best-effort guide, not a
-// word-accurate sync. The stem split itself (MLK v3 band/spatial separation) is
-// also approximate and bleeds, so the guide vocal is a reference, not a clean a-cappella.
+// transcribe the audio or run forced alignment — we detect where the guide vocal
+// is loud (singing) vs quiet, then distribute the lyric lines across those voiced
+// regions. Treat every timestamp as a best-effort guide, not a word-accurate sync.
 
 function getAudioContextCtor(): typeof AudioContext | null {
   if (typeof window === "undefined") return null;
   const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
   return w.AudioContext ?? w.webkitAudioContext ?? null;
-}
-
-export class SplitError extends Error {
-  /** True when the failure is an entitlement/paywall response (HTTP 402/403). */
-  paywall: boolean;
-  code?: string;
-  constructor(message: string, opts?: { paywall?: boolean; code?: string }) {
-    super(message);
-    this.name = "SplitError";
-    this.paywall = opts?.paywall ?? false;
-    this.code = opts?.code;
-  }
-}
-
-export interface SplitResult {
-  /** Full mix with vocals removed — becomes the karaoke backing track. */
-  instrumental: Blob;
-  /** Isolated (approximate) vocal stem — used as the optional guide vocal. */
-  vocals: Blob;
-}
-
-/** Progress events emitted during splitSong(). */
-export type SplitProgress =
-  | { stage: "uploading"; pct: number }
-  | { stage: "compressing" }
-  | { stage: "separating"; pct: number }
-  | { stage: "finishing" };
-
-/**
- * Split a full song into stems on the server and return the instrumental +
- * vocal blobs. Uses the Studio stem-split path, which requires a Pro
- * subscription (the page is already Pro-gated, so entitled users pass).
- *
- * onProgress receives stage events: uploading (real XHR %) → compressing →
- * separating (animated %) → finishing.
- */
-export async function splitSong(
-  file: File,
-  onProgress?: (p: SplitProgress) => void,
-): Promise<SplitResult> {
-  const form = new FormData();
-  form.append("audio", file, file.name);
-  form.append("mode", "stem_split");
-  form.append("source", "studio");
-  form.append("multiplier", "0.75");
-  form.append("stemsOnly", "primary"); // only vocals + instrumental — prevents iOS OOM on large ZIPs
-
-  // Use XHR so we get real upload-progress events.
-  const { status, body } = await new Promise<{ status: number; body: Blob }>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.responseType = "blob";
-    xhr.withCredentials = true;
-    // Hard 3-minute timeout — Replicate can take 90 s on large files
-    xhr.timeout = 3 * 60 * 1000;
-
-    let processingTimer: ReturnType<typeof setInterval> | null = null;
-    let processingPct = 0;
-
-    // ── Upload phase ─────────────────────────────────────────────────────────
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && e.total > 0) {
-        onProgress?.({ stage: "uploading", pct: Math.round((e.loaded / e.total) * 100) });
-      }
-    };
-
-    // Upload complete → server is now compressing + running the AI separator
-    xhr.upload.onload = () => {
-      onProgress?.({ stage: "compressing" });
-      // Switch to "separating" after ~3 s (server compression is fast)
-      setTimeout(() => {
-        onProgress?.({ stage: "separating", pct: 0 });
-        processingTimer = setInterval(() => {
-          processingPct = Math.min(90, processingPct + 1.5);
-          onProgress?.({ stage: "separating", pct: Math.round(processingPct) });
-        }, 1000);
-      }, 3000);
-    };
-
-    // ── Response received ────────────────────────────────────────────────────
-    xhr.onload = () => {
-      if (processingTimer) clearInterval(processingTimer);
-      onProgress?.({ stage: "finishing" });
-      resolve({ status: xhr.status, body: xhr.response as Blob });
-    };
-
-    const fail = (msg: string, opts?: { paywall?: boolean }) => {
-      if (processingTimer) clearInterval(processingTimer);
-      reject(new SplitError(msg, opts));
-    };
-
-    xhr.onerror   = () => fail("Network error while splitting. Check your connection and try again.");
-    xhr.onabort   = () => fail("Split timed out — the song may be too long. Try a shorter clip (under 5 minutes).");
-    xhr.ontimeout = () => fail("Split timed out — the song may be too long. Try a shorter clip (under 5 minutes).");
-
-    xhr.open("POST", "/api/kernel/process-audio");
-    xhr.send(form);
-  });
-
-  // ── Handle error status codes ────────────────────────────────────────────
-  if (status === 402 || status === 403) {
-    let errMsg = "Splitting a song requires a GravelKing Pro subscription.";
-    let code: string | undefined;
-    try { const d = JSON.parse(await body.text()) as { error?: string; code?: string }; if (d.error) errMsg = d.error; code = d.code; } catch {}
-    throw new SplitError(errMsg, { paywall: true, code });
-  }
-  if (status < 200 || status >= 300) {
-    let errMsg = `Split failed (server error ${status}). Try a shorter file or try again in a moment.`;
-    try { const d = JSON.parse(await body.text()) as { error?: string }; if (d.error) errMsg = d.error; } catch {}
-    throw new SplitError(errMsg);
-  }
-
-  const zipBlob = body;
-  const { unzip } = await import("fflate");
-  const bytes = new Uint8Array(await zipBlob.arrayBuffer());
-  const files = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-    unzip(bytes, (err: Error | null, f: Record<string, Uint8Array>) => (err ? reject(err) : resolve(f)));
-  });
-
-  const instr = files["GKP_instrumental.wav"];
-  const voc = files["GKP_vocals.wav"];
-  if (!instr || !voc) {
-    throw new SplitError("The server response was missing the instrumental or vocal stem.");
-  }
-  return {
-    instrumental: new Blob([instr as BlobPart], { type: "audio/wav" }),
-    vocals: new Blob([voc as BlobPart], { type: "audio/wav" }),
-  };
 }
 
 /** A lyric line (by its index in the full lyrics) and its approximate start time (seconds). */
@@ -170,7 +41,6 @@ function computeVoicedSegments(buf: AudioBuffer): VoicedSegment[] {
   const length = buf.length;
   if (length === 0) return [];
 
-  // Mix to mono.
   const mono = new Float32Array(length);
   for (let c = 0; c < buf.numberOfChannels; c++) {
     const data = buf.getChannelData(c);
@@ -180,7 +50,7 @@ function computeVoicedSegments(buf: AudioBuffer): VoicedSegment[] {
     for (let i = 0; i < length; i++) mono[i] /= buf.numberOfChannels;
   }
 
-  const hop = Math.max(1, Math.floor(sr * 0.05)); // ~50ms frames
+  const hop = Math.max(1, Math.floor(sr * 0.05));
   const frames: number[] = [];
   let maxRms = 0;
   for (let start = 0; start < length; start += hop) {
@@ -193,9 +63,8 @@ function computeVoicedSegments(buf: AudioBuffer): VoicedSegment[] {
   }
   if (maxRms <= 1e-6) return [];
 
-  // Hysteresis thresholds, relative to the loudest frame.
   const enter = maxRms * 0.16;
-  const exit = maxRms * 0.08;
+  const exit  = maxRms * 0.08;
   const frameDur = hop / sr;
 
   const segments: VoicedSegment[] = [];
@@ -203,42 +72,29 @@ function computeVoicedSegments(buf: AudioBuffer): VoicedSegment[] {
   let segStart = 0;
   for (let f = 0; f < frames.length; f++) {
     const t = f * frameDur;
-    if (!voiced && frames[f] >= enter) {
-      voiced = true;
-      segStart = t;
-    } else if (voiced && frames[f] < exit) {
-      voiced = false;
-      segments.push({ start: segStart, end: t });
-    }
+    if (!voiced && frames[f] >= enter) { voiced = true; segStart = t; }
+    else if (voiced && frames[f] < exit) { voiced = false; segments.push({ start: segStart, end: t }); }
   }
   if (voiced) segments.push({ start: segStart, end: frames.length * frameDur });
 
-  // Merge gaps shorter than 250ms.
   const merged: VoicedSegment[] = [];
   for (const s of segments) {
     const last = merged[merged.length - 1];
     if (last && s.start - last.end < 0.25) last.end = s.end;
     else merged.push({ ...s });
   }
-  // Drop very short blips (< 150ms).
   return merged.filter((s) => s.end - s.start >= 0.15);
 }
 
-/** Spread singable line indices across detected onsets / voiced span. */
 function distribute(singable: number[], segments: VoicedSegment[], duration: number): TimedLine[] {
   const n = singable.length;
   if (n === 0) return [];
-
-  // No usable energy info → even linear spread across the whole track.
   if (segments.length === 0 || duration <= 0) {
     return singable.map((idx, k) => ({ idx, t: (k / n) * Math.max(duration, 1) }));
   }
-
   const voicedStart = segments[0].start;
-  const voicedEnd = segments[segments.length - 1].end;
+  const voicedEnd   = segments[segments.length - 1].end;
   const span = Math.max(0.001, voicedEnd - voicedStart);
-
-  // Enough distinct onsets to anchor each line → snap lines to onset times.
   const onsets = segments.map((s) => s.start);
   if (onsets.length >= n && n > 1) {
     return singable.map((idx, k) => {
@@ -246,21 +102,17 @@ function distribute(singable: number[], segments: VoicedSegment[], duration: num
       return { idx, t: onsets[Math.min(onsets.length - 1, oi)] };
     });
   }
-
-  // Otherwise distribute evenly across the voiced span.
   return singable.map((idx, k) => ({ idx, t: voicedStart + (k / n) * span }));
 }
 
 /**
  * Energy-based, approximate timing. Decodes the guide-vocal blob, finds voiced
  * regions, and assigns each singable lyric line a start time. Returns null when
- * there is nothing to time or decoding is unavailable (caller should then fall
- * back to plain linear teleprompter scroll).
+ * there is nothing to time or decoding is unavailable.
  */
 export async function analyzeGuideTiming(vocalsBlob: Blob, lyricLines: string[]): Promise<TimedLine[] | null> {
   const singable = singableLineIndices(lyricLines);
   if (singable.length === 0) return null;
-
   const Ctor = getAudioContextCtor();
   if (!Ctor) return null;
   const ctx = new Ctor();

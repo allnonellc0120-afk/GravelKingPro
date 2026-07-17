@@ -1,4 +1,5 @@
 import { useCallback, useId, useRef, useState } from "react";
+import { BeforeAfterDemo } from "@/components/before-after-demo";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
@@ -111,18 +112,23 @@ export default function MixStudio() {
 
   if (!canUseStudio) return (
     <Layout>
-      <div className="max-w-lg mx-auto text-center space-y-4 py-20">
-        <div className="text-5xl">🎛️</div>
-        <h1 className="text-2xl font-bold">GravelKing Studio</h1>
-        <p className="text-muted-foreground text-sm">The full DAW — multi-track recording, stems, plugins, and mixing — is available on GravelKing Pro.</p>
-        <a href="/pricing" className="inline-block mt-2">
-          <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro</button>
-        </a>
+      <div className="max-w-lg mx-auto space-y-6 py-16">
+        <BeforeAfterDemo
+          before={{ label: "Before", sub: "Raw mix", src: "/demo_original.wav" }}
+          after={{ label: "After", sub: "MLK v3 Mastered", src: "/demo_mastered.wav" }}
+          heading="Hear what the Studio does"
+          sub="Same clip — raw vs processed through the MLK v3 kernel."
+        />
+        <div className="text-center space-y-4">
+          <div className="text-5xl">🎛️</div>
+          <h1 className="text-2xl font-bold">GravelKing Studio</h1>
+          <p className="text-muted-foreground text-sm">The full DAW — multi-track recording, stems, plugins, and mixing — is available on GravelKing Pro.</p>
+          <a href="/pricing" className="inline-block mt-2">
+            <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro</button>
+          </a>
+        </div>
         <button
-          onClick={() => {
-            localStorage.setItem(DEV_BYPASS_KEY, "1");
-            setDevBypass(true);
-          }}
+          onClick={() => { localStorage.setItem(DEV_BYPASS_KEY, "1"); setDevBypass(true); }}
           className="block mx-auto text-[10px] text-muted-foreground underline opacity-50 hover:opacity-100"
         >
           Dev bypass
