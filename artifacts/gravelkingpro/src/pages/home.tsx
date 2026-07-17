@@ -86,18 +86,28 @@ const PLANS = [
   {
     name: "Starter",
     price: "Free",
+    period: null,
     color: "border-border/30",
-    features: ["1 free full master (WAV)", "Songwriting Studio (basic)", "Vocal Booth access", "Live vocal monitoring"],
+    features: ["Mastering 30s preview", "Vocal Booth access", "Songwriting Studio (basic)"],
   },
   {
-    name: "GravelKing Pro",
-    price: "$39.99",
+    name: "GravelKing Weekly",
+    price: "$9.99",
+    period: "/week",
+    color: "border-emerald-500/30 bg-emerald-500/5",
+    badge: "Flexible",
+    badgeColor: "bg-emerald-500 text-black",
+    features: ["Full MLK v3 mastering suite", "Unlimited WAV exports", "Vocal Booth + karaoke DAW"],
+  },
+  {
+    name: "GravelKing Pro Plus",
+    price: "$24.99",
     period: "/mo",
     color: "border-amber-500/40 bg-amber-500/5",
     highlight: true,
     badge: "Most Popular",
     badgeColor: "bg-amber-500 text-black",
-    features: ["Full MLK v3 mastering suite", "Unlimited WAV exports", "IP Embed Code + authorship cert", "Vocal Booth + karaoke DAW", "PDF mastering certificates", "Processing history"],
+    features: ["Everything in Weekly", "MLK v3 mastering kernel", "IP Embed Code + authorship cert", "7-day free trial"],
   },
   {
     name: "Node Auditor",
@@ -106,7 +116,7 @@ const PLANS = [
     color: "border-purple-500/40 bg-purple-500/5",
     badge: "Enterprise",
     badgeColor: "bg-purple-500 text-white",
-    features: ["Everything in Pro", "1T-scale benchmarking", "Morris Law V2 access", "Adjustable mastering kernel", "Priority support + custom integrations"],
+    features: ["Everything in Pro Plus", "Unlimited MLK V3.5 optimizer runs", "Up to 100 devices optimized", "White-label WAV & PDF exports"],
   },
 ];
 
@@ -422,7 +432,7 @@ export default function Home() {
 
             {!isPro && (
               <div className="flex items-center justify-between gap-4 pt-1 border-t border-violet-500/15">
-                <p className="text-xs text-muted-foreground">IP tools included in GravelKing Pro ($39.99/mo)</p>
+                <p className="text-xs text-muted-foreground">IP tools included in GravelKing Pro Plus ($24.99/mo)</p>
                 <Link href="/pricing">
                   <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs h-8 px-4 shrink-0">
                     <Crown className="w-3 h-3 mr-1.5" /> Upgrade to Pro
@@ -459,7 +469,7 @@ export default function Home() {
               Full details <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {PLANS.map((plan, i) => (
               <motion.div key={plan.name} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
                 <Card className={`border h-full ${plan.color}`}>
