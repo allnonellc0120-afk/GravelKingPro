@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 const isBuild = process.env.NODE_ENV === "production" || process.argv.includes("build");
 
@@ -29,6 +30,32 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: "autoUpdate",
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/gravelkingpro\.it\.com\/api\//,
+            handler: "NetworkFirst",
+            options: { cacheName: "api-cache", networkTimeoutSeconds: 10 },
+          },
+        ],
+      },
+      manifest: {
+        name: "GravelKing Pro",
+        short_name: "GravelKing",
+        description: "Pro audio mastering, vocal booth, DAW, and IP certification",
+        theme_color: "#09090b",
+        background_color: "#09090b",
+        display: "standalone",
+        orientation: "portrait",
+        start_url: "/",
+        icons: [
+          { src: "/favicon.svg", sizes: "any", type: "image/svg+xml" },
+        ],
+      },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
