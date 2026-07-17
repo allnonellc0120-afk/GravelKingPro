@@ -42,3 +42,4 @@
 - [GravelKingPro product focus](product-focus.md) — 4 pillars only (IP, Mastering, Vocal Booth, karaoke DAW); cloud-AI/Replicate/splitter/voice-removal deprecated, don't reintroduce in code or public copy
 - [Authorship scoring](authorship-scoring.md) — shared @workspace/authorship lib (diff-match-patch); score MUST stay 0–100 to preserve >=25 copyright gate; delete+retype-same=0 credit; client import aliased to avoid state-var collision
 - [Admin Ops diagnostics pattern](admin-ops-diagnostics.md) — logToolError/recordActivity conventions, admin_settings-backed kill switch (bypasses via isAdminAuthenticated not requireAdmin), /tmp-scoped cache purge
+- [Custom domain + GoDaddy DNS](custom-domain-godaddy.md) — gravelkingpro.it.com attached to THIS repl's deploy; relink issues new replit-verify TXT; GoDaddy API secrets exist; PUT replaces ALL apex TXT (keep MS/SPF)
