@@ -26,6 +26,7 @@ export const usersTable = pgTable("users", {
   freeVoiceRemovals: integer("free_voice_removals").notNull().default(0),
   freeStemSplits: integer("free_stem_splits").notNull().default(0),
   freeMasterDownloads: integer("free_master_downloads").notNull().default(0),
+  freeMasterPreviews: integer("free_master_previews").notNull().default(0),
   totalDownloads: integer("total_downloads").notNull().default(0),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),

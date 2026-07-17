@@ -161,8 +161,24 @@ masterRouter.post(
       const usageUser = await getUsageUser(req, res);
       usageUserId = usageUser.id;
       usedTotalDownloads = usageUser.totalDownloads ?? 0;
-      const usedMaster = usageUser.freeMasterDownloads ?? 0;
-      isSample = usedMaster >= FREE_LIMITS.freeMasterDownloads;
+      const usedDownloads = usageUser.freeMasterDownloads ?? 0;
+      const usedPreviews = usageUser.freeMasterPreviews ?? 0;
+
+      if (usedDownloads >= FREE_LIMITS.freeMasterDownloads) {
+        // Free full master already used — check preview allowance
+        if (usedPreviews >= FREE_LIMITS.freeMasterPreviews) {
+          // Both free master and preview used — hard paywall
+          res.status(402).json({
+            success: false,
+            code: "LIMIT_REACHED",
+            feature: "master",
+            error: "You've used your free master and preview. Subscribe to GravelKing Pro for unlimited masters.",
+            fallback: { action: "subscribe", url: "/pricing" },
+          });
+          return;
+        }
+        isSample = true; // serve 30-sec preview
+      }
     }
 
     const uploadedPath = req.file.path;
@@ -226,8 +242,10 @@ masterRouter.post(
       const filename = `gravelking_mastered_${presetName}.wav`;
 
       if (isSample) {
-        // Free tier: a 30-second preview. Always well under the Cloud Run ~32 MiB
-        // response cap, so stream it straight back (chunked, no Content-Length).
+        // Free preview (30s) — count it against the user's single allowed preview.
+        if (usageUserId) {
+          await incrementUsage(usageUserId, "freeMasterPreviews");
+        }
         res.setHeader("Content-Type", "audio/wav");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         res.setHeader("X-GK-Mode", "master");
