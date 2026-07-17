@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock } from "lucide-react";
+import { BeforeAfterDemo } from "@/components/before-after-demo";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
 import { type VocalPreset } from "@/lib/daw/vocalPresets";
 import { analyzeGuideTiming, type TimedLine } from "@/lib/daw/stemTiming";
@@ -50,22 +51,30 @@ export default function VocalBooth() {
   if (!canUseStudio) {
     return (
       <Layout>
-        <div className="max-w-lg mx-auto text-center space-y-4 py-20">
-          <div className="text-5xl">🎤</div>
-          <h1 className="text-2xl font-bold">Vocal Booth</h1>
-          <p className="text-muted-foreground text-sm">
-            Sing over any backing track with a scrolling-lyrics teleprompter, record your vocal,
-            and mix it down through the Morris Law kernel — part of the GravelKing Pro Plus (Studio) plan.
-          </p>
-          <a href="/pricing" className="inline-block mt-2">
-            <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro Plus</button>
-          </a>
-          <button
-            onClick={() => { localStorage.setItem(DEV_BYPASS_KEY, "1"); setDevBypass(true); }}
-            className="block mx-auto text-[10px] text-muted-foreground underline opacity-50 hover:opacity-100"
-          >
-            Dev bypass
-          </button>
+        <div className="max-w-lg mx-auto space-y-6 py-16">
+          <BeforeAfterDemo
+            before={{ label: "Before", sub: "Dry vocal — no effects", src: "/demo_vocal_dry.wav" }}
+            after={{ label: "After", sub: "Vocal Booth — reverb + compression", src: "/demo_vocal_booth.wav" }}
+            heading="Hear what the Vocal Booth does"
+            sub="Same vocal clip — dry vs processed through booth effects."
+          />
+          <div className="text-center space-y-4">
+            <div className="text-5xl">🎤</div>
+            <h1 className="text-2xl font-bold">Vocal Booth</h1>
+            <p className="text-muted-foreground text-sm">
+              Sing over any backing track with a scrolling-lyrics teleprompter, record your vocal,
+              and mix it down through the Morris Law kernel — part of the GravelKing Pro Plus (Studio) plan.
+            </p>
+            <a href="/pricing" className="inline-block mt-2">
+              <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro Plus</button>
+            </a>
+            <button
+              onClick={() => { localStorage.setItem(DEV_BYPASS_KEY, "1"); setDevBypass(true); }}
+              className="block mx-auto text-[10px] text-muted-foreground underline opacity-50 hover:opacity-100"
+            >
+              Dev bypass
+            </button>
+          </div>
         </div>
       </Layout>
     );
@@ -899,6 +908,14 @@ function VocalBoothInner() {
           </div>
           <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">Studio</Badge>
         </div>
+
+        {/* Before / After demo */}
+        <BeforeAfterDemo
+          before={{ label: "Before", sub: "Dry vocal — no effects", src: "/demo_vocal_dry.wav" }}
+          after={{ label: "After", sub: "Vocal Booth — reverb + compression", src: "/demo_vocal_booth.wav" }}
+          heading="Hear what the Vocal Booth does"
+          sub="Same vocal clip — dry vs processed through booth effects."
+        />
 
         <div className="grid md:grid-cols-2 gap-5">
           {/* ── Left: lyrics ── */}
