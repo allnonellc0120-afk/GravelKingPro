@@ -70,7 +70,7 @@ const FAQ = [
   },
   {
     q: "Does it work without Pro?",
-    a: "Generation is free. Editing your lines, reaching 25%, and getting the embed code all require a Pro (Studio) subscription — that's where the forensic authorship ledger lives.",
+    a: "Generation is free. Editing your lines, reaching 25%, and getting the embed code all require a GravelKing Pro subscription ($39.99/mo) — that's where the forensic authorship ledger lives.",
   },
   {
     q: "What does the embed code look like on my website?",
@@ -229,12 +229,12 @@ export default function PitchPage() {
             <Crown className="w-8 h-8 text-amber-400 mx-auto" />
             <h2 className="text-xl font-bold">Get your embed code today</h2>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              The Songwriting Studio's forensic ledger, authorship score, and embed code are all included in the Pro Plus plan.
+              The Songwriting Studio's forensic ledger, authorship score, and embed code are all included in GravelKing Pro.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link href="/pricing">
                 <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-11 px-8">
-                  <Crown className="w-4 h-4 mr-2" /> Start Free Trial — Studio
+                  <Crown className="w-4 h-4 mr-2" /> Get GravelKing Pro
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
@@ -244,7 +244,7 @@ export default function PitchPage() {
                 </Button>
               </Link>
             </div>
-            <p className="text-[10px] text-muted-foreground">$39.99/mo · 3-day free trial · Cancel anytime</p>
+            <p className="text-[10px] text-muted-foreground">$39.99/mo · cancel anytime · 1 free master included on signup</p>
           </div>
         )}
 

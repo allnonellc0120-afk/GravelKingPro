@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useSearch } from "wouter";
 import { Layout } from "@/components/layout";
 import { useAppState } from "@/lib/context";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Wand2, Music2, FileCode2, PenLine, Activity, LayoutDashboard,
   Play, ChevronRight, CheckCircle2, Zap, Download, Mail, Bell,
-  X, Crown, ShieldCheck, ArrowRight,
+  X, Crown, ShieldCheck, ArrowRight, Pause, Volume2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,7 @@ const AUDIO_TOOLS = [
     icon: <Wand2 className="w-5 h-5 text-sky-400" />,
     title: "MLK v3 Mastering",
     description: "6 professional presets — Broadcast, Vinyl, Podcast, Club, Film, Normal. One click, studio-quality WAV output.",
-    badge: "30s Preview Free",
+    badge: "1 Free Master",
     badgeColor: "border-emerald-500/40 text-emerald-400",
     href: "/mastering",
     cta: "Master a track",
@@ -87,7 +87,7 @@ const PLANS = [
     name: "Starter",
     price: "Free",
     color: "border-border/30",
-    features: ["Mastering 30s preview", "Songwriting Studio (basic)", "Vocal Booth access", "Live vocal monitoring"],
+    features: ["1 free full master (WAV)", "Songwriting Studio (basic)", "Vocal Booth access", "Live vocal monitoring"],
   },
   {
     name: "GravelKing Pro",
@@ -109,6 +109,49 @@ const PLANS = [
     features: ["Everything in Pro", "1T-scale benchmarking", "Morris Law V2 access", "Adjustable mastering kernel", "Priority support + custom integrations"],
   },
 ];
+
+function AudioCard({ label, sub, src, color, badge }: {
+  label: string; sub: string; src: string; color: string; badge: string;
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const toggle = async () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      await el.play();
+      setPlaying(true);
+    }
+  };
+
+  return (
+    <div className={`rounded-xl border p-5 space-y-3 ${color}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge}`}>{label}</span>
+          <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+        </div>
+        <Volume2 className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <audio ref={audioRef} src={src} onEnded={() => setPlaying(false)} preload="none" />
+      <Button
+        size="sm"
+        variant={label === "After" ? "default" : "outline"}
+        className={`w-full h-9 font-semibold text-xs ${label === "After" ? "bg-amber-500 hover:bg-amber-600 text-black" : ""}`}
+        onClick={toggle}
+      >
+        {playing
+          ? <><Pause className="w-3.5 h-3.5 mr-1.5" /> Pause</>
+          : <><Play className="w-3.5 h-3.5 mr-1.5 fill-current" /> Play {label}</>
+        }
+      </Button>
+    </div>
+  );
+}
 
 function NotifyBanner() {
   const [email, setEmail] = useState("");
@@ -244,7 +287,7 @@ export default function Home() {
             <div className="flex items-center justify-center gap-3 flex-wrap">
               <Link href="/mastering">
                 <Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-12 px-8 text-base shadow-lg shadow-amber-500/25">
-                  <Play className="w-4 h-4 mr-2 fill-current" /> Master a Track — Free Preview
+                  <Play className="w-4 h-4 mr-2 fill-current" /> Master a Track — First One Free
                 </Button>
               </Link>
               <Link href="/songwriting">
@@ -274,6 +317,29 @@ export default function Home() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* ── Before / After Demo ── */}
+        <div className="space-y-5">
+          <div className="text-center space-y-1">
+            <h2 className="text-xl font-bold">Hear the difference</h2>
+            <p className="text-sm text-muted-foreground">Same track. 10 seconds. MLK v3 mastering.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              { label: "Before", sub: "Raw upload", src: "/demo_original.wav", color: "border-border/40 bg-card/30", badge: "bg-zinc-700 text-zinc-300" },
+              { label: "After", sub: "MLK v3 Mastered", src: "/demo_mastered.wav", color: "border-amber-500/30 bg-amber-500/5", badge: "bg-amber-500 text-black" },
+            ].map(({ label, sub, src, color, badge }) => (
+              <AudioCard key={label} label={label} sub={sub} src={src} color={color} badge={badge} />
+            ))}
+          </div>
+          <div className="text-center">
+            <Link href="/mastering">
+              <Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-8 h-11">
+                <Wand2 className="w-4 h-4 mr-2" /> Master your track — first one free
+              </Button>
+            </Link>
           </div>
         </div>
 
