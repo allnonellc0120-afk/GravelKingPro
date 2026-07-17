@@ -25,7 +25,7 @@ export default function Landing() {
               The fastest matrix multiplication kernel in existence.
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-[600px] leading-relaxed">
-              MLK V3.5 achieves 92% of theoretical peak performance on NVIDIA A100/H100 architectures. Engineered for high-frequency trading, dense simulations, and proprietary AI training.
+              MLK V3.5 achieves 92% of theoretical peak FP64 throughput on multi-core x86-64 architectures with AVX-512. Engineered for high-frequency trading, dense simulations, and proprietary AI training.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/pricing" className="inline-flex h-12 items-center justify-center border border-primary bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
@@ -45,7 +45,7 @@ export default function Landing() {
               <Cpu className="h-8 w-8 mb-4 text-accent" />
               <h3 className="text-lg font-bold mb-2 uppercase">Hardware Native</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Written directly in PTX and SASS. Bypasses standard CUDA abstractions for zero-overhead execution and precise register allocation.
+                Hand-optimized BLAS kernels with AVX-512 intrinsics. Bypasses standard library overhead for direct hardware-level FP64 DGEMM execution and precise thread binding.
               </p>
             </div>
           </div>
@@ -73,13 +73,13 @@ export default function Landing() {
 
         <section className="border bg-zinc-950 text-zinc-50 p-8 md:p-12 overflow-hidden relative">
           <div className="absolute top-0 right-0 p-4 opacity-20 font-mono text-9xl font-bold pointer-events-none">
-            A16
+            FP64
           </div>
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-2xl font-bold uppercase mb-4 text-zinc-100">Live Telemetry</h2>
               <p className="text-zinc-400 mb-6">
-                Average sustained performance on an isolated NVIDIA A100 80GB PCIe instance running FP64 GEMM operations.
+                Average sustained performance on an isolated high-core-count x86-64 cloud instance running FP64 DGEMM operations with AVX-512 and memory-locked pages.
               </p>
               <Link href="/benchmark" className="inline-flex items-center text-accent hover:underline font-mono text-sm">
                 VERIFY NUMBERS <ArrowRight className="ml-2 w-4 h-4" />
