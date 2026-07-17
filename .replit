@@ -38,7 +38,7 @@ integrations = ["stripe:1.0.0", "github:1.0.0", "google-mail:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
-timeoutMs = 20000
+timeoutMs = 90000
 
 [[ports]]
 localPort = 8080
