@@ -157,7 +157,8 @@ overrides:
   "@expo/ngrok-bin>@expo/ngrok-bin-win32-x64": "-"
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
-  esbuild: "0.27.7"
+  # GHSA-g7r4-m6w7-qqqr: esbuild<0.25.0 dev-server allows arbitrary file reads; 0.25.8 is patched
+  esbuild: "0.25.8"
   # GHSA-vxpw-j846-p89q / GHSA-p88m-4jfj-68fv / GHSA-35p6-xmwp-9g52 / GHSA-g8m3-5g58-fq7m:
   # undici<=6.26.0 is vulnerable; 6.27.0 is the first patched release
   undici: "6.27.0"
