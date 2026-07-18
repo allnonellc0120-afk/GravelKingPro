@@ -258,25 +258,40 @@ masterRouter.post(
         return;
       }
 
-      // Full-length master (paid / unlimited tiers only). A 16-bit 44.1 kHz stereo
-      // WAV can exceed the Cloud Run ~32 MiB response limit, which the Google
-      // Frontend rejects with an empty 500 before our body is ever read. Persist the
-      // result to object storage and hand back a signed URL so the browser downloads
-      // straight from GCS — the audio never traverses Cloud Run.
-      const key = `masters/${randomUUID()}.wav`;
-      const url = await objectStorage.saveSignedDownload(key, carvedBuffer, "audio/wav", filename);
+      // Full-length master — try object storage first (signed URL avoids large
+      // response bodies). If storage is unavailable, stream the buffer directly
+      // so mastering never hard-fails just because object storage is down.
+      let url: string | null = null;
+      try {
+        const key = `masters/${randomUUID()}.wav`;
+        url = await objectStorage.saveSignedDownload(key, carvedBuffer, "audio/wav", filename);
+      } catch (storageErr) {
+        logger.warn({ err: storageErr }, "Object storage unavailable; streaming mastered audio directly");
+      }
 
-      res.json({
-        success: true,
-        url,
-        filename,
-        isSample: false,
-        preset: presetName,
-        denoise,
-        kernel: "MLK_v3",
-        parity,
-        bytes: carvedBuffer.length,
-      });
+      if (url) {
+        res.json({
+          success: true,
+          url,
+          filename,
+          isSample: false,
+          preset: presetName,
+          denoise,
+          kernel: "MLK_v3",
+          parity,
+          bytes: carvedBuffer.length,
+        });
+      } else {
+        res.setHeader("Content-Type", "audio/wav");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("X-GK-Mode", "master");
+        res.setHeader("X-GK-Preset", presetName);
+        res.setHeader("X-GK-Denoise", denoise ? "true" : "false");
+        res.setHeader("X-GK-Sample", "false");
+        res.setHeader("X-GK-Kernel", "MLK_v3");
+        res.setHeader("X-GK-Parity", parity);
+        streamBuffer(res, carvedBuffer);
+      }
     } catch (err: any) {
       void logToolError("Mastering Tool", "MASTERING", err);
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });
