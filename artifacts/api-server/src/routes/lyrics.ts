@@ -17,7 +17,7 @@ import { randomUUID, createHmac, createHash } from "crypto";
 import type { LineState } from "@workspace/db";
 import { authorshipScore } from "@workspace/authorship";
 import { generateVertexText, isVertexConfigured } from "../geminiVertex";
-import { generateProxyText } from "../geminiProxy";
+import { generateProxyText, isProxyConfigured } from "../geminiProxy";
 import { logger } from "../lib/logger";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
@@ -47,24 +47,35 @@ function verifyEmbedToken(projectId: string, authorshipScore: number, token: str
  */
 async function geminiGenerate(prompt: string): Promise<string> {
   const cfg = { maxOutputTokens: 8192 };
-  // 8-second hard timeout on Vertex — falls back to Replit proxy immediately
-  const TIMEOUT_MS = 8_000;
+  const TIMEOUT_MS = 15_000; // 15s max per provider
+
+  // Race both providers simultaneously — whichever responds first with a
+  // non-empty result wins. MLK v3 kernel runs on the output side regardless
+  // of which provider answered.
+  const candidates: Promise<string>[] = [];
 
   if (isVertexConfigured()) {
-    try {
-      const text = await generateVertexText(prompt, cfg, TIMEOUT_MS);
-      if (text.trim()) return text;
-      logger.warn("Vertex AI returned empty lyric output; falling back to Gemini proxy");
-    } catch (err) {
-      logger.warn({ err }, "Vertex AI lyric generation failed; falling back to Gemini proxy");
-    }
+    candidates.push(
+      generateVertexText(prompt, cfg, TIMEOUT_MS)
+        .then(t => { if (!t.trim()) throw new Error("vertex:empty"); return t; })
+        .catch(err => { logger.warn({ err }, "Vertex AI race lost or failed"); throw err; })
+    );
   }
 
-  const proxyText = await generateProxyText(prompt, cfg, TIMEOUT_MS);
-  if (!proxyText.trim()) {
-    throw new Error("Gemini returned empty lyric output");
+  if (isProxyConfigured()) {
+    candidates.push(
+      generateProxyText(prompt, cfg, TIMEOUT_MS)
+        .then(t => { if (!t.trim()) throw new Error("proxy:empty"); return t; })
+        .catch(err => { logger.warn({ err }, "Replit proxy race lost or failed"); throw err; })
+    );
   }
-  return proxyText;
+
+  if (candidates.length === 0) {
+    throw new Error("No AI provider configured (set GCP_SERVICE_ACCOUNT or AI_INTEGRATIONS_GEMINI_*)");
+  }
+
+  // Promise.any: first fulfillment wins; only throws AggregateError if ALL fail
+  return Promise.any(candidates);
 }
 
 const DEFAULT_CERTIFICATION = "I certify these lyrics are my original human work and were NOT produced by an AI.";
