@@ -146,9 +146,10 @@ export default function VideoTemplate({
   }, [currentSceneKey, baseSceneKey, hasEnded]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-[#09090b] text-[#fafafa] font-['Outfit']">
-      {/* Noise texture */}
-      <div className="noise-overlay z-50"></div>
+    <div className="w-screen h-screen flex items-center justify-center overflow-hidden bg-black">
+      <div className="relative w-full max-w-[177.78vh] aspect-video max-h-screen overflow-hidden bg-[#09090b] text-[#fafafa] font-['Outfit']">
+        {/* Noise texture */}
+        <div className="noise-overlay z-50"></div>
 
       {/* Persistent ambient layer across scenes */}
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -181,17 +182,18 @@ export default function VideoTemplate({
         </span>
       </div>
 
-      {/* Ambient music bed (quiet, looping) */}
-      <audio
-        ref={musicRef}
-        src={`${import.meta.env.BASE_URL}audio/gravelking_pro_soundtrack.mp3`}
-        preload="auto"
-        autoPlay
-        loop
-        muted={muted}
-      />
-      {/* Per-scene voice-over narration */}
-      <audio ref={voRef} preload="auto" autoPlay muted={muted} />
+        {/* Ambient music bed (quiet, looping) */}
+        <audio
+          ref={musicRef}
+          src={`${import.meta.env.BASE_URL}audio/gravelking_pro_soundtrack.mp3`}
+          preload="auto"
+          autoPlay
+          loop
+          muted={muted}
+        />
+        {/* Per-scene voice-over narration */}
+        <audio ref={voRef} preload="auto" autoPlay muted={muted} />
+      </div>
     </div>
   );
 }
