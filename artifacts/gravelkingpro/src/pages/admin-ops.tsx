@@ -331,6 +331,48 @@ function OpsDashboard() {
           </CardContent>
         </Card>
 
+        {/* Corporate Documents */}
+        <Card className="border-border/40 bg-card/40">
+          <CardContent className="pt-5">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-4">Corporate Pipeline Documents</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <a
+                href="/pitch-paper.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 hover:bg-amber-500/10 transition-colors"
+              >
+                <div className="text-xs font-bold uppercase tracking-widest text-amber-500">Investor Pitch</div>
+                <div className="text-sm font-semibold text-foreground">Executive Pitch Paper</div>
+                <div className="text-xs text-muted-foreground leading-relaxed">MLK V3.5 moat, Clean Room Protocol, product overview, ask. Printable PDF-ready.</div>
+                <div className="text-xs text-amber-500/60 mt-1 font-mono">pitch-paper.html ↗</div>
+              </a>
+              <a
+                href="/admin-strategy.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col gap-1.5 rounded-lg border border-border/40 bg-card/30 p-4 hover:bg-card/60 transition-colors"
+              >
+                <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Internal Strategy</div>
+                <div className="text-sm font-semibold text-foreground">Admin Strategy Brief</div>
+                <div className="text-xs text-muted-foreground leading-relaxed">Revenue pillars, chain-of-title licensing, distributor targets, 90-day priority stack, 7-day social calendar.</div>
+                <div className="text-xs text-muted-foreground/50 mt-1 font-mono">admin-strategy.html ↗</div>
+              </a>
+              <a
+                href="/cashflow-plan.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col gap-1.5 rounded-lg border border-border/40 bg-card/30 p-4 hover:bg-card/60 transition-colors"
+              >
+                <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Financial Model</div>
+                <div className="text-sm font-semibold text-foreground">24-Month Cash Flow Plan</div>
+                <div className="text-xs text-muted-foreground leading-relaxed">Three revenue drivers, monthly MRR projections, unit economics, break-even, bear/base/bull scenarios.</div>
+                <div className="text-xs text-muted-foreground/50 mt-1 font-mono">cashflow-plan.html ↗</div>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Error log */}
         <Card className="border-border/40 bg-card/40">
           <CardContent className="pt-5">

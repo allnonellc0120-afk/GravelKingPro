@@ -311,6 +311,18 @@ masterRouter.post(
       const filename = `gravelking_mastered_${presetName}.wav`;
 
       // Shared header setter used for both sample and full-length paths
+      // Integrity block — the structured "Membership Pass" payload attached to
+      // every delivery. UI uses this to render the seal badge; downstream systems
+      // can inspect it without parsing raw header strings.
+      const integrityBlock = {
+        status:       "sealed",          // "sealed" = left our server pristine
+        stamp:        "GKP_V2",          // LSB format version
+        certId,
+        artist:       artistHandle,
+        verifyUrl:    "/api/kernel/verify-cert",
+        note:         "LSB nominator embedded. Any re-encode or bit-level edit breaks the chain of custody and revokes ecosystem status.",
+      } as const;
+
       const setCertHeaders = () => {
         res.setHeader("X-GK-Mode",              "master");
         res.setHeader("X-GK-Preset",            presetName);
@@ -321,6 +333,9 @@ masterRouter.post(
         res.setHeader("X-GK-Artist",            artistHandle);
         res.setHeader("X-GK-Style-Score",       String(styleScore.score));
         res.setHeader("X-GK-Style-Eligible",    styleScore.eligible ? "true" : "false");
+        // Active seal signal — one header the client can gate UI on without
+        // inspecting the full cert or parsing the cert hash.
+        res.setHeader("X-GK-Integrity",         "sealed");
       };
 
       if (isSample) {
@@ -337,7 +352,22 @@ masterRouter.post(
       let url: string | null = null;
       try {
         const key = `masters/${randomUUID()}.wav`;
-        url = await objectStorage.saveSignedDownload(key, stampedBuffer, "audio/wav", filename);
+        // Pass cert metadata so the GCS object itself carries the seal record —
+        // stamp is visible at the storage layer, not only in PCM LSBs + DB.
+        url = await objectStorage.saveSignedDownload(
+          key,
+          stampedBuffer,
+          "audio/wav",
+          filename,
+          3600,
+          {
+            "gkp-integrity":  "sealed",
+            "gkp-cert-id":    certId,
+            "gkp-artist":     artistHandle,
+            "gkp-stamp":      "GKP_V2",
+            "gkp-kernel":     "MLK_v3.5",
+          },
+        );
       } catch (storageErr) {
         logger.warn({ err: storageErr }, "Object storage unavailable; streaming mastered audio directly");
       }
@@ -355,6 +385,7 @@ masterRouter.post(
           certHash,
           artist:     artistHandle,
           bytes:      stampedBuffer.length,
+          integrity:  integrityBlock,
         });
       } else {
         res.setHeader("Content-Type", "audio/wav");

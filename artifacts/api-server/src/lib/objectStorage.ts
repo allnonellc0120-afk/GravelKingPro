@@ -239,7 +239,11 @@ export class ObjectStorageService {
     buffer: Buffer,
     contentType: string,
     downloadFilename: string,
-    ttlSec = 3600
+    ttlSec = 3600,
+    /** Optional key/value pairs stored as GCS custom object metadata.
+     *  Use this to attach forensic/cert fields directly to the stored object
+     *  so the seal record is visible at the storage layer, not only in the DB. */
+    certMetadata?: Record<string, string>,
   ): Promise<string> {
     const privateDir = this.getPrivateObjectDir();
     const base = privateDir.endsWith("/") ? privateDir.slice(0, -1) : privateDir;
@@ -252,7 +256,12 @@ export class ObjectStorageService {
       .file(objectName)
       .save(buffer, {
         contentType,
-        metadata: { contentDisposition: `attachment; filename="${safeName}"` },
+        metadata: {
+          contentDisposition: `attachment; filename="${safeName}"`,
+          // Spread any cert/integrity fields into GCS object custom metadata.
+          // These survive the object's lifetime independently of the DB record.
+          ...(certMetadata ?? {}),
+        },
       });
     return signObjectURL({ bucketName, objectName, method: "GET", ttlSec });
   }
