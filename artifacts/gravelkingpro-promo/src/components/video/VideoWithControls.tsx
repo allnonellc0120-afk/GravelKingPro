@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Repeat, Volume2, VolumeX, ChevronDown, ChevronUp } from 'lucide-react';
+import { Repeat, Volume2, VolumeX, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import VideoTemplate, { SCENE_DURATIONS } from './VideoTemplate';
 import { useSceneControls } from '@/hooks/useSceneControls';
 
@@ -136,46 +136,68 @@ function ControlBar({
 
 export default function VideoWithControls() {
   const isIframed = typeof window !== 'undefined' && window.self !== window.top;
+  const isExport = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('export') === '1';
 
   const {
     sceneKeys, activeIndex, locked, mountKey, tick,
     durations, activeDuration, onSceneChange, jumpTo, toggleLock,
   } = useSceneControls(SCENE_DURATIONS);
 
+  const AUTO_HIDE_MS = 2500;
   const [muted, setMuted] = useState(true);
   const [needsGesture, setNeedsGesture] = useState(true);
   const sensorRef = useRef<HTMLDivElement | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [hovering, setHovering] = useState(false);
   const [tapPinned, setTapPinned] = useState(false);
+  const [mp4Url, setMp4Url] = useState<string | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const mp4Path = `${import.meta.env.BASE_URL}videos/gravelkingpro_pitch_228.mp4`;
 
-  const handlePointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse') setHovering(true);
+  const resetHideTimer = useCallback(() => {
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => {
+      setCollapsed(true);
+      setTapPinned(false);
+      setHovering(false);
+    }, AUTO_HIDE_MS);
   }, []);
+  const handlePointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse') {
+      setHovering(true);
+      resetHideTimer();
+    }
+  }, [resetHideTimer]);
   const handlePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse') setHovering(false);
   }, []);
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse') return;
     if (collapsed) setTapPinned(true);
-  }, [collapsed]);
+    resetHideTimer();
+  }, [collapsed, resetHideTimer]);
   const handleToggleCollapsed = useCallback(() => {
     setCollapsed(c => {
-      if (!c) { setHovering(false); setTapPinned(false); }
-      return !c;
-    });
-  }, []);
-  const handleToggleMuted = useCallback(() => {
-    setMuted(m => {
-      const next = !m;
-      if (!next) {
-        // iOS Safari requires play() to be issued inside a user gesture to unlock audio.
-        document.querySelectorAll('audio').forEach((a) => a.play().catch(() => {}));
+      const next = !c;
+      if (next) {
+        setHovering(false);
+        setTapPinned(false);
+      } else {
+        resetHideTimer();
       }
       return next;
     });
+  }, [resetHideTimer]);
+  const handleToggleMuted = useCallback(() => {
+    // Unlock audio inside the current user gesture; iOS Safari requires this.
+    document.querySelectorAll('audio').forEach((a) => {
+      a.muted = false;
+      a.play().catch(() => {});
+    });
+    setMuted(false);
     setNeedsGesture(false);
-  }, []);
+    resetHideTimer();
+  }, [resetHideTimer]);
 
   useEffect(() => {
     if (!(collapsed && tapPinned)) return;
@@ -188,11 +210,24 @@ export default function VideoWithControls() {
     return () => document.removeEventListener('pointerdown', onDocPointerDown);
   }, [collapsed, tapPinned]);
 
-  const barVisible = !collapsed || hovering || tapPinned;
-  const showGestureOverlay = isIframed && needsGesture;
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const res = await fetch(mp4Path, { method: 'HEAD' });
+        if (alive && res.ok) setMp4Url(mp4Path);
+      } catch {}
+    };
+    check();
+    const id = window.setInterval(check, 15000);
+    return () => { alive = false; window.clearInterval(id); };
+  }, [mp4Path]);
 
-  // Export path: no props, preserves recording markers and unmuted audio.
-  if (!isIframed) return <VideoTemplate />;
+  const barVisible = !collapsed || hovering || tapPinned;
+  const showGestureOverlay = needsGesture;
+
+  // Export path: clean, no controls, unmuted audio.
+  if (isExport) return <VideoTemplate />;
 
   return (
     <div className="relative w-full h-screen">
@@ -203,13 +238,25 @@ export default function VideoWithControls() {
         muted={muted}
         onSceneChange={onSceneChange}
       />
+      {mp4Url && (
+        <a
+          href={mp4Url}
+          download
+          className="absolute top-4 right-4 z-[55] flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-full text-sm font-semibold hover:bg-white/10 transition-colors"
+          aria-label="Download MP4"
+        >
+          <Download className="w-5 h-5" />
+          <span className="hidden sm:inline">Download MP4</span>
+        </a>
+      )}
       {showGestureOverlay && (
         <button
-          className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 text-white"
-          onClick={handleToggleMuted}
+          className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 text-white touch-manipulation"
+          onPointerDown={handleToggleMuted}
           aria-label="Tap to play with sound"
+          style={{ touchAction: 'manipulation' }}
         >
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 pointer-events-none">
             <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
               <Volume2 className="w-10 h-10" />
             </div>
