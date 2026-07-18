@@ -26,10 +26,20 @@
 }
 
 @layer base {
+  html {
+    height: 100%;
+    width: 100%;
+  }
   body {
+    height: 100%;
+    width: 100%;
     background-color: #09090b;
     color: #fafafa;
     overflow: hidden;
+  }
+  #root {
+    height: 100%;
+    width: 100%;
   }
 }
 
