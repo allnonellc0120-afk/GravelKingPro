@@ -47,10 +47,12 @@ function verifyEmbedToken(projectId: string, authorshipScore: number, token: str
  */
 async function geminiGenerate(prompt: string): Promise<string> {
   const cfg = { maxOutputTokens: 8192 };
+  // 8-second hard timeout on Vertex — falls back to Replit proxy immediately
+  const TIMEOUT_MS = 8_000;
 
   if (isVertexConfigured()) {
     try {
-      const text = await generateVertexText(prompt, cfg);
+      const text = await generateVertexText(prompt, cfg, TIMEOUT_MS);
       if (text.trim()) return text;
       logger.warn("Vertex AI returned empty lyric output; falling back to Gemini proxy");
     } catch (err) {
@@ -58,7 +60,7 @@ async function geminiGenerate(prompt: string): Promise<string> {
     }
   }
 
-  const proxyText = await generateProxyText(prompt, cfg);
+  const proxyText = await generateProxyText(prompt, cfg, TIMEOUT_MS);
   if (!proxyText.trim()) {
     throw new Error("Gemini returned empty lyric output");
   }
