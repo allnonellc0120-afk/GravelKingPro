@@ -131,3 +131,9 @@ id = "Jr9uNyHF39Cu0uJdfq2rL"
 uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_promo_youtube.mp4"
 type = "video"
 title = "GravelKing Pro — YouTube Promo (99s, 1080p)"
+
+[[outputs]]
+id = "vtsO69zU_zj12MlYc4aa_"
+uri = "file://attached_assets/gravelking_ip_certified_demo.mp3"
+type = "audio"
+title = "GravelKing IP Certified Demo — MLK v3.5 (30 sec)"
