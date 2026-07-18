@@ -1,8 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
 @layer base {
   :root {
@@ -66,6 +64,15 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+/* Poster/QA mode (?still): force the scene layer to its final visual state.
+   !important beats framer-motion inline styles, so screenshots show full content. */
+.poster-mode .z-10,
+.poster-mode .z-10 * {
+  opacity: 1 !important;
+  transition: none !important;
+  animation: none !important;
 }
 
 /* Custom transitions and animations */
