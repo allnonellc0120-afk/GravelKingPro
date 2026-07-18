@@ -139,11 +139,13 @@ export default function VideoTemplate({
     }
     const src = SCENE_VO[baseSceneKey];
     if (!src) return;
-    vo.src = `${import.meta.env.BASE_URL}${src}`;
-    vo.currentTime = 0;
+    if (vo.src !== `${import.meta.env.BASE_URL}${src}`) {
+      vo.src = `${import.meta.env.BASE_URL}${src}`;
+      vo.currentTime = 0;
+    }
     vo.volume = 1.0;
     vo.play().catch(() => {});
-  }, [currentSceneKey, baseSceneKey, hasEnded]);
+  }, [currentSceneKey, baseSceneKey, hasEnded, muted]);
 
   return (
     <div className="w-screen h-screen flex items-center justify-center overflow-hidden bg-black">

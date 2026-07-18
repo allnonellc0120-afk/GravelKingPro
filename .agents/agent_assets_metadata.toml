@@ -179,3 +179,9 @@ id = "vvPHiZVDfbPSc_TQAPhFP"
 uri = "file://attached_assets/promo/vo_revenue.mp3"
 type = "audio"
 title = "pitch vo revenue"
+
+[[outputs]]
+id = "n_wrSjV5FAwr3DklfP0Bx"
+uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_pitch_228.mp4"
+type = "video"
+title = "GravelKing Pro Pitch Video (228.5s MP4)"
