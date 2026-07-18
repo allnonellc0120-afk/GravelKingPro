@@ -145,6 +145,19 @@ async function migrateAppSchema() {
       )
     `);
 
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ip_cert_stubs (
+        cert_id               text        PRIMARY KEY,
+        denominator           text        NOT NULL,
+        handshake             text        NOT NULL,
+        content_hash          text        NOT NULL,
+        artist                text        NOT NULL,
+        certified_at          timestamptz NOT NULL DEFAULT now(),
+        style_prompt          text,
+        style_authorship_score integer
+      )
+    `);
+
     logger.info("App schema migration complete");
   } catch (err: unknown) {
     logger.error({ err }, "App schema migration failed — continuing anyway");

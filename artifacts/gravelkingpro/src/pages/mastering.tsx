@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
+import { styleAuthorshipScore } from "@workspace/authorship";
 import { BeforeAfterDemo } from "@/components/before-after-demo";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
@@ -46,8 +47,11 @@ export default function Mastering() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [stylePrompt, setStylePrompt] = useState("");
 
-  const processFile = useCallback(async (file: File, selectedPreset: PresetId, denoise: boolean) => {
+  const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
+
+  const processFile = useCallback(async (file: File, selectedPreset: PresetId, denoise: boolean, style: string) => {
     setFileName(file.name);
     setResultUrl(null);
     setErrorMsg("");
@@ -82,6 +86,7 @@ export default function Mastering() {
     fd.append("mode", "master");
     fd.append("preset", selectedPreset);
     fd.append("denoise", String(denoise));
+    fd.append("stylePrompt", style);
 
     // 3-minute hard cap — keeps mobile browsers from hanging forever when the
     // tab is backgrounded or the connection stalls mid-upload/download.
@@ -170,7 +175,7 @@ export default function Mastering() {
   };
 
   const startMastering = () => {
-    if (pendingFile) processFile(pendingFile, preset, denoiseOn);
+    if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt);
   };
 
   const download = () => {
@@ -296,6 +301,71 @@ export default function Mastering() {
               <label htmlFor="denoise" className="text-sm cursor-pointer">
                 Denoise — remove background hiss and hum before mastering
               </label>
+            </div>
+
+            {/* ── Human Authorship — Style Prompt ───────────────────────── */}
+            <div className="space-y-2 p-3 rounded-lg border border-indigo-500/20 bg-indigo-500/5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-indigo-300">Instrumental Style Prompt</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Describe how you directed the instrumental. The more specific, the stronger your copyright claim.
+                  </p>
+                </div>
+                {stylePrompt.trim() && (
+                  <div className={`shrink-0 text-right ${styleScore.eligible ? "text-emerald-400" : "text-amber-400"}`}>
+                    <p className="text-lg font-black leading-none">{styleScore.score}</p>
+                    <p className="text-[9px] leading-none mt-0.5 opacity-70">/ 100</p>
+                  </div>
+                )}
+              </div>
+
+              <textarea
+                value={stylePrompt}
+                onChange={(e) => setStylePrompt(e.target.value)}
+                placeholder={`e.g. "Outlaw grunge at 98 BPM in E minor — acoustic guitar intro, electric lead in verse, heavy distorted chorus with tight snare and ride cymbal, brooding and raw production"`}
+                rows={3}
+                className="w-full text-xs bg-background/60 border border-indigo-500/20 rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:border-indigo-500/50"
+              />
+
+              {stylePrompt.trim() && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={styleScore.eligible ? "text-emerald-400" : "text-amber-400"}>
+                      {styleScore.label}
+                    </span>
+                    <span className="text-muted-foreground/60">
+                      {styleScore.eligible ? "✓ Copyright eligible" : "Add more specifics"}
+                    </span>
+                  </div>
+                  <div className="h-1 rounded-full bg-indigo-500/10 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        styleScore.score >= 75 ? "bg-emerald-400" :
+                        styleScore.score >= 50 ? "bg-sky-400" :
+                        styleScore.score >= 25 ? "bg-amber-400" : "bg-red-400/60"
+                      }`}
+                      style={{ width: `${styleScore.score}%` }}
+                    />
+                  </div>
+                  {/* Breakdown chips */}
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {(Object.entries(styleScore.breakdown) as [string, number][])
+                      .filter(([, v]) => v > 0)
+                      .map(([k, v]) => (
+                        <span key={k} className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                          {k} +{v}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {!stylePrompt.trim() && (
+                <p className="text-[10px] text-muted-foreground/50 italic">
+                  Optional but recommended — embedded in the IP cert with your track. Helps prove human creative direction in court.
+                </p>
+              )}
             </div>
 
             <Button

@@ -40,6 +40,7 @@
 - [Admin purge-user endpoint](admin-purge-user.md) — deleting a user needs FK-safe order (process_runs → tracks → users); admin-cookie gated; run against prod after deploy
 - [Lyric import possession stamp](lyric-import-possession-stamp.md) — self-written lyrics = SEPARATE IP track (lyric_imports + stampType), never merged with AI-collab scoring; cert canonical server-side
 - [GravelKingPro product focus](product-focus.md) — 4 pillars only (IP, Mastering, Vocal Booth, karaoke DAW); cloud-AI/Replicate/splitter/voice-removal deprecated, don't reintroduce in code or public copy
+- [IP Cert split-key architecture](cert-split-architecture.md) — nominator in track LSBs, denominator+HMAC on server only; dual-stored Postgres+Firestore; style score 0–100 in cert
 - [Authorship scoring](authorship-scoring.md) — shared @workspace/authorship lib (diff-match-patch); score MUST stay 0–100 to preserve >=25 copyright gate; delete+retype-same=0 credit; client import aliased to avoid state-var collision
 - [Admin Ops diagnostics pattern](admin-ops-diagnostics.md) — logToolError/recordActivity conventions, admin_settings-backed kill switch (bypasses via isAdminAuthenticated not requireAdmin), /tmp-scoped cache purge
 - [Custom domain + GoDaddy DNS](custom-domain-godaddy.md) — gravelkingpro.it.com attached to THIS repl's deploy; relink issues new replit-verify TXT; GoDaddy API secrets exist; PUT replaces ALL apex TXT (keep MS/SPF)

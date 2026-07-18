@@ -7,24 +7,32 @@ import { Scene3 } from './video_scenes/Scene3';
 import { Scene4 } from './video_scenes/Scene4';
 import { Scene5 } from './video_scenes/Scene5';
 import { Scene6 } from './video_scenes/Scene6';
-import { SceneFootage } from './video_scenes/SceneFootage';
+import { Scene7 } from './video_scenes/Scene7';
+import { Scene8 } from './video_scenes/Scene8';
+import { Scene9 } from './video_scenes/Scene9';
 
 export const SCENE_DURATIONS = {
-  rights_alert: 6000,
-  law_fact:     9000,
-  footage:     58000,
-  ip_embed:    10000,
-  workflow:    10000,
-  outro:        6000,
+  intro: 6000,
+  songwriting: 9000,
+  mastering: 9000,
+  mix_studio: 9000,
+  vocal_booth: 9000,
+  ip_cert: 9000,
+  authorship: 11000,
+  label: 9000,
+  outro: 12000,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
-  rights_alert: Scene1,
-  law_fact:     Scene2,
-  footage:      SceneFootage,
-  ip_embed:     Scene4,
-  workflow:     Scene5,
-  outro:        Scene6,
+  intro: Scene1,
+  songwriting: Scene2,
+  mastering: Scene3,
+  mix_studio: Scene4,
+  vocal_booth: Scene5,
+  ip_cert: Scene6,
+  authorship: Scene9,
+  label: Scene7,
+  outro: Scene8,
 };
 
 const SCENE_START_SEC: Record<string, number> = (() => {
@@ -60,10 +68,8 @@ export default function VideoTemplate({
 
   const baseSceneKey = currentSceneKey.replace(/_r[12]$/, '') as keyof typeof SCENE_DURATIONS;
   const SceneComponent = SCENE_COMPONENTS[baseSceneKey];
-  const isFootage = baseSceneKey === 'footage';
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const footageRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -74,75 +80,76 @@ export default function VideoTemplate({
       return;
     }
 
-    if (isFootage) {
-      audio.pause();
-      return;
-    }
-
     audio.volume = 0.45;
     const targetTime = SCENE_START_SEC[baseSceneKey] ?? 0;
     if (Math.abs(audio.currentTime - targetTime) > AUDIO_SEEK_EPSILON_SEC) {
       audio.currentTime = targetTime;
     }
     audio.play().catch(() => {});
-  }, [currentSceneKey, baseSceneKey, muted, isFootage, hasEnded]);
-
-  useEffect(() => {
-    const video = footageRef.current;
-    if (!video) return;
-
-    video.muted = muted;
-
-    if (isFootage) {
-      video.currentTime = 0;
-      video.play().catch(() => {});
-    } else {
-      video.pause();
-      video.currentTime = 0;
-    }
-  }, [isFootage, muted]);
+  }, [currentSceneKey, baseSceneKey, muted, hasEnded]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-[#0a0a0a] text-[#f5f5f5]">
-      {/* Persistent ambient layer */}
-      <div className="absolute inset-0 pointer-events-none">
+    <div className="relative w-full h-screen overflow-hidden bg-[#09090b] text-[#fafafa] font-['Outfit']">
+      {/* Noise texture */}
+      <div className="noise-overlay z-50"></div>
+      
+      {/* Persistent ambient layer across scenes */}
+      <div className="absolute inset-0 pointer-events-none z-0">
         <motion.div
-          className="absolute border border-white/5 opacity-40 mix-blend-overlay"
+          className="absolute bg-[#f59e0b] rounded-full blur-[120px] mix-blend-screen"
           animate={{
-            x: ['-10vw', '40vw', '10vw', '-10vw'][currentScene % 4],
-            y: ['20vh', '-10vh', '50vh', '20vh'][currentScene % 4],
-            scale: [1, 2, 1.5, 1][currentScene % 4],
-            rotate: [0, 45, -45, 0][currentScene % 4],
+            x: ['-20vw', '50vw', '80vw', '10vw', '-20vw'][currentScene % 5],
+            y: ['-20vh', '30vh', '80vh', '10vh', '-20vh'][currentScene % 5],
+            scale: [1, 1.5, 0.8, 1.2, 1][currentScene % 5],
+            opacity: [0.05, 0.08, 0.04, 0.07, 0.05][currentScene % 5],
           }}
-          transition={{ duration: 5, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 8, ease: [0.25, 0.1, 0.25, 1] }}
           style={{ width: '40vw', height: '40vw' }}
         />
         <motion.div
-          className="absolute bg-[#c9a227] rounded-full blur-[150px] opacity-10 mix-blend-screen"
+          className="absolute bg-[#71717a] rounded-full blur-[150px] mix-blend-screen"
           animate={{
-            x: ['80vw', '10vw', '50vw', '80vw'][currentScene % 4],
-            y: ['80vh', '20vh', '-20vh', '80vh'][currentScene % 4],
-            scale: [1, 0.8, 1.2, 1][currentScene % 4],
+            x: ['80vw', '20vw', '-10vw', '60vw', '80vw'][currentScene % 5],
+            y: ['80vh', '10vh', '60vh', '-10vh', '80vh'][currentScene % 5],
+            scale: [1.2, 0.9, 1.4, 0.8, 1.2][currentScene % 5],
+            opacity: [0.03, 0.06, 0.02, 0.05, 0.03][currentScene % 5],
           }}
-          transition={{ duration: 7, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 10, ease: [0.25, 0.1, 0.25, 1] }}
           style={{ width: '50vw', height: '50vw' }}
+        />
+        
+        {/* Dynamic framing lines */}
+        <motion.div
+          className="absolute top-0 left-8 w-[1px] h-full bg-gradient-to-b from-transparent via-[#f59e0b]/20 to-transparent"
+          animate={{
+            y: ['-100%', '100%']
+          }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+        />
+        <motion.div
+          className="absolute top-0 right-8 w-[1px] h-full bg-gradient-to-b from-transparent via-[#f59e0b]/20 to-transparent"
+          animate={{
+            y: ['100%', '-100%']
+          }}
+          transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
         />
       </div>
 
-      {/* Real footage video — fills screen during footage scene */}
-      <video
-        ref={footageRef}
-        src={`${import.meta.env.BASE_URL}videos/walkthrough.mp4`}
-        className="absolute inset-0 w-full h-full object-contain z-10"
-        style={{ opacity: isFootage ? 1 : 0, transition: 'opacity 0.6s ease' }}
-        playsInline
-        preload="auto"
-        muted={muted}
-      />
-
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence mode="sync">
         {SceneComponent && <SceneComponent key={currentSceneKey} />}
       </AnimatePresence>
+
+      {/* Global persistent overlay elements */}
+      <div className="absolute bottom-[4vh] left-[3vw] z-40 flex items-center gap-[1vw]">
+        <motion.div 
+          className="w-[0.8vw] h-[0.8vw] rounded-full bg-[#f59e0b]"
+          animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+        <span className="font-mono text-[0.8vw] text-[#71717a] tracking-widest uppercase">
+          GravelKing Pro // Studio V3.5
+        </span>
+      </div>
 
       <audio
         ref={audioRef}

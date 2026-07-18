@@ -1,7 +1,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, unlink } from "fs/promises";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { gravelking_opt } from "./kernel";
 
 const execFileAsync = promisify(execFile);
@@ -171,6 +171,92 @@ export function isValidWav(buf: Buffer): boolean {
     return frameBytes > 0 && dataSize >= frameBytes;
   } catch {
     return false;
+  }
+}
+
+// ── LSB Watermark — opaque bit transport ─────────────────────────────────────
+//
+// This module ONLY moves bytes in/out of audio sample LSBs.
+// All cert math (SHA-256 splitting, HMAC, key derivation) lives in the server
+// route layer (master.ts) and never appears here. The kernel is deliberately
+// ignorant of what the payload means — it only writes and reads bits.
+//
+// Wire format starting at sample 0:
+//   5 bytes  magic "GKPW\x03"
+//   2 bytes  big-endian uint16 payload byte length
+//   N bytes  opaque payload (caller decides the contents)
+//
+// Each bit costs one 16-bit PCM sample (2 bytes each).
+// A 256-byte payload = 2096 samples ≈ 24ms at 44100 Hz — completely inaudible.
+// Survives lossless copies (WAV↔FLAC). Destroyed by lossy re-encode (MP3/AAC)
+// — detectable absence = re-encoded copy after GK export.
+
+const GKP_MAGIC = Buffer.from("GKPW\x03"); // 5 bytes, format version 3
+
+/** Read `bytes` bytes from PCM LSBs starting at `startSample`. */
+function lsbRead(pcm: Buffer, startSample: number, bytes: number): Buffer {
+  const out = Buffer.alloc(bytes);
+  for (let b = 0; b < bytes * 8; b++) {
+    const off = (startSample + b) * 2;
+    if (off + 2 > pcm.length) break;
+    const byteIdx = b >> 3;
+    const bitIdx  = 7 - (b & 7);
+    out[byteIdx]  = (out[byteIdx] & ~(1 << bitIdx)) | ((pcm.readInt16LE(off) & 1) << bitIdx);
+  }
+  return out;
+}
+
+/** Write `data` bytes into PCM LSBs starting at `startSample`. Mutates pcm. */
+function lsbWrite(pcm: Buffer, startSample: number, data: Buffer): void {
+  for (let b = 0; b < data.length * 8; b++) {
+    const off = (startSample + b) * 2;
+    if (off + 2 > pcm.length) break;
+    const bitVal = (data[b >> 3] >> (7 - (b & 7))) & 1;
+    pcm.writeInt16LE((pcm.readInt16LE(off) & ~1) | bitVal, off);
+  }
+}
+
+/**
+ * Embed an opaque payload into a WAV buffer's LSBs.
+ * The calling route (master.ts) decides what the payload contains —
+ * this function only handles the bit mechanics.
+ */
+export function embedLsbPayload(wavBuf: Buffer, payload: Buffer): Buffer {
+  const { numChannels, sampleRate, bitsPerSample, dataOffset, dataSize } = parseWav(wavBuf);
+
+  const frame = Buffer.alloc(GKP_MAGIC.length + 2 + payload.length);
+  GKP_MAGIC.copy(frame, 0);
+  frame.writeUInt16BE(payload.length, GKP_MAGIC.length);
+  payload.copy(frame, GKP_MAGIC.length + 2);
+
+  if (Math.floor(dataSize / 2) < frame.length * 8) return wavBuf; // too short
+
+  const pcm = Buffer.from(wavBuf.subarray(dataOffset, dataOffset + dataSize));
+  lsbWrite(pcm, 0, frame);
+  return Buffer.concat([buildWavHeader(numChannels, sampleRate, bitsPerSample, pcm.length), pcm]);
+}
+
+/**
+ * Extract the opaque payload from a WAV buffer's LSBs.
+ * Returns null when the GKP magic header is absent — file was not stamped or
+ * was re-encoded after export (lossy encoding destroys LSB watermarks).
+ */
+export function extractLsbPayload(wavBuf: Buffer): Buffer | null {
+  try {
+    const { dataOffset, dataSize } = parseWav(wavBuf);
+    const pcm        = wavBuf.subarray(dataOffset, dataOffset + dataSize);
+    const hdrSize    = GKP_MAGIC.length + 2;
+    if (Math.floor(dataSize / 2) < hdrSize * 8) return null;
+
+    const hdr = lsbRead(pcm, 0, hdrSize);
+    if (!hdr.subarray(0, GKP_MAGIC.length).equals(GKP_MAGIC)) return null;
+
+    const len = hdr.readUInt16BE(GKP_MAGIC.length);
+    if (Math.floor(dataSize / 2) < (hdrSize + len) * 8) return null;
+
+    return lsbRead(pcm, hdrSize * 8, len);
+  } catch {
+    return null;
   }
 }
 
