@@ -115,6 +115,57 @@ export function queryLibraryBySession(sessionId: string): Promise<{ songs: SongD
   })).catch(() => ({ songs: [], jobs: [] }));
 }
 
+// ── ip_cert_stubs — dual backup (court-subpoenable) ──────────────────────────
+//
+// Every mastered track's cert stub is written here to Google Firestore
+// IN ADDITION TO the local Postgres DB. Firestore is Google-operated
+// infrastructure, independently accessible via court subpoena even if
+// GravelKing's own servers are unavailable or the company closes.
+//
+// Collection: "gk_cert_stubs"
+// Document ID: certId (UUID embedded in the track watermark)
+
+export interface CertStubBackup {
+  certId:               string;
+  denominator:          string;   // server half of the split hash
+  handshake:            string;   // HMAC — only GK server can regenerate
+  contentHash:          string;   // SHA-256 of pre-MLK audio
+  artist:               string;
+  stylePrompt:          string | null;
+  styleAuthorshipScore: number | null;
+  certifiedAt:          string;   // ISO timestamp — legal creation record
+  backupNote:           string;   // human-readable legal context
+}
+
+/**
+ * Fire-and-forget Firestore backup of a cert stub.
+ * Never throws — failure is logged but never blocks the mastering response.
+ * The local Postgres DB is the primary source of truth; Firestore is the
+ * independently-subpoenable court-accessible replica.
+ */
+export function backupCertStub(stub: Omit<CertStubBackup, "backupNote">): void {
+  const db = getDb();
+  if (!db) return;
+
+  const doc: CertStubBackup = {
+    ...stub,
+    backupNote:
+      "GravelKing IP Certificate — dual-stored for independent legal verification. " +
+      "This record on Google Cloud Firestore serves as a tamper-evident, " +
+      "court-subpoenable backup of the server-side denominator. " +
+      "Verification requires this record plus the nominator embedded in the audio file. " +
+      "Neither half alone constitutes proof of ownership.",
+  };
+
+  db.collection("gk_cert_stubs")
+    .doc(stub.certId)
+    .set(doc)
+    .catch((err) => {
+      // Non-fatal — Postgres is the primary store
+      console.error("[firestore] cert backup failed:", err?.message ?? err);
+    });
+}
+
 export function updateSongDraft(
   draftId: string,
   update: Partial<Pick<SongDraftData, "authorshipScore" | "isCopyrightEligible" | "aiDraft" | "is_certified">>

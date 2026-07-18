@@ -1,92 +1,96 @@
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export function Scene4() {
-  const [phase, setPhase] = useState(0);
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setPhase(1), 500),  // Split and titles
-      setTimeout(() => setPhase(2), 2000), // Before waveform
-      setTimeout(() => setPhase(3), 4000), // After waveform sweep
-      setTimeout(() => setPhase(4), 7000), // Meta text
-    ];
-    return () => timers.forEach(t => clearTimeout(t));
-  }, []);
-
-  const numBars = 40;
-  
   return (
-    <motion.div className="absolute inset-0 bg-[#080808] flex items-center justify-center overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-20" src={`${import.meta.env.BASE_URL}videos/mpc_pads.mp4`} />
+    <motion.div 
+      className="absolute inset-0 flex items-center justify-center z-10 overflow-hidden"
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="absolute inset-0 bg-[#09090b] -z-10"></div>
+      
+      {/* Abstract Dashboard UI */}
+      <motion.div
+        className="absolute inset-0 z-0 opacity-20"
+        initial={{ scale: 1.2, opacity: 0 }}
+        animate={{ scale: 1, opacity: 0.2 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ duration: 8, ease: "easeOut" }}
+      >
+        <img 
+          src={`${import.meta.env.BASE_URL}images/dashboard_abstract.jpg`}
+          alt="Mix Studio"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-[#09090b]/60"></div>
+      </motion.div>
 
-      {/* Split Line */}
-      <motion.div 
-        className="absolute top-0 bottom-0 left-1/2 w-[2px] bg-white/10 -translate-x-1/2 z-20"
-        initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 1 }}
-      />
+      <div className="relative z-10 w-full max-w-[85vw] px-[3vw] mx-auto flex flex-col items-center">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 1, delay: 0.2 }}
+          className="text-center mb-[8vh]"
+        >
+          <div className="text-[#f59e0b] font-mono text-[1vw] tracking-widest uppercase mb-[2vh]">Step 03 // Mix Studio</div>
+          <h2 className="text-[4vw] font-bold tracking-tight">8-Track Live Multitrack</h2>
+        </motion.div>
 
-      <div className="w-full h-full flex">
-        {/* BEFORE SIDE */}
-        <div className="flex-1 flex flex-col items-center justify-center relative p-[4vw]">
-          <motion.div 
-            className="absolute top-[10vh] text-[1.5vw] font-black tracking-[0.5em] text-[#ef4444]/60"
-            initial={{ opacity: 0 }} animate={phase >= 1 ? { opacity: 1 } : { opacity: 0 }}
-          >
-            BEFORE
-          </motion.div>
-          
-          <div className="w-full h-[30vh] flex items-center gap-[0.5vw] justify-center opacity-70">
-            {Array.from({length: numBars}).map((_, i) => (
-              <motion.div 
-                key={`b-${i}`}
-                className="w-[1vw] bg-[#ef4444]/40 rounded-full"
-                initial={{ height: '2%' }}
-                animate={{ height: phase >= 2 ? `${10 + Math.random() * 30}%` : '2%' }}
-                transition={{ duration: 0.5, delay: phase >= 2 ? i * 0.02 : 0 }}
-              />
-            ))}
-          </div>
-        </div>
+        {/* Mixer UI */}
+        <motion.div
+          className="flex gap-[1vw] w-full justify-center h-[40vh]"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
+        >
+          {[1,2,3,4,5,6,7,8].map((track, i) => (
+            <motion.div 
+              key={track}
+              className="w-[6vw] bg-[#18181b]/80 border border-white/5 rounded-t-xl backdrop-blur-md flex flex-col items-center py-[3vh]"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 + (i * 0.1) }}
+            >
+              <div className="text-[0.8vw] font-mono text-[#71717a] mb-[3vh]">CH 0{track}</div>
+              
+              {/* EQ Knobs */}
+              <div className="space-y-[2vh] mb-auto">
+                {[1,2,3].map(knob => (
+                  <div key={knob} className="w-[2vw] h-[2vw] rounded-full border-2 border-[#27272a] bg-[#09090b] flex items-center justify-center relative">
+                    <motion.div 
+                      className="absolute w-[2px] h-[1vh] bg-[#f59e0b] top-[20%]"
+                      animate={{ rotate: [-45, 45, 0] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatType: "reverse", delay: i * 0.2 + knob * 0.1 }}
+                      style={{ originY: "1vh" }}
+                    />
+                  </div>
+                ))}
+              </div>
 
-        {/* AFTER SIDE */}
-        <div className="flex-1 flex flex-col items-center justify-center relative p-[4vw] bg-[#c9a227]/5">
-          <motion.div 
-            className="absolute top-[10vh] text-[1.5vw] font-black tracking-[0.5em] text-[#c9a227]"
-            initial={{ opacity: 0 }} animate={phase >= 1 ? { opacity: 1 } : { opacity: 0 }}
-          >
-            AFTER
-          </motion.div>
-          
-          <div className="w-full h-[30vh] flex items-center gap-[0.5vw] justify-center">
-            {Array.from({length: numBars}).map((_, i) => (
-              <motion.div 
-                key={`a-${i}`}
-                className="w-[1vw] bg-[#c9a227] rounded-full shadow-[0_0_15px_rgba(201,162,39,0.5)]"
-                initial={{ height: '2%' }}
-                animate={{ height: phase >= 3 ? `${40 + Math.random() * 50}%` : '2%' }}
-                transition={{ duration: 0.8, delay: phase >= 3 ? i * 0.05 : 0, type: "spring", bounce: 0.4 }}
-              />
-            ))}
-          </div>
-        </div>
+              {/* Fader */}
+              <div className="w-[0.5vw] h-[15vh] bg-black rounded-full relative mt-[3vh] border border-white/5 shadow-inner">
+                <motion.div 
+                  className="absolute w-[1.5vw] h-[4vh] bg-gradient-to-b from-gray-300 to-gray-500 rounded left-1/2 -translate-x-1/2 shadow-lg"
+                  initial={{ bottom: "10%" }}
+                  animate={{ bottom: `${40 + (Math.sin(i) * 30)}%` }}
+                  transition={{ duration: 2, ease: "easeInOut" }}
+                />
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+        
+        <motion.div
+          className="absolute bottom-[6vh] bg-black/60 backdrop-blur-md border border-white/10 px-[2vw] py-[2vh] rounded-full"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1, delay: 2 }}
+        >
+          <span className="text-[1.2vw] font-light">Real-time EQ • Compression • Metering • <span className="text-[#f59e0b] font-semibold">Zero Latency</span></span>
+        </motion.div>
       </div>
-
-      {/* Track Info Overlay */}
-      <AnimatePresence>
-        {phase >= 4 && (
-          <motion.div 
-            className="absolute bottom-[10vh] left-0 right-0 flex justify-center z-30"
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="bg-black/80 backdrop-blur-md border border-white/10 px-[4vw] py-[2vh] rounded-2xl flex flex-col items-center shadow-2xl">
-              <div className="text-[1.5vw] font-bold text-white">Used to Think I Was Superman</div>
-              <div className="text-[1vw] text-[#c9a227] font-mono mt-[0.5vh]">Mastered in 8 seconds</div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
     </motion.div>
   );
 }

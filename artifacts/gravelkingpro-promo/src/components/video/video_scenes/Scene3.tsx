@@ -1,116 +1,93 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export function Scene3() {
-  const [phase, setPhase] = useState(0);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setPhase(1), 500),  // File drags in
-      setTimeout(() => setPhase(2), 2000), // File drops
-      setTimeout(() => setPhase(3), 3000), // Preset highlights
-      setTimeout(() => setPhase(4), 4000), // Progress starts
-      setTimeout(() => setPhase(5), 7500), // Mastered
-    ];
-    return () => timers.forEach(t => clearTimeout(t));
-  }, []);
-
-  useEffect(() => {
-    if (phase !== 4) return;
-    let current = 0;
-    const interval = setInterval(() => {
-      current += 2;
-      setProgress(Math.min(current, 100));
-      if (current >= 100) clearInterval(interval);
-    }, 60);
-    return () => clearInterval(interval);
-  }, [phase]);
-
   return (
-    <motion.div className="absolute inset-0 bg-[#080808] flex items-center justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      {/* Background UI context */}
-      <div className="absolute inset-0 border border-white/5 bg-[#0a0a0a] m-[5vh] rounded-2xl p-[4vw] flex flex-col items-center">
-        <div className="text-[2vw] font-bold text-white/80 mb-[4vh]">Mastering</div>
-        
-        {/* Drop Zone */}
-        <motion.div 
-          className="w-full max-w-[40vw] aspect-video rounded-xl flex items-center justify-center relative overflow-hidden"
-          animate={{
-            borderColor: phase >= 2 ? 'rgba(201,162,39,0.5)' : 'rgba(255,255,255,0.2)',
-            borderWidth: '2px',
-            borderStyle: 'dashed',
-            backgroundColor: phase >= 2 ? 'rgba(201,162,39,0.05)' : 'transparent'
-          }}
-          transition={{ duration: 0.3 }}
-        >
-          {phase < 2 && <div className="text-white/40 text-[1.2vw]">Drop file to master</div>}
-          
-          <AnimatePresence>
-            {phase >= 2 && (
-              <motion.div 
-                className="flex flex-col items-center gap-[2vh]"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-              >
-                <div className="text-[2.5vw]">🎵</div>
-                <div className="text-[1.2vw] text-[#c9a227] font-mono">Used_to_Think_I_Was_Superman.wav</div>
-                
-                {phase >= 4 && (
-                  <div className="w-[30vw] mt-[2vh] flex flex-col items-center gap-[1vh]">
-                    <div className="w-full h-[0.5vh] bg-white/10 rounded-full overflow-hidden">
-                      <motion.div className="h-full bg-[#c9a227]" style={{ width: `${progress}%` }} />
-                    </div>
-                    {phase < 5 ? (
-                      <div className="text-[1vw] text-white/50">Processing {progress}%</div>
-                    ) : (
-                      <motion.div 
-                        className="text-[1.2vw] font-bold text-[#10b981] flex items-center gap-2"
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                      >
-                        ✓ Mastered
-                      </motion.div>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+    <motion.div 
+      className="absolute inset-0 flex items-center z-10 overflow-hidden"
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="absolute inset-0 bg-[#09090b] -z-10"></div>
+      <motion.div
+        className="absolute inset-0 z-0"
+        initial={{ opacity: 0, scale: 1.1 }}
+        animate={{ opacity: 0.3, scale: 1 }}
+        exit={{ opacity: 0, filter: "blur(20px)" }}
+        transition={{ duration: 2, ease: "easeOut" }}
+      >
+        <img 
+          src={`${import.meta.env.BASE_URL}images/daw_abstract.jpg`}
+          alt="DAW Abstract"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-[#09090b]/80"></div>
+      </motion.div>
 
-        {/* Presets */}
-        <div className="mt-[6vh] flex gap-[2vw]">
-          {["Baseline", "Punchy", "Warm", "Loud"].map(p => (
+      <div className="relative z-10 w-full max-w-[85vw] px-[4vw] mx-auto grid grid-cols-2 gap-[4vw] items-center">
+        
+        {/* Visual Column - Meters */}
+        <motion.div
+          className="flex flex-col gap-[2vh]"
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -50 }}
+          transition={{ duration: 1, delay: 0.2 }}
+        >
+          {[
+            { label: 'Club', val: '-12 LUFS', w: '85%' },
+            { label: 'YouTube', val: '-14 LUFS', w: '75%' },
+            { label: 'Apple', val: '-16 LUFS', w: '65%' },
+            { label: 'SoundCloud', val: '-11 LUFS', w: '92%' },
+          ].map((preset, i) => (
             <motion.div 
-              key={p} 
-              className="px-[2vw] py-[1vh] rounded-full border text-[1vw]"
-              animate={{
-                borderColor: p === "Baseline" && phase >= 3 ? 'rgba(201,162,39,1)' : 'rgba(255,255,255,0.2)',
-                color: p === "Baseline" && phase >= 3 ? '#c9a227' : 'rgba(255,255,255,0.7)',
-                backgroundColor: p === "Baseline" && phase >= 3 ? 'rgba(201,162,39,0.1)' : 'transparent'
-              }}
+              key={preset.label}
+              className="bg-black/50 border border-white/5 rounded-xl p-[2vh] backdrop-blur-md"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.5 + (i * 0.15) }}
             >
-              {p}
+              <div className="flex justify-between text-[1vw] mb-[1vh] font-mono">
+                <span className="text-white">{preset.label}</span>
+                <span className="text-[#f59e0b]">{preset.val}</span>
+              </div>
+              <div className="h-[1vh] w-full bg-white/10 rounded-full overflow-hidden flex">
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                  initial={{ width: '0%' }}
+                  animate={{ width: preset.w }}
+                  transition={{ duration: 1.5, delay: 1 + (i * 0.1), type: "spring" }}
+                />
+              </div>
             </motion.div>
           ))}
-        </div>
-      </div>
+        </motion.div>
 
-      {/* Dragging File Element */}
-      <AnimatePresence>
-        {phase === 1 && (
+        {/* Text Column */}
+        <div className="flex flex-col justify-center">
           <motion.div
-            className="absolute z-50 bg-[#1a1a1a] border border-white/20 p-[1.5vw] rounded-lg shadow-2xl flex items-center gap-[1vw]"
-            initial={{ x: '100vw', y: '20vh', rotate: 5 }}
-            animate={{ x: '0vw', y: '0vh', rotate: 0 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20, filter: "blur(10px)" }}
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
           >
-            <div className="text-[2vw]">🎵</div>
-            <div className="text-[1vw] text-white/80 font-mono">Used_to_Think_I_Was_Superman.wav</div>
+            <div className="text-[#f59e0b] font-mono text-[1vw] tracking-widest uppercase mb-[2vh]">Step 02 // Mastering Tool</div>
+            <h2 className="text-[4vw] font-bold tracking-tight mb-[3vh] leading-tight">
+              Broadcast<br />Ready. Instantly.
+            </h2>
+            <p className="text-[#71717a] text-[1.2vw] max-w-[30vw] font-light mb-[4vh]">
+              Local MLK v3.5 kernel processing. No cloud uploads. 11 broadcast presets to hit exact LUFS targets in under 2 minutes.
+            </p>
+            
+            <div className="inline-flex items-center gap-[1vw] px-[1.5vw] py-[1.5vh] rounded-lg border border-[#f59e0b]/50 bg-[#f59e0b]/10">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#f59e0b] w-[1.5vw] h-[1.5vw]">
+                <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="font-semibold text-white text-[1.1vw]">44.1kHz Studio Quality</span>
+            </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+
+      </div>
     </motion.div>
   );
 }
