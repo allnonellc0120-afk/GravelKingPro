@@ -137,3 +137,45 @@ id = "vtsO69zU_zj12MlYc4aa_"
 uri = "file://attached_assets/gravelking_ip_certified_demo.mp3"
 type = "audio"
 title = "GravelKing IP Certified Demo — MLK v3.5 (30 sec)"
+
+[[outputs]]
+id = "bao-NyvBGLqkDcGUHIyPZ"
+uri = "file://attached_assets/promo/vo_hook.mp3"
+type = "audio"
+title = "pitch vo hook"
+
+[[outputs]]
+id = "LyIPeu9UQpdgvKeHFkHiB"
+uri = "file://attached_assets/promo/vo_intro.mp3"
+type = "audio"
+title = "pitch vo intro"
+
+[[outputs]]
+id = "nF62DXnokcncbD159TnIq"
+uri = "file://attached_assets/promo/vo_problem.mp3"
+type = "audio"
+title = "pitch vo problem"
+
+[[outputs]]
+id = "PR23uzdT7ktg0wXZ8BUiY"
+uri = "file://attached_assets/promo/vo_market.mp3"
+type = "audio"
+title = "pitch vo market"
+
+[[outputs]]
+id = "rMu39G6tC9b5JbqXYoNWk"
+uri = "file://attached_assets/promo/vo_moat.mp3"
+type = "audio"
+title = "pitch vo moat"
+
+[[outputs]]
+id = "jOK8LrHXMU4ctjj_RnK-j"
+uri = "file://attached_assets/promo/vo_ask.mp3"
+type = "audio"
+title = "pitch vo ask"
+
+[[outputs]]
+id = "vvPHiZVDfbPSc_TQAPhFP"
+uri = "file://attached_assets/promo/vo_revenue.mp3"
+type = "audio"
+title = "pitch vo revenue"
