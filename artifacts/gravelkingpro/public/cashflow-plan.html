@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GravelKing Pro — Cash Flow Plan</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#fff;color:#111;font-family:'Inter',sans-serif;line-height:1.7;font-size:15px}
+  .cover{background:#080808;color:#f0f0f0;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;position:relative;overflow:hidden}
+  .cover::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,#c9a22718,transparent 70%)}
+  .logo-text{font-size:clamp(72px,12vw,130px);font-weight:900;color:#c9a227;letter-spacing:-5px;font-style:italic;line-height:1;text-shadow:0 0 80px #c9a22730;position:relative;z-index:1}
+  .cover-label{font-size:10px;font-weight:700;letter-spacing:6px;text-transform:uppercase;color:#c9a227;margin-bottom:10px;position:relative;z-index:1}
+  .cover-tagline{font-size:clamp(14px,2vw,20px);font-weight:700;color:#f0f0f0;letter-spacing:3px;text-transform:uppercase;margin:14px 0 6px;position:relative;z-index:1}
+  .cover-subtitle{font-size:12px;color:#555;letter-spacing:5px;text-transform:uppercase;margin-bottom:50px;position:relative;z-index:1}
+  .cover-badge{display:inline-block;border:1px solid #c9a22740;color:#c9a227;font-weight:700;font-size:11px;letter-spacing:4px;text-transform:uppercase;padding:10px 28px;border-radius:100px;position:relative;z-index:1}
+  .confidential{position:absolute;top:30px;right:40px;font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:#444;z-index:2;border:1px solid #333;padding:6px 14px;border-radius:4px}
+  .page{max-width:920px;margin:0 auto;padding:70px 40px}
+  .eyebrow{font-size:10px;font-weight:700;letter-spacing:5px;text-transform:uppercase;color:#c9a227;margin-bottom:12px}
+  h2{font-size:clamp(24px,3.5vw,38px);font-weight:900;color:#080808;line-height:1.1;margin-bottom:20px}
+  h2 em{color:#c9a227;font-style:normal}
+  h3{font-size:18px;font-weight:800;color:#080808;margin:36px 0 14px}
+  p{font-size:14px;line-height:1.85;color:#444;margin-bottom:12px}
+  p.lead{font-size:17px;font-weight:600;color:#111;line-height:1.6;margin-bottom:20px}
+  .divider{border:none;border-top:2px solid #f0f0f0;margin:60px 0}
+  .hook{background:#080808;color:#f0f0f0;border-radius:16px;padding:40px;margin:32px 0;position:relative;overflow:hidden}
+  .hook::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#c9a227,#e8c84a)}
+  .hook p{color:#bbb;font-size:15px;line-height:1.85;margin:0 0 10px}
+  .hook p:last-child{margin:0}
+  .hook p strong{color:#c9a227}
+  /* NUMBERS */
+  .numbers{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:#f0f0f0;border:1px solid #f0f0f0;border-radius:16px;overflow:hidden;margin:28px 0}
+  .num-box{background:#fff;padding:26px 14px;text-align:center}
+  .num-box.dark{background:#080808}
+  .num{font-size:clamp(22px,3vw,36px);font-weight:900;color:#c9a227;line-height:1}
+  .num-box.dark .num{color:#c9a227}
+  .num-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:3px;color:#999;margin-top:5px}
+  .num-box.dark .num-label{color:#555}
+  /* PROJECTION TABLE */
+  .proj-table{width:100%;border-collapse:collapse;margin:24px 0;font-size:13px}
+  .proj-table th{background:#080808;color:#c9a227;font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:12px 14px;text-align:right}
+  .proj-table th:first-child{text-align:left}
+  .proj-table td{padding:11px 14px;border-bottom:1px solid #f0f0f0;text-align:right;vertical-align:middle}
+  .proj-table td:first-child{text-align:left;font-weight:700;color:#080808}
+  .proj-table tr:nth-child(even) td{background:#fafafa}
+  .proj-table .milestone td{background:#fffdf0;border-top:2px solid #c9a22740;border-bottom:2px solid #c9a22740}
+  .proj-table .milestone td:first-child{color:#c9a227}
+  .proj-table .total{font-weight:900;color:#080808}
+  .proj-table .gold{color:#c9a227;font-weight:800}
+  .proj-table .green{color:#16a34a;font-weight:700}
+  .proj-table .dim{color:#aaa}
+  /* BAR CHART */
+  .chart{margin:28px 0}
+  .chart-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .chart-label{font-size:11px;font-weight:700;color:#444;width:80px;flex-shrink:0;text-align:right}
+  .chart-bar-wrap{flex:1;background:#f5f5f5;border-radius:4px;height:28px;position:relative;overflow:hidden}
+  .chart-bar{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:10px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;transition:width 0.3s}
+  .chart-bar.pro{background:linear-gradient(90deg,#c9a227,#e8c84a)}
+  .chart-bar.ent{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
+  .chart-bar.api{background:linear-gradient(90deg,#0ea5e9,#38bdf8)}
+  .chart-bar.total{background:linear-gradient(90deg,#080808,#333)}
+  .chart-legend{display:flex;gap:20px;margin-bottom:16px;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#444}
+  .legend-dot{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+  /* ASSUMPTIONS */
+  .assume-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0}
+  .assume{background:#fafafa;border:1px solid #e8e8e8;border-radius:12px;padding:22px}
+  .assume h4{font-size:13px;font-weight:900;color:#080808;margin-bottom:8px}
+  .assume ul{padding-left:16px}
+  .assume li{font-size:12px;color:#555;line-height:1.7;margin-bottom:3px}
+  /* SCENARIOS */
+  .scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+  .scenario{border-radius:14px;padding:24px 20px}
+  .scenario.bear{background:#fff5f5;border:1.5px solid #fecaca}
+  .scenario.base{background:#fffdf0;border:1.5px solid #fde68a}
+  .scenario.bull{background:#f0fdf4;border:1.5px solid #bbf7d0}
+  .scenario h4{font-size:14px;font-weight:900;margin-bottom:6px}
+  .scenario.bear h4{color:#b91c1c}
+  .scenario.base h4{color:#92400e}
+  .scenario.bull h4{color:#15803d}
+  .scenario .scenario-label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}
+  .scenario.bear .scenario-label{color:#ef4444}
+  .scenario.base .scenario-label{color:#c9a227}
+  .scenario.bull .scenario-label{color:#22c55e}
+  .scenario p{font-size:12px;line-height:1.65;margin:0}
+  .scenario.bear p{color:#7f1d1d}
+  .scenario.base p{color:#78350f}
+  .scenario.bull p{color:#14532d}
+  .scenario .scenario-mrr{font-size:22px;font-weight:900;margin:10px 0 6px}
+  .scenario.bear .scenario-mrr{color:#ef4444}
+  .scenario.base .scenario-mrr{color:#c9a227}
+  .scenario.bull .scenario-mrr{color:#22c55e}
+  /* BREAK-EVEN */
+  .breakeven{background:#080808;border-radius:16px;padding:40px;margin:28px 0;color:#f0f0f0}
+  .breakeven h3{color:#c9a227;margin-top:0}
+  .breakeven p{color:#888;font-size:14px;margin-bottom:8px}
+  .breakeven p strong{color:#f0f0f0}
+  .be-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1a1a1a;font-size:13px}
+  .be-row:last-child{border-bottom:none}
+  .be-label{color:#888}
+  .be-value{font-weight:800;color:#c9a227}
+  @media print{.cover{min-height:auto;page-break-after:always}.page{padding:50px 40px}body{font-size:12px}}
+  @media(max-width:700px){.assume-grid{grid-template-columns:1fr}.scenario-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="confidential">Confidential · Internal</div>
+  <div class="logo-text">GK™</div>
+  <div class="cover-label">Financial Projection</div>
+  <div class="cover-tagline">GravelKing Pro — Cash Flow Plan</div>
+  <div class="cover-subtitle">24-Month Projection · Three Revenue Drivers · July 2026</div>
+  <div class="cover-badge">All N One LLC · Bootstrapped</div>
+</div>
+
+<!-- MODEL OVERVIEW -->
+<div class="page">
+  <div class="eyebrow">Revenue Model</div>
+  <h2>Three Drivers. <em>One Compounding Network.</em></h2>
+
+  <p class="lead">The cash flow model is structured around three distinct revenue streams that are not independent — they reinforce each other. Every mastered track generates a cert. Every cert in the database increases the authority of the verification network. Every enterprise verification call monetizes that authority. The network effect is the moat.</p>
+
+  <div class="hook">
+    <p><strong>Driver 1 — Automated Mastering Fees:</strong> The primary acquisition engine. Free tier converts to $9.99/mo Pro. High volume, high conversion intent (users who upload a track are already committed). Every Pro subscriber generates certs that grow the database.</p>
+    <p><strong>Driver 2 — Enterprise Catalog Audit Subscriptions:</strong> The high-margin, high-LTV anchor. Labels and distributors auditing AI-assisted catalogs. $499/mo Starter → $2,499/mo Pro → $25K–$100K/yr licensing deals. 10 enterprise customers equals the ARR of 500 Pro subscribers.</p>
+    <p><strong>Driver 3 — Verification API Call Volumes:</strong> The compounding revenue floor. Third parties (attorneys, platforms, A&amp;Rs, distributors) pay per verification call. $0.10/call standalone, $0.05/call in bulk packages. As the cert database grows, call volume grows without additional customer acquisition cost.</p>
+  </div>
+
+  <div class="numbers">
+    <div class="num-box"><div class="num">$9.99</div><div class="num-label">Pro monthly fee</div></div>
+    <div class="num-box"><div class="num">$499</div><div class="num-label">Enterprise Starter / mo</div></div>
+    <div class="num-box"><div class="num">$0.10</div><div class="num-label">Verify API per call</div></div>
+    <div class="num-box dark"><div class="num">~95%</div><div class="num-label">Gross margin</div></div>
+    <div class="num-box"><div class="num">~$180</div><div class="num-label">Pro LTV (18mo avg)</div></div>
+    <div class="num-box dark"><div class="num">~$12K</div><div class="num-label">Enterprise LTV (24mo)</div></div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- MONTHLY PROJECTIONS -->
+<div class="page">
+  <div class="eyebrow">24-Month Projection · Base Case</div>
+  <h2>Monthly <em>Revenue Projections</em></h2>
+  <p>Assumptions: 2–6% free-to-paid conversion scaling over time; organic acquisition only (no paid ads); enterprise pipeline begins Month 3; Verify API usage tied to cert database size. Server costs fixed at $200/mo (Replit hosting + GCS) through Month 12, scaling to $600/mo by Month 24.</p>
+
+  <table class="proj-table">
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>Free Users</th>
+        <th>Pro Subs</th>
+        <th>Enterprise</th>
+        <th>Pro MRR</th>
+        <th>Ent MRR</th>
+        <th>API MRR</th>
+        <th>Total MRR</th>
+        <th>Infra Cost</th>
+        <th>Net</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Month 1 (Aug '26)</td>
+        <td>400</td><td>8</td><td>0</td>
+        <td>$80</td><td>—</td><td>$5</td>
+        <td class="total">$85</td>
+        <td class="dim">−$200</td>
+        <td style="color:#b91c1c">−$115</td>
+      </tr>
+      <tr>
+        <td>Month 2 (Sep '26)</td>
+        <td>900</td><td>22</td><td>0</td>
+        <td>$220</td><td>—</td><td>$15</td>
+        <td class="total">$235</td>
+        <td class="dim">−$200</td>
+        <td style="color:#b91c1c">−$35</td>
+      </tr>
+      <tr class="milestone">
+        <td>Month 3 (Oct '26) ★</td>
+        <td>1,800</td><td>54</td><td>1</td>
+        <td>$539</td><td class="gold">$499</td><td>$40</td>
+        <td class="gold">$1,078</td>
+        <td class="dim">−$200</td>
+        <td class="green">+$878</td>
+      </tr>
+      <tr>
+        <td>Month 4 (Nov '26)</td>
+        <td>2,800</td><td>95</td><td>1</td>
+        <td>$949</td><td>$499</td><td>$75</td>
+        <td class="total">$1,523</td>
+        <td class="dim">−$250</td>
+        <td class="green">+$1,273</td>
+      </tr>
+      <tr>
+        <td>Month 5 (Dec '26)</td>
+        <td>4,000</td><td>160</td><td>2</td>
+        <td>$1,598</td><td>$998</td><td>$130</td>
+        <td class="total">$2,726</td>
+        <td class="dim">−$250</td>
+        <td class="green">+$2,476</td>
+      </tr>
+      <tr class="milestone">
+        <td>Month 6 (Jan '27) ★</td>
+        <td>5,500</td><td>242</td><td>3</td>
+        <td>$2,418</td><td class="gold">$1,497</td><td>$230</td>
+        <td class="gold">$4,145</td>
+        <td class="dim">−$300</td>
+        <td class="green">+$3,845</td>
+      </tr>
+      <tr>
+        <td>Month 7 (Feb '27)</td>
+        <td>7,200</td><td>360</td><td>4</td>
+        <td>$3,596</td><td>$1,996</td><td>$390</td>
+        <td class="total">$5,982</td>
+        <td class="dim">−$300</td>
+        <td class="green">+$5,682</td>
+      </tr>
+      <tr>
+        <td>Month 8 (Mar '27)</td>
+        <td>9,000</td><td>495</td><td>5</td>
+        <td>$4,945</td><td>$2,495</td><td>$580</td>
+        <td class="total">$8,020</td>
+        <td class="dim">−$350</td>
+        <td class="green">+$7,670</td>
+      </tr>
+      <tr>
+        <td>Month 9 (Apr '27)</td>
+        <td>11,000</td><td>660</td><td>6</td>
+        <td>$6,593</td><td>$2,994</td><td>$820</td>
+        <td class="total">$10,407</td>
+        <td class="dim">−$350</td>
+        <td class="green">+$10,057</td>
+      </tr>
+      <tr>
+        <td>Month 10 (May '27)</td>
+        <td>13,500</td><td>850</td><td>7</td>
+        <td>$8,492</td><td>$3,493</td><td>$1,100</td>
+        <td class="total">$13,085</td>
+        <td class="dim">−$400</td>
+        <td class="green">+$12,685</td>
+      </tr>
+      <tr>
+        <td>Month 11 (Jun '27)</td>
+        <td>16,000</td><td>1,040</td><td>8</td>
+        <td>$10,390</td><td>$3,992</td><td>$1,400</td>
+        <td class="total">$15,782</td>
+        <td class="dim">−$400</td>
+        <td class="green">+$15,382</td>
+      </tr>
+      <tr class="milestone">
+        <td>Month 12 (Jul '27) ★</td>
+        <td>19,000</td><td>1,235</td><td>10</td>
+        <td>$12,338</td><td class="gold">$4,990</td><td>$1,800</td>
+        <td class="gold">$19,128</td>
+        <td class="dim">−$450</td>
+        <td class="green">+$18,678</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:12px;color:#aaa;margin-top:-12px">★ = milestone quarter. Month 12 ARR = <strong>$229,536</strong>. Month 3 marks first profitable month.</p>
+
+  <h3 style="margin-top:40px">Months 13–24 (Year 2)</h3>
+
+  <table class="proj-table">
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>Free Users</th>
+        <th>Pro Subs</th>
+        <th>Enterprise</th>
+        <th>Pro MRR</th>
+        <th>Ent MRR</th>
+        <th>API MRR</th>
+        <th>Total MRR</th>
+        <th>Infra</th>
+        <th>Net</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Q1 Y2 (Oct–Dec '27)</td>
+        <td>28K avg</td><td>1,820</td><td>14</td>
+        <td>$18,178</td><td>$6,986</td><td>$3,200</td>
+        <td class="total">$28,364</td>
+        <td class="dim">−$500</td>
+        <td class="green">+$27,864</td>
+      </tr>
+      <tr>
+        <td>Q2 Y2 (Jan–Mar '28)</td>
+        <td>42K avg</td><td>2,730</td><td>20</td>
+        <td>$27,267</td><td>$9,980</td><td>$5,500</td>
+        <td class="total">$42,747</td>
+        <td class="dim">−$550</td>
+        <td class="green">+$42,197</td>
+      </tr>
+      <tr class="milestone">
+        <td>Q3 Y2 (Apr–Jun '28) ★</td>
+        <td>60K avg</td><td>3,900</td><td>28</td>
+        <td>$38,961</td><td class="gold">$13,972</td><td>$8,800</td>
+        <td class="gold">$61,733</td>
+        <td class="dim">−$600</td>
+        <td class="green">+$61,133</td>
+      </tr>
+      <tr class="milestone">
+        <td>Month 24 (Jul '28) ★★</td>
+        <td>75,000</td><td>5,100</td><td>36</td>
+        <td>$50,949</td><td class="gold">$17,964</td><td>$12,500</td>
+        <td class="gold">$81,413</td>
+        <td class="dim">−$650</td>
+        <td class="green">+$80,763</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:12px;color:#aaa;margin-top:-12px">★★ Month 24 ARR = <strong>$976,956</strong> — crossing $1M ARR milestone. Enterprise accounts at Month 24 (36 customers) contribute 22% of MRR at a fraction of the acquisition cost of Pro subscribers.</p>
+</div>
+
+<hr class="divider"/>
+
+<!-- VISUAL BAR CHART -->
+<div class="page">
+  <div class="eyebrow">Revenue Mix Visualization</div>
+  <h2>Revenue <em>Driver Composition</em> Over Time</h2>
+  <p>How the revenue mix shifts as the enterprise and API channels mature. Note: API revenue as a percentage grows from 6% in Month 1 to 15% by Month 24 — driven entirely by the growing cert database, not by additional sales effort.</p>
+
+  <div class="chart-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#c9a227"></div>Pro Mastering MRR</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>Enterprise MRR</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#0ea5e9"></div>Verify API MRR</div>
+  </div>
+
+  <div class="chart">
+    <div style="font-size:10px;font-weight:700;color:#aaa;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-left:92px">Scale: each segment proportional to MRR contribution</div>
+
+    <div class="chart-row">
+      <div class="chart-label">Month 1</div>
+      <div class="chart-bar-wrap">
+        <div style="display:flex;height:100%">
+          <div class="chart-bar pro" style="width:94%">$80</div>
+          <div class="chart-bar api" style="width:6%;padding-left:4px;font-size:10px">$5</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-label">Month 3</div>
+      <div class="chart-bar-wrap">
+        <div style="display:flex;height:100%">
+          <div class="chart-bar pro" style="width:50%">$539</div>
+          <div class="chart-bar ent" style="width:46%;background:linear-gradient(90deg,#6366f1,#8b5cf6)">$499</div>
+          <div class="chart-bar api" style="width:4%;padding-left:4px;font-size:10px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-label">Month 6</div>
+      <div class="chart-bar-wrap">
+        <div style="display:flex;height:100%">
+          <div class="chart-bar pro" style="width:58%">$2,418</div>
+          <div class="chart-bar ent" style="width:36%;background:linear-gradient(90deg,#6366f1,#8b5cf6)">$1,497</div>
+          <div class="chart-bar api" style="width:6%;padding-left:4px;font-size:10px">$230</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-label">Month 12</div>
+      <div class="chart-bar-wrap">
+        <div style="display:flex;height:100%">
+          <div class="chart-bar pro" style="width:64%">$12,338</div>
+          <div class="chart-bar ent" style="width:26%;background:linear-gradient(90deg,#6366f1,#8b5cf6)">$4,990</div>
+          <div class="chart-bar api" style="width:10%;padding-left:4px;font-size:10px">$1,800</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-label">Month 18</div>
+      <div class="chart-bar-wrap">
+        <div style="display:flex;height:100%">
+          <div class="chart-bar pro" style="width:62%">$27,267</div>
+          <div class="chart-bar ent" style="width:25%;background:linear-gradient(90deg,#6366f1,#8b5cf6)">$9,980</div>
+          <div class="chart-bar api" style="width:13%;padding-left:4px;font-size:10px">$5,500</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-label">Month 24</div>
+      <div class="chart-bar-wrap">
+        <div style="display:flex;height:100%">
+          <div class="chart-bar pro" style="width:63%">$50,949</div>
+          <div class="chart-bar ent" style="width:22%;background:linear-gradient(90deg,#6366f1,#8b5cf6)">$17,964</div>
+          <div class="chart-bar api" style="width:15%;padding-left:4px;font-size:10px">$12,500</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Unit Economics</h3>
+  <div class="assume-grid">
+    <div class="assume">
+      <h4>Pro Subscriber</h4>
+      <ul>
+        <li>Price: $9.99/mo</li>
+        <li>Avg lifespan: 18 months</li>
+        <li>LTV: ~$180</li>
+        <li>CAC: ~$0 (organic SEO + community)</li>
+        <li>LTV:CAC: ∞ (organic)</li>
+        <li>Gross margin: ~98% (no per-user infra cost)</li>
+        <li>Break-even: Month 1 of subscription</li>
+      </ul>
+    </div>
+    <div class="assume">
+      <h4>Enterprise Starter</h4>
+      <ul>
+        <li>Price: $499/mo</li>
+        <li>Avg lifespan: 24 months (contract)</li>
+        <li>LTV: ~$11,976</li>
+        <li>CAC: ~$500–$2K (direct outreach, demos)</li>
+        <li>LTV:CAC: 6–24×</li>
+        <li>Gross margin: ~96%</li>
+        <li>Break-even: Month 1–4 of contract</li>
+      </ul>
+    </div>
+    <div class="assume">
+      <h4>Verify API</h4>
+      <ul>
+        <li>Price: $0.10/call (bulk: $0.05)</li>
+        <li>CAC: $0 (passive — certs drive demand)</li>
+        <li>Gross margin: ~99.5%</li>
+        <li>Revenue tied to cert database size</li>
+        <li>Floor: grows even with 0 new subscribers</li>
+        <li>Ceiling: every cert ever issued generates</li>
+        <li>potential future API calls indefinitely</li>
+      </ul>
+    </div>
+    <div class="assume">
+      <h4>Chain-of-Title License (Y2+)</h4>
+      <ul>
+        <li>Price: $25K–$100K/yr</li>
+        <li>CAC: $1K–$5K (enterprise sales motion)</li>
+        <li>LTV: $25K–$300K+ (multi-year)</li>
+        <li>LTV:CAC: 5–60×</li>
+        <li>1 deal = 2,500–10,000 Pro subscribers equiv.</li>
+        <li>Gross margin: ~99% (API infra is sunk cost)</li>
+        <li>Not modeled in base case above</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- BREAK-EVEN + SCENARIOS -->
+<div class="page">
+  <div class="eyebrow">Risk &amp; Sensitivity</div>
+  <h2>Break-Even Analysis &amp; <em>Scenario Planning</em></h2>
+
+  <div class="breakeven">
+    <h3>Break-Even Summary</h3>
+    <p>Based on fixed infrastructure costs of $200–$650/mo over the 24-month period.</p>
+    <div class="be-row"><span class="be-label">First profitable month</span><span class="be-value">Month 3 (Oct 2026)</span></div>
+    <div class="be-row"><span class="be-label">Break-even Pro subscriber count</span><span class="be-value">21 Pro subscribers ($9.99 × 21 = $210)</span></div>
+    <div class="be-row"><span class="be-label">Server cost at Month 12</span><span class="be-value">$450/mo (2.4% of MRR)</span></div>
+    <div class="be-row"><span class="be-label">Server cost at Month 24</span><span class="be-value">$650/mo (0.8% of MRR)</span></div>
+    <div class="be-row"><span class="be-label">12-Month cumulative revenue (base)</span><span class="be-value">~$82,000</span></div>
+    <div class="be-row"><span class="be-label">12-Month cumulative net (base)</span><span class="be-value">~$77,600</span></div>
+    <div class="be-row"><span class="be-label">24-Month ARR (base case)</span><span class="be-value">$976,956 (~$1M ARR)</span></div>
+    <div class="be-row"><span class="be-label">Chain-of-title license impact (+1 deal at M18)</span><span class="be-value">+$50K–$100K one-time, ARR +$25K–$100K</span></div>
+  </div>
+
+  <h3>Scenario Analysis — Month 24 MRR</h3>
+
+  <div class="scenario-grid">
+    <div class="scenario bear">
+      <div class="scenario-label">Bear Case</div>
+      <h4>Slow Conversion</h4>
+      <div class="scenario-mrr">$22,400/mo</div>
+      <p>1.5% free-to-paid conversion. 0 enterprise customers. No licensing deals. API call volume 50% of base. Still profitable from Month 5. Certs accumulate regardless.</p>
+    </div>
+    <div class="scenario base">
+      <div class="scenario-label">Base Case</div>
+      <h4>Organic Growth</h4>
+      <div class="scenario-mrr">$81,413/mo</div>
+      <p>3–5% conversion. 36 enterprise accounts. No paid acquisition. 1 licensing conversation (not closed). Consistent with community-driven growth patterns for music tools.</p>
+    </div>
+    <div class="scenario bull">
+      <div class="scenario-label">Bull Case</div>
+      <h4>Enterprise + Licensing</h4>
+      <div class="scenario-mrr">$165,000/mo</div>
+      <p>5–8% conversion. 75 enterprise accounts. 2 chain-of-title licenses ($50K + $100K ACV). 1 DSP integration deal. One press placement in music-tech media triggers a signup spike.</p>
+    </div>
+  </div>
+
+  <h3>Key Assumptions &amp; Risks</h3>
+  <table class="proj-table">
+    <thead>
+      <tr><th style="text-align:left">Assumption</th><th style="text-align:left">Base Case Value</th><th style="text-align:left">Primary Risk</th><th>Risk Level</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Free-to-paid conversion</td>
+        <td>3–5% over 24mo</td>
+        <td>Poor onboarding or pricing resistance</td>
+        <td style="color:#f59e0b;font-weight:800">Medium</td>
+      </tr>
+      <tr>
+        <td>Enterprise pipeline opens Month 3</td>
+        <td>1 customer by Month 3</td>
+        <td>Long sales cycle pushes to Month 6</td>
+        <td style="color:#f59e0b;font-weight:800">Medium</td>
+      </tr>
+      <tr>
+        <td>No paid acquisition</td>
+        <td>$0 CAC</td>
+        <td>Organic plateaus without community presence</td>
+        <td style="color:#ef4444;font-weight:800">High</td>
+      </tr>
+      <tr>
+        <td>Server costs stay under $650/mo</td>
+        <td>$450–$650/mo</td>
+        <td>High-volume API usage spikes infra costs</td>
+        <td style="color:#22c55e;font-weight:800">Low</td>
+      </tr>
+      <tr>
+        <td>No competing cert infrastructure emerges</td>
+        <td>No direct competitor in 24mo</td>
+        <td>Well-funded competitor builds equivalent</td>
+        <td style="color:#22c55e;font-weight:800">Low (18–36mo to replicate)</td>
+      </tr>
+      <tr>
+        <td>DSP AI-track policies tighten</td>
+        <td>1 major DSP policy shift in 24mo</td>
+        <td>Regulatory tailwind accelerates enterprise demand</td>
+        <td style="color:#22c55e;font-weight:800">Low (positive risk)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="divider"/>
+
+<div class="page" style="text-align:center;padding-bottom:80px">
+  <div class="eyebrow" style="text-align:center">Summary</div>
+  <h2 style="max-width:640px;margin:0 auto 20px">Profitable by <em>Month 3.</em><br/>$1M ARR by Month 24.</h2>
+  <p style="max-width:540px;margin:0 auto 16px;font-size:15px;color:#555">Three revenue drivers. Near-zero marginal cost per cert. A verification monopoly that becomes more valuable as the catalog grows. The infrastructure is built. The financial model is clear.</p>
+  <p style="max-width:540px;margin:0 auto 32px;font-size:13px;color:#aaa">The question is not whether this model works at scale — it does. The question is how fast to reach the first chain-of-title licensing deal, because one enterprise distributor license rewrites the Year 2 ARR projection entirely.</p>
+  <div style="font-size:12px;color:#bbb;letter-spacing:3px;text-transform:uppercase">All N One LLC · GravelKing Pro · Confidential · July 2026</div>
+</div>
+
+</body>
+</html>
