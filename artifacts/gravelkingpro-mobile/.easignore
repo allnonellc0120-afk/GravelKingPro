@@ -1,0 +1,17 @@
+# Exclude heavy workspace-level directories that EAS should never bundle
+../../.pythonlibs
+../../.cache
+../../.local
+../../node_modules
+../../artifacts/api-server
+../../artifacts/gravelkingpro
+../../artifacts/gravelkingpro-promo
+../../artifacts/mlk-licensing
+../../artifacts/mockup-sandbox
+../../scripts
+../../.uv
+
+# Local dev artifacts
+.expo
+android
+ios

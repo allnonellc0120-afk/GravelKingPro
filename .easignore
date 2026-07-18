@@ -1,0 +1,12 @@
+.pythonlibs
+.cache
+.uv
+.local
+.git
+
+# Other artifacts — not needed for mobile build
+artifacts/api-server
+artifacts/gravelkingpro
+artifacts/gravelkingpro-promo
+artifacts/mlk-licensing
+artifacts/mockup-sandbox
