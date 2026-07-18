@@ -143,6 +143,7 @@ export default function VideoWithControls() {
   } = useSceneControls(SCENE_DURATIONS);
 
   const [muted, setMuted] = useState(true);
+  const [needsGesture, setNeedsGesture] = useState(true);
   const sensorRef = useRef<HTMLDivElement | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -165,7 +166,15 @@ export default function VideoWithControls() {
     });
   }, []);
   const handleToggleMuted = useCallback(() => {
-    setMuted(m => !m);
+    setMuted(m => {
+      const next = !m;
+      if (!next) {
+        // iOS Safari requires play() to be issued inside a user gesture to unlock audio.
+        document.querySelectorAll('audio').forEach((a) => a.play().catch(() => {}));
+      }
+      return next;
+    });
+    setNeedsGesture(false);
   }, []);
 
   useEffect(() => {
@@ -180,6 +189,7 @@ export default function VideoWithControls() {
   }, [collapsed, tapPinned]);
 
   const barVisible = !collapsed || hovering || tapPinned;
+  const showGestureOverlay = isIframed && needsGesture;
 
   // Export path: no props, preserves recording markers and unmuted audio.
   if (!isIframed) return <VideoTemplate />;
@@ -193,6 +203,20 @@ export default function VideoWithControls() {
         muted={muted}
         onSceneChange={onSceneChange}
       />
+      {showGestureOverlay && (
+        <button
+          className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 text-white"
+          onClick={handleToggleMuted}
+          aria-label="Tap to play with sound"
+        >
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center">
+              <Volume2 className="w-10 h-10" />
+            </div>
+            <span className="text-lg font-semibold tracking-wide">Tap to play with sound</span>
+          </div>
+        </button>
+      )}
       <div
         ref={sensorRef}
         className="absolute bottom-0 left-0 right-0 z-50 flex flex-col justify-end"

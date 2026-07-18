@@ -26,6 +26,7 @@
     "gsap": "^3.14.2",
     "lottie-react": "^2.4.1",
     "lucide-react": "catalog:",
+    "playwright": "^1.61.1",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwind-merge": "catalog:",
