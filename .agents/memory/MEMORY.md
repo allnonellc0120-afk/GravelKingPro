@@ -45,3 +45,4 @@
 - [Admin Ops diagnostics pattern](admin-ops-diagnostics.md) — logToolError/recordActivity conventions, admin_settings-backed kill switch (bypasses via isAdminAuthenticated not requireAdmin), /tmp-scoped cache purge
 - [Custom domain + GoDaddy DNS](custom-domain-godaddy.md) — gravelkingpro.it.com attached to THIS repl's deploy; relink issues new replit-verify TXT; GoDaddy API secrets exist; PUT replaces ALL apex TXT (keep MS/SPF)
 - [Tailwind v4 legacy directives](tailwind-v4-legacy-directives.md) — v3 @tailwind lines under the v4 engine compile a PARTIAL utility set (inset-0/from-* missing) → invisible 0×0 UIs; use @import 'tailwindcss'; ?still/?scene poster QA for videos
+- [PWA SW navigateFallback hijack](pwa-sw-navigate-fallback.md) — generateSW serves SPA shell for /api/* navigations → sign-in 404s for RETURNING users only; curl can't see it; denylist server + sibling-artifact prefixes
