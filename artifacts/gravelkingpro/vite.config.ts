@@ -34,6 +34,10 @@ export default defineConfig({
       registerType: "autoUpdate",
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // CRITICAL: never serve the SPA shell for server-side routes.
+        // Without this, the service worker hijacks navigations to /api/login
+        // (OIDC sign-in), /api/logout, etc. and renders the SPA 404 page.
+        navigateFallbackDenylist: [/^\/api\//, /^\/mobile\//, /^\/mlk-licensing/, /^\/gravelkingpro-promo/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/gravelkingpro\.it\.com\/api\//,
