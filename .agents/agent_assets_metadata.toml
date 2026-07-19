@@ -94,7 +94,7 @@ title = "GravelKingPro MLK v3 White Paper (PDF)"
 id = "Kap8xFsaJ_kX--TvbfwwH"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_PitchDeck.pdf"
 type = "pdf"
-title = "GravelKingPro MLK v3 Pitch Deck (PDF)"
+title = "GravelKing Pro Pitch Deck PDF"
 
 [[outputs]]
 id = "jwWuoMhaW3zvW94AARX9Z"
@@ -185,3 +185,15 @@ id = "n_wrSjV5FAwr3DklfP0Bx"
 uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_pitch_228.mp4"
 type = "video"
 title = "GravelKing Pro Pitch Video (228.5s MP4)"
+
+[[outputs]]
+id = "z3XhWnvAyEAT5WSM9lRxD"
+uri = "file://artifacts/gravelkingpro/public/pitch-paper.html"
+type = "unspecified"
+title = "Investor Pitch Paper (Executive Pitch)"
+
+[[outputs]]
+id = "S2AMa_xYZkSuYlrG-6t8J"
+uri = "file://artifacts/gravelkingpro/public/admin-strategy.html"
+type = "unspecified"
+title = "Admin Strategy Brief"
