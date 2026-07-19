@@ -197,3 +197,15 @@ id = "S2AMa_xYZkSuYlrG-6t8J"
 uri = "file://artifacts/gravelkingpro/public/admin-strategy.html"
 type = "unspecified"
 title = "Admin Strategy Brief"
+
+[[outputs]]
+id = "JhrDqk3q2QqzbVsJgmnrb"
+uri = "file://artifacts/gravelkingpro/public/GravelKingPro_PromoPitchDeck.pdf"
+type = "pdf"
+title = "GravelKing Pro — Promo Pitch Deck (from video slides)"
+
+[[outputs]]
+id = "g9MMHbFDDRI_8GHuMHC2p"
+uri = "file://artifacts/gravelkingpro/public/GravelKingPro_AdminStrategy.pdf"
+type = "pdf"
+title = "GravelKing Pro — Admin Strategy Brief"
