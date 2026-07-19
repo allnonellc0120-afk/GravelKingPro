@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -33,6 +34,13 @@ import { RouteSeo } from "@/lib/seo";
 
 const queryClient = new QueryClient();
 
+function SignInRedirect() {
+  useEffect(() => {
+    window.location.href = "/api/login";
+  }, []);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -61,6 +69,8 @@ function Router() {
       <Route path="/protected-lyrics" component={ProtectedLyrics} />
       <Route path="/vocal-booth" component={VocalBooth} />
       <Route path="/pitch" component={PitchPage} />
+      <Route path="/sign-in" component={SignInRedirect} />
+      <Route path="/login" component={SignInRedirect} />
       <Route component={NotFound} />
     </Switch>
   );
