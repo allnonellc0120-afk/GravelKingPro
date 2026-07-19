@@ -52,10 +52,26 @@ function setOidcCookie(res: Response, name: string, value: string) {
 }
 
 function getSafeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+  if (typeof value !== "string" || !value.startsWith("/")) {
     return "/";
   }
-  return value;
+  // Reject backslashes and control chars: browsers normalize "/\evil.com" to
+  // "//evil.com", turning a same-origin-looking path into an open redirect.
+  // eslint-disable-next-line no-control-regex
+  if (/[\\\u0000-\u001f]/.test(value)) {
+    return "/";
+  }
+  // Canonical check: resolve against a fixed origin and only accept values
+  // that stay on that origin (catches "//evil.com" and encoded variants).
+  try {
+    const url = new URL(value, "https://internal.local");
+    if (url.origin !== "https://internal.local") {
+      return "/";
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/";
+  }
 }
 
 /**
