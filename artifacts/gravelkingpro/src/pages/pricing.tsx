@@ -121,7 +121,7 @@ export default function Pricing() {
   const handleCheckout = async (planId: PlanId) => {
     // Require sign-in before checkout
     if (!isSignedIn) {
-      window.location.href = `/api/login?return_to=${encodeURIComponent("/pricing")}`;
+      window.location.href = `/api/login?returnTo=${encodeURIComponent("/pricing")}`;
       return;
     }
 
@@ -156,7 +156,7 @@ export default function Pricing() {
       if (!checkoutRes.ok) {
         const errData = await checkoutRes.json() as { error?: string; authRequired?: boolean };
         if (errData.authRequired) {
-          window.location.href = `/api/login?return_to=${encodeURIComponent("/pricing")}`;
+          window.location.href = `/api/login?returnTo=${encodeURIComponent("/pricing")}`;
           return;
         }
         throw new Error(errData.error ?? "Checkout failed");

@@ -175,11 +175,20 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   );
 });
 
+router.get("/auth/login", (req: Request, res: Response) => {
+  const returnTo = getSafeReturnTo(req.query.returnTo ?? req.query.return_to);
+  const redirectTo = new URL("/api/login", getOrigin(req));
+  if (returnTo !== "/") {
+    redirectTo.searchParams.set("returnTo", returnTo);
+  }
+  res.redirect(redirectTo.href);
+});
+
 router.get("/login", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
-  const returnTo = getSafeReturnTo(req.query.returnTo);
+  const returnTo = getSafeReturnTo(req.query.returnTo ?? req.query.return_to);
 
   const state = oidc.randomState();
   const nonce = oidc.randomNonce();
