@@ -233,3 +233,15 @@ id = "jjn2Ge-WTTMqICoeO9sT1"
 uri = "file://attached_assets/gravelkingpro_dev_header.jpg"
 type = "image"
 title = "Header Image (upload to Google Play)"
+
+[[outputs]]
+id = "pJmMivuRCQam8ivdFpRA9"
+uri = "file://attached_assets/gravelkingpro_icon_512.jpg"
+type = "image"
+title = "Developer Icon — 512×512"
+
+[[outputs]]
+id = "boVHWE8P4jnIuIJ4mthg9"
+uri = "file://attached_assets/gravelkingpro_header_512.jpg"
+type = "image"
+title = "Header Image — 512×512"
