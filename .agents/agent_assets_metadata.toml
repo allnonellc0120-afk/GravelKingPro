@@ -245,3 +245,15 @@ id = "boVHWE8P4jnIuIJ4mthg9"
 uri = "file://attached_assets/gravelkingpro_header_512.jpg"
 type = "image"
 title = "Header Image — 512×512"
+
+[[outputs]]
+id = "Wp-_0q3L69aqgeMgg6-l-"
+uri = "file://attached_assets/gravelkingpro_icon_512x512.jpg"
+type = "image"
+title = "Developer Icon — exactly 512×512 px"
+
+[[outputs]]
+id = "I-STMGxpIG4OtOPoeeoMf"
+uri = "file://attached_assets/gravelkingpro_header_4096x2304.jpg"
+type = "image"
+title = "Header Image — exactly 4096×2304 px"
