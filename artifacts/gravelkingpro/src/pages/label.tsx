@@ -123,6 +123,45 @@ export default function LabelPage() {
           </div>
         </div>
 
+        {/* ── Featured Artist ── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Star className="w-5 h-5 text-amber-400" />
+            <h2 className="text-2xl font-black">Featured Artist</h2>
+            <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">Spotlight</Badge>
+          </div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/8 via-amber-400/4 to-transparent p-7 flex flex-col sm:flex-row items-center gap-7">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/30 to-amber-900/40 border-4 border-amber-500/40 flex items-center justify-center shrink-0">
+              <Mic2 className="w-10 h-10 text-amber-400" />
+            </div>
+            <div className="flex-1 text-center sm:text-left space-y-2">
+              <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                <h3 className="text-xl font-black">GravelKing Productions</h3>
+                <Badge className="bg-amber-500 text-black text-[10px] font-bold">Founder</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                The founder of GravelKing Pro — independently releasing IP-certified music through the same platform built to protect every artist's rights. Every track is processed with MLK v3, cryptographically certified, and distributed through the label.
+              </p>
+              <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap pt-1">
+                <Link href="/label">
+                  <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-8 px-4 text-xs">
+                    <Disc3 className="w-3.5 h-3.5 mr-1.5" /> View Catalog
+                  </Button>
+                </Link>
+                <Link href="/submit">
+                  <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 h-8 px-4 text-xs">
+                    Submit to Label
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+          <p className="text-xs text-muted-foreground text-center">
+            Want to be featured? <Link href="/submit" className="text-amber-400 underline underline-offset-2">Submit your IP-certified track</Link> to the label catalog.
+          </p>
+        </div>
+
         {/* ── What We Stand For ── */}
         <div className="space-y-6">
           <div className="text-center space-y-1">
