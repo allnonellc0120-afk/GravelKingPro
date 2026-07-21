@@ -209,3 +209,15 @@ id = "g9MMHbFDDRI_8GHuMHC2p"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_AdminStrategy.pdf"
 type = "pdf"
 title = "GravelKing Pro — Admin Strategy Brief"
+
+[[outputs]]
+id = "VO4iK_qXPSA_TARiKvUxM"
+uri = "file://artifacts/gravelkingpro/public/GravelKingPro_DetailedPitchDeck.pdf"
+type = "pdf"
+title = "GravelKing Pro — Detailed Investor Pitch Deck"
+
+[[outputs]]
+id = "m1HEWpTw36naLxPC_sq9D"
+uri = "file://artifacts/gravelkingpro/public/GravelKingPro_DetailedAdminDeck.pdf"
+type = "pdf"
+title = "GravelKing Pro — Detailed Admin Strategy & Operations Deck"
