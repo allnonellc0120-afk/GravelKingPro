@@ -221,3 +221,15 @@ id = "m1HEWpTw36naLxPC_sq9D"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_DetailedAdminDeck.pdf"
 type = "pdf"
 title = "GravelKing Pro — Detailed Admin Strategy & Operations Deck"
+
+[[outputs]]
+id = "yxyF5_TwID32XEarqrwqL"
+uri = "file://attached_assets/gravelkingpro_dev_icon.jpg"
+type = "image"
+title = "Developer Icon — 512×512 (upload to Google Play)"
+
+[[outputs]]
+id = "jjn2Ge-WTTMqICoeO9sT1"
+uri = "file://attached_assets/gravelkingpro_dev_header.jpg"
+type = "image"
+title = "Header Image (upload to Google Play)"
