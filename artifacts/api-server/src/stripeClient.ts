@@ -12,16 +12,37 @@ function getSecretKey(): string {
   return key;
 }
 
+/**
+ * Returns true when the value looks like a Stripe publishable key (pk_live_... / pk_test_...).
+ * Publishable keys cannot make server-side API calls and must be rejected.
+ */
+function isPublishableKey(key: string): boolean {
+  return key.startsWith("pk_live_") || key.startsWith("pk_test_");
+}
+
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
-  // Fast path: env var secret key (set when Replit integration is not used)
-  if (process.env.STRIPE_SECRET_KEY) {
+  // Fast path: env var secret key — only if it is actually a secret key (sk_*).
+  // If someone accidentally saved a publishable key (pk_*) here, skip it so the
+  // Replit OAuth integration path below can supply the real secret key instead.
+  const envKey = process.env.STRIPE_SECRET_KEY;
+  if (envKey && !isPublishableKey(envKey)) {
     return {
-      secretKey: process.env.STRIPE_SECRET_KEY,
+      secretKey: envKey,
       webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     };
   }
 
-  // Replit integration path
+  if (envKey && isPublishableKey(envKey)) {
+    // Log a clear warning so operators can see this in server logs.
+    console.warn(
+      "[stripe] STRIPE_SECRET_KEY is set to a publishable key (pk_*) — " +
+      "falling through to the Replit OAuth integration for the real secret key."
+    );
+  }
+
+  // Replit integration path: the Stripe OAuth connector (status=added) holds the
+  // real sk_* key.  REPLIT_CONNECTORS_HOSTNAME and REPL_IDENTITY are injected at
+  // runtime by the platform — they won't appear in static env-var listings.
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? "repl " + process.env.REPL_IDENTITY
@@ -56,7 +77,7 @@ async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecre
 
   throw new Error(
     'Stripe not configured. Either connect Stripe via the Integrations tab, ' +
-    'or set the STRIPE_SECRET_KEY environment secret.'
+    'or set the STRIPE_SECRET_KEY environment secret to a valid sk_live_* / sk_test_* key.'
   );
 }
 
