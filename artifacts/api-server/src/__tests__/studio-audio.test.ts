@@ -135,7 +135,7 @@ async function main(): Promise<void> {
       const res = await fetch(`${base}/api/kernel/process-audio`, {
         method: "POST",
         headers: auth,
-        body: buildForm({ mode: "standard" }, [
+        body: buildForm({ mode: "standard", author_assertion: "true" }, [
           { field: "audio", name: "in.wav", type: "audio/wav", buf: stereoWav },
         ]),
       });
@@ -151,7 +151,7 @@ async function main(): Promise<void> {
       const res = await fetch(`${base}/api/kernel/studio-mix`, {
         method: "POST",
         headers: auth,
-        body: buildForm({ arrangement: "sequential", speed: "1" }, [
+        body: buildForm({ arrangement: "sequential", speed: "1", author_assertion: "true" }, [
           { field: "tracks", name: "t1.wav", type: "audio/wav", buf: stereoWav },
         ]),
       });
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
       const res = await fetch(`${base}/api/kernel/studio-mix`, {
         method: "POST",
         headers: auth,
-        body: buildForm({ arrangement: "sequential", speed: "0.25" }, [
+        body: buildForm({ arrangement: "sequential", speed: "0.25", author_assertion: "true" }, [
           { field: "tracks", name: "long.mp3", type: "audio/mpeg", buf: longMp3 },
         ]),
       });

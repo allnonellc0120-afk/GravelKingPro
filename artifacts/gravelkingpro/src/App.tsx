@@ -29,6 +29,8 @@ import VocalBooth from "@/pages/vocal-booth";
 import AdminLabel from "@/pages/admin-label";
 import AdminOps from "@/pages/admin-ops";
 import PitchPage from "@/pages/pitch";
+import VerifyPage from "@/pages/verify";
+import WhitepaperPage from "@/pages/whitepaper";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
 
@@ -69,6 +71,9 @@ function Router() {
       <Route path="/protected-lyrics" component={ProtectedLyrics} />
       <Route path="/vocal-booth" component={VocalBooth} />
       <Route path="/pitch" component={PitchPage} />
+      <Route path="/verify" component={VerifyPage} />
+      <Route path="/whitepaper" component={WhitepaperPage} />
+      <Route path="/demo" component={VerifyPage} />
       <Route path="/sign-in" component={SignInRedirect} />
       <Route path="/login" component={SignInRedirect} />
       <Route component={NotFound} />

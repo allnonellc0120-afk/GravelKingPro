@@ -38,8 +38,24 @@ import { getUsageUser, incrementUsage, FREE_LIMITS, type UsageField } from "../l
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
+import type { NextFunction } from "express";
 
 const execFileAsync = promisify(execFile);
+
+/** Auth-gating middleware: process-audio requires Studio (monthly) tier.
+ *  Runs BEFORE multer so unauthenticated requests never write to /tmp
+ *  and cannot reach the ingestion validator. */
+async function requireStudioForAudio(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (!await hasStudio(req)) {
+    res.status(403).json({
+      success: false,
+      error: "Processing audio requires a GravelKing Studio (monthly) subscription.",
+      code: "STUDIO_REQUIRED",
+    });
+    return;
+  }
+  next();
+}
 const upload = multer({
   storage: multer.diskStorage({
     destination: "/tmp",
@@ -264,6 +280,7 @@ audioRouter.post(
   "/kernel/process-audio",
   audioRateLimit,
   audioConcurrency,
+  requireStudioForAudio,
   upload.single("audio"),
   validateAssetIngestion({ requireAudio: true }),
   async (req: Request, res: Response) => {

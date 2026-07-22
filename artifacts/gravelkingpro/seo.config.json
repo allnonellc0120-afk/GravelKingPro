@@ -1,60 +1,78 @@
 {
   "siteUrl": "https://gravelkingpro.it.com",
-  "siteName": "GravelKing Productions",
+  "siteName": "GravelKing Pro | MLK V3.5 Signal-Level Audio Security",
   "locale": "en_US",
   "twitterCard": "summary_large_image",
   "ogImage": "/opengraph.jpg",
-  "ogImageAlt": "GravelKing Productions — master your music and own your IP",
+  "ogImageAlt": "GravelKing Pro MLK V3.5 — enterprise audio steganography and IP protection",
   "ogImageWidth": 1280,
   "ogImageHeight": 720,
-  "defaultTitle": "GravelKing Productions",
-  "defaultDescription": "MLK v3 mastering, a karaoke vocal booth, a live multitrack DAW, and forensic IP authorship certification. Built by All N One LLC.",
+  "defaultTitle": "GravelKing Pro | MLK V3.5 Signal-Level Audio Security & AI Governance Engine",
+  "defaultDescription": "Enterprise audio steganography, dual-anchor cryptographic verification, and signal-level asset protection for publishers, A&Rs, and music tech platforms.",
   "routes": [
     {
       "path": "/",
-      "title": "GravelKing Productions — Pro Audio Tools, No Plugins Required",
-      "description": "Master your tracks with MLK v3, record in the karaoke vocal booth, mix in a live multitrack DAW, and certify your authorship. Free to try — no plugins, no installs.",
+      "title": "GravelKing Pro | MLK V3.5 Signal-Level Audio Security & AI Governance Engine",
+      "description": "Enterprise audio steganography, dual-anchor cryptographic verification, and signal-level asset protection for publishers, A&Rs, and music tech platforms. Built by All N One LLC.",
+      "ogType": "website"
+    },
+    {
+      "path": "/verify",
+      "title": "Signal Verification Lab — GravelKing Pro MLK V3.5 | Clean Room Audio Cert Check",
+      "description": "Upload a .wav master to verify its MLK V3.5 dual-anchor cryptographic certificate. Public clean-room verification for publishers, A&Rs, and enterprise partners. No account required.",
+      "ogType": "website"
+    },
+    {
+      "path": "/demo",
+      "title": "Live Demo — GravelKing Pro Audio Verification | MLK V3.5",
+      "description": "Test GravelKing Pro's MLK V3.5 signal-level audio verification live. Upload a certified .wav and see Anchor A, Anchor B, and HMAC handshake status in real time.",
+      "ogType": "website"
+    },
+    {
+      "path": "/whitepaper",
+      "title": "Technical Brief — GravelKing Pro MLK V3.5 | LSB Steganography & Chain-of-Custody",
+      "description": "Full technical brief: LSB dual-anchor steganography, HMAC-SHA256 chain-of-custody, FRE 901(b)(9) compliance, and enterprise API integration guide for GravelKing Pro.",
       "ogType": "website"
     },
     {
       "path": "/pricing",
-      "title": "Pricing — GravelKing Productions Audio Tools & Studio",
-      "description": "Stop paying $200+/track for mastering. GravelKing Studio delivers MLK v3 mastering, a karaoke vocal booth, and a live DAW from $39.99/mo. Compare Starter, Pro, and Node Auditor plans.",
+      "title": "Pricing — GravelKing Pro | MLK V3.5 Audio Security & Mastering Plans",
+      "description": "Enterprise audio steganography from $39.99/mo. Compare Starter, Pro, and Node Auditor plans. GravelKing Pro protects every master with signal-level IP certification.",
       "ogType": "website"
     },
     {
       "path": "/mastering",
-      "title": "Audio Mastering Online — Pro Mastering Chain | GravelKing",
-      "description": "Apply a professional mastering chain with optional denoise, powered by MLK v3. Polished, release-ready masters in seconds — no upload to third parties.",
+      "title": "Audio Mastering Online — MLK V3.5 Mastering Chain | GravelKing Pro",
+      "description": "Apply a professional mastering chain powered by MLK V3.5. Polished, release-ready masters with embedded IP certification — no upload to third parties.",
       "ogType": "website"
     },
     {
       "path": "/download",
-      "title": "Download GravelKing — Free Local Audio Tools",
-      "description": "Download GravelKing Productions and run pro audio tools locally for free with ffmpeg. Sign in to upgrade and unlock paid processing on our servers.",
+      "title": "Download GravelKing Pro — Free Local Audio Tools",
+      "description": "Download GravelKing Pro and run MLK V3.5 audio tools locally for free with ffmpeg. Sign in to unlock cloud-side mastering and IP certification.",
       "ogType": "website"
     },
     {
       "path": "/contact",
-      "title": "Contact GravelKing Productions — All N One LLC",
-      "description": "Questions about licensing, partnerships, the GravelKing kernel, or custom integration work? Get in touch with All N One LLC directly.",
+      "title": "Contact GravelKing Pro — All N One LLC | Enterprise Licensing",
+      "description": "Questions about enterprise licensing, API integration, white-label deployment, or the MLK V3.5 kernel? Get in touch with All N One LLC directly.",
       "ogType": "website"
     },
     {
       "path": "/label",
-      "title": "GravelKing Label — Browse Tracks | GravelKing Productions",
+      "title": "GravelKing Label — Browse Tracks | GravelKing Pro",
       "description": "Discover tracks from GravelKing Productions label artists. Purchase, preview, and download high-quality audio.",
       "ogType": "website"
     },
     {
       "path": "/library",
-      "title": "My Library — GravelKing Productions",
+      "title": "My Library — GravelKing Pro",
       "description": "Your purchased tracks from GravelKing Productions label. Stream and download anytime.",
       "ogType": "website"
     },
     {
       "path": "/submit",
-      "title": "Submit Track — GravelKing Productions",
+      "title": "Submit Track — GravelKing Pro",
       "description": "Submit your track to the GravelKing Productions label. Get reviewed and published.",
       "ogType": "website"
     }
