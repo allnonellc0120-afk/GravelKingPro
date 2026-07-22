@@ -13,6 +13,7 @@ export function Scene3() {
       <CharacterVideo
         dialogue="FIRE! FIRE! This is cool!"
         subDialogue="Signal-level protection that survives metadata stripping."
+        audioSrc="audio/scene3.mp3"
       />
 
       {/* Top headline and bullets */}
