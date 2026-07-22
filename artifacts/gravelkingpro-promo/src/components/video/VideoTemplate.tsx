@@ -51,13 +51,6 @@ const SCENE_COMPONENTS: Record<string, ComponentType> = {
   cta: Scene4,
 };
 
-/** Per-scene narration files — each restarts cleanly on scene entry/jump. */
-const SCENE_VO: Record<string, string> = {
-  problem: 'audio/vo_intro.mp3', // Note: placeholders if audio files don't match names
-  loophole: 'audio/vo_hook.mp3',
-  solution: 'audio/vo_problem.mp3',
-  cta: 'audio/vo_technology.mp3',
-};
 
 export default function VideoTemplate({
   durations = SCENE_DURATIONS,
@@ -95,9 +88,8 @@ export default function VideoTemplate({
   const SceneComponent = SCENE_COMPONENTS[baseSceneKey];
 
   const musicRef = useRef<HTMLAudioElement | null>(null);
-  const voRef = useRef<HTMLAudioElement | null>(null);
 
-  // Ambient music bed: quiet loop underneath the narration.
+  // Ambient music bed: quiet loop underneath the visuals (no voiceover).
   useEffect(() => {
     const m = musicRef.current;
     if (!m) return;
@@ -108,24 +100,6 @@ export default function VideoTemplate({
     m.volume = 0.1;
     m.play().catch(() => {});
   }, [hasEnded, muted]);
-
-  // Voice-over: load this scene's narration and play from the top.
-  useEffect(() => {
-    const vo = voRef.current;
-    if (!vo) return;
-    if (hasEnded) {
-      vo.pause();
-      return;
-    }
-    const src = SCENE_VO[baseSceneKey];
-    if (!src) return;
-    if (vo.src !== `${import.meta.env.BASE_URL}${src}`) {
-      vo.src = `${import.meta.env.BASE_URL}${src}`;
-      vo.currentTime = 0;
-    }
-    vo.volume = 1.0;
-    vo.play().catch(() => {});
-  }, [currentSceneKey, baseSceneKey, hasEnded, muted]);
 
   return (
     <div className="w-screen h-screen flex items-center justify-center overflow-hidden bg-black">
