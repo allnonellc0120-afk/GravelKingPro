@@ -23,9 +23,9 @@ export function Scene2() {
           className="flex-shrink-0"
         >
           <CharacterVideo 
-            className="w-[22vw]" 
+            className="w-[30vw]" 
             dialogue="Heh heh... they stole your song, dumbass." 
-            speaker="butthead"
+            speaker="right"
           />
         </motion.div>
 
@@ -49,7 +49,7 @@ export function Scene2() {
                 fill="none" 
                 strokeLinecap="round"
                 animate={{ x: [0, -10], opacity: [1, 0.5] }}
-                transition={{ delay: 2, duration: 0.5, ease: "easeIn", fillMode: "forwards" }}
+                transition={{ delay: 2, duration: 0.5, ease: "easeIn" }}
               />
               {/* Right Link */}
               <motion.path 
@@ -59,7 +59,7 @@ export function Scene2() {
                 fill="none" 
                 strokeLinecap="round"
                 animate={{ x: [0, 10], opacity: [1, 0.5] }}
-                transition={{ delay: 2, duration: 0.5, ease: "easeIn", fillMode: "forwards" }}
+                transition={{ delay: 2, duration: 0.5, ease: "easeIn" }}
               />
               
               {/* Middle Link (Breaks) */}

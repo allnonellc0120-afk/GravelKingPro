@@ -79,9 +79,9 @@ export function Scene1() {
           className="mb-[4vh]"
         >
           <CharacterVideo 
-            className="w-[20vw]" 
+            className="w-[30vw]" 
             dialogue="Uh... this sucks." 
-            speaker="beavis"
+            speaker="left"
           />
         </motion.div>
 
