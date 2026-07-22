@@ -257,3 +257,39 @@ id = "I-STMGxpIG4OtOPoeeoMf"
 uri = "file://attached_assets/gravelkingpro_header_4096x2304.jpg"
 type = "image"
 title = "Header Image — exactly 4096×2304 px"
+
+[[outputs]]
+id = "hUvA4eVYg8hZW5ybdT8qN"
+uri = "file://attached_assets/generated_audio/speech_beavis_scene1.mp3"
+type = "audio"
+title = "beavis_scene1"
+
+[[outputs]]
+id = "k6O-8BFMM_BopL6-b_7g9"
+uri = "file://attached_assets/generated_audio/speech_butthead_scene2.mp3"
+type = "audio"
+title = "butthead_scene2"
+
+[[outputs]]
+id = "o3MWvhlWL1GDBuiz5qpml"
+uri = "file://attached_assets/generated_audio/speech_beavis_scene1_2.mp3"
+type = "audio"
+title = "beavis_scene1"
+
+[[outputs]]
+id = "eimUpfavsfDtplH3pYACQ"
+uri = "file://attached_assets/generated_audio/speech_beavis_scene3.mp3"
+type = "audio"
+title = "beavis_scene3"
+
+[[outputs]]
+id = "W2I9-E4YucyxX1namnYmN"
+uri = "file://attached_assets/generated_audio/speech_butthead_scene4_2.mp3"
+type = "audio"
+title = "butthead_scene4"
+
+[[outputs]]
+id = "Ri_L4Fa6IMc3qjTbGpnwa"
+uri = "file://attached_assets/generated_audio/speech_butthead_scene2_2.mp3"
+type = "audio"
+title = "butthead_scene2"
