@@ -19,7 +19,10 @@ async function buildTest() {
   await rm(outDir, { recursive: true, force: true });
 
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/__tests__/studio-audio.test.ts")],
+    entryPoints: [
+      path.resolve(artifactDir, "src/__tests__/studio-audio.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/whitepaper.test.ts"),
+    ],
     platform: "node",
     bundle: true,
     format: "esm",
