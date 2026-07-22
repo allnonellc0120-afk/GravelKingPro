@@ -1,0 +1,43 @@
+Act as a Principal Software Engineer and Technical Writer. Implement a dedicated, public-facing White Paper page and PDF download pipeline on our GravelKing Pro platform at routes `/whitepaper`, `/api/v1/download-whitepaper`, and `/api/v1/whitepaper-spec`.
+
+The output must dynamically reflect our official 2026 technical brief specifications across the following sections:
+
+--------------------------------------------------------------------------------
+1. TECHNICAL BRIEF CONTENT SPECIFICATIONS
+--------------------------------------------------------------------------------
+Render the following structured sections cleanly into HTML/PDF output:
+
+- EXECUTIVE SUMMARY & 2026 MARKET IMPERATIVE:
+  * Detail the $43B+ creator economy market context (2026).
+  * Address regulatory enforcement: EU AI Act provenance declarations (Aug 2026) and U.S. Copyright Office human-authorship threshold requirements (Thaler v. Vidal).
+  * Contrast legacy external blockchain/ledger timestamps (which can be stripped or bypassed) against our MLK V3.5 dual-anchor LSB steganography.
+
+- 3-TIER INGESTION DEFENSE PIPELINE (`validate_asset_ingestion`):
+  * Tier 1 Metadata Collision Check: Scans title, artist, ISRC (CC-XXX-YY-NNNNN), ISWC, UPC against major label/DSP commercial blacklists (Sony, Universal, Warner, Atlantic, Columbia).
+  * Tier 2 Spectral Audio Fingerprinting: Runs ffmpeg ebur128 loudness analysis to reject near-silence (< -55 LUFS), clipped signals (> -0.5 dBFS), or single-frequency test tones.
+  * Tier 3 Digital Assertion Signature: Requires `author_assertion: true` in payload. Returns HTTP 422 `ERR_COPYRIGHT_WARRANT_REQUIRED` if absent.
+
+- FORENSIC CHAIN-OF-TITLE & DUAL-ANCHOR ARCHITECTURE:
+  * Anchor A (Nominator): Injected into audio least-significant bits. Encodes SHA-256(contentHash | artistHandle | certId) truncated to 32 hex chars. Survives lossless exports (WAV, FLAC, AIFF).
+  * Anchor B (Denominator): Stored exclusively server-side in PostgreSQL + Google Firestore append-only audit trail. Never transmitted to clients.
+  * HMAC Handshake: `HMAC(SESSION_SECRET, certId | nominator | denominator)`.
+  * Verification States: INTACT vs. TAMPERED (triggers Default of Warrant in legal proceedings) vs. NO_WATERMARK.
+  * FRE 901(b)(9) Federal Evidence Authentication standards met.
+
+- B2B INTEGRATION MODEL (e.g., PortalBunny, DSPs, Creator Platforms):
+  * Endpoints: `POST /api/v1/ingest`, `POST /api/v1/verify` (< 2ms median latency), `GET /api/court-cert/:certId.pdf`.
+  * Media Formats: Lossless (WAV, FLAC, AIFF), auto-conversion for lossy formats (MP3, AAC, OGG, Opus, M4A), and video container audio stripping (MP4, MOV, MKV, WebM) via ffmpeg.
+
+- CONTAINERIZED INFRASTRUCTURE MOAT:
+  * Docker multi-stage build: Node.js 22 LTS + ffmpeg-headless + native C-bound kernel binary using FFI.
+  * Zero-copy `mmap()` buffer access + `mlockall` memory pinning to prevent swap exposure.
+  * Zero secrets in image; all keys runtime-injected.
+
+--------------------------------------------------------------------------------
+2. ROUTE & UI IMPLEMENTATION
+--------------------------------------------------------------------------------
+1. Route `/whitepaper`: Render an executive dark-mode UI displaying the structured white paper with scannable tables, code blocks, and data callouts.
+2. Endpoint `/api/v1/download-whitepaper`: Stream a downloadable, PDF version of this technical brief.
+3. Endpoint `/api/v1/whitepaper-spec`: Return a structured JSON representation of the document payload.
+
+Ensure all endpoints build without errors and pass basic integration tests.
