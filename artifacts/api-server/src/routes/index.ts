@@ -20,6 +20,8 @@ import convertRouter from "./convert";
 import lyricsRouter from "./lyrics";
 import adminLabelRouter from "./adminLabel";
 import courtCertRouter from "./court-cert";
+import verifySignalRouter from "./verify-signal";
+import leadCaptureRouter from "./lead-capture";
 
 const router: IRouter = Router();
 
@@ -44,5 +46,7 @@ router.use(activateRouter);
 router.use(convertRouter);
 router.use(lyricsRouter);
 router.use(adminLabelRouter);
+router.use(verifySignalRouter);
+router.use(leadCaptureRouter);
 
 export default router;

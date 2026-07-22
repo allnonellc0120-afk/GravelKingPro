@@ -1,0 +1,34 @@
+Act as a Senior Full-Stack Engineer and SEO/Web Performance Specialist. We need to upgrade our production deployment for GravelKing Pro (MLK V3.5) to solve three critical business challenges: Search Engine Visibility, Public Technical Verification, and Automated Lead Capture.
+
+Implement the following production updates across our application:
+
+--------------------------------------------------------------------------------
+1. ADVANCED SEO & B2B SEARCH INDEXING OVERHAUL
+--------------------------------------------------------------------------------
+Update the primary HTML head / layout meta tags to claim index ownership for "GravelKing Pro" in the audio/AI security space (disambiguating from bicycle tire searches):
+- Open Graph / Meta Title: "GravelKing Pro | MLK V3.5 Signal-Level Audio Security & AI Governance Engine"
+- Description: "Enterprise audio steganography, dual-anchor cryptographic verification, and signal-level asset protection for publishers, A&Rs, and music tech platforms."
+- Structured Data (JSON-LD): Add a valid schema.org "SoftwareApplication" and "Organization" block defining All N One LLC, GravelKing Pro, and our core capabilities (LSB Steganography, Audio Watermarking, Chain-of-Title Verification).
+- Sitemap & Robots.txt: Ensure `/sitemap.xml` and `/robots.txt` explicitly allow indexing for root, `/verify`, `/whitepaper`, and `/demo`.
+
+--------------------------------------------------------------------------------
+2. PUBLIC "CLEAN ROOM" AUDIO VERIFICATION DEMO PAGE (`/verify`)
+--------------------------------------------------------------------------------
+Build a lightweight, visual public demo page where prospective enterprise partners (A&Rs, Publishers) can test our MLK V3.5 signal verification live:
+- Create a dropzone interface allowing users to upload a sample `.wav` master file.
+- Client/Server Handler: Pass the file to our backend verification service (`validate_signal_handshake`).
+- Visual Output: Render an interactive waveform display showing:
+  1. Steganographic Anchor A and Anchor B status (VALID / INVALID).
+  2. HMAC Cryptographic Hash status.
+  3. Clean Room Asset Warrant status ("WARRANT INTACT" vs "DEFAULT OF WARRANT - TAMPERED").
+- Include a clear CTA button: "Download Technical White Paper (PDF)" linked to our brief.
+
+--------------------------------------------------------------------------------
+3. ENTERPRISE LEAD CAPTURE & AUTO-DEMO PIPELINE
+--------------------------------------------------------------------------------
+Implement a high-converting B2B contact modal and API endpoint (`/api/v1/lead-capture`):
+- Capture fields: Name, Email, Organization/Company, Role (A&R, Publisher, Producer, Platform Developer).
+- Automated Response: Upon submission, auto-generate a temporal demo API key and email/deliver the official GravelKing Pro Technical Brief PDF package directly to their inbox.
+- Store lead entries cleanly in our database model with timestamp, company, and verification activity metrics.
+
+Run build checks and verify that all meta tags, schema blocks, and endpoint routes render cleanly.

@@ -106,7 +106,8 @@ async function computeSpectralUniqueness(audioBuffer: Buffer, ext: string): Prom
     ).catch(() => ({ stdout: "" }));
 
     // Fallback: use a robust entropy-based signature via ebur128 + silencedetect.
-    const { stdout: loudnessStdout } = await execFileAsync(
+    // ffmpeg always writes loudness stats to stderr, not stdout.
+    const loudnessResult = await execFileAsync(
       "ffmpeg",
       [
         "-y", "-i", tmpPath,
@@ -115,10 +116,17 @@ async function computeSpectralUniqueness(audioBuffer: Buffer, ext: string): Prom
         "-f", "null", "-",
       ],
       { timeout: 30_000 }
-    ).catch(() => ({ stdout: "" }));
+    ).catch((e: { stderr?: string; stdout?: string }) => ({ stdout: e.stdout ?? "", stderr: e.stderr ?? "" }));
+    const loudnessOutput = loudnessResult.stderr ?? loudnessResult.stdout ?? "";
 
-    const integratedMatch = loudnessStdout.match(/I:\s*([-\d.]+)\s*LUFS/);
-    const peakMatch = loudnessStdout.match(/Peak:\s*([-\d.]+)\s*dBFS/);
+    // ebur128 emits per-frame lines like "I: -70.0 LUFS" while the file plays,
+    // then a final Summary block with the true integrated value.  Always parse
+    // from the Summary block; per-frame values are still converging.
+    const summaryIdx = loudnessOutput.indexOf("Summary:");
+    const loudnessSummary = summaryIdx >= 0 ? loudnessOutput.slice(summaryIdx) : loudnessOutput;
+
+    const integratedMatch = loudnessSummary.match(/I:\s*([-\d.]+)\s*LUFS/);
+    const peakMatch = loudnessSummary.match(/Peak:\s*([-\d.]+)\s*dBFS/);
     const lufs = integratedMatch ? parseFloat(integratedMatch[1]) : -70;
     const peakDb = peakMatch ? parseFloat(peakMatch[1]) : -70;
 
