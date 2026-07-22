@@ -293,3 +293,9 @@ id = "Ri_L4Fa6IMc3qjTbGpnwa"
 uri = "file://attached_assets/generated_audio/speech_butthead_scene2_2.mp3"
 type = "audio"
 title = "butthead_scene2"
+
+[[outputs]]
+id = "qPL9ofyPcQld_rDtTzCXD"
+uri = "file://attached_assets/GravelKingPro-MLKv35-Technical-Brief.pdf"
+type = "pdf"
+title = "GravelKing Pro MLK V3.5 — Technical Brief (PDF)"
