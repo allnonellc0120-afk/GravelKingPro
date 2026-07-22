@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Permanent+Marker&display=swap');
 
 @import 'tailwindcss';
 
@@ -7,19 +7,20 @@
     --background: 240 10% 4%; /* #09090b */
     --foreground: 0 0% 98%; /* #fafafa */
     
-    --primary: 38 92% 50%; /* #f59e0b */
+    --primary: 174 100% 50%; /* #00FFE5 - Neon Cyan */
     --primary-foreground: 240 10% 4%;
     
     --muted: 240 5% 46%; /* #71717a */
     --muted-foreground: 240 5% 80%;
     
-    --accent: 38 92% 50%;
+    --accent: 38 92% 55%; /* #F5A623 - Deep Amber */
     --accent-foreground: 240 10% 4%;
     
     --border: 240 5% 15%;
     
     --font-heading: 'Outfit', sans-serif;
     --font-mono: 'Space Mono', monospace;
+    --font-comic: 'Permanent Marker', cursive;
   }
 }
 
