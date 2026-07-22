@@ -32,51 +32,31 @@ import { Scene1 } from './video_scenes/Scene1';
 import { Scene2 } from './video_scenes/Scene2';
 import { Scene3 } from './video_scenes/Scene3';
 import { Scene4 } from './video_scenes/Scene4';
-import { Scene5 } from './video_scenes/Scene5';
-import { Scene6 } from './video_scenes/Scene6';
-import { Scene7 } from './video_scenes/Scene7';
-import { Scene8 } from './video_scenes/Scene8';
-import { Scene9 } from './video_scenes/Scene9';
 
 /**
  * Boardroom pitch cut — every scene duration is sized to its narration
  * file (measured via ffprobe) plus a ~1.5s breathing buffer.
  */
 export const SCENE_DURATIONS = {
-  intro: 19500, // vo 17.8s — welcome
-  hook: 16000, // vo 14.5s — 200M tracks, zero certified
-  problem: 25500, // vo 23.7s — the copyright ruling
-  technology: 25500, // vo 23.7s — MLK V3.5 patent pending
-  product: 25500, // vo 23.7s — four tools, $9.99
-  market: 25500, // vo 23.7s — the market is ownership
-  revenue: 38000, // vo 36.0s — three streams, $1M ARR
-  moat: 25500, // vo 23.7s — the accumulated record
-  ask: 27500, // vo 25.5s — partner / acquire / invest
+  problem: 5000,
+  loophole: 7000,
+  solution: 10000,
+  cta: 8000,
 };
 
 const SCENE_COMPONENTS: Record<string, ComponentType> = {
-  intro: Scene1,
-  hook: Scene2,
-  problem: Scene3,
-  technology: Scene4,
-  product: Scene5,
-  market: Scene6,
-  revenue: Scene7,
-  moat: Scene8,
-  ask: Scene9,
+  problem: Scene1,
+  loophole: Scene2,
+  solution: Scene3,
+  cta: Scene4,
 };
 
 /** Per-scene narration files — each restarts cleanly on scene entry/jump. */
 const SCENE_VO: Record<string, string> = {
-  intro: 'audio/vo_intro.mp3',
-  hook: 'audio/vo_hook.mp3',
-  problem: 'audio/vo_problem.mp3',
-  technology: 'audio/vo_technology.mp3',
-  product: 'audio/vo_product.mp3',
-  market: 'audio/vo_market.mp3',
-  revenue: 'audio/vo_revenue.mp3',
-  moat: 'audio/vo_moat.mp3',
-  ask: 'audio/vo_ask.mp3',
+  problem: 'audio/vo_intro.mp3', // Note: placeholders if audio files don't match names
+  loophole: 'audio/vo_hook.mp3',
+  solution: 'audio/vo_problem.mp3',
+  cta: 'audio/vo_technology.mp3',
 };
 
 export default function VideoTemplate({
@@ -156,14 +136,25 @@ export default function VideoTemplate({
       {/* Persistent ambient layer across scenes */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <motion.div
-          className="absolute bg-[#f59e0b] rounded-full blur-[120px] mix-blend-screen"
+          className="absolute bg-[#00FFE5] rounded-full blur-[150px] mix-blend-screen"
           animate={{
             x: ['-20vw', '50vw', '80vw', '10vw', '-20vw'][currentScene % 5],
             y: ['-20vh', '30vh', '80vh', '10vh', '-20vh'][currentScene % 5],
             scale: [1, 1.5, 0.8, 1.2, 1][currentScene % 5],
-            opacity: [0.05, 0.08, 0.04, 0.07, 0.05][currentScene % 5],
+            opacity: [0.08, 0.12, 0.05, 0.1, 0.08][currentScene % 5],
           }}
           transition={{ duration: 8, ease: [0.25, 0.1, 0.25, 1] }}
+          style={{ width: '50vw', height: '50vw' }}
+        />
+        <motion.div
+          className="absolute bg-[#F5A623] rounded-full blur-[150px] mix-blend-screen"
+          animate={{
+            x: ['80vw', '10vw', '-20vw', '50vw', '80vw'][currentScene % 5],
+            y: ['80vh', '10vh', '-20vh', '30vh', '80vh'][currentScene % 5],
+            scale: [0.8, 1.2, 1, 1.5, 0.8][currentScene % 5],
+            opacity: [0.05, 0.1, 0.08, 0.12, 0.05][currentScene % 5],
+          }}
+          transition={{ duration: 10, ease: [0.25, 0.1, 0.25, 1] }}
           style={{ width: '40vw', height: '40vw' }}
         />
       </div>
@@ -175,12 +166,12 @@ export default function VideoTemplate({
       {/* Global persistent overlay elements */}
       <div className="absolute bottom-[4vh] left-[3vw] z-40 flex items-center gap-[1vw]">
         <motion.div
-          className="w-[0.8vw] h-[0.8vw] rounded-full bg-[#f59e0b]"
+          className="w-[0.8vw] h-[0.8vw] rounded-full bg-[#00FFE5]"
           animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 2, repeat: Infinity }}
         />
         <span className="font-mono text-[0.8vw] text-[#71717a] tracking-widest uppercase">
-          GravelKing Pro // Investor Cut
+          GravelKing Pro // Promo Cut
         </span>
       </div>
 
