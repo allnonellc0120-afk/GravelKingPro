@@ -17,6 +17,7 @@ import { readFile, unlink } from "fs/promises";
 import { randomUUID, createHash, createHmac } from "crypto";
 import { extractLsbPayload } from "../kernel-v3";
 import { sanitizeExt } from "../lib/audioGuards";
+import { buildWhitepaperPdf } from "../lib/whitepaper-pdf";
 import { db, ipCertStubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -184,111 +185,19 @@ router.post(
   }
 );
 
-// ── GET /api/whitepaper.pdf ───────────────────────────────────────────────────
-// Serves the GravelKing Pro MLK V3.5 Technical Brief as a minimal PDF.
-router.get("/whitepaper.pdf", (_req: Request, res: Response) => {
-  const lines = [
-    "GRAVELKING PRO — MLK V3.5 SIGNAL-LEVEL AUDIO SECURITY",
-    "Technical Brief for Enterprise Partners",
-    "======================================================",
-    "",
-    "EXECUTIVE SUMMARY",
-    "-----------------",
-    "GravelKing Pro (MLK V3.5) is a server-authoritative audio IP protection",
-    "platform built for publishers, A&Rs, and music-tech platforms operating in",
-    "the AI-era content landscape.",
-    "",
-    "The platform solves the metadata loophole: today, any streamed or distributed",
-    "audio track can have its ID3 metadata stripped, reassigned, or fraudulently",
-    "claimed by a third party. GravelKing Pro embeds proof of ownership directly",
-    "into the audio signal at the bit level — making tampering detectable and",
-    "chain-of-custody verification server-authoritative.",
-    "",
-    "CORE TECHNOLOGY: LSB DUAL-ANCHOR STEGANOGRAPHY",
-    "------------------------------------------------",
-    "MLK V3.5 employs a dual-anchor split-key architecture:",
-    "",
-    "  Anchor A (Nominator) — embedded into the audio's least-significant bits",
-    "    - SHA-256 hash slice of: contentHash | artistHandle | certId",
-    "    - Survives lossless export and WAV archival",
-    "    - Travel with the track forever",
-    "",
-    "  Anchor B (Denominator) — held exclusively on GravelKing servers",
-    "    - Server-side complement to the nominator",
-    "    - HMAC-SHA256 handshake signed with SESSION_SECRET",
-    "    - Never transmitted to any client",
-    "",
-    "Verification requires BOTH anchors. Without the server denominator, a",
-    "discovered nominator proves nothing. This is legally equivalent to a",
-    "two-factor notarisation: the track carries half the proof; the server",
-    "holds the other half.",
-    "",
-    "CHAIN-OF-CUSTODY CERTIFICATE",
-    "-----------------------------",
-    "Every certified master generates a forensic certificate containing:",
-    "  - ISO-8601 UTC timestamp (certifiedAt)",
-    "  - SHA-256 hash of the pre-MLK audio content",
-    "  - SHA-256 hash of the artist's style prompt (authorship evidence)",
-    "  - Dual-anchor HMAC proof",
-    "  - Style authorship score (0-100) for human-contribution quantification",
-    "",
-    "Certificates are dual-stored: PostgreSQL (live) and Google Firestore",
-    "(immutable append-only backup). Dual storage prevents unilateral deletion.",
-    "",
-    "COMPLIANCE & LEGAL CONTEXT",
-    "---------------------------",
-    "  - Consistent with U.S. Copyright Office guidance (Thaler v. Vidal, 2023)",
-    "  - Human-authorship score threshold: >= 25% for copyright assertability",
-    "  - SHA-256 content fingerprint satisfies FRE Rule 901(b)(9) authentication",
-    "  - HMAC-SHA256 handshake constitutes server-authoritative digital evidence",
-    "",
-    "INTEGRATION",
-    "-----------",
-    "  POST /api/kernel/master        — apply MLK V3.5 mastering + embed cert",
-    "  POST /api/kernel/verify-signal — public clean-room verification",
-    "  GET  /api/court-cert/:certId   — JSON forensic certificate",
-    "  GET  /api/court-cert/:certId.pdf — PDF forensic certificate",
-    "  POST /api/v1/lead-capture      — enterprise partner onboarding",
-    "",
-    "ENTERPRISE LICENSING",
-    "--------------------",
-    "GravelKing Pro is available as:",
-    "  - SaaS (gravelkingpro.it.com) — immediate access",
-    "  - White-label API integration — custom subdomain, volume pricing",
-    "  - On-premise Docker deployment — air-gapped for major labels",
-    "",
-    "Contact: kevm@gravelkingpro.it.com",
-    "Demo:    https://gravelkingpro.it.com/verify",
-    "",
-    "All N One LLC — GravelKing Productions",
-    "======================================================",
-    "CONFIDENTIAL — For authorized enterprise evaluation only.",
-  ];
-
-  const text = lines.join("\n");
-  const pdfHeader = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
-  const obj1 = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
-  const obj2 = "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
-  const obj3 = "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n";
-
-  const contentLines = text.split("\n").map((line, i) => {
-    const escaped = line
-      .replace(/\\/g, "\\\\")
-      .replace(/\(/g, "\\(")
-      .replace(/\)/g, "\\)");
-    return `BT /F1 9 Tf 36 ${740 - i * 13} Td (${escaped}) Tj ET`;
-  }).join("\n");
-  const obj4 = `4 0 obj\n<< /Length ${Buffer.byteLength(contentLines)} >>\nstream\n${contentLines}\nendstream\nendobj\n`;
-  const obj5 = "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n";
-
-  const body = pdfHeader + obj1 + obj2 + obj3 + obj4 + obj5;
-  const xref = `xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000274 00000 n \n0000000${274 + Buffer.byteLength(obj4)} 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${Buffer.byteLength(body)}\n%%EOF\n`;
-
-  const pdf = Buffer.concat([Buffer.from(body, "latin1"), Buffer.from(xref, "latin1")]);
+// ── GET /api/v1/download-whitepaper (alias: /api/whitepaper.pdf) ──────────────
+// Streams the MLK V3.5 Technical Brief as a styled multi-page PDF document.
+const streamWhitepaperPdf = (_req: Request, res: Response) => {
+  const pdf = buildWhitepaperPdf();
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", 'attachment; filename="GravelKingPro-MLKv35-Technical-Brief.pdf"');
+  res.setHeader("Content-Length", String(pdf.length));
+  res.setHeader("Cache-Control", "public, max-age=3600");
   res.send(pdf);
-});
+};
+
+router.get("/v1/download-whitepaper", streamWhitepaperPdf);
+router.get("/whitepaper.pdf", streamWhitepaperPdf);
 
 // ── GET /api/v1/whitepaper-spec ───────────────────────────────────────────────
 // Structured JSON data model of the MLK V3.5 Technical Brief.
@@ -352,6 +261,7 @@ router.get("/v1/whitepaper-spec", (_req: Request, res: Response) => {
         { method: "POST", path: "/api/v1/verify", alias: "/api/kernel/verify-signal", description: "Public clean-room verification. No auth required. Returns VerifyResult JSON.", requiresAuth: false, medianLatencyMs: 2 },
         { method: "GET", path: "/api/court-cert/:certId", description: "Retrieve structured forensic certificate JSON.", requiresAuth: false },
         { method: "GET", path: "/api/court-cert/:certId.pdf", description: "Download court-ready PDF certificate.", requiresAuth: false },
+        { method: "GET", path: "/api/v1/download-whitepaper", alias: "/api/whitepaper.pdf", description: "Stream this technical brief as a downloadable PDF document.", requiresAuth: false },
         { method: "POST", path: "/api/v1/lead-capture", description: "Enterprise partner onboarding. Issues 7-day demo API key.", requiresAuth: false },
         { method: "GET", path: "/api/v1/whitepaper-spec", description: "This document — structured JSON data model.", requiresAuth: false },
       ],
