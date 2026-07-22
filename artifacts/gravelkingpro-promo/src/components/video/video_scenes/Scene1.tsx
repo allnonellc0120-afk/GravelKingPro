@@ -1,95 +1,118 @@
 import { motion } from 'framer-motion';
-import { Beavis } from './Beavis';
-import { Butthead } from './Butthead';
+import { useEffect, useRef } from 'react';
+import { CharacterVideo } from './CharacterVideo';
 
-export const Scene1 = () => {
+function FlatWaveformCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    let animationId: number;
+    
+    const render = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      const w = canvas.width;
+      const h = canvas.height;
+      const mid = h / 2;
+      
+      ctx.clearRect(0, 0, w, h);
+      
+      // Draw grid
+      ctx.strokeStyle = 'rgba(0, 255, 229, 0.1)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let y = 0; y < h; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+      
+      // Draw flatline waveform with slight jitter
+      ctx.beginPath();
+      ctx.strokeStyle = '#F5A623';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#F5A623';
+      ctx.shadowBlur = 10;
+      
+      for (let x = 0; x < w; x += 4) {
+        // almost flat, some occasional noise
+        const noise = Math.random() < 0.03 ? (Math.random() - 0.5) * 25 : (Math.random() - 0.5) * 3;
+        const y = mid + noise;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      
+      animationId = requestAnimationFrame(render);
+    };
+    render();
+    
+    return () => cancelAnimationFrame(animationId);
+  }, []);
+
+  return <canvas ref={canvasRef} className="w-full h-full opacity-80" />;
+}
+
+export function Scene1() {
   return (
     <motion.div 
-      className="absolute inset-0 flex flex-col items-center justify-center w-full h-full overflow-hidden"
+      className="absolute inset-0 flex items-center justify-center bg-[#09090b]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-      transition={{ duration: 0.5 }}
+      exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
+      transition={{ duration: 0.8 }}
     >
-      
-      {/* Background glitch effect */}
-      <motion.div 
-        className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"
-        animate={{ backgroundPosition: ['0% 0%', '100% 100%'] }}
-        transition={{ repeat: Infinity, duration: 0.2 }}
-      />
-
-      {/* Main TV Screen content */}
-      <div className="relative z-10 w-[80vw] h-[40vw] border-[0.5vw] border-zinc-800 bg-black/80 rounded-[2vw] flex flex-col items-center justify-center overflow-hidden mb-[10vw] shadow-[0_0_50px_rgba(0,255,229,0.1)]">
-        
-        {/* Flat Waveform */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-30">
-          <motion.div 
-            className="w-[90%] h-[2vw] bg-[#00FFE5]"
-            animate={{ 
-              scaleY: [1, 1.2, 0.8, 1],
-              opacity: [0.3, 0.5, 0.3]
-            }}
-            transition={{ repeat: Infinity, duration: 0.1 }}
-          />
-        </div>
-
-        {/* Glitch Overlay */}
-        <motion.div 
-          className="absolute inset-0 bg-[#F5A623] mix-blend-overlay pointer-events-none"
-          animate={{ opacity: [0, 0.2, 0, 0.5, 0] }}
-          transition={{ repeat: Infinity, duration: 2, times: [0, 0.1, 0.2, 0.3, 1] }}
-        />
-
-        {/* Text */}
-        <motion.h1 
-          className="font-mono text-[#00FFE5] text-[4vw] font-bold text-center tracking-tighter uppercase relative z-20"
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
-          <motion.span
-            animate={{ x: [-2, 2, -2, 0] }}
-            transition={{ repeat: Infinity, duration: 0.1, repeatDelay: 3 }}
-            className="inline-block"
-          >
-            PASSIVE TIMESTAMPS
-          </motion.span>
-          <br/>
-          ARE OBSOLETE.
-        </motion.h1>
-        
-        <motion.p 
-          className="font-mono text-[#F5A623] text-[1.5vw] mt-[2vw] relative z-20"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1 }}
-        >
-          External ledgers can't protect your actual audio.
-        </motion.p>
+      <div className="absolute inset-0 z-0">
+        <FlatWaveformCanvas />
       </div>
 
-      {/* Couch / Characters foreground */}
-      <div className="absolute bottom-[-5vw] left-0 right-0 h-[25vw] flex items-end justify-center z-30">
-        <div className="absolute bottom-0 w-[90vw] h-[15vw] bg-zinc-900 rounded-t-[5vw] border-t-[1vw] border-zinc-700 shadow-2xl flex justify-center items-end px-[10vw]">
-          
-          <div className="relative">
-            <Beavis className="scale-[0.8] origin-bottom mb-[-5vw] mr-[2vw]" />
-            {/* Speech bubble */}
-            <motion.div 
-              className="absolute top-[-5vw] right-[-10vw] bg-white text-black font-['Permanent_Marker'] text-[1.5vw] px-[1.5vw] py-[1vw] rounded-[1vw] border-[0.3vw] border-black z-50"
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 2, type: 'spring' }}
-            >
-              Uh... this sucks.
-              <div className="absolute bottom-[-1vw] left-[2vw] w-[1vw] h-[1.5vw] bg-white border-l-[0.3vw] border-b-[0.3vw] border-black transform -rotate-45" />
-            </motion.div>
-          </div>
+      <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.5 }}
+          className="mb-[4vh]"
+        >
+          <CharacterVideo 
+            className="w-[20vw]" 
+            dialogue="Uh... this sucks." 
+            speaker="beavis"
+          />
+        </motion.div>
 
-          <Butthead className="scale-[0.85] origin-bottom mb-[-5vw]" />
-        </div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
+          className="text-center"
+        >
+          <h1 className="text-[4vw] font-bold tracking-tighter text-white uppercase drop-shadow-[0_0_15px_rgba(245,166,35,0.8)]">
+            <motion.span
+              animate={{ opacity: [1, 0.5, 1, 0.8, 1], x: [0, -2, 2, -1, 0] }}
+              transition={{ repeat: Infinity, duration: 2, repeatType: "mirror" }}
+              className="inline-block"
+            >
+              Passive Timestamps
+            </motion.span>
+            <br />
+            <span className="text-[#F5A623]">Are Obsolete.</span>
+          </h1>
+          
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2, duration: 0.8 }}
+            className="text-[1.5vw] text-[#71717a] mt-[2vh] max-w-[50vw] mx-auto uppercase tracking-wide font-mono"
+          >
+            External ledgers can't protect your actual audio.
+          </motion.p>
+        </motion.div>
       </div>
     </motion.div>
   );
-};
+}

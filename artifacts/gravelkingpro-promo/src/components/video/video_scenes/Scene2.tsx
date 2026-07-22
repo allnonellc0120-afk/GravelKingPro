@@ -1,114 +1,137 @@
 import { motion } from 'framer-motion';
-import { Beavis } from './Beavis';
-import { Butthead } from './Butthead';
+import { CharacterVideo } from './CharacterVideo';
 
-export const Scene2 = () => {
+export function Scene2() {
   return (
     <motion.div 
-      className="absolute inset-0 flex flex-col items-center justify-center w-full h-full overflow-hidden"
-      initial={{ opacity: 0, scale: 1.05 }}
+      className="absolute inset-0 flex items-center justify-center bg-[#09090b]"
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, filter: "blur(10px)" }}
-      transition={{ duration: 0.5 }}
+      exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
+      transition={{ duration: 0.8 }}
     >
-      
-      {/* Background glitch effect */}
-      <motion.div 
-        className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"
-      />
+      {/* Background elements */}
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,rgba(245,166,35,0.05)_0%,transparent_70%)]" />
 
-      {/* Main TV Screen content */}
-      <div className="relative z-10 w-[80vw] h-[40vw] border-[0.5vw] border-zinc-800 bg-black/80 rounded-[2vw] flex flex-col items-center justify-center overflow-hidden mb-[10vw] shadow-[0_0_50px_rgba(245,166,35,0.1)]">
+      <div className="relative z-10 w-full h-full flex items-center justify-center gap-[10vw]">
         
-        <div className="flex flex-col items-center w-full mt-[-5vw]">
-          {/* Animated Chain and Metadata */}
-          <div className="relative w-[40vw] h-[15vw] flex items-center justify-center">
+        {/* Left Side: Character */}
+        <motion.div
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.8 }}
+          className="flex-shrink-0"
+        >
+          <CharacterVideo 
+            className="w-[22vw]" 
+            dialogue="Heh heh... they stole your song, dumbass." 
+            speaker="butthead"
+          />
+        </motion.div>
+
+        {/* Right Side: The Breaking Chain & ID3 Tag */}
+        <div className="flex flex-col items-start w-[40vw]">
+          <div className="relative h-[20vw] w-full flex items-center justify-center mb-[2vh]">
             
-            {/* The Chain */}
-            <motion.div 
-              className="absolute w-[20vw] h-[2vw] flex items-center justify-between"
-              initial={{ opacity: 1 }}
-              animate={{ opacity: [1, 1, 0] }}
-              transition={{ duration: 3, times: [0, 0.8, 1] }}
-            >
-              <div className="w-[5vw] h-[2vw] border-[0.3vw] border-[#00FFE5] rounded-full" />
-              <div className="w-[5vw] h-[2vw] border-[0.3vw] border-[#00FFE5] rounded-full" />
-              <div className="w-[5vw] h-[2vw] border-[0.3vw] border-[#00FFE5] rounded-full" />
-            </motion.div>
-
-            <motion.div 
-              className="absolute w-[20vw] h-[2vw] flex items-center justify-between z-10"
+            {/* The Database Node / Chain */}
+            <motion.svg 
+              viewBox="0 0 200 100" 
+              className="absolute w-[15vw] drop-shadow-[0_0_15px_rgba(0,255,229,0.5)]"
               initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0, 1] }}
-              transition={{ duration: 3, times: [0, 0.8, 1] }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
             >
-              <div className="w-[5vw] h-[2vw] border-[0.3vw] border-red-500 rounded-full transform -translate-x-[2vw] rotate-12" />
-              <div className="w-[5vw] h-[2vw] border-[0.3vw] border-red-500 rounded-full" />
-              <div className="w-[5vw] h-[2vw] border-[0.3vw] border-red-500 rounded-full transform translate-x-[2vw] -rotate-12" />
+              {/* Left Link */}
+              <motion.path 
+                d="M 60,30 L 40,30 C 20,30 20,70 40,70 L 60,70" 
+                stroke="#00FFE5" 
+                strokeWidth="10" 
+                fill="none" 
+                strokeLinecap="round"
+                animate={{ x: [0, -10], opacity: [1, 0.5] }}
+                transition={{ delay: 2, duration: 0.5, ease: "easeIn", fillMode: "forwards" }}
+              />
+              {/* Right Link */}
+              <motion.path 
+                d="M 140,30 L 160,30 C 180,30 180,70 160,70 L 140,70" 
+                stroke="#00FFE5" 
+                strokeWidth="10" 
+                fill="none" 
+                strokeLinecap="round"
+                animate={{ x: [0, 10], opacity: [1, 0.5] }}
+                transition={{ delay: 2, duration: 0.5, ease: "easeIn", fillMode: "forwards" }}
+              />
+              
+              {/* Middle Link (Breaks) */}
+              <motion.path 
+                d="M 50,50 L 150,50" 
+                stroke="#F5A623" 
+                strokeWidth="12" 
+                strokeLinecap="round"
+                initial={{ pathLength: 1, opacity: 1 }}
+                animate={{ opacity: 0, pathLength: 0, scale: 1.5 }}
+                transition={{ delay: 1.8, duration: 0.4 }}
+              />
+              
+              <motion.circle 
+                cx="100" cy="50" r="8" 
+                fill="#F5A623"
+                initial={{ scale: 1, opacity: 1 }}
+                animate={{ scale: 3, opacity: 0 }}
+                transition={{ delay: 1.8, duration: 0.4 }}
+              />
+            </motion.svg>
+            
+            {/* ID3 Tag Box that gets stripped */}
+            <motion.div
+              className="absolute bg-[#18181b] border border-[#00FFE5] rounded px-[2vw] py-[1vw] shadow-[0_0_20px_rgba(0,255,229,0.2)]"
+              initial={{ y: -80, opacity: 0 }}
+              animate={{ 
+                y: [-80, 0, 0, 150], 
+                opacity: [0, 1, 1, 0],
+                rotateZ: [0, 0, -10, -45],
+                scale: [1, 1, 1, 0.5]
+              }}
+              transition={{ 
+                times: [0, 0.1, 0.6, 1], 
+                duration: 3, 
+                delay: 0.8 
+              }}
+            >
+              <div className="text-[#00FFE5] font-mono text-[1vw] mb-1">ID3 METADATA</div>
+              <div className="text-[#a1a1aa] font-mono text-[0.8vw]">ARTIST: GRAVELKING</div>
+              <div className="text-[#a1a1aa] font-mono text-[0.8vw]">ISRC: US-S1Z-99-00001</div>
             </motion.div>
-
-            {/* The Metadata Tag */}
+            
+            {/* Particle Explosion on Break */}
             <motion.div 
-              className="absolute bg-zinc-800 border-[0.2vw] border-[#F5A623] px-[2vw] py-[0.5vw] rounded-[0.5vw] font-mono text-[#F5A623] text-[1.5vw] z-20"
-              initial={{ y: 0, opacity: 1, rotate: 0 }}
-              animate={{ y: 150, opacity: 0, rotate: 45 }}
-              transition={{ delay: 1.5, duration: 1.5, ease: "easeIn" }}
-            >
-              [ ID3_TAG: OWNER ]
-            </motion.div>
-
+              className="absolute w-[2vw] h-[2vw] bg-[#F5A623] rounded-full blur-[10px]"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: [0, 5], opacity: [1, 0] }}
+              transition={{ delay: 1.8, duration: 0.6 }}
+            />
           </div>
 
-          {/* Text */}
-          <motion.h1 
-            className="font-mono text-[#F5A623] text-[3.5vw] font-bold text-center tracking-tighter uppercase mt-[2vw]"
+          <motion.h2 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
+            transition={{ delay: 2.2, duration: 0.6 }}
+            className="text-[3vw] font-bold uppercase tracking-tight text-white leading-tight"
           >
-            Metadata stripped?
-            <br/>
-            <motion.span 
-              className="text-red-500 inline-block"
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ delay: 2.5, duration: 0.3 }}
-            >
-              Chain broken.
-            </motion.span>
-          </motion.h1>
-          
-          <motion.p 
-            className="font-mono text-[#00FFE5] text-[1.5vw] mt-[1vw]"
+            Metadata stripped? <br/>
+            <span className="text-[#F5A623]">Chain broken.</span>
+          </motion.h2>
+
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 3 }}
+            transition={{ delay: 2.8, duration: 0.6 }}
+            className="text-[1.2vw] text-[#71717a] font-mono mt-[2vh] uppercase"
           >
             Receipts don't stop audio theft.
           </motion.p>
         </div>
       </div>
-
-      {/* Couch / Characters foreground */}
-      <div className="absolute bottom-[-5vw] left-0 right-0 h-[25vw] flex items-end justify-center z-30">
-        <div className="absolute bottom-0 w-[90vw] h-[15vw] bg-zinc-900 rounded-t-[5vw] border-t-[1vw] border-zinc-700 shadow-2xl flex justify-center items-end px-[10vw]">
-          
-          <Beavis className="scale-[0.8] origin-bottom mb-[-5vw] mr-[2vw]" />
-
-          <div className="relative">
-            <Butthead pointing className="scale-[0.85] origin-bottom mb-[-5vw]" />
-            {/* Speech bubble */}
-            <motion.div 
-              className="absolute top-[-6vw] left-[-15vw] bg-white text-black font-['Permanent_Marker'] text-[1.5vw] px-[1.5vw] py-[1vw] rounded-[1vw] border-[0.3vw] border-black z-50 whitespace-nowrap"
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 1, type: 'spring' }}
-            >
-              Heh heh... they stole<br/>your song, dumbass.
-              <div className="absolute bottom-[-1vw] right-[2vw] w-[1vw] h-[1.5vw] bg-white border-r-[0.3vw] border-b-[0.3vw] border-black transform rotate-45" />
-            </motion.div>
-          </div>
-        </div>
-      </div>
     </motion.div>
   );
-};
+}
