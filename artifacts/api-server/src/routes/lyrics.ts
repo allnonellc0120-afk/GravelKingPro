@@ -56,7 +56,7 @@ async function geminiGenerate(prompt: string): Promise<string> {
 
   if (isVertexConfigured()) {
     candidates.push(
-      generateVertexText(prompt, cfg, TIMEOUT_MS)
+      generateVertexText(prompt, { ...cfg, responseMimeType: "text/plain" })
         .then(t => { if (!t.trim()) throw new Error("vertex:empty"); return t; })
         .catch(err => { logger.warn({ err }, "Vertex AI race lost or failed"); throw err; })
     );

@@ -19,6 +19,7 @@ import activateRouter from "./activate";
 import convertRouter from "./convert";
 import lyricsRouter from "./lyrics";
 import adminLabelRouter from "./adminLabel";
+import courtCertRouter from "./court-cert";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,7 @@ router.use(kernelRouter);
 router.use(audioRouter);
 router.use(studioRouter);
 router.use(masterRouter);
+router.use(courtCertRouter);
 router.use(stripeRouter);
 router.use(historyRouter);
 router.use(downloadRouter);

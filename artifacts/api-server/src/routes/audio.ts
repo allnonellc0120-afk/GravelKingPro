@@ -37,6 +37,7 @@ import { hasStudio, hasUnlimitedSplits, resolveTier } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS, type UsageField } from "../lib/usage";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
+import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
 
 const execFileAsync = promisify(execFile);
 const upload = multer({
@@ -264,6 +265,7 @@ audioRouter.post(
   audioRateLimit,
   audioConcurrency,
   upload.single("audio"),
+  validateAssetIngestion({ requireAudio: true }),
   async (req: Request, res: Response) => {
     if (!req.file) {
       res.status(400).json({ success: false, error: "No audio file uploaded." });
