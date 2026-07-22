@@ -10,6 +10,7 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio } from "../lib/entitlement";
 import { applyMLKv3Fast } from "../kernel-v3";
+import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
 
 const execFileAsync = promisify(execFile);
 
@@ -75,6 +76,7 @@ studioRouter.post(
   studioConcurrency,
   requireStudio,
   upload.array("tracks", 6),
+  validateAssetIngestion({ requireAudio: true }),
   async (req: Request, res: Response) => {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) {

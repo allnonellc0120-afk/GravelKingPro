@@ -20,6 +20,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
+import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
 
 /** Optional denoise stage folded into mastering (applied before the preset). */
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
@@ -132,6 +133,7 @@ masterRouter.post(
   masterRateLimit,
   masterConcurrency,
   upload.single("audio"),
+  validateAssetIngestion({ requireAudio: true }),
   async (req: Request, res: Response) => {
     // Log the moment the request enters the handler — if a crash happens before
     // the pino-http completion log fires, this entry at least shows the request

@@ -1,0 +1,101 @@
+services:
+  # ── API Core Layer (Node/Express) ─────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: gk-api
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - DATABASE_URL=${DATABASE_URL}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - GCP_SERVICE_ACCOUNT=${GCP_SERVICE_ACCOUNT}
+      - DEFAULT_OBJECT_STORAGE_BUCKET_ID=${DEFAULT_OBJECT_STORAGE_BUCKET_ID}
+      - REPLIT_CONNECTORS_HOSTNAME=${REPLIT_CONNECTORS_HOSTNAME}
+      - REPL_IDENTITY=${REPL_IDENTITY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gk-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      - "traefik.enable=false"
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: gk-postgres
+    environment:
+      - POSTGRES_USER=${DB_USER:-gravelking}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-gravelking}
+      - POSTGRES_DB=${DB_NAME:-gravelking}
+    volumes:
+      - gk-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - gk-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gravelking} -d ${DB_NAME:-gravelking}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ── MLK V3.5 Engine Processing Service ──────────────────────────────────────
+  # This is a placeholder container for the CPU-bound, memory-locked C++
+  # processing worker. In the current architecture the engine is invoked via
+  # ffmpeg from the API container; a dedicated worker is the enterprise upgrade.
+  mlk-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlk-engine
+    container_name: gk-mlk-engine
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - gk-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    profiles:
+      - advanced
+
+  # ── Redis (for task queue between API and MLK engine) ───────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: gk-redis
+    networks:
+      - gk-network
+    volumes:
+      - gk-redis-data:/data
+    profiles:
+      - advanced
+
+volumes:
+  gk-postgres-data:
+  gk-redis-data:
+
+networks:
+  gk-network:
+    driver: bridge

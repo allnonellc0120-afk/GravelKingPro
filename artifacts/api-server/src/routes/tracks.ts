@@ -8,6 +8,7 @@ import { getUncachableStripeClient } from "../stripeClient";
 import { storage } from "../storage";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
+import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { writeFileSync, unlinkSync } from "node:fs";
@@ -215,6 +216,7 @@ router.post(
     { name: "audio_preview", maxCount: 1 },
     { name: "cover_art", maxCount: 1 },
   ]),
+  validateAssetIngestion({ requireAudio: false }),
   async (req: Request, res: Response) => {
     // Dev privileges: an admin-authenticated request (gk_admin cookie or
     // x-admin-key header, both derived from ADMIN_KEY) bypasses the paid-tier
