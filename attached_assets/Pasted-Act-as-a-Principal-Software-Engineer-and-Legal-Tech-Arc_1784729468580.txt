@@ -1,0 +1,39 @@
+Act as a Principal Software Engineer and Legal-Tech Architect. We need to implement three core production features into our platform to satisfy strict B2B investor due diligence regarding cryptographic hashing, copyright liability, and defensible tech stack architecture.
+
+Implement the following modular updates cleanly into our existing codebase:
+
+--------------------------------------------------------------------------------
+1. PLAGIARISM & ANTI-PIRACY INGESTION FILTER (Handling Bad Actors)
+--------------------------------------------------------------------------------
+Before any cryptographic hash or LSB steganographic watermark is generated, implement a strict verification/validation gateway:
+
+- Add an pre-hash inspection middleware (`validate_asset_ingestion`):
+  1. Metadata Check: Scan track metadata for known copyrighted strings, ISWC/ISRC collision patterns, or flagged public blacklists.
+  2. Audio Fingerprint Check: Run an initial lightweight spectral analysis on incoming raw audio to verify basic waveform uniqueness before hashing.
+  3. Terms of Ownership Assertion: Require an explicit, signed user payload parameter (`author_assertion=True`) where the uploader digitally signs a warranty stating they own the raw inputs.
+- Behavior: If the track fails the pre-hash inspection or lacks the signed warranty, return HTTP 422 (Unprocessable Entity) with error code `ERR_COPYRIGHT_WARRANT_REQUIRED`. Do not generate the hash or apply the watermark.
+
+--------------------------------------------------------------------------------
+2. COURT-ADMISSIBLE FORENSIC AUDIT GENERATOR (Defending Hashes in Court)
+--------------------------------------------------------------------------------
+Create a dedicated export utility module (`generate_court_certificate.py` or `.ts` depending on stack) that compiles a comprehensive "Digital Chain-of-Custody Certificate":
+
+- Upon successful processing, auto-generate a structured JSON payload and downloadable PDF Certificate containing:
+  1. Immutable Timestamp: UTC ISO-8601 server-validated timestamp.
+  2. Input Metadata: SHA-256 hashes of raw input lyrics, prompt structures, and raw PCM audio buffers.
+  3. Dual-Anchor Handshake Data: Server-side HMAC signature verifying LSB Steganography Anchor A & Anchor B positions.
+  4. Legal Forensics Disclaimer: Include formal language asserting: "This document serves as an immutable, timestamped cryptographic proof-of-existence and chain-of-custody log generated at signal-level export."
+
+--------------------------------------------------------------------------------
+3. ENTERPRISE INFRASTRUCTURE & ARCHITECTURE MOAT DOCKERIZATION
+--------------------------------------------------------------------------------
+To transition from a basic Replit app deployment to a defensible, enterprise-ready architecture:
+
+- Structure a clean `Dockerfile` and `docker-compose.yml` isolating:
+  1. The API Core Layer (Node/Express or FastAPI)
+  2. The MLK V3.5 Engine Processing Service (Containerized C++/Python C-bindings for memory-locked `mmap` performance)
+  3. The Firestore / State Storage Sync Interface
+- Abstract environment variables cleanly into a `.env.example` template (verifying API keys, HMAC secrets, and DB handles are zero-trust secured).
+- Ensure all endpoints return structured microservice logs showing execution times, container IDs, and cryptographic validation statuses for audit tracking.
+
+Run tests on the pipeline to ensure existing endpoint functionality remains 100% operational while enforcing these new validation and certification steps.
