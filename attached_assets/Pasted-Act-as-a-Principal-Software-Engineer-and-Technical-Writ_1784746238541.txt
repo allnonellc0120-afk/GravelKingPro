@@ -1,0 +1,23 @@
+Act as a Principal Software Engineer and Technical Writer. We need to implement a dedicated, public-facing White Paper generation and download endpoint on our GravelKing Pro platform (`/whitepaper` and `/api/v1/download-whitepaper`).
+
+Generate a comprehensive, beautifully styled HTML/PDF Technical Brief detailing our MLK V3.5 engine and current 2026 AI legal/asset governance implications:
+
+--------------------------------------------------------------------------------
+1. TECHNICAL CONTENT & ARCHITECTURAL SPECIFICATIONS
+--------------------------------------------------------------------------------
+The White Paper must cover the following core sections:
+1. Executive Summary & Market Imperative (2026 Landscape): Moving from passive external blockchain/ledger timestamps to active, signal-level LSB steganographic watermarking.
+2. Ingestion Defense & Bad-Actor Mitigation: Detail our 3-tier `validate_asset_ingestion` filter (metadata collision check, spectral audio fingerprinting, and digital assertion signature).
+3. Court-Admissible Forensic Chain-of-Title: Explain our dual-anchor server handshake (Anchor A + Anchor B) and how downstream alterations trigger an automatic "Default of Warrant" in legal disputes.
+4. B2B Platform Integration Model (e.g., Creator Ecosystems like PortalBunny): Detail our containerized REST API (`/api/v1/ingest` and `/api/v1/verify`), supported formats (WAV, FLAC, AIFF, MP3/AAC), and millisecond server-side throughput.
+5. Containerized Infrastructure Moat: Highlight our Docker/C-binding architecture (`mmap`, `mlockall`) ensuring zero-trust enterprise cloud deployment (AWS/GCP).
+
+--------------------------------------------------------------------------------
+2. UI ROUTE & DOWNLOADING INTERFACE
+--------------------------------------------------------------------------------
+- Create a clean public web route `/whitepaper` with an executive dark-mode UI (dark slate background, neon cyan and amber accents).
+- Render the full white paper cleanly with scannable headings, data comparison matrices, and visual architecture diagrams.
+- Add an instant "Download PDF / Brief" action button using HTML2PDF or server-side PDF stream rendering.
+- Expose a raw JSON endpoint `/api/v1/whitepaper-spec` returning the document's structured data model.
+
+Verify the route compiles cleanly, meta tags are set, and output text is completely accessible for partner review.
