@@ -13,6 +13,7 @@ export function Scene4() {
       <CharacterVideo
         dialogue="This is the greatest thing I've ever seen."
         subDialogue="Secure your masters at the signal level."
+        audioSrc="audio/scene4.mp3"
       />
 
       {/* Center shield and CTA */}

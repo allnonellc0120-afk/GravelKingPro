@@ -13,6 +13,7 @@ export function Scene1() {
       <CharacterVideo
         dialogue="Uh... this sucks."
         subDialogue="External ledgers can't protect your actual audio."
+        audioSrc="audio/scene1.mp3"
       />
 
       {/* Top headline */}

@@ -13,6 +13,7 @@ export function Scene2() {
       <CharacterVideo
         dialogue="Heh heh... they stole your song, dumbass."
         subDialogue="Receipts don't stop audio theft."
+        audioSrc="audio/scene2.mp3"
       />
 
       {/* Top headline */}
