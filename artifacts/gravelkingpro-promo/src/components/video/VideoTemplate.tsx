@@ -158,8 +158,6 @@ export default function VideoTemplate({
           loop
           muted={muted}
         />
-        {/* Per-scene voice-over narration */}
-        <audio ref={voRef} preload="auto" autoPlay muted={muted} />
       </div>
     </div>
   );
