@@ -26,7 +26,6 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
     { href: "/studio", label: "DAW" },
     { href: "/songwriting", label: "Songwriting" },
     { href: "/label", label: "Label" },
-    { href: "/pitch", label: "Invest" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
     ...(isDeveloper ? [{ href: "/admin", label: "Admin" }] : []),
@@ -208,7 +207,6 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 justify-center sm:justify-end">
             <Link href="/label" className="hover:text-amber-500 transition-colors">Label</Link>
             <Link href="/library" className="hover:text-amber-500 transition-colors">Library</Link>
-            <Link href="/pitch" className="hover:text-amber-500 transition-colors">IP Embed</Link>
             <Link href="/protected-lyrics" className="hover:text-amber-500 transition-colors">My Lyrics</Link>
             <Link href="/contact" className="hover:text-amber-500 transition-colors">Contact</Link>
             <Link href="/download" className="hover:text-amber-500 transition-colors">Download</Link>

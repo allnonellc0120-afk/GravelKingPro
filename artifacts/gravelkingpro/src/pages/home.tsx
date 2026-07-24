@@ -10,7 +10,7 @@ import {
   ShieldCheck, Wand2, Music2, LayoutDashboard, PenLine,
   Play, Pause, Volume2, ChevronRight, ArrowRight, Crown,
   FileCode2, Disc3, Smartphone, CheckCircle2, Zap,
-  TrendingUp, DollarSign, Users, Mail,
+  Mail,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -66,80 +66,6 @@ function AppCard({ icon, title, desc, badge, badgeColor, href, cta, accent }: {
         </div>
       </motion.div>
     </Link>
-  );
-}
-
-/* ─── Investor pitch section ─────────────────────────────────────────── */
-function InvestorSection() {
-  return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/8 via-amber-400/4 to-transparent p-8 space-y-6">
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-          <TrendingUp className="w-6 h-6 text-amber-400" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h2 className="text-2xl font-black">Investor Opportunity</h2>
-            <Badge variant="outline" className="border-amber-500/40 text-amber-400 text-[10px]">Raising Seed</Badge>
-          </div>
-          <p className="text-muted-foreground leading-relaxed">
-            GravelKing Pro is the first platform that solves AI-era music copyright at the tool level. We are raising a $250K seed round to convert our 58 registered users into paying subscribers and prove enterprise demand from labels and publishers.
-          </p>
-        </div>
-      </div>
-
-      {/* Key metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { icon: <Users className="w-4 h-4 text-amber-400" />, val: "58", label: "Registered Users" },
-          { icon: <DollarSign className="w-4 h-4 text-emerald-400" />, val: "$25", label: "Blended ARPU/mo" },
-          { icon: <TrendingUp className="w-4 h-4 text-sky-400" />, val: "$250K", label: "Raising" },
-          { icon: <ShieldCheck className="w-4 h-4 text-violet-400" />, val: "1st", label: "IP cert platform" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-white/8 bg-black/30 p-4 text-center space-y-1">
-            <div className="flex justify-center">{s.icon}</div>
-            <div className="text-xl font-black text-white">{s.val}</div>
-            <div className="text-[10px] text-muted-foreground">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* 12-month projections */}
-      <div className="rounded-xl border border-border/30 bg-background/50 p-5 space-y-3">
-        <h3 className="text-sm font-bold text-amber-400">12-Month Revenue Projections</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[
-            { label: "Month 3", sub: "50 paying subs", val: "$1,250 MRR", color: "text-emerald-400" },
-            { label: "Month 6", sub: "200 paying subs", val: "$5,000 MRR", color: "text-amber-400" },
-            { label: "Month 12", sub: "500 subs + 2 enterprise", val: "$18,000 MRR", color: "text-sky-400" },
-          ].map((p) => (
-            <div key={p.label} className="rounded-lg border border-border/20 bg-card/30 p-3 space-y-0.5">
-              <p className="text-xs font-bold text-muted-foreground">{p.label}</p>
-              <p className="text-[10px] text-muted-foreground">{p.sub}</p>
-              <p className={`text-lg font-black ${p.color}`}>{p.val}</p>
-            </div>
-          ))}
-        </div>
-        <p className="text-[10px] text-muted-foreground">Conservative model. Zero paid ad spend. Based on organic conversion of existing user base and community outreach.</p>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-center gap-3 pt-1 border-t border-amber-500/15">
-        <div className="flex-1 text-sm text-muted-foreground">
-          Seed round open. <strong className="text-white">$250K target.</strong> Strategic partner preferred — music-tech, media, or IP-focused.
-        </div>
-        <Link href="/pitch">
-          <Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 h-10 shrink-0">
-            <TrendingUp className="w-3.5 h-3.5 mr-1.5" /> View Full Pitch
-          </Button>
-        </Link>
-        <Link href="/contact">
-          <Button variant="outline" className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 font-semibold h-10 px-5 shrink-0">
-            Contact Founder
-          </Button>
-        </Link>
-      </div>
-    </motion.div>
   );
 }
 
@@ -473,11 +399,6 @@ export default function Home() {
             </Link>
           </div>
         </motion.div>
-
-        {/* ══════════════════════════════════════════
-            INVESTOR PITCH SECTION
-        ══════════════════════════════════════════ */}
-        <InvestorSection />
 
         {/* ══════════════════════════════════════════
             EMAIL SIGN-UP
