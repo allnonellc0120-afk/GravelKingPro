@@ -11,6 +11,7 @@ import { eq, inArray, desc } from "drizzle-orm";
 import { setMaintenanceMode, isMaintenanceModeOn } from "../middlewares/maintenanceMode";
 import { getActiveSessions } from "../lib/activityTracker";
 import { purgeTempAudioCache } from "../lib/cachePurge";
+import { submitSitemapToGSC } from "../lib/gsc-api";
 
 const adminAuthRouter = Router();
 
@@ -290,6 +291,29 @@ adminAuthRouter.post("/admin/cache-purge", async (req: Request, res: Response) =
     res.json({ ok: true, ...result });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
+  }
+});
+
+/**
+ * POST /api/admin/gsc-submit
+ * Adds the site to Google Search Console and submits the sitemap using the
+ * GCP_SERVICE_ACCOUNT credential. Returns instructions if the service account
+ * needs to be granted GSC access first.
+ */
+adminAuthRouter.post("/admin/gsc-submit", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  try {
+    const result = await submitSitemapToGSC();
+    res.json(result);
+  } catch (err: unknown) {
+    res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : "Unknown error",
+      siteAdded: false,
+      sitemapSubmitted: false,
+      serviceAccountEmail: "",
+      sitesListed: [],
+    });
   }
 });
 

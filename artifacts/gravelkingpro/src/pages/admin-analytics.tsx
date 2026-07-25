@@ -60,12 +60,36 @@ function AnalyticsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
   const [copied, setCopied] = useState<string | null>(null);
+  const [gscLoading, setGscLoading] = useState(false);
+  const [gscResult, setGscResult] = useState<{
+    ok: boolean; siteAdded: boolean; sitemapSubmitted: boolean;
+    serviceAccountEmail: string; sitesListed: string[];
+    error?: string; needsAccessGrant?: boolean;
+  } | null>(null);
 
   const copyText = (text: string, key: string) => {
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(key);
       setTimeout(() => setCopied(null), 2000);
     });
+  };
+
+  const submitToGSC = async () => {
+    setGscLoading(true);
+    setGscResult(null);
+    try {
+      const adminKey = localStorage.getItem("gk_admin_key") ?? "";
+      const resp = await fetch("/api/admin/gsc-submit", {
+        method: "POST",
+        headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+      });
+      const data = await resp.json() as typeof gscResult;
+      setGscResult(data);
+    } catch {
+      setGscResult({ ok: false, siteAdded: false, sitemapSubmitted: false, serviceAccountEmail: "", sitesListed: [], error: "Network error" });
+    } finally {
+      setGscLoading(false);
+    }
   };
 
   const load = useCallback(async (range: number) => {
@@ -215,6 +239,74 @@ function AnalyticsDashboard() {
 
         {activeTab === "grow" && (
           <div className="space-y-6">
+            {/* Google Search Console Submit */}
+            <Card className="border-emerald-500/20 bg-emerald-500/5">
+              <CardContent className="pt-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      <span className="text-lg">🔍</span> Submit Sitemap to Google
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-md">
+                      Uses your GCP service account to add the site to Google Search Console and
+                      submit <span className="font-mono text-foreground/70">sitemap.xml</span> in one click.
+                      Since you've already verified ownership, this should go straight through.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => void submitToGSC()}
+                    disabled={gscLoading}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 gap-2"
+                    size="sm"
+                  >
+                    {gscLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TrendingUp className="w-3.5 h-3.5" />}
+                    {gscLoading ? "Submitting…" : "Submit to Google"}
+                  </Button>
+                </div>
+
+                {gscResult && (
+                  <div className={`mt-4 rounded-lg border p-4 text-sm space-y-2 ${gscResult.ok ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+                    {gscResult.ok ? (
+                      <>
+                        <p className="font-semibold text-emerald-400 flex items-center gap-2">
+                          <CheckCheck className="w-4 h-4" /> Sitemap submitted successfully!
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Google will start crawling your sitemap within 24–48 hours.
+                          Site added: {gscResult.siteAdded ? "✓" : "already present"} ·
+                          Sitemap: ✓
+                        </p>
+                      </>
+                    ) : gscResult.needsAccessGrant ? (
+                      <>
+                        <p className="font-semibold text-amber-400 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" /> One manual step needed
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Go to{" "}
+                          <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="underline text-foreground">
+                            Google Search Console
+                          </a>
+                          {" "}→ Settings → Users and permissions → Add user:
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="text-xs bg-black/30 px-2 py-1 rounded font-mono text-foreground/90 break-all">
+                            {gscResult.serviceAccountEmail}
+                          </code>
+                          <Button variant="ghost" size="sm" className="h-6 px-1.5 shrink-0" onClick={() => copyText(gscResult!.serviceAccountEmail, "gsc-email")}>
+                            {copied === "gsc-email" ? <CheckCheck className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Set role to <strong>Owner</strong> or <strong>Full user</strong>, then click Submit again above.</p>
+                      </>
+                    ) : (
+                      <p className="text-amber-300 text-xs">{gscResult.error}</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* SEO Checklist */}
             <Card className="border-border/40 bg-card/40">
               <CardContent className="pt-5 space-y-4">
