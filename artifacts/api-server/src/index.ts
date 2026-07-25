@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
+import { submitSitemapToGSC } from "./lib/googleSearchConsole";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
@@ -164,8 +165,64 @@ async function migrateAppSchema() {
   }
 }
 
+/**
+ * Submits the sitemap to Google Search Console on startup (production only).
+ *
+ * A lightweight DB table tracks the last successful submission so we only
+ * ping GSC once per 24 hours, not on every container restart.
+ * All errors are logged and swallowed — this must never block startup.
+ */
+async function submitSitemapOnStartup(): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
+
+  try {
+    // Ensure the tracking table exists (idempotent).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS sitemap_submission_log (
+        key          text        PRIMARY KEY,
+        submitted_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    // Check whether a submission already happened in the last 24 hours.
+    const rows = await db.execute(sql`
+      SELECT submitted_at
+      FROM   sitemap_submission_log
+      WHERE  key = 'gsc'
+    `);
+
+    const lastSubmitted = rows.rows[0]?.submitted_at as Date | undefined;
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    if (lastSubmitted && new Date(lastSubmitted) > cutoff) {
+      logger.info({ lastSubmitted }, "GSC sitemap already submitted within 24 h — skipping");
+      return;
+    }
+
+    logger.info("Submitting sitemap to Google Search Console...");
+    const result = await submitSitemapToGSC();
+
+    if (result.ok) {
+      await db.execute(sql`
+        INSERT INTO sitemap_submission_log (key, submitted_at)
+        VALUES ('gsc', now())
+        ON CONFLICT (key) DO UPDATE SET submitted_at = now()
+      `);
+      logger.info(
+        { siteAdded: result.siteAdded, serviceAccountEmail: result.serviceAccountEmail },
+        "Sitemap submitted to GSC successfully",
+      );
+    } else {
+      logger.error({ error: result.error }, "GSC sitemap submission failed");
+    }
+  } catch (err: unknown) {
+    logger.error({ err }, "GSC sitemap startup submission error — continuing");
+  }
+}
+
 await migrateAppSchema();
 await initStripe();
+await submitSitemapOnStartup();
 
 app.listen(port, (err) => {
   if (err) {
