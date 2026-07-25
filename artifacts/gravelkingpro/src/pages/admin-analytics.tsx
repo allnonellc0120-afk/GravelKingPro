@@ -66,6 +66,11 @@ function AnalyticsDashboard() {
     serviceAccountEmail: string; sitesListed: string[];
     error?: string; needsAccessGrant?: boolean;
   } | null>(null);
+  const [bingLoading, setBingLoading] = useState(false);
+  const [bingResult, setBingResult] = useState<{
+    ok: boolean; siteAdded: boolean; sitemapSubmitted: boolean;
+    error?: string;
+  } | null>(null);
 
   const copyText = (text: string, key: string) => {
     void navigator.clipboard.writeText(text).then(() => {
@@ -88,6 +93,23 @@ function AnalyticsDashboard() {
       setGscResult({ ok: false, siteAdded: false, sitemapSubmitted: false, serviceAccountEmail: "", sitesListed: [], error: e instanceof Error ? e.message : "Network error" });
     } finally {
       setGscLoading(false);
+    }
+  };
+
+  const submitToBing = async () => {
+    setBingLoading(true);
+    setBingResult(null);
+    try {
+      const res = await fetch("/api/admin/bing-submit", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = (await res.json()) as typeof bingResult;
+      setBingResult(data);
+    } catch (e) {
+      setBingResult({ ok: false, siteAdded: false, sitemapSubmitted: false, error: e instanceof Error ? e.message : "Network error" });
+    } finally {
+      setBingLoading(false);
     }
   };
 
@@ -300,6 +322,52 @@ function AnalyticsDashboard() {
                       </>
                     ) : (
                       <p className="text-amber-300 text-xs">{gscResult.error}</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Bing Webmaster Tools Submit */}
+            <Card className="border-blue-500/20 bg-blue-500/5">
+              <CardContent className="pt-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      <span className="text-lg">🔎</span> Submit Sitemap to Bing
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-md">
+                      Submits <span className="font-mono text-foreground/70">sitemap.xml</span> to Bing Webmaster Tools,
+                      covering Bing and DuckDuckGo traffic in one click.
+                      Requires a <span className="font-mono text-foreground/70">BING_API_KEY</span> secret (Settings → API access in Bing WMT).
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => void submitToBing()}
+                    disabled={bingLoading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 gap-2"
+                    size="sm"
+                  >
+                    {bingLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TrendingUp className="w-3.5 h-3.5" />}
+                    {bingLoading ? "Submitting…" : "Submit to Bing"}
+                  </Button>
+                </div>
+
+                {bingResult && (
+                  <div className={`mt-4 rounded-lg border p-4 text-sm space-y-2 ${bingResult.ok ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+                    {bingResult.ok ? (
+                      <>
+                        <p className="font-semibold text-emerald-400 flex items-center gap-2">
+                          <CheckCheck className="w-4 h-4" /> Sitemap submitted to Bing successfully!
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Bing will begin crawling your sitemap shortly.
+                          Site added: {bingResult.siteAdded ? "✓" : "already present"} ·
+                          Sitemap: ✓
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-amber-300 text-xs">{bingResult.error}</p>
                     )}
                   </div>
                 )}
