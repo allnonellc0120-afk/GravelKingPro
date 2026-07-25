@@ -178,11 +178,16 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
     // Live subscription / MRR snapshot from Stripe (all-time, current state).
     let activeSubs = 0;
     let trialingSubs = 0;
+    let pastDueSubs = 0;
     let mrrCents = 0;
+    let recentRevenueCents = 0; // successful charges in the selected window
+    let lifetimeRevenueCents = 0; // all successful charge amounts ever
     let stripeOk = true;
     try {
       const stripe = await getUncachableStripeClient();
-      for (const status of ["active", "trialing"] as const) {
+
+      // Count subscriptions across all paying statuses
+      for (const status of ["active", "trialing", "past_due", "incomplete"] as const) {
         let startingAfter: string | undefined;
         for (;;) {
           const page = await stripe.subscriptions.list({
@@ -192,14 +197,41 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
           });
           for (const sub of page.data) {
             if (status === "active") activeSubs += 1;
-            else trialingSubs += 1;
-            for (const item of sub.items.data) {
-              mrrCents += monthlyCentsFor(item.price, item.quantity ?? 1);
+            else if (status === "trialing") trialingSubs += 1;
+            else pastDueSubs += 1;
+            // Only count active + trialing toward MRR (past_due may never collect)
+            if (status === "active" || status === "trialing") {
+              for (const item of sub.items.data) {
+                mrrCents += monthlyCentsFor(item.price, item.quantity ?? 1);
+              }
             }
           }
           if (!page.has_more || page.data.length === 0) break;
           startingAfter = page.data[page.data.length - 1]?.id;
         }
+      }
+
+      // Recent + lifetime revenue from successful charges
+      const windowStart = Math.floor(since.getTime() / 1000);
+      let chargeAfter: string | undefined;
+      for (;;) {
+        const page = await stripe.charges.list({
+          limit: 100,
+          ...(chargeAfter ? { starting_after: chargeAfter } : {}),
+        });
+        for (const charge of page.data) {
+          if (charge.paid && !charge.refunded) {
+            lifetimeRevenueCents += charge.amount;
+            if (charge.created >= windowStart) {
+              recentRevenueCents += charge.amount;
+            }
+          }
+        }
+        if (!page.has_more || page.data.length === 0) break;
+        // Stop paginating once all charges are older than window
+        const oldest = page.data[page.data.length - 1];
+        if (oldest && oldest.created < windowStart - 86400 * 365) break; // 1yr hard stop
+        chargeAfter = oldest?.id;
       }
     } catch (err: unknown) {
       stripeOk = false;
@@ -220,8 +252,11 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
       subscriptions: {
         active: activeSubs,
         trialing: trialingSubs,
+        pastDue: pastDueSubs,
         total: payingTotal,
         mrr: Math.round(mrrCents) / 100,
+        recentRevenue: Math.round(recentRevenueCents) / 100,
+        lifetimeRevenue: Math.round(lifetimeRevenueCents) / 100,
         stripeOk,
       },
       conversion: {

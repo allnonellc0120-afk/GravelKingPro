@@ -10,7 +10,6 @@ Allow: /label
 Allow: /library
 Allow: /submit
 Allow: /download
-Allow: /pitch
 Allow: /studio
 Allow: /songwriting
 Allow: /vocal-booth
@@ -21,5 +20,6 @@ Disallow: /admin/
 Disallow: /kernel
 Disallow: /account
 Disallow: /api/
+Disallow: /pitch
 
 Sitemap: https://gravelkingpro.it.com/sitemap.xml

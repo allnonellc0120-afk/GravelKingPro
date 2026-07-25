@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Users, Eye, CreditCard, Crown, Clock, DollarSign,
   Loader2, RefreshCw, ArrowRight, AlertTriangle, BarChart3,
+  TrendingUp, Wallet, AlertCircle, ExternalLink, Copy, CheckCheck,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -15,7 +16,10 @@ import { Link, useLocation } from "wouter";
 interface Summary {
   rangeDays: number;
   totals: { pageviews: number; uniqueVisitors: number; checkoutStarts: number };
-  subscriptions: { active: number; trialing: number; total: number; mrr: number; stripeOk: boolean };
+  subscriptions: {
+    active: number; trialing: number; pastDue: number; total: number;
+    mrr: number; recentRevenue: number; lifetimeRevenue: number; stripeOk: boolean;
+  };
   conversion: { visitorToCheckoutPct: number; visitorToPaidPct: number; checkoutToPaidPct: number };
   series: Array<{ day: string; pageviews: number; visitors: number; checkoutStarts: number }>;
   topPaths: Array<{ path: string | null; count: number }>;
@@ -23,6 +27,7 @@ interface Summary {
 }
 
 const RANGES = [7, 30, 90] as const;
+type AdminTab = "analytics" | "grow";
 
 const fmt = (n: number): string => n.toLocaleString();
 const money = (n: number): string =>
@@ -53,6 +58,15 @@ function AnalyticsDashboard() {
   const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyText = (text: string, key: string) => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  };
 
   const load = useCallback(async (range: number) => {
     setLoading(true);
@@ -88,11 +102,52 @@ function AnalyticsDashboard() {
     { href: "/admin/ops", label: "Ops" },
   ];
 
+  const SOCIAL_POSTS = [
+    {
+      key: "twitter1",
+      label: "Twitter/X — Feature",
+      text: `🎚️ GravelKing Pro just dropped — pro-level audio mastering, music IP protection & a full live DAW in your browser.\n\nFree trial 👇\nhttps://gravelkingpro.it.com #MusicProduction #AudioMastering #IndieArtist`,
+    },
+    {
+      key: "twitter2",
+      label: "Twitter/X — IP angle",
+      text: `Your music has a fingerprint. GravelKing Pro embeds a cryptographic certificate into every master — provable, verifiable, court-ready.\n\nTry it free: https://gravelkingpro.it.com #MusicIP #Copyright #BeatMaker`,
+    },
+    {
+      key: "instagram",
+      label: "Instagram caption",
+      text: `Stop paying $200+ per track for mastering. GravelKing Pro gives you studio-grade masters, music IP certification, vocal booth, and a live DAW — all for less than a coffee a week. ☕🎛️\n\nLink in bio → https://gravelkingpro.it.com\n\n#GravelKing #AudioMastering #MusicProduction #IndieArtist #BeatMaker #MusicBusiness #VocalBooth #DAW #MusicIP`,
+    },
+    {
+      key: "reddit",
+      label: "Reddit post (r/WeAreTheMusicMakers)",
+      text: `I built GravelKing Pro — a browser-based audio mastering + IP certification tool\n\nHey r/WeAreTheMusicMakers — I've been building GravelKing Pro for the past year and it's finally live.\n\nWhat it does:\n• MLK V3.5 mastering kernel — 6 broadcast-ready presets + full EQ/compression\n• Music IP certification with cryptographic fingerprinting\n• Live multitrack DAW in the browser\n• Vocal booth with LRC lyric sync\n\nFree trial, no install: https://gravelkingpro.it.com\n\nWould love feedback from producers!`,
+    },
+    {
+      key: "producthunt",
+      label: "Product Hunt tagline",
+      text: `GravelKing Pro — Studio mastering, music IP protection & live DAW in your browser`,
+    },
+  ];
+
+  const DIRECTORIES = [
+    { name: "Google Search Console", url: "https://search.google.com/search-console", desc: "Submit sitemap: https://gravelkingpro.it.com/sitemap.xml", urgent: true },
+    { name: "Bing Webmaster Tools", url: "https://www.bing.com/webmasters", desc: "Submit sitemap to reach Bing & DuckDuckGo traffic", urgent: true },
+    { name: "Product Hunt", url: "https://www.producthunt.com/posts/new", desc: "Schedule a launch — can drive hundreds of signups in 24h", urgent: true },
+    { name: "Indie Hackers", url: "https://www.indiehackers.com/product/new", desc: "Post your product and MRR story", urgent: false },
+    { name: "Reddit r/WeAreTheMusicMakers", url: "https://reddit.com/r/WeAreTheMusicMakers/submit", desc: "Post a demo or show-and-tell — very active music producer community", urgent: false },
+    { name: "Reddit r/makinghiphop", url: "https://reddit.com/r/makinghiphop/submit", desc: "Hip-hop producers — strong match for mastering + vocal booth", urgent: false },
+    { name: "Music Ally", url: "https://musically.com/contact/", desc: "Music tech press — pitch GravelKing as an AI governance story", urgent: false },
+    { name: "Hacker News Show HN", url: "https://news.ycombinator.com/submit", desc: "Title: 'Show HN: GravelKing Pro – browser-based audio mastering + IP certification'", urgent: false },
+    { name: "AlternativeTo", url: "https://alternativeto.net/software/add/", desc: "List as alternative to iZotope Ozone, Bandlab Mastering, Landr", urgent: false },
+    { name: "Capterra / G2", url: "https://www.capterra.com/vendors/sign-up", desc: "Music production software category", urgent: false },
+  ];
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto py-8 space-y-6">
         {/* Admin tab navigation */}
-        <div className="flex gap-0 border-b border-border/40">
+        <div className="flex gap-0 border-b border-border/40 flex-wrap">
           {tabs.map(t => (
             <Link key={t.href} href={t.href}>
               <button className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${location === t.href ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -100,38 +155,55 @@ function AnalyticsDashboard() {
               </button>
             </Link>
           ))}
+          <button
+            onClick={() => setActiveTab("analytics")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${activeTab === "analytics" && location === "/admin" ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab("grow")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${activeTab === "grow" ? "border-emerald-500 text-emerald-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            🚀 Grow
+          </button>
         </div>
+
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-amber-500" />
-              Analytics
+              {activeTab === "grow" ? <TrendingUp className="w-6 h-6 text-emerald-500" /> : <BarChart3 className="w-6 h-6 text-amber-500" />}
+              {activeTab === "grow" ? "Grow" : "Analytics"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Traffic & conversion funnel · live revenue snapshot</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {activeTab === "grow" ? "SEO checklist, social posts & submission directories" : "Traffic & conversion funnel · live revenue snapshot"}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-md border border-border/40 overflow-hidden">
-              {RANGES.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setDays(r)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                    days === r ? "bg-amber-500 text-black" : "text-muted-foreground hover:bg-secondary/60"
-                  }`}
-                >
-                  {r}d
-                </button>
-              ))}
+          {activeTab === "analytics" && (
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-md border border-border/40 overflow-hidden">
+                {RANGES.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setDays(r)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      days === r ? "bg-amber-500 text-black" : "text-muted-foreground hover:bg-secondary/60"
+                    }`}
+                  >
+                    {r}d
+                  </button>
+                ))}
+              </div>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void load(days)} disabled={loading}>
+                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Refresh
+              </Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => void logout()}>
+                Lock
+              </Button>
             </div>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void load(days)} disabled={loading}>
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Refresh
-            </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => void logout()}>
-              Lock
-            </Button>
-          </div>
+          )}
         </div>
 
         {error && (
@@ -141,22 +213,106 @@ function AnalyticsDashboard() {
           </div>
         )}
 
-        {!data && loading && (
+        {activeTab === "grow" && (
+          <div className="space-y-6">
+            {/* SEO Checklist */}
+            <Card className="border-border/40 bg-card/40">
+              <CardContent className="pt-5 space-y-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">SEO Checklist — do these first</div>
+                {[
+                  { done: true, label: "Sitemap at /sitemap.xml", detail: "gravelkingpro.it.com/sitemap.xml ✓" },
+                  { done: true, label: "robots.txt configured", detail: "Allows all public pages, blocks /admin & /api ✓" },
+                  { done: true, label: "Google verification file present", detail: "google47e9ec0db824f939.html ✓" },
+                  { done: true, label: '"Gravel King" added to meta keywords', detail: 'Title & description now include both "GravelKing" and "Gravel King" ✓' },
+                  { done: false, label: "Submit sitemap to Google Search Console", detail: "Go to search.google.com/search-console → Sitemaps → paste https://gravelkingpro.it.com/sitemap.xml" },
+                  { done: false, label: "Submit sitemap to Bing Webmaster Tools", detail: "Covers Bing + DuckDuckGo in one step" },
+                  { done: false, label: "Launch on Product Hunt", detail: "Single biggest free traffic spike available — plan for a Tuesday–Thursday launch" },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${item.done ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>
+                      {item.done ? <CheckCheck className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    </div>
+                    <div>
+                      <p className={`text-sm font-medium ${item.done ? "text-muted-foreground line-through" : "text-foreground"}`}>{item.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Submission Directories */}
+            <Card className="border-border/40 bg-card/40">
+              <CardContent className="pt-5">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-4">Submit to these directories</div>
+                <div className="space-y-2">
+                  {DIRECTORIES.map((d) => (
+                    <div key={d.name} className={`flex items-start justify-between gap-3 p-3 rounded-lg border ${d.urgent ? "border-amber-500/30 bg-amber-500/5" : "border-border/30 bg-secondary/10"}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold truncate">{d.name}</p>
+                          {d.urgent && <span className="text-[10px] bg-amber-500 text-black font-bold px-1.5 py-0.5 rounded shrink-0">HIGH IMPACT</span>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{d.desc}</p>
+                      </div>
+                      <a href={d.url} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="sm" className="shrink-0 gap-1 text-xs h-7 px-2">
+                          Open <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Social Post Templates */}
+            <Card className="border-border/40 bg-card/40">
+              <CardContent className="pt-5">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-4">Ready-to-post social copy</div>
+                <div className="space-y-3">
+                  {SOCIAL_POSTS.map((p) => (
+                    <div key={p.key} className="border border-border/30 rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-amber-400">{p.label}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 gap-1 text-xs text-muted-foreground"
+                          onClick={() => copyText(p.text, p.key)}
+                        >
+                          {copied === p.key ? <><CheckCheck className="w-3 h-3 text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                        </Button>
+                      </div>
+                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">{p.text}</pre>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "analytics" && !data && loading && (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         )}
 
-        {data && (
+        {activeTab === "analytics" && data && (
           <>
             {/* Stat cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               <StatCard icon={<Users className="w-4 h-4" />} label="Visitors" value={fmt(data.totals.uniqueVisitors)} sub={`last ${data.rangeDays}d`} />
               <StatCard icon={<Eye className="w-4 h-4" />} label="Pageviews" value={fmt(data.totals.pageviews)} sub={`last ${data.rangeDays}d`} />
               <StatCard icon={<CreditCard className="w-4 h-4" />} label="Trial Starts" value={fmt(data.totals.checkoutStarts)} sub="checkout opened" />
-              <StatCard icon={<Crown className="w-4 h-4 text-amber-500" />} label="Active" value={fmt(data.subscriptions.active)} sub="paying subs" accent="text-amber-500" />
-              <StatCard icon={<Clock className="w-4 h-4" />} label="Trialing" value={fmt(data.subscriptions.trialing)} sub="in trial" />
-              <StatCard icon={<DollarSign className="w-4 h-4 text-emerald-400" />} label="MRR" value={data.subscriptions.stripeOk ? money(data.subscriptions.mrr) : "—"} sub={data.subscriptions.stripeOk ? "normalized" : "stripe unavailable"} accent="text-emerald-400" />
+              <StatCard icon={<Crown className="w-4 h-4 text-amber-500" />} label="Active Subs" value={fmt(data.subscriptions.active)} sub={data.subscriptions.pastDue > 0 ? `+ ${data.subscriptions.pastDue} past due` : "paying"} accent="text-amber-500" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <StatCard icon={<Clock className="w-4 h-4" />} label="Trialing" value={fmt(data.subscriptions.trialing)} sub="in free trial" />
+              <StatCard icon={<DollarSign className="w-4 h-4 text-emerald-400" />} label="MRR" value={data.subscriptions.stripeOk ? money(data.subscriptions.mrr) : "—"} sub={data.subscriptions.stripeOk ? "recurring/mo" : "stripe unavailable"} accent="text-emerald-400" />
+              <StatCard icon={<TrendingUp className="w-4 h-4 text-sky-400" />} label={`Revenue (${data.rangeDays}d)`} value={data.subscriptions.stripeOk ? money(data.subscriptions.recentRevenue) : "—"} sub="from Stripe charges" accent="text-sky-400" />
+              <StatCard icon={<Wallet className="w-4 h-4 text-violet-400" />} label="Lifetime Revenue" value={data.subscriptions.stripeOk ? money(data.subscriptions.lifetimeRevenue) : "—"} sub="all-time charges" accent="text-violet-400" />
             </div>
 
             {/* Funnel */}
