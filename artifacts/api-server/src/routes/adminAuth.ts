@@ -12,6 +12,7 @@ import { setMaintenanceMode, isMaintenanceModeOn } from "../middlewares/maintena
 import { getActiveSessions } from "../lib/activityTracker";
 import { purgeTempAudioCache } from "../lib/cachePurge";
 import { submitSitemapToGSC } from "../lib/gsc-api";
+import { submitSitemapToBing } from "../lib/bingWebmaster";
 
 const adminAuthRouter = Router();
 
@@ -313,6 +314,27 @@ adminAuthRouter.post("/admin/gsc-submit", async (req: Request, res: Response) =>
       sitemapSubmitted: false,
       serviceAccountEmail: "",
       sitesListed: [],
+    });
+  }
+});
+
+/**
+ * POST /api/admin/bing-submit
+ * Adds the site to Bing Webmaster Tools and submits the sitemap using the
+ * BING_API_KEY secret. Returns a clear error message when the key is missing
+ * or invalid.
+ */
+adminAuthRouter.post("/admin/bing-submit", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  try {
+    const result = await submitSitemapToBing();
+    res.status(result.ok ? 200 : 502).json(result);
+  } catch (err: unknown) {
+    res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : "Unknown error",
+      siteAdded: false,
+      sitemapSubmitted: false,
     });
   }
 });
