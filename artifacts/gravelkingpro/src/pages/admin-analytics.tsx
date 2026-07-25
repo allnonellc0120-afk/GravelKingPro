@@ -78,15 +78,14 @@ function AnalyticsDashboard() {
     setGscLoading(true);
     setGscResult(null);
     try {
-      const adminKey = localStorage.getItem("gk_admin_key") ?? "";
-      const resp = await fetch("/api/admin/gsc-submit", {
+      const res = await fetch("/api/admin/gsc-submit", {
         method: "POST",
-        headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        credentials: "include",
       });
-      const data = await resp.json() as typeof gscResult;
+      const data = (await res.json()) as typeof gscResult;
       setGscResult(data);
-    } catch {
-      setGscResult({ ok: false, siteAdded: false, sitemapSubmitted: false, serviceAccountEmail: "", sitesListed: [], error: "Network error" });
+    } catch (e) {
+      setGscResult({ ok: false, siteAdded: false, sitemapSubmitted: false, serviceAccountEmail: "", sitesListed: [], error: e instanceof Error ? e.message : "Network error" });
     } finally {
       setGscLoading(false);
     }
