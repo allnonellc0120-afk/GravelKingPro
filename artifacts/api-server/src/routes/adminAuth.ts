@@ -304,7 +304,7 @@ adminAuthRouter.post("/admin/gsc-submit", async (req: Request, res: Response) =>
   if (!await requireAdmin(req, res)) return;
   try {
     const result = await submitSitemapToGSC();
-    res.json(result);
+    res.status(result.ok ? 200 : 502).json(result);
   } catch (err: unknown) {
     res.status(500).json({
       ok: false,
