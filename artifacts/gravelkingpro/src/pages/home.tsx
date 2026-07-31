@@ -13,6 +13,7 @@ import {
   Mail,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { usePlanPrices } from "@/lib/usePlanPrices";
 
 /* ─── Audio demo component ──────────────────────────────────────────── */
 /* ─── App feature card ───────────────────────────────────────────────── */
@@ -112,6 +113,7 @@ function SignUpSection() {
 /* ─── Main page ──────────────────────────────────────────────────────── */
 export default function Home() {
   const { isAuthenticated, login } = useAuth();
+  const planPrices = usePlanPrices();
 
   return (
     <Layout>
@@ -410,14 +412,14 @@ export default function Home() {
                 cta: "Get Started", ctaStyle: "outline" as const,
               },
               {
-                name: "GravelKing Weekly", price: "$9.99", period: "/week",
+                name: "GravelKing Weekly", price: planPrices.weekly.amount, period: planPrices.weekly.period,
                 color: "border-emerald-500/30 bg-emerald-500/5",
                 badge: "Flexible", badgeColor: "bg-emerald-500 text-black",
                 features: ["Full MLK v3 mastering", "Unlimited WAV exports", "Vocal Booth + karaoke DAW"],
                 cta: "Start Weekly", ctaStyle: "outline" as const,
               },
               {
-                name: "Pro Plus", price: "$24.99", period: "/mo",
+                name: "Pro Plus", price: planPrices.monthly.amount, period: planPrices.monthly.period,
                 color: "border-amber-500/40 bg-amber-500/5",
                 badge: "Most Popular", badgeColor: "bg-amber-500 text-black",
                 features: ["Everything in Weekly", "IP certificate", "7-day free trial"],
@@ -425,7 +427,7 @@ export default function Home() {
                 highlight: true,
               },
               {
-                name: "Node Auditor", price: "$249.50", period: "/mo",
+                name: "Node Auditor", price: planPrices.node_auditor.amount, period: planPrices.node_auditor.period,
                 color: "border-purple-500/40 bg-purple-500/5",
                 badge: "Enterprise", badgeColor: "bg-purple-500 text-white",
                 features: ["Everything in Pro Plus", "MLK V3.5 optimizer", "White-label exports"],

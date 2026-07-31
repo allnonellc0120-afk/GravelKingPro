@@ -5,8 +5,10 @@ import { Mail, Globe, Building2, Zap, MessageSquare } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanPrices } from "@/lib/usePlanPrices";
 
 export default function Contact() {
+  const planPrices = usePlanPrices();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
@@ -143,7 +145,7 @@ export default function Contact() {
               <CardContent className="p-5 space-y-3">
                 <h3 className="font-semibold text-sm">Node Auditor Access</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Node Auditor ($249.50) includes remote kernel endpoint access, raw telemetry feed, and direct support. Contact us to discuss your specific needs.
+                  Node Auditor ({planPrices.node_auditor.amount}) includes remote kernel endpoint access, raw telemetry feed, and direct support. Contact us to discuss your specific needs.
                 </p>
               </CardContent>
             </Card>

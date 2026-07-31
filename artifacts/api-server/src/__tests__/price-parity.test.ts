@@ -107,13 +107,23 @@ async function main(): Promise<void> {
     );
   }
 
-  // Each advertised price must actually be shown on the pricing + home pages.
-  for (const rel of ["artifacts/gravelkingpro/src/pages/pricing.tsx", "artifacts/gravelkingpro/src/pages/home.tsx"]) {
-    const abs = path.join(root, rel);
-    if (!existsSync(abs)) continue;
-    const src = readFileSync(abs, "utf8");
+  // Pages render prices live from GET /api/stripe/products via the shared
+  // usePlanPrices hook; the only hardcoded amounts left are its fallbacks.
+  // Those fallbacks must stay in sync with the advertised (Stripe) prices.
+  const hookRel = "artifacts/gravelkingpro/src/lib/usePlanPrices.ts";
+  const hookAbs = path.join(root, hookRel);
+  check(`${hookRel} exists (live-price hook)`, existsSync(hookAbs));
+  if (existsSync(hookAbs)) {
+    const src = readFileSync(hookAbs, "utf8");
+    const tokens = src.match(priceToken) ?? [];
+    const rogue = tokens.filter((t) => !ALLOWED_TOKENS.has(t));
+    check(
+      `${hookRel} fallbacks contain no unrecognized price tokens`,
+      rogue.length === 0,
+      `rogue prices: ${[...new Set(rogue)].join(", ")}`,
+    );
     for (const plan of ADVERTISED) {
-      check(`${rel} shows ${plan.display} (${plan.product})`, src.includes(plan.display));
+      check(`${hookRel} fallback shows ${plan.display} (${plan.product})`, src.includes(plan.display));
     }
   }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
+import { usePlanPrices } from "@/lib/usePlanPrices";
 import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Card, CardContent } from "@/components/ui/card";
@@ -373,6 +374,7 @@ function TrackOptimizer({ isNodeAuditor }: { isNodeAuditor: boolean }) {
 
 export default function KernelDashboard() {
   const { isPro, tier, results, setResults, hasRun, setHasRun } = useAppState();
+  const planPrices = usePlanPrices();
   const { user, isAuthenticated, logout } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -525,10 +527,10 @@ export default function KernelDashboard() {
               </div>
               <Link href="/pricing">
                 <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-10 px-8">
-                  Upgrade to Studio — $29.99/mo
+                  Upgrade to Studio — {planPrices.monthly.label}
                 </Button>
               </Link>
-              <p className="text-xs text-muted-foreground">Node Auditor ($249.50) includes unlimited track optimization + remote kernel.</p>
+              <p className="text-xs text-muted-foreground">Node Auditor ({planPrices.node_auditor.amount}) includes unlimited track optimization + remote kernel.</p>
             </div>
           </div>
         ) : (
