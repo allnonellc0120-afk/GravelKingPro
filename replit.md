@@ -2,6 +2,11 @@
 
 A gravel-optimisation benchmarking tool with real Stripe subscription payments.
 
+## User preferences
+
+- **Big builds require explicit approval first**: For anything beyond a small fix, present the plan and get the user's sign-off BEFORE building, and check in during the work. Never run a large multi-part build silently end-to-end. (Set after the promo-code build was killed mid-way for being too much at once.)
+- **No fake/demo content presented as real**: No canned before/after tracks, mock stats, or placeholder data shown as if functional. If something is a demo, label it or don't ship it.
+
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
