@@ -116,6 +116,30 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
     }
   };
 
+  const resend = async () => {
+    setBusy("resend");
+    setError(null);
+    setDeliverResult(null);
+    try {
+      const res = await fetch(`/api/weekend-special/admin/orders/${order.id}/resend`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json()) as { emailed?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Re-send failed");
+      setDeliverResult(
+        json.emailed
+          ? "Download window restarted — the customer was emailed a fresh link."
+          : "Download window restarted, but the email could not be sent. Send the link manually.",
+      );
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Re-send failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const status = STATUS_LABEL[order.status] ?? STATUS_LABEL.awaiting_uploads;
   const allMastersUp = order.masters.every((m) => m.uploaded);
 
@@ -224,10 +248,28 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
             </Button>
           </div>
         )}
-        {order.status === "delivered" && order.deliveredAt && (
-          <p className="text-xs text-muted-foreground text-right">
-            Delivered {new Date(order.deliveredAt).toLocaleString()}
-          </p>
+        {order.status === "delivered" && (
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {order.deliveredAt && (
+              <p className="text-xs text-muted-foreground">
+                Delivered {new Date(order.deliveredAt).toLocaleString()}
+              </p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              disabled={busy !== null}
+              onClick={() => void resend()}
+            >
+              {busy === "resend" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              Re-send download link
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
