@@ -11,7 +11,8 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { AdminGate, useAdminAuth } from "@/components/admin-gate";
-import { Link, useLocation } from "wouter";
+import { AdminNav } from "@/components/admin-nav";
+import { useLocation } from "wouter";
 
 interface Summary {
   rangeDays: number;
@@ -140,12 +141,6 @@ function AnalyticsDashboard() {
   useEffect(() => { void load(days); }, [days, load]);
 
   const [location] = useLocation();
-  const tabs = [
-    { href: "/admin", label: "Analytics" },
-    { href: "/admin/tracks", label: "Tracks" },
-    { href: "/admin/waitlist", label: "Waitlist" },
-    { href: "/admin/ops", label: "Ops" },
-  ];
 
   const SOCIAL_POSTS = [
     {
@@ -192,14 +187,7 @@ function AnalyticsDashboard() {
     <Layout>
       <div className="max-w-6xl mx-auto py-8 space-y-6">
         {/* Admin tab navigation */}
-        <div className="flex gap-0 border-b border-border/40 flex-wrap">
-          {tabs.map(t => (
-            <Link key={t.href} href={t.href}>
-              <button className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${location === t.href ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                {t.label}
-              </button>
-            </Link>
-          ))}
+        <AdminNav>
           <button
             onClick={() => setActiveTab("analytics")}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${activeTab === "analytics" && location === "/admin" ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}
@@ -212,7 +200,7 @@ function AnalyticsDashboard() {
           >
             🚀 Grow
           </button>
-        </div>
+        </AdminNav>
 
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">

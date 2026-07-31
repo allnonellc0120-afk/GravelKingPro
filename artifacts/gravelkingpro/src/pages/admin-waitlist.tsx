@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AdminGate, useAdminAuth } from "@/components/admin-gate";
+import { AdminNav } from "@/components/admin-nav";
 import { downloadBlob } from "@/lib/download";
 
 interface WaitlistEntry {
@@ -137,6 +138,7 @@ function WaitlistDashboard() {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto py-8 space-y-6">
+        <AdminNav />
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
