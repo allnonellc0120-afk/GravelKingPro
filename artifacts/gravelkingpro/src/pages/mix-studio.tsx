@@ -1,5 +1,4 @@
 import { useCallback, useId, useRef, useState } from "react";
-import { BeforeAfterDemo } from "@/components/before-after-demo";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
@@ -113,12 +112,6 @@ export default function MixStudio() {
   if (!canUseStudio) return (
     <Layout>
       <div className="max-w-lg mx-auto space-y-6 py-16">
-        <BeforeAfterDemo
-          before={{ label: "Before", sub: "Raw mix", src: "/demo_original.wav" }}
-          after={{ label: "After", sub: "MLK v3 Mastered", src: "/demo_mastered.wav" }}
-          heading="Hear what the Studio does"
-          sub="Same clip — raw vs processed through the MLK v3 kernel."
-        />
         <div className="text-center space-y-4">
           <div className="text-5xl">🎛️</div>
           <h1 className="text-2xl font-bold">GravelKing Studio</h1>

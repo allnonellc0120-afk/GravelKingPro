@@ -15,34 +15,6 @@ import {
 import { motion } from "framer-motion";
 
 /* ─── Audio demo component ──────────────────────────────────────────── */
-function DemoPlayer({ label, sub, src, isAfter }: { label: string; sub: string; src: string; isAfter?: boolean }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const toggle = async () => {
-    const el = ref.current;
-    if (!el) return;
-    if (playing) { el.pause(); setPlaying(false); }
-    else { await el.play(); setPlaying(true); }
-  };
-  return (
-    <div className={`rounded-xl border p-5 space-y-3 ${isAfter ? "border-amber-500/40 bg-amber-500/5" : "border-border/40 bg-card/30"}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAfter ? "bg-amber-500 text-black" : "bg-zinc-700 text-zinc-300"}`}>{label}</span>
-          <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-        </div>
-        <Volume2 className="w-4 h-4 text-muted-foreground" />
-      </div>
-      <audio ref={ref} src={src} onEnded={() => setPlaying(false)} preload="none" />
-      <Button size="sm" variant={isAfter ? "default" : "outline"}
-        className={`w-full h-9 font-semibold text-xs ${isAfter ? "bg-amber-500 hover:bg-amber-600 text-black" : ""}`}
-        onClick={toggle}>
-        {playing ? <><Pause className="w-3.5 h-3.5 mr-1.5" />Pause</> : <><Play className="w-3.5 h-3.5 mr-1.5 fill-current" />Play {label}</>}
-      </Button>
-    </div>
-  );
-}
-
 /* ─── App feature card ───────────────────────────────────────────────── */
 function AppCard({ icon, title, desc, badge, badgeColor, href, cta, accent }: {
   icon: React.ReactNode; title: string; desc: string; badge: string;
@@ -334,16 +306,12 @@ export default function Home() {
         </div>
 
         {/* ══════════════════════════════════════════
-            BEFORE / AFTER AUDIO DEMO
+            TRY IT — the real before/after is your own track
         ══════════════════════════════════════════ */}
         <div className="space-y-5">
           <div className="text-center space-y-1">
-            <h2 className="text-xl font-bold">Hear the MLK v3 Difference</h2>
-            <p className="text-sm text-muted-foreground">Same track. Same file. 10 seconds of processing.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <DemoPlayer label="Before" sub="Raw upload" src="/demo_original.wav" />
-            <DemoPlayer label="After" sub="MLK v3 Mastered" src="/demo_mastered.wav" isAfter />
+            <h2 className="text-xl font-bold">Hear the MLK v3 Difference — on your own track</h2>
+            <p className="text-sm text-muted-foreground">Upload any song and A/B your original against the master, right in the app.</p>
           </div>
           <div className="text-center">
             <Link href="/mastering">

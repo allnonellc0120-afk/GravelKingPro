@@ -6,34 +6,6 @@ import { Play, Pause, Volume2, CheckCircle2, Loader2, AlertCircle, Zap, Clock, F
 import { motion, AnimatePresence } from "framer-motion";
 
 /* ─── Audio demo player ──────────────────────────────────────────── */
-function DemoPlayer({ label, sub, src, isAfter }: { label: string; sub: string; src: string; isAfter?: boolean }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const toggle = async () => {
-    const el = ref.current;
-    if (!el) return;
-    if (playing) { el.pause(); setPlaying(false); }
-    else { await el.play(); setPlaying(true); }
-  };
-  return (
-    <div className={`border p-5 space-y-3 transition-colors ${isAfter ? "border-amber-500/40 bg-amber-500/5" : "border-border/40 bg-card/30"}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 ${isAfter ? "bg-amber-500 text-black" : "bg-zinc-700 text-zinc-300"}`}>{label}</span>
-          <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-        </div>
-        <Volume2 className="w-4 h-4 text-muted-foreground" />
-      </div>
-      <audio ref={ref} src={src} onEnded={() => setPlaying(false)} preload="none" />
-      <Button size="sm" variant={isAfter ? "default" : "outline"}
-        className={`w-full h-9 font-semibold text-xs ${isAfter ? "bg-amber-500 hover:bg-amber-600 text-black" : ""}`}
-        onClick={toggle}>
-        {playing ? <><Pause className="w-3.5 h-3.5 mr-1.5" />Pause</> : <><Play className="w-3.5 h-3.5 mr-1.5 fill-current" />Play {label}</>}
-      </Button>
-    </div>
-  );
-}
-
 export default function WeekendSpecial() {
   const [checkoutState, setCheckoutState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -452,25 +424,6 @@ export default function WeekendSpecial() {
                 <span className="text-sm font-medium">{item.text}</span>
               </div>
             ))}
-          </div>
-        </motion.div>
-
-        {/* ══════════════════════════════════════════
-            AUDIO DEMO — Before/After
-        ══════════════════════════════════════════ */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-5"
-        >
-          <div className="text-center space-y-1">
-            <h2 className="text-xl font-bold">Hear the difference</h2>
-            <p className="text-sm text-muted-foreground">Same track, before and after MLK v3 mastering.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <DemoPlayer label="Before" sub="Raw upload" src="/demo_original.wav" />
-            <DemoPlayer label="After" sub="MLK v3 Mastered" src="/demo_mastered.wav" isAfter />
           </div>
         </motion.div>
 
