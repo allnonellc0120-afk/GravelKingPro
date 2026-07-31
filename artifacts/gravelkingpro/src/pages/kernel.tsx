@@ -530,7 +530,7 @@ export default function KernelDashboard() {
                   Upgrade to Studio — $29.99/mo
                 </Button>
               </Link>
-              <p className="text-xs text-muted-foreground">Node Auditor ($499) includes unlimited track optimization + remote kernel.</p>
+              <p className="text-xs text-muted-foreground">Node Auditor ($249.50) includes unlimited track optimization + remote kernel.</p>
             </div>
           </div>
         ) : (
