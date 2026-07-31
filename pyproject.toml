@@ -7,4 +7,6 @@ dependencies = [
     "numpy>=2.0",
     "scipy>=1.10",
     "psutil>=5.9",
+    "streamlit>=1.60.0",
+    "pyloudnorm>=0.2.0",
 ]

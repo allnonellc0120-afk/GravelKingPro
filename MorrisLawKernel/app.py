@@ -3,6 +3,12 @@ import numpy as np
 import soundfile as sf
 import io
 from morris_law_kernel import MorrisLawKernel, IntelligentMultiBandIsolator
+from lyric_detector import add_to_vault, preflight_scan
+from verification_api import (
+    GRAVELKING_VERIFY_URL,
+    VerificationBackendError,
+    verify_against_gravelking,
+)
 
 st.set_page_config(page_title="GravelKing Pro | Morris Law Kernel v3.5", layout="wide")
 st.title("GravelKing Pro — Morris Law Kernel v3.5 + IP Protection")
@@ -10,29 +16,117 @@ st.title("GravelKing Pro — Morris Law Kernel v3.5 + IP Protection")
 kernel = MorrisLawKernel()
 isolator = IntelligentMultiBandIsolator()
 
-tab1, tab2, tab3 = st.tabs(["Mastering", "Stem/Voice Isolation", "IP Protection"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["Mastering", "Stem/Voice Isolation", "IP Protection", "Lyric Pre-Flight"]
+)
 
 with tab1:
     uploaded = st.file_uploader("Upload WAV", type=["wav"], key="m")
     if uploaded:
-        audio, sr = sf.read(io.BytesIO(uploaded.read()))
-        st.audio(uploaded)
-        if st.button("Master"):
-            processed = kernel.process(audio.astype(np.float32))
-            buf = io.BytesIO()
-            sf.write(buf, processed, sr, format="WAV")
-            st.download_button("Download", buf.getvalue(), "mastered.wav")
+        load_err = None
+        try:
+            audio, sr = sf.read(io.BytesIO(uploaded.read()))
+        except Exception as exc:
+            load_err = f"Could not read that file as audio: {exc}"
+        else:
+            if np.asarray(audio).size == 0:
+                load_err = "That file contains no audio samples."
+        if load_err:
+            st.error(load_err)
+        else:
+            st.audio(uploaded)
+            preset = st.selectbox("Preset", list(MorrisLawKernel.PRESETS), index=5)
+            intensity = st.slider("Intensity", 0, 100, 65)
+            if st.button("Master"):
+                try:
+                    k = MorrisLawKernel(sample_rate=sr)
+                    processed = k.process(audio.astype(np.float32), preset=preset,
+                                          intensity=float(intensity))
+                except ValueError as exc:
+                    st.error(f"Cannot master this file: {exc}")
+                else:
+                    buf = io.BytesIO()
+                    sf.write(buf, processed, sr, format="WAV")
+                    st.download_button("Download", buf.getvalue(), "mastered.wav")
 
 with tab2:
+    st.caption(
+        "Pure-DSP band gating — fast and model-free. Expect bleed on shared "
+        "frequencies; this is honest filter-bank isolation, not ML separation."
+    )
     uploaded2 = st.file_uploader("Upload WAV", type=["wav"], key="i")
     if uploaded2:
-        audio2, sr2 = sf.read(io.BytesIO(uploaded2.read()))
-        if st.button("Isolate Voice"):
-            result = isolator.isolate_voice(audio2.astype(np.float32))
-            buf = io.BytesIO()
-            sf.write(buf, result, sr2, format="WAV")
-            st.download_button("Download", buf.getvalue(), "voice_isolated.wav")
+        load_err2 = None
+        try:
+            audio2, sr2 = sf.read(io.BytesIO(uploaded2.read()))
+        except Exception as exc:
+            load_err2 = f"Could not read that file as audio: {exc}"
+        else:
+            if np.asarray(audio2).size == 0:
+                load_err2 = "That file contains no audio samples."
+        if load_err2:
+            st.error(load_err2)
+        else:
+            stem = st.selectbox("Stem", ["vocals", "bass", "drums"])
+            strength = st.slider("Strength", 0.0, 1.0, 0.85)
+            if st.button("Isolate"):
+                try:
+                    iso = IntelligentMultiBandIsolator(sample_rate=sr2)
+                    result = iso.isolate_stem(audio2.astype(np.float32), stem, strength)
+                except ValueError as exc:
+                    st.error(f"Cannot isolate from this file: {exc}")
+                else:
+                    buf = io.BytesIO()
+                    sf.write(buf, result, sr2, format="WAV")
+                    st.download_button("Download", buf.getvalue(), f"{stem}_isolated.wav")
 
 with tab3:
-    st.info("IP Protection features ready. Full cryptographic signing happens on backend.")
-    st.write("Connects to verification_api.py and ip_protection_system.ts")
+    st.subheader("Verify a track against the live GravelKing server")
+    st.caption(
+        "The nominator is read from the track's LSB watermark locally; the "
+        "denominator + HMAC handshake are verified server-side (split-key). "
+        f"Backend: {GRAVELKING_VERIFY_URL}"
+    )
+    uploaded3 = st.file_uploader("Upload WAV", type=["wav"], key="v")
+    if uploaded3 and st.button("Verify Certification"):
+        try:
+            report = verify_against_gravelking(uploaded3.read(), uploaded3.name)
+        except VerificationBackendError as exc:
+            st.error(f"Verification backend error — no verdict was issued: {exc}")
+        except Exception as exc:  # protocol/parse surprises: fail loudly, never mislabel
+            st.error(f"Verification failed unexpectedly — no verdict was issued: {exc}")
+        else:
+            if report.get("valid"):
+                st.success(
+                    f"GravelKing certified — {report.get('artist')} "
+                    f"(cert {report.get('certId')}, {report.get('kernel')})"
+                )
+            else:
+                st.warning(f"Not verified: {report.get('reason') or report.get('error')}")
+            st.json(report)
+
+with tab4:
+    st.subheader("Pre-flight copyright scan (local vault)")
+    st.caption(
+        "3-line n-gram hash matching against your local fingerprint vault. "
+        "Advisory screening only — a clean result is not proof of originality "
+        "and not legal clearance."
+    )
+    lyrics = st.text_area("Paste lyrics", height=220, key="lyrics")
+    col_scan, col_add = st.columns(2)
+    with col_scan:
+        if st.button("Scan") and lyrics.strip():
+            report = preflight_scan(lyrics)
+            if report["matches_found"]:
+                st.error(f"Overlap found — {len(report['window_matches'])} vault entr(y/ies) matched")
+            elif report["vault_entries_checked"] == 0:
+                st.warning("Vault is empty — nothing to screen against; no conclusion possible.")
+            else:
+                st.success(f"No overlap with {report['vault_entries_checked']} vault entr(y/ies)")
+            st.json(report)
+    with col_add:
+        title = st.text_input("Title", key="vt")
+        artist = st.text_input("Artist", key="va")
+        if st.button("Add to vault (hashes only)") and lyrics.strip() and title and artist:
+            entry = add_to_vault(title, artist, lyrics)
+            st.success(f"Fingerprinted: {entry['title']} — {len(entry['window_hashes'])} windows")

@@ -31,6 +31,7 @@ import AdminOps from "@/pages/admin-ops";
 import PitchPage from "@/pages/pitch";
 import VerifyPage from "@/pages/verify";
 import WhitepaperPage from "@/pages/whitepaper";
+import WeekendSpecial from "@/pages/weekend-special";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
 
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/pitch" component={PitchPage} />
       <Route path="/verify" component={VerifyPage} />
       <Route path="/whitepaper" component={WhitepaperPage} />
+      <Route path="/weekend-special" component={WeekendSpecial} />
       <Route path="/demo" component={VerifyPage} />
       <Route path="/sign-in" component={SignInRedirect} />
       <Route path="/login" component={SignInRedirect} />

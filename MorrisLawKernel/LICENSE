@@ -1,0 +1,30 @@
+PROPRIETARY LICENSE
+
+Copyright (c) 2026 Kevin Morris / GravelKing Productions. All rights reserved.
+
+This software, including all source code, documentation, algorithms, and
+associated materials in this repository (the "Software"), is proprietary and
+confidential to Kevin Morris / GravelKing Productions.
+
+No license is granted. Without the prior written permission of the copyright
+holder, you may not:
+
+  1. Use, execute, or deploy the Software, in whole or in part;
+  2. Copy, reproduce, or create derivative works of the Software;
+  3. Publish, distribute, sublicense, sell, lease, or otherwise transfer the
+     Software or any portion of it;
+  4. Reverse engineer, decompile, or extract the algorithms, watermarking
+     schemes, or certificate formats embodied in the Software, except to the
+     extent such restriction is prohibited by applicable law.
+
+The split-key verification design referenced by this Software depends on
+server-side secrets that are NOT contained in this repository; nothing in this
+repository grants any right to the GravelKing production services.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+FROM THE USE OF OR INABILITY TO USE THE SOFTWARE.
+
+For licensing inquiries: Kevin Morris / GravelKing Productions.

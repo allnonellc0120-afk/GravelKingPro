@@ -1,0 +1,29 @@
+[project]
+name = "morrislawkernel"
+version = "3.5.0"
+description = "Morris Law Kernel v3.5 — production audio DSP + court-grade split-key IP protection (GravelKing Pro moat)"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Kevin Morris / GravelKing Productions" }]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "soundfile>=0.12",
+    "streamlit>=1.36",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "requests>=2.31",
+    "pyloudnorm>=0.1.1",
+]
+
+[project.optional-dependencies]
+# JIT acceleration — the kernel auto-falls back to pure NumPy without it.
+accel = ["numba>=0.59"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["morris_law_kernel", "verification_api", "lyric_detector", "benchmark"]

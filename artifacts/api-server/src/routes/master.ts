@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { streamBuffer } from "../lib/streamResponse";
 import multer from "multer";
 import { unlink } from "fs/promises";
@@ -16,8 +16,6 @@ import { db, ipCertStubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { styleAuthorshipScore } from "@workspace/authorship";
 import { backupCertStub } from "../lib/firestore";
-import { ObjectStorageService } from "../lib/objectStorage";
-import { logger } from "../lib/logger";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
@@ -36,12 +34,7 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB matches the audio route; 200 MB was unnecessarily large
 });
 
-// Clean up uploaded file after processing
-async function cleanupUpload(path: string | undefined) {
-  if (path) await unlink(path).catch(() => {});
-}
 const masterRouter = Router();
-const objectStorage = new ObjectStorageService();
 
 const masterRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
 const masterConcurrency = concurrencyLimit(3);
@@ -128,12 +121,24 @@ export const MASTER_PRESETS: Record<
 
 const VALID_PRESETS = new Set(Object.keys(MASTER_PRESETS));
 
+// Copyright/ownership validation is OPT-IN. Plain mastering works on any
+// track — karaoke backing, covers, reference mixes — with no ownership
+// warranty and no watermark. Only when the client asks to certify ownership
+// (certify=true) do the ingestion checks run and the IP cert get embedded.
+const maybeValidateIngestion = (req: Request, res: Response, next: NextFunction): void => {
+  if ((req.body as Record<string, unknown> | undefined)?.certify === "true") {
+    void validateAssetIngestion({ requireAudio: true })(req, res, next);
+    return;
+  }
+  next();
+};
+
 masterRouter.post(
   "/kernel/master",
   masterRateLimit,
   masterConcurrency,
   upload.single("audio"),
-  validateAssetIngestion({ requireAudio: true }),
+  maybeValidateIngestion,
   async (req: Request, res: Response) => {
     // Log the moment the request enters the handler — if a crash happens before
     // the pino-http completion log fires, this entry at least shows the request
@@ -157,6 +162,9 @@ masterRouter.post(
 
     const preset       = MASTER_PRESETS[presetName as MasterPreset];
     const denoise      = (req.body.denoise as string) === "true";
+    // certify=true → copyright/ownership validation (runs in middleware) plus
+    // an embedded IP cert. Default false → master any track, no watermark.
+    const certify      = (req.body.certify as string) === "true";
     // Artist handle attached to every cert
     const artistHandle = ((req.body.artist as string) || "Unknown Artist")
       .trim().slice(0, 64).replace(/[^\w\s@._-]/g, "");
@@ -229,12 +237,6 @@ masterRouter.post(
 
       await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 120_000 });
 
-      // Hash the normalized pre-MLK audio for the cert — this is what we bind
-      // to the artist. Done here so the hash reflects the original mix, not the
-      // MLK-carved output (which varies per kernel version).
-      const preMlkBytes  = await readFile(outPath);
-      const contentHash  = createHash("sha256").update(preMlkBytes).digest("hex");
-
       // Count the free user's first full download against their allowance.
       if (!isSample && usageUserId) {
         if (usedTotalDownloads >= FREE_LIMITS.totalDownloads) {
@@ -256,146 +258,104 @@ masterRouter.post(
       // Carve the mastered output through the MLK v3 kernel.
       const { buf: carvedBuffer, parity } = await applyMLKv3Fast(outPath);
 
-      // ── Nominator / Denominator cert split ──────────────────────────────────
-      // All math happens here, server-side. The kernel only moves bits.
-      //
-      //   fullHash   = SHA-256(contentHash | artist | certId)   64 hex chars
-      //   nominator  = fullHash[:32]   → embedded in track LSBs (goes with track)
-      //   denominator = fullHash[32:]  → stored in DB (stays on server)
-      //   handshake  = HMAC(certId|nominator|denominator, SESSION_SECRET)
-      //                → also stored in DB; only this server can regenerate it
-      //
-      // Verification requires BOTH track (nominator) + server record (denominator
-      // + handshake). Neither half is meaningful alone. Only the GK server can
-      // produce a valid handshake — making this the sole verification authority.
-      const secret     = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
-      const certId     = randomUUID();
-      const fullHash   = createHash("sha256")
-        .update(`${contentHash}|${artistHandle}|${certId}`)
-        .digest("hex");                          // 64 hex chars
-      const nominator   = fullHash.slice(0, 32); // first half → track
-      const denominator = fullHash.slice(32);    // second half → server only
-      const handshake  = createHmac("sha256", secret)
-        .update(`${certId}|${nominator}|${denominator}`)
-        .digest("hex");
+      // Certification is opt-in. Plain masters ship the carved audio untouched —
+      // no hash, no watermark, no DB record — so karaoke tracks, covers, and
+      // reference mixes master cleanly. Only certify=true gets the full
+      // nominator/denominator IP cert split.
+      let outBuffer = carvedBuffer;
+      let certHash: string | null = null;
+      let certId: string | null = null;
 
-      // Store denominator stub on the server — this is the primary court record
-      await db.insert(ipCertStubsTable).values({
-        certId,
-        denominator,
-        handshake,
-        contentHash,
-        artist: artistHandle,
-        stylePrompt:          rawStylePrompt || null,
-        styleAuthorshipScore: styleScore.score,
-      }).onConflictDoNothing();
+      if (certify) {
+        // Hash the normalized pre-MLK audio — bound to the original mix, not the
+        // MLK-carved output (which varies per kernel version).
+        const preMlkBytes  = await readFile(outPath);
+        const contentHash  = createHash("sha256").update(preMlkBytes).digest("hex");
 
-      // Dual-backup to Google Cloud Firestore — independently subpoenable even
-      // if GravelKing's own servers are unavailable or the company closes down.
-      backupCertStub({
-        certId,
-        denominator,
-        handshake,
-        contentHash,
-        artist:               artistHandle,
-        stylePrompt:          rawStylePrompt || null,
-        styleAuthorshipScore: styleScore.score,
-        certifiedAt:          new Date().toISOString(),
-      });
+        // ── Nominator / Denominator cert split ──────────────────────────────
+        //   fullHash    = SHA-256(contentHash | artist | certId)
+        //   nominator   = fullHash[:32] → embedded in track LSBs
+        //   denominator = fullHash[32:] → stored server-side only
+        //   handshake   = HMAC(certId|nominator|denominator, SESSION_SECRET)
+        // Verification requires BOTH the track and the server record.
+        const secret   = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
+        certId         = randomUUID();
+        const fullHash = createHash("sha256")
+          .update(`${contentHash}|${artistHandle}|${certId}`)
+          .digest("hex");                          // 64 hex chars
+        const nominator   = fullHash.slice(0, 32); // first half → track
+        const denominator = fullHash.slice(32);    // second half → server only
+        const handshake  = createHmac("sha256", secret)
+          .update(`${certId}|${nominator}|${denominator}`)
+          .digest("hex");
 
-      // Embed only the nominator into the track LSBs — no secrets in the file
-      const nominatorPayload = Buffer.from(
-        JSON.stringify({ v: 2, id: certId, n: nominator, a: artistHandle })
-      );
-      const stampedBuffer = embedLsbPayload(carvedBuffer, nominatorPayload);
-      const certHash      = fullHash; // full hash for response header only
+        // Store denominator stub on the server — the primary court record.
+        await db.insert(ipCertStubsTable).values({
+          certId,
+          denominator,
+          handshake,
+          contentHash,
+          artist: artistHandle,
+          stylePrompt:          rawStylePrompt || null,
+          styleAuthorshipScore: styleScore.score,
+        }).onConflictDoNothing();
+
+        // Dual-backup to Firestore — independently subpoenable even if
+        // GravelKing's own servers are unavailable.
+        backupCertStub({
+          certId,
+          denominator,
+          handshake,
+          contentHash,
+          artist:               artistHandle,
+          stylePrompt:          rawStylePrompt || null,
+          styleAuthorshipScore: styleScore.score,
+          certifiedAt:          new Date().toISOString(),
+        });
+
+        // Embed only the nominator into the track LSBs — no secrets in the file.
+        const nominatorPayload = Buffer.from(
+          JSON.stringify({ v: 2, id: certId, n: nominator, a: artistHandle })
+        );
+        outBuffer = embedLsbPayload(carvedBuffer, nominatorPayload);
+        certHash = fullHash;
+      }
 
       const filename = `gravelking_mastered_${presetName}.wav`;
 
-      // Shared header setter used for both sample and full-length paths
-      // Integrity block — the structured "Membership Pass" payload attached to
-      // every delivery. UI uses this to render the seal badge; downstream systems
-      // can inspect it without parsing raw header strings.
-      const integrityBlock = {
-        status:       "sealed",          // "sealed" = left our server pristine
-        stamp:        "GKP_V2",          // LSB format version
-        certId,
-        artist:       artistHandle,
-        verifyUrl:    "/api/kernel/verify-cert",
-        note:         "LSB nominator embedded. Any re-encode or bit-level edit breaks the chain of custody and revokes ecosystem status.",
-      } as const;
-
-      const setCertHeaders = () => {
+      const setResultHeaders = () => {
         res.setHeader("X-GK-Mode",              "master");
         res.setHeader("X-GK-Preset",            presetName);
         res.setHeader("X-GK-Denoise",           denoise ? "true" : "false");
         res.setHeader("X-GK-Kernel",            "MLK_v3.5");
         res.setHeader("X-GK-Parity",            parity);
-        res.setHeader("X-GK-Cert-Hash",         certHash);
-        res.setHeader("X-GK-Artist",            artistHandle);
-        res.setHeader("X-GK-Style-Score",       String(styleScore.score));
-        res.setHeader("X-GK-Style-Eligible",    styleScore.eligible ? "true" : "false");
-        // Active seal signal — one header the client can gate UI on without
-        // inspecting the full cert or parsing the cert hash.
-        res.setHeader("X-GK-Integrity",         "sealed");
+        if (certHash && certId) {
+          res.setHeader("X-GK-Cert-Hash",       certHash);
+          res.setHeader("X-GK-Artist",          artistHandle);
+          res.setHeader("X-GK-Style-Score",     String(styleScore.score));
+          res.setHeader("X-GK-Style-Eligible",  styleScore.eligible ? "true" : "false");
+          res.setHeader("X-GK-Integrity",       "sealed");
+        }
       };
 
+      // Both sample and full-length masters stream straight back as audio
+      // bytes so the result plays and downloads inside the app — no external
+      // storage link, no third-party hand-off.
       if (isSample) {
         if (usageUserId) await incrementUsage(usageUserId, "freeMasterPreviews");
         res.setHeader("Content-Type", "audio/wav");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         res.setHeader("X-GK-Sample", "true");
-        setCertHeaders();
-        streamBuffer(res, stampedBuffer);
+        setResultHeaders();
+        streamBuffer(res, outBuffer);
         return;
       }
 
-      // Full-length master — try object storage; fall back to direct stream.
-      let url: string | null = null;
-      try {
-        const key = `masters/${randomUUID()}.wav`;
-        // Pass cert metadata so the GCS object itself carries the seal record —
-        // stamp is visible at the storage layer, not only in PCM LSBs + DB.
-        url = await objectStorage.saveSignedDownload(
-          key,
-          stampedBuffer,
-          "audio/wav",
-          filename,
-          3600,
-          {
-            "gkp-integrity":  "sealed",
-            "gkp-cert-id":    certId,
-            "gkp-artist":     artistHandle,
-            "gkp-stamp":      "GKP_V2",
-            "gkp-kernel":     "MLK_v3.5",
-          },
-        );
-      } catch (storageErr) {
-        logger.warn({ err: storageErr }, "Object storage unavailable; streaming mastered audio directly");
-      }
-
-      if (url) {
-        res.json({
-          success:    true,
-          url,
-          filename,
-          isSample:   false,
-          preset:     presetName,
-          denoise,
-          kernel:     "MLK_v3.5",
-          parity,
-          certHash,
-          artist:     artistHandle,
-          bytes:      stampedBuffer.length,
-          integrity:  integrityBlock,
-        });
-      } else {
-        res.setHeader("Content-Type", "audio/wav");
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-        res.setHeader("X-GK-Sample", "false");
-        setCertHeaders();
-        streamBuffer(res, stampedBuffer);
-      }
+      res.setHeader("Content-Type", "audio/wav");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("X-GK-Sample", "false");
+      setResultHeaders();
+      streamBuffer(res, outBuffer);
     } catch (err: any) {
       void logToolError("Mastering Tool", "MASTERING", err);
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });

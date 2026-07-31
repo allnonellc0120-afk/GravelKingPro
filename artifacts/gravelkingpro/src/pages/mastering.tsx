@@ -43,6 +43,7 @@ export default function Mastering() {
   const [fileName, setFileName] = useState("");
   const [preset, setPreset] = useState<PresetId>("baseline");
   const [denoiseOn, setDenoiseOn] = useState(false);
+  const [certifyOn, setCertifyOn] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
@@ -51,7 +52,7 @@ export default function Mastering() {
 
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
 
-  const processFile = useCallback(async (file: File, selectedPreset: PresetId, denoise: boolean, style: string) => {
+  const processFile = useCallback(async (file: File, selectedPreset: PresetId, denoise: boolean, style: string, certify: boolean) => {
     setFileName(file.name);
     setResultUrl(null);
     setErrorMsg("");
@@ -87,6 +88,11 @@ export default function Mastering() {
     fd.append("preset", selectedPreset);
     fd.append("denoise", String(denoise));
     fd.append("stylePrompt", style);
+    if (certify) {
+      fd.append("certify", "true");
+      // Checking the certify box IS the ownership assertion.
+      fd.append("author_assertion", "true");
+    }
 
     // 3-minute hard cap — keeps mobile browsers from hanging forever when the
     // tab is backgrounded or the connection stalls mid-upload/download.
@@ -129,22 +135,10 @@ export default function Mastering() {
       const rem = resp.headers.get("X-GK-Free-Remaining");
       if (rem !== null) setRemaining(parseInt(rem));
 
-      const contentType = resp.headers.get("content-type") ?? "";
-      if (contentType.includes("application/json")) {
-        // Full-length master: the server stored the WAV in object storage and
-        // returned a signed URL so the browser downloads directly from GCS,
-        // bypassing the Cloud Run response-size limit. Playback and download
-        // both use the URL directly (the stored Content-Disposition forces the
-        // download filename cross-origin).
-        const data = (await resp.json()) as { url?: string; remaining?: number };
-        if (typeof data.remaining === "number") setRemaining(data.remaining);
-        if (!data.url) throw new Error("Processing failed");
-        setResultUrl(data.url);
-      } else {
-        // Free preview (30s): small enough to stream back inline as a blob.
-        const blob = await resp.blob();
-        setResultUrl(URL.createObjectURL(blob));
-      }
+      // The server always streams the mastered WAV back — it plays and
+      // downloads right here in the app, no external link.
+      const blob = await resp.blob();
+      setResultUrl(URL.createObjectURL(blob));
       setState("done");
       setProgress(100);
     } catch (err: any) {
@@ -175,7 +169,7 @@ export default function Mastering() {
   };
 
   const startMastering = () => {
-    if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt);
+    if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn);
   };
 
   const download = () => {
@@ -300,6 +294,22 @@ export default function Mastering() {
               />
               <label htmlFor="denoise" className="text-sm cursor-pointer">
                 Denoise — remove background hiss and hum before mastering
+              </label>
+            </div>
+
+            {/* Ownership certification (opt-in) — off by default so karaoke,
+                covers, and reference mixes master with no copyright check and
+                no watermark. */}
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-border/30 bg-card/30">
+              <input
+                type="checkbox"
+                id="certify"
+                checked={certifyOn}
+                onChange={(e) => setCertifyOn(e.target.checked)}
+                className="w-4 h-4 accent-sky-500 mt-0.5"
+              />
+              <label htmlFor="certify" className="text-sm cursor-pointer">
+                Certify this as my original work <span className="text-muted-foreground">(optional) — runs a copyright check and embeds an IP ownership certificate in the WAV. Leave off for karaoke, covers, or remixes.</span>
               </label>
             </div>
 
