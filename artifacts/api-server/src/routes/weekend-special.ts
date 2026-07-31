@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac, timingSafeEqual } from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { unlink } from "fs/promises";
@@ -19,6 +19,43 @@ const execFileAsync = promisify(execFile);
 const WEEKEND_SPECIAL_PRICE_ID = "price_1TzNCQD1aprhezOsuHcySJVo";
 const NOTIFY_EMAIL = process.env.WEEKEND_NOTIFY_EMAIL?.trim() || "allnonellc0120@gmail.com";
 const OFFER_ID = "weekend_3_master_999";
+// Downloads stop working this long after delivery (task: time-limited links).
+const DOWNLOAD_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+// Short-lived HMAC download token TTL — a secondary gate on top of the
+// fulfillment_token, so a token leaked from logs/history expires quickly.
+const DOWNLOAD_TOKEN_TTL_MS = 60 * 60 * 1000;
+
+function getDownloadSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET is required for download tokens");
+  return secret;
+}
+
+function issueDownloadToken(sessionId: string): string {
+  const exp = Date.now() + DOWNLOAD_TOKEN_TTL_MS;
+  const sig = createHmac("sha256", getDownloadSecret())
+    .update(`weekend-master:${sessionId}:${exp}`)
+    .digest("hex");
+  return `${exp}.${sig}`;
+}
+
+function verifyDownloadToken(sessionId: string, token: string): boolean {
+  const [expRaw, sig] = token.split(".");
+  const exp = Number(expRaw);
+  if (!expRaw || !sig || !Number.isFinite(exp) || Date.now() > exp) return false;
+  const expected = createHmac("sha256", getDownloadSecret())
+    .update(`weekend-master:${sessionId}:${exp}`)
+    .digest("hex");
+  const a = Buffer.from(sig, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function deliveryExpired(meta: Record<string, string | null | undefined>): boolean {
+  const deliveredAt = meta.delivered_at ? Date.parse(meta.delivered_at) : NaN;
+  // Fail closed: a delivered order with no parseable delivery date is expired.
+  return !Number.isFinite(deliveredAt) || Date.now() - deliveredAt > DOWNLOAD_WINDOW_MS;
+}
 const MAX_FILE_SIZE = 250 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
@@ -109,12 +146,15 @@ router.get("/weekend-special/order", async (req: Request, res: Response): Promis
     const masters = [1, 2, 3]
       .filter((slot) => meta[`master_${slot}_path`])
       .map((slot) => ({ slot, name: meta[`master_${slot}_name`] ?? `master-${slot}.wav` }));
+    const delivered = meta.fulfillment_status === "delivered";
+    const downloadExpired = delivered && deliveryExpired(meta);
     res.json({
       paid: true,
-      submitted:
-        meta.fulfillment_status === "files_submitted" || meta.fulfillment_status === "delivered",
-      delivered: meta.fulfillment_status === "delivered",
-      masters: meta.fulfillment_status === "delivered" ? masters : [],
+      submitted: meta.fulfillment_status === "files_submitted" || delivered,
+      delivered,
+      downloadExpired,
+      masters: delivered && !downloadExpired ? masters : [],
+      downloadToken: delivered && !downloadExpired ? issueDownloadToken(sessionId) : null,
     });
   } catch (error) {
     req.log.warn({ err: error }, "Weekend special order lookup failed");
@@ -298,14 +338,24 @@ router.get("/weekend-special/master", async (req: Request, res: Response): Promi
   const fulfillmentToken =
     typeof req.query.fulfillment_token === "string" ? req.query.fulfillment_token : "";
   const slot = Number(req.query.slot);
+  const downloadToken =
+    typeof req.query.download_token === "string" ? req.query.download_token : "";
   if (!sessionId.startsWith("cs_") || !fulfillmentToken || ![1, 2, 3].includes(slot)) {
     res.status(400).json({ error: "Invalid download request" });
+    return;
+  }
+  if (!downloadToken || !verifyDownloadToken(sessionId, downloadToken)) {
+    res.status(403).json({ error: "This download link has expired. Reload your order page to get a fresh one." });
     return;
   }
   try {
     const paid = await getPaidOfferSession(sessionId, fulfillmentToken);
     if (!paid || paid.session.metadata?.fulfillment_status !== "delivered") {
       res.status(403).json({ error: "This order has no delivered masters yet." });
+      return;
+    }
+    if (deliveryExpired(paid.session.metadata ?? {})) {
+      res.status(410).json({ error: "Downloads for this order expired 7 days after delivery. Contact support if you need your masters re-sent." });
       return;
     }
     const path = paid.session.metadata?.[`master_${slot}_path`];
@@ -508,6 +558,7 @@ router.post(
           deliveryLink,
           "",
           "The download links on that page are unique to your order — please don't share them.",
+          "For security, downloads are available for 7 days after delivery, so grab your files soon.",
           "Each track includes one revision; just reply to this email if you'd like adjustments.",
           "",
           "— GravelKing Pro",
