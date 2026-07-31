@@ -23,6 +23,7 @@ import courtCertRouter from "./court-cert";
 import verifySignalRouter from "./verify-signal";
 import leadCaptureRouter from "./lead-capture";
 import weekendSpecialRouter from "./weekend-special";
+import emailCaptureRouter from "./email-capture";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(adminLabelRouter);
 router.use(verifySignalRouter);
 router.use(leadCaptureRouter);
 router.use(weekendSpecialRouter);
+router.use(emailCaptureRouter);
 
 export default router;

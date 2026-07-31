@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
+import { EmailGate, useEmailGate } from "@/components/email-gate";
 import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,15 @@ export default function VocalBooth() {
     try { return localStorage.getItem(DEV_BYPASS_KEY) === "1"; } catch { return false; }
   });
   const canUseStudio = isPro || devBypass;
+  const emailGate = useEmailGate();
+
+  if (emailGate.gated) {
+    return (
+      <Layout>
+        <EmailGate tool="vocal-booth" onUnlocked={emailGate.unlock} />
+      </Layout>
+    );
+  }
 
   if (!canUseStudio) {
     return (

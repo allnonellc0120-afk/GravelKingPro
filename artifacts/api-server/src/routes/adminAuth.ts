@@ -13,11 +13,20 @@ import { getActiveSessions } from "../lib/activityTracker";
 import { purgeTempAudioCache } from "../lib/cachePurge";
 import { submitSitemapToGSC } from "../lib/gsc-api";
 import { submitSitemapToBing } from "../lib/bingWebmaster";
+import { rateLimit } from "../lib/rateLimiter";
 
 const adminAuthRouter = Router();
 
+// Brute-force protection — the admin key is short by design (owner's personal
+// code), so failed attempts must be expensive: 5 tries per 15 min per IP.
+const adminLoginRateLimit = rateLimit({
+  windowMs: 15 * 60_000,
+  max: 5,
+  message: "Too many login attempts. Wait 15 minutes and try again.",
+});
+
 /** POST /api/admin/login — verify key, set httpOnly session cookie. */
-adminAuthRouter.post("/admin/login", (req: Request, res: Response) => {
+adminAuthRouter.post("/admin/login", adminLoginRateLimit, (req: Request, res: Response) => {
   const adminKey = process.env.ADMIN_KEY?.trim() ?? "";
   if (!adminKey) {
     res.status(503).json({ error: "Admin key not configured on the server." });

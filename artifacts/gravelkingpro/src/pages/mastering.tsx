@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { downloadUrl } from "@/lib/download";
 import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
+import { EmailGate, useEmailGate } from "@/components/email-gate";
 import { Link } from "wouter";
 
 type State = "idle" | "compressing" | "processing" | "done" | "error";
@@ -36,6 +37,7 @@ type PresetId = (typeof PRESETS)[number]["id"];
 export default function Mastering() {
   const { isPro } = useAppState();
   const { toast } = useToast();
+  const emailGate = useEmailGate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [state, setState] = useState<State>("idle");
@@ -121,6 +123,10 @@ export default function Mastering() {
       clearInterval(crawlId);
       setProgress(95);
 
+      if (resp.status === 403) {
+        const data = await resp.json().catch(() => ({})) as { code?: string };
+        if (data.code === "EMAIL_REQUIRED") { emailGate.forceGate(); return; }
+      }
       if (resp.status === 402) {
         const data = await resp.json() as { error: string };
         setState("error");
@@ -190,6 +196,14 @@ export default function Mastering() {
     setErrorMsg("");
     setPendingFile(null);
   };
+
+  if (emailGate.gated) {
+    return (
+      <Layout>
+        <EmailGate tool="mastering" onUnlocked={emailGate.unlock} />
+      </Layout>
+    );
+  }
 
   const busy = state === "compressing" || state === "processing";
   const selectedPreset = PRESETS.find(p => p.id === preset)!;
