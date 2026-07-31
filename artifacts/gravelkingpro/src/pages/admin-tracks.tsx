@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AdminGate, useAdminAuth } from "@/components/admin-gate";
+import { AdminNav } from "@/components/admin-nav";
 import { useToast } from "@/hooks/use-toast";
-import { Link, useLocation } from "wouter";
 import { Music, CheckCircle, XCircle, Loader2, RefreshCw, User, Clock, Disc3, Upload } from "lucide-react";
 
 interface Track {
@@ -163,27 +163,11 @@ function TracksDashboard() {
   const accepted = tracks.filter(t => t.status === "accepted");
   const rejected = tracks.filter(t => t.status === "rejected");
 
-  const [location] = useLocation();
-  const tabs = [
-    { href: "/admin", label: "Analytics" },
-    { href: "/admin/tracks", label: "Tracks" },
-    { href: "/admin/waitlist", label: "Waitlist" },
-    { href: "/admin/ops", label: "Ops" },
-  ];
 
   return (
     <Layout>
       <div className="max-w-6xl mx-auto py-8 space-y-6">
-        {/* Admin tab navigation */}
-        <div className="flex gap-0 border-b border-border/40">
-          {tabs.map(t => (
-            <Link key={t.href} href={t.href}>
-              <button className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${location === t.href ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                {t.label}
-              </button>
-            </Link>
-          ))}
-        </div>
+        <AdminNav />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">

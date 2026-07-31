@@ -8,7 +8,7 @@ import {
   Trash2, CheckCircle2, XCircle, HelpCircle,
 } from "lucide-react";
 import { AdminGate, useAdminAuth } from "@/components/admin-gate";
-import { Link, useLocation } from "wouter";
+import { AdminNav } from "@/components/admin-nav";
 
 interface ToolErrorRow {
   id: number;
@@ -58,7 +58,6 @@ function StatusPill({ ok, label }: { ok: boolean | null; label: string }) {
 
 function OpsDashboard() {
   const { logout } = useAdminAuth();
-  const [location] = useLocation();
 
   const [maintenanceOn, setMaintenanceOn] = useState<boolean | null>(null);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
@@ -173,25 +172,11 @@ function OpsDashboard() {
     }
   }, [authed]);
 
-  const tabs = [
-    { href: "/admin", label: "Analytics" },
-    { href: "/admin/tracks", label: "Tracks" },
-    { href: "/admin/waitlist", label: "Waitlist" },
-    { href: "/admin/ops", label: "Ops" },
-  ];
 
   return (
     <Layout>
       <div className="max-w-6xl mx-auto py-8 space-y-6">
-        <div className="flex gap-0 border-b border-border/40">
-          {tabs.map(t => (
-            <Link key={t.href} href={t.href}>
-              <button className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${location === t.href ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                {t.label}
-              </button>
-            </Link>
-          ))}
-        </div>
+        <AdminNav />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
