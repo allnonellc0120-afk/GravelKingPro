@@ -1,20 +1,10 @@
 ---
-name: Vertex AI Gemini transcription
-description: How audio transcription is authenticated and called — Vertex AI via GCP_SERVICE_ACCOUNT, not Replit proxy
+name: Gemini transcription dual provider
+description: Audio transcription tries Vertex AI first, falls back to Replit Gemini proxy; Vertex is 403 (aiplatform API disabled in the GCP project)
 ---
 
-## Rule
-POST /api/audio/transcribe calls Vertex AI Gemini (gemini-2.0-flash) authenticated with `GCP_SERVICE_ACCOUNT`. This bills the user's Google Cloud project — NOT Replit AI credits. Do NOT use `AI_INTEGRATIONS_GEMINI_*` env vars for audio transcription.
+POST /api/audio/transcribe uses a dual-provider chain: Vertex AI gemini-2.0-flash via GCP_SERVICE_ACCOUNT first, then the Replit AI Integrations Gemini proxy (gemini-2.5-flash) on failure. Only when both fail does it return 502 → client tap-to-time fallback.
 
-## Implementation
-- `artifacts/api-server/src/geminiTranscribe.ts` — standalone module
-- Uses `google-auth-library` (already a direct dep of api-server) with `GoogleAuth({ credentials: { client_email, private_key } })`
-- Same GCP_SERVICE_ACCOUNT JSON parsing pattern as `lib/firestore.ts` (project_id + client_email + private_key)
-- Access token is cached in memory (1h TTL, refreshed 60s before expiry)
-- Audio compressed to mono 16kHz 32kbps MP3 via ffmpeg before sending as base64 inline data (≤7MB)
-- Endpoint: `https://us-central1-aiplatform.googleapis.com/v1/projects/{project}/locations/us-central1/publishers/google/models/gemini-2.0-flash:generateContent`
-- Returns `{ segments: { text, start, end }[], fullText }` — same shape as the old Replicate Whisper response
+**Why:** The GCP project tied to GCP_SERVICE_ACCOUNT has the aiplatform (Agent Platform/Vertex AI) API DISABLED → Vertex returns 403 and cannot be enabled from inside Replit; only the user can enable it in Google Cloud Console. The Replit proxy accepts inlineData audio parts and works in dev; note the earlier memory that the proxy can 401 in production — if prod transcription starts 502ing, that's the first suspect.
 
-**Why:** User explicitly rejected Replit proxy (billing concern) and Replicate. GCP_SERVICE_ACCOUNT is already provisioned for Firestore; reusing it avoids a separate key.
-
-**How to apply:** If transcription breaks with 403/404 from Vertex AI, the likely cause is either (a) Vertex AI API not enabled on the GCP project, or (b) the service account lacks `roles/aiplatform.user`. User must enable `aiplatform.googleapis.com` and grant that role.
+**How to apply:** Provider logic lives in the transcription module next to the shared Vertex/proxy clients; both use identical generateContent bodies (mono 16kHz 32kbps MP3 inline, JSON segments response). If the user enables the Vertex API, no code change needed — Vertex automatically wins again.
