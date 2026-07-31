@@ -112,7 +112,7 @@ export default function SubmitTrackPage() {
               <div>
                 <h3 className="font-semibold text-base">Pro subscription required</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Track submission is available to Pro ($39.99/mo) and Node Auditor ($499/mo) subscribers.
+                  Track submission is available to Pro ($39.99/mo) and Node Auditor ($249.50/mo) subscribers.
                 </p>
               </div>
               <Link href="/pricing">

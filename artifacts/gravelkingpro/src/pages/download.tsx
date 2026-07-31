@@ -191,7 +191,7 @@ export default function DownloadPage() {
                 {[
                   { name: "GravelKing Splits", price: "$9.99/mo", color: "text-emerald-400" },
                   { name: "GravelKing Pro", price: "$39.99/mo", color: "text-amber-400" },
-                  { name: "Node Auditor", price: "$499/mo", color: "text-purple-400" },
+                  { name: "Node Auditor", price: "$249.50/mo", color: "text-purple-400" },
                 ].map((p) => (
                   <div key={p.name} className="flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/30 border border-border/30">
                     <span className={`text-xs font-medium ${p.color}`}>{p.name}</span>

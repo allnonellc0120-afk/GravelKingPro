@@ -457,7 +457,7 @@ export default function Home() {
                 highlight: true,
               },
               {
-                name: "Node Auditor", price: "$499", period: "/mo",
+                name: "Node Auditor", price: "$249.50", period: "/mo",
                 color: "border-purple-500/40 bg-purple-500/5",
                 badge: "Enterprise", badgeColor: "bg-purple-500 text-white",
                 features: ["Everything in Pro Plus", "MLK V3.5 optimizer", "White-label exports"],

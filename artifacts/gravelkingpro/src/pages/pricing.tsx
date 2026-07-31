@@ -479,7 +479,7 @@ export default function Pricing() {
                 <CardTitle className="text-lg">Node Auditor</CardTitle>
                 <CardDescription>Unlimited optimization runs — up to 100 devices, personal use</CardDescription>
                 <div className="mt-3">
-                  <span className="text-3xl font-bold">$499</span>
+                  <span className="text-3xl font-bold">$249.50</span>
                   <span className="text-muted-foreground text-sm">/mo</span>
                 </div>
               </CardHeader>

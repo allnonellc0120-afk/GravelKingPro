@@ -8,7 +8,7 @@ import { storage } from "../storage";
  *   free          — no paid plan
  *   weekly        — $9.99/week: unlimited voice remover / stem split + preset masters (with denoise); 3-day trial
  *   monthly       — $24.99/month (Studio): everything in weekly PLUS Studio (adjustable mastering + live DAW); 7-day trial
- *   node_auditor  — $499/month enterprise tier (superset of everything)
+ *   node_auditor  — $249.50/month enterprise tier (superset of everything)
  */
 export type Tier = "free" | "weekly" | "monthly" | "node_auditor";
 

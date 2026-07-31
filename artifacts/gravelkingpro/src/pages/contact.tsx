@@ -143,7 +143,7 @@ export default function Contact() {
               <CardContent className="p-5 space-y-3">
                 <h3 className="font-semibold text-sm">Node Auditor Access</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Node Auditor ($499) includes remote kernel endpoint access, raw telemetry feed, and direct support. Contact us to discuss your specific needs.
+                  Node Auditor ($249.50) includes remote kernel endpoint access, raw telemetry feed, and direct support. Contact us to discuss your specific needs.
                 </p>
               </CardContent>
             </Card>

@@ -73,14 +73,14 @@ async function createProducts() {
     );
     await ensurePrice(stripe, studio, 2499, 'month');
 
-    // Node Auditor — $499/month
+    // Node Auditor — $249.50/month
     const auditor = await ensureProduct(
       stripe,
       'Node Auditor',
       'Enterprise benchmarking at 1T scale, Morris Law V2 access, dedicated support, and custom reports.',
       'node_auditor',
     );
-    await ensurePrice(stripe, auditor, 49900, 'month');
+    await ensurePrice(stripe, auditor, 24950, 'month');
 
     console.log('\nDone. Run the app — Stripe products are ready.');
   } catch (err: any) {
