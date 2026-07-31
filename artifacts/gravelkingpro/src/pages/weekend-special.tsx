@@ -37,8 +37,9 @@ function DemoPlayer({ label, sub, src, isAfter }: { label: string; sub: string; 
 export default function WeekendSpecial() {
   const [checkoutState, setCheckoutState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [orderState, setOrderState] = useState<"sales" | "verifying" | "upload" | "submitted" | "delivered" | "error">("sales");
+  const [orderState, setOrderState] = useState<"sales" | "verifying" | "upload" | "submitted" | "delivered" | "expired" | "error">("sales");
   const [masters, setMasters] = useState<Array<{ slot: number; name: string }>>([]);
+  const [downloadToken, setDownloadToken] = useState<string | null>(null);
   const [downloadingSlot, setDownloadingSlot] = useState<number | null>(null);
   const [files, setFiles] = useState<Array<File | null>>([null, null, null]);
   const [uploading, setUploading] = useState(false);
@@ -83,10 +84,15 @@ export default function WeekendSpecial() {
     setOrderState("verifying");
     fetch(`/api/weekend-special/order?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}`)
       .then(async (response) => {
-        const data = await response.json() as { paid?: boolean; submitted?: boolean; delivered?: boolean; masters?: Array<{ slot: number; name: string }>; error?: string };
+        const data = await response.json() as { paid?: boolean; submitted?: boolean; delivered?: boolean; downloadExpired?: boolean; masters?: Array<{ slot: number; name: string }>; downloadToken?: string | null; error?: string };
         if (!response.ok || !data.paid) throw new Error(data.error ?? "Payment could not be confirmed");
         if (data.delivered) {
+          if (data.downloadExpired) {
+            setOrderState("expired");
+            return;
+          }
           setMasters(data.masters ?? []);
+          setDownloadToken(data.downloadToken ?? null);
           setOrderState("delivered");
         } else {
           setOrderState(data.submitted ? "submitted" : "upload");
@@ -209,6 +215,7 @@ export default function WeekendSpecial() {
                   <h1 className="text-3xl font-black mt-5">Your masters are ready</h1>
                   <p className="text-muted-foreground mt-3 max-w-md mx-auto">
                     All three finished masters are below. Links are unique to your order — please don't share them.
+                    Downloads stay available for 7 days after delivery.
                   </p>
                 </div>
                 <div className="space-y-3 mt-8">
@@ -221,12 +228,12 @@ export default function WeekendSpecial() {
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
                         disabled={downloadingSlot !== null}
                         onClick={async () => {
-                          if (!sessionId || !fulfillmentToken) return;
+                          if (!sessionId || !fulfillmentToken || !downloadToken) return;
                           setDownloadingSlot(master.slot);
                           setErrorMessage(null);
                           try {
                             const response = await fetch(
-                              `/api/weekend-special/master?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}&slot=${master.slot}`,
+                              `/api/weekend-special/master?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}&download_token=${encodeURIComponent(downloadToken)}&slot=${master.slot}`,
                             );
                             const data = await response.json() as { url?: string; error?: string };
                             if (!response.ok || !data.url) throw new Error(data.error ?? "Download failed");
@@ -248,6 +255,16 @@ export default function WeekendSpecial() {
                 )}
                 <p className="text-xs text-muted-foreground mt-5 text-center">
                   Each track includes one revision — <a href="/contact" className="text-amber-500 underline">contact us</a> if you'd like adjustments.
+                </p>
+              </div>
+            )}
+            {orderState === "expired" && (
+              <div className="text-center py-8">
+                <Clock className="w-10 h-10 text-amber-500 mx-auto" />
+                <h1 className="text-2xl font-black mt-5">Download window has closed</h1>
+                <p className="text-muted-foreground mt-3 max-w-md mx-auto">
+                  For security, masters are available for 7 days after delivery. This order's window has passed —
+                  <a href="/contact" className="text-amber-500 underline ml-1">contact support</a> and we'll re-send your files.
                 </p>
               </div>
             )}
