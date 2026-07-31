@@ -8,6 +8,7 @@ import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, Arro
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { usePlanPrices } from "@/lib/usePlanPrices";
 
 type PlanId = "weekly" | "monthly" | "node_auditor";
 
@@ -60,6 +61,7 @@ const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref
 
 export default function Pricing() {
   const { tier, activePromo, redeemPromo, revokePromo, isLoadingSubscription, refreshSubscription } = useAppState();
+  const planPrices = usePlanPrices();
   const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
   const [promoInput, setPromoInput] = useState("");
@@ -365,8 +367,8 @@ export default function Pricing() {
                 <CardTitle className="text-lg text-emerald-400">GravelKing Weekly</CardTitle>
                 <CardDescription>Unlimited removal, splitting &amp; preset masters</CardDescription>
                 <div className="mt-3">
-                  <span className="text-3xl font-bold">$9.99</span>
-                  <span className="text-muted-foreground text-sm">/week</span>
+                  <span className="text-3xl font-bold">{planPrices.weekly.amount}</span>
+                  <span className="text-muted-foreground text-sm">{planPrices.weekly.period}</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Zap className="w-3 h-3 text-emerald-400" />
@@ -420,8 +422,8 @@ export default function Pricing() {
                 </CardTitle>
                 <CardDescription>Studio tools + the MLK V3.5 Quality Optimizer that tunes your separation settings</CardDescription>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">$24.99</span>
-                  <span className="text-muted-foreground text-sm">/mo</span>
+                  <span className="text-3xl font-bold">{planPrices.monthly.amount}</span>
+                  <span className="text-muted-foreground text-sm">{planPrices.monthly.period}</span>
                   <span className="text-xs text-emerald-400 font-medium ml-1">7-day free trial</span>
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
@@ -479,8 +481,8 @@ export default function Pricing() {
                 <CardTitle className="text-lg">Node Auditor</CardTitle>
                 <CardDescription>Unlimited optimization runs — up to 100 devices, personal use</CardDescription>
                 <div className="mt-3">
-                  <span className="text-3xl font-bold">$249.50</span>
-                  <span className="text-muted-foreground text-sm">/mo</span>
+                  <span className="text-3xl font-bold">{planPrices.node_auditor.amount}</span>
+                  <span className="text-muted-foreground text-sm">{planPrices.node_auditor.period}</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">

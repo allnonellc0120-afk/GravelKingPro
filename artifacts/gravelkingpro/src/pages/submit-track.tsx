@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Music, Upload, ArrowLeft, Loader2, AlertTriangle, Lock, Clock } from "lucide-react";
 import { Link } from "wouter";
+import { usePlanPrices } from "@/lib/usePlanPrices";
 
 interface Eligibility {
   eligible: boolean;
@@ -17,6 +18,7 @@ interface Eligibility {
 
 export default function SubmitTrackPage() {
   const { toast } = useToast();
+  const planPrices = usePlanPrices();
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(true);
 
@@ -112,7 +114,7 @@ export default function SubmitTrackPage() {
               <div>
                 <h3 className="font-semibold text-base">Pro subscription required</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Track submission is available to Pro ($39.99/mo) and Node Auditor ($249.50/mo) subscribers.
+                  Track submission is available to Pro ({planPrices.monthly.label}) and Node Auditor ({planPrices.node_auditor.label}) subscribers.
                 </p>
               </div>
               <Link href="/pricing">

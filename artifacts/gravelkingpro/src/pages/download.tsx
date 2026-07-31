@@ -10,6 +10,7 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { downloadBlob } from "@/lib/download";
+import { usePlanPrices } from "@/lib/usePlanPrices";
 
 const FREE_LOCAL = [
   "Noise reduction (Denoise)",
@@ -37,6 +38,7 @@ const SYSTEM_REQ = [
 
 export default function DownloadPage() {
   const { toast } = useToast();
+  const planPrices = usePlanPrices();
 
   const handleDownload = async () => {
     try {
@@ -187,9 +189,9 @@ export default function DownloadPage() {
               </p>
               <div className="space-y-2">
                 {[
-                  { name: "GravelKing Weekly", price: "$9.99/week", color: "text-emerald-400" },
-                  { name: "GravelKing Pro Plus", price: "$24.99/mo", color: "text-amber-400" },
-                  { name: "Node Auditor", price: "$249.50/mo", color: "text-purple-400" },
+                  { name: "GravelKing Weekly", price: planPrices.weekly.label, color: "text-emerald-400" },
+                  { name: "GravelKing Pro Plus", price: planPrices.monthly.label, color: "text-amber-400" },
+                  { name: "Node Auditor", price: planPrices.node_auditor.label, color: "text-purple-400" },
                 ].map((p) => (
                   <div key={p.name} className="flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/30 border border-border/30">
                     <span className={`text-xs font-medium ${p.color}`}>{p.name}</span>
