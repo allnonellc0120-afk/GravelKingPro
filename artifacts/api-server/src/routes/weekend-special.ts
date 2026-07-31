@@ -581,4 +581,67 @@ router.post(
   },
 );
 
+// Re-open downloads on a delivered order: refresh delivered_at (restarting the
+// 7-day window) and re-email the customer their order link.
+router.post(
+  "/weekend-special/admin/orders/:sessionId/resend",
+  async (req: Request, res: Response): Promise<void> => {
+    if (!(await requireAdmin(req, res))) return;
+    const sessionId = String(req.params.sessionId ?? "");
+    if (!sessionId.startsWith("cs_")) {
+      res.status(400).json({ error: "Invalid order" });
+      return;
+    }
+    try {
+      const order = await getAdminOfferSession(sessionId);
+      if (!order) {
+        res.status(404).json({ error: "Paid weekend-special order not found." });
+        return;
+      }
+      const meta = order.session.metadata ?? {};
+      if (meta.fulfillment_status !== "delivered") {
+        res.status(400).json({ error: "Only delivered orders can have their download link re-sent." });
+        return;
+      }
+      const customerEmail = order.session.customer_details?.email;
+      if (!customerEmail) {
+        res.status(400).json({ error: "This order has no customer email on file." });
+        return;
+      }
+
+      const deliveryLink = `https://gravelkingpro.it.com/weekend-special?session_id=${encodeURIComponent(
+        sessionId,
+      )}&fulfillment_token=${encodeURIComponent(meta.fulfillment_token ?? "")}`;
+      const emailed = await sendGmail({
+        to: customerEmail,
+        subject: "Your download link has been refreshed — GravelKing Pro",
+        text: [
+          "Good news — we've re-opened the downloads for your mastering order.",
+          "",
+          "All three finished masters are ready to download from your private order page:",
+          deliveryLink,
+          "",
+          "The download links on that page are unique to your order — please don't share them.",
+          "For security, downloads are available for 7 days from now, so grab your files soon.",
+          "",
+          "— GravelKing Pro",
+        ].join("\n"),
+      });
+
+      await order.stripe.checkout.sessions.update(sessionId, {
+        metadata: {
+          ...meta,
+          fulfillment_status: "delivered",
+          delivered_at: new Date().toISOString(),
+        },
+      });
+      req.log.info({ checkoutSessionId: sessionId, emailed }, "Weekend order download link re-sent");
+      res.json({ success: true, emailed, deliveryLink });
+    } catch (error) {
+      req.log.error({ err: error }, "Weekend admin resend failed");
+      res.status(500).json({ error: "Could not re-send the download link." });
+    }
+  },
+);
+
 export default router;
