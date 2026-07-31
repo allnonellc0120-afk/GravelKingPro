@@ -195,7 +195,7 @@ function TrackOptimizer({ isNodeAuditor }: { isNodeAuditor: boolean }) {
         const blob = base64ToBlob(item.b64);
         const fd = new FormData();
         fd.append("audio", blob, `${item.trackName}.wav`);
-        fd.append("preset", "balanced");
+        fd.append("preset", "baseline");
         const res = await fetch("/api/kernel/master", { method: "POST", credentials: "include", body: fd });
         if (!res.ok) throw new Error("Kernel returned an error");
         const afterBlob = await res.blob();

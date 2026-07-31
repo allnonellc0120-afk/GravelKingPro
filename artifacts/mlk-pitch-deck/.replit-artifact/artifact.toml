@@ -1,0 +1,27 @@
+kind = "slides"
+previewPath = "/mlk-pitch-deck/"
+title = "Morris Law Kernel v3.5 — Pitch Deck"
+version = "1.0.0"
+id = "artifacts/mlk-pitch-deck"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/mlk-pitch-deck/" ]
+localPort = 26198
+
+[services.development]
+run = "pnpm --filter @workspace/mlk-pitch-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mlk-pitch-deck", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mlk-pitch-deck/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26198"
+BASE_PATH = "/mlk-pitch-deck/"

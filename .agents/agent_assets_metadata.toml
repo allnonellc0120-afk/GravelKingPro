@@ -299,3 +299,117 @@ id = "qPL9ofyPcQld_rDtTzCXD"
 uri = "file://attached_assets/GravelKingPro-MLKv35-Technical-Brief.pdf"
 type = "pdf"
 title = "GravelKing Pro MLK V3.5 — Technical Brief (large print)"
+
+[[outputs]]
+id = "fzhiCeZCXjsU8ISJHy5S5"
+uri = "file://.local/outputs/Morris-Law-Kernel-v3-5---Pitch-Deck.pdf"
+type = "pdf"
+title = "Morris Law Kernel v3.5 — Pitch Deck (PDF)"
+
+[[outputs]]
+id = "iiYSFhX1HITkxmD9bC3x9"
+uri = "file://.local/outputs/Morris-Law-Kernel-v3-5---Pitch-Deck.pptx"
+type = "slides"
+title = "Morris Law Kernel v3.5 — Pitch Deck (PPTX)"
+
+[[outputs]]
+id = "zpEiwRnYGV25ZXS1RAbOX"
+uri = "file://business-package/pdf/START_HERE_Simple_Guide.pdf"
+type = "pdf"
+title = "Start Here — Simple Guide (PDF)"
+
+[[outputs]]
+id = "vaxvfMPNRzwzumRXHz3Px"
+uri = "file://business-package/pdf/MASTER_PACKAGE_INDEX.pdf"
+type = "pdf"
+title = "Master Package Index (PDF)"
+
+[[outputs]]
+id = "046FDfAP27OvEdZaeFufC"
+uri = "file://business-package/pdf/ONE_PAGE_EXECUTIVE_SUMMARY.pdf"
+type = "pdf"
+title = "One-Page Executive Summary (PDF)"
+
+[[outputs]]
+id = "lBcAxy-gJyFFcyYWNhriD"
+uri = "file://business-package/pdf/WHITE_PAPER_Morris_Law_Kernel_v3.5.pdf"
+type = "pdf"
+title = "White Paper — Morris Law Kernel v3.5 (PDF)"
+
+[[outputs]]
+id = "KMDXIxQPOAoZTtw-oAx6D"
+uri = "file://business-package/pdf/TECHNICAL_ARCHITECTURE_OVERVIEW.pdf"
+type = "pdf"
+title = "Technical Architecture Overview (PDF)"
+
+[[outputs]]
+id = "1si5oEIvQhe7CfQQv497b"
+uri = "file://business-package/pdf/PITCH_DECK_Morris_Law_Kernel_v3.5.pdf"
+type = "pdf"
+title = "Pitch Deck Content Outline (PDF)"
+
+[[outputs]]
+id = "KiJuFlEdmRZuuTJGfVBhG"
+uri = "file://business-package/pdf/PITCH_DECK_VISUALS_DESIGN.pdf"
+type = "pdf"
+title = "Pitch Deck Visuals & Design Guide (PDF)"
+
+[[outputs]]
+id = "vhg91P6eE7BQyTH1ByZ0C"
+uri = "file://business-package/pdf/FINANCIAL_PROJECTIONS.pdf"
+type = "pdf"
+title = "Financial Projections (PDF)"
+
+[[outputs]]
+id = "qnPnIKRXo3NAv5UujIMFQ"
+uri = "file://business-package/pdf/FINANCIAL_PLAN_0_30_Days_Bootstrapped.pdf"
+type = "pdf"
+title = "Financial Plan — First 30 Days, Bootstrapped (PDF)"
+
+[[outputs]]
+id = "mnKDK-VsvU9tEHSddyAjt"
+uri = "file://business-package/pdf/LICENSING_TERMS_TEMPLATE.pdf"
+type = "pdf"
+title = "Licensing Terms Template (PDF)"
+
+[[outputs]]
+id = "7xabOJ4AfbSIChu-ypEjE"
+uri = "file://business-package/pdf/INVESTOR_PARTNER_EMAIL_TEMPLATES.pdf"
+type = "pdf"
+title = "Investor & Partner Email Templates (PDF)"
+
+[[outputs]]
+id = "3x6ZWFnsgcNSkKcH195Yg"
+uri = "file://business-package/pdf/LINKEDIN_OUTREACH.pdf"
+type = "pdf"
+title = "LinkedIn Outreach Playbook (PDF)"
+
+[[outputs]]
+id = "-AFTognScaA0Tncox8xix"
+uri = "file://business-package/pdf/7_DAY_PROMO_POSTS.pdf"
+type = "pdf"
+title = "7-Day Promo Posts (PDF)"
+
+[[outputs]]
+id = "9uHpDNG0EUQUKLD-NTT6I"
+uri = "file://business-package/pdf/OUTREACH_TRACKER.pdf"
+type = "pdf"
+title = "Outreach Tracker (PDF)"
+
+[[outputs]]
+id = "M0fzPhSqUpr0fvM3Xmosr"
+uri = "file://business-package/pdf/DATA_ROOM_STRUCTURE.pdf"
+type = "pdf"
+title = "Data Room Structure (PDF)"
+
+[[outputs]]
+id = "ixeX0D7fYT1k4x-XL4rvx"
+uri = "file://business-package/pdf/DATA_ROOM_CHECKLIST.pdf"
+type = "pdf"
+title = "Data Room Checklist (PDF)"
+
+[[outputs]]
+id = "JTcuDs0C5XoXz5OGoO4Z0"
+uri = "file://business-package/pdf/DEMO_VIDEO_SCRIPT.pdf"
+type = "pdf"
+title = "Demo Video Script (PDF)"

@@ -22,6 +22,7 @@ import adminLabelRouter from "./adminLabel";
 import courtCertRouter from "./court-cert";
 import verifySignalRouter from "./verify-signal";
 import leadCaptureRouter from "./lead-capture";
+import weekendSpecialRouter from "./weekend-special";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(lyricsRouter);
 router.use(adminLabelRouter);
 router.use(verifySignalRouter);
 router.use(leadCaptureRouter);
+router.use(weekendSpecialRouter);
 
 export default router;

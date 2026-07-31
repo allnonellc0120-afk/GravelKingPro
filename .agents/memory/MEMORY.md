@@ -28,6 +28,8 @@
 - [Subscription DB fallback to Stripe API](subscription-stripe-api-fallback.md) — storage.ts getUserSubscriptionStatus: if stripe.subscriptions mirror empty, dynamic-import stripeClient and list active/trialing subscriptions directly; prevents wrongly-free on webhook delay
 - [Lifetime/owner full access](lifetime-access.md) — owners unlocked via email allowlist in auth.ts upsertUser (self-applies on OIDC login, dev+prod after publish); entitlement keyed by returned row id, not the OIDC sub
 - [Gmail integration](gmail-integration.md) — google-mail connector added via @replit/connectors-sdk; send via POST /gmail/v1/users/me/messages/send with base64url RFC-2822 raw body; only 2 users have emails on file (session-based system)
+- [GitHub connector usage](github-connector-usage.md) — sandbox listConnections empty; push via connectors-sdk proxy script at workspace root
+- [MorrisLawKernel repo](morrislawkernel-repo.md) — private standalone showcase repo on user's GitHub; files verbatim from handover, don't refactor; local copy in MorrisLawKernel/
 - [Static SPA per-route SEO](static-spa-seo-prerender.md) — Vite SPA SEO: comment-marker head block + post-build prerender per route + EXACT artifact.toml rewrites before the /* fallback; client head mgr only complements
 - [Expo native modules in Expo Go](expo-native-module-expo-go.md) — third-party native views render "Unimplemented component" in Expo Go; guard before rendering
 - [Mobile audio result handling](mobile-audio-result-handling.md) — native can't use object URLs / Linking blob:; write bytes to expo-file-system cache, play via expo-av, share via expo-sharing
@@ -45,4 +47,7 @@
 - [Admin Ops diagnostics pattern](admin-ops-diagnostics.md) — logToolError/recordActivity conventions, admin_settings-backed kill switch (bypasses via isAdminAuthenticated not requireAdmin), /tmp-scoped cache purge
 - [Custom domain + GoDaddy DNS](custom-domain-godaddy.md) — gravelkingpro.it.com attached to THIS repl's deploy; relink issues new replit-verify TXT; GoDaddy API secrets exist; PUT replaces ALL apex TXT (keep MS/SPF)
 - [Tailwind v4 legacy directives](tailwind-v4-legacy-directives.md) — v3 @tailwind lines under the v4 engine compile a PARTIAL utility set (inset-0/from-* missing) → invisible 0×0 UIs; use @import 'tailwindcss'; ?still/?scene poster QA for videos
+- [Two MLK v3.5 products](mlk-naming-collision.md) — audio Morris Law Kernel ≠ mlk-licensing matrix-multiplication site; never mix assets/copy between them
 - [PWA SW navigateFallback hijack](pwa-sw-navigate-fallback.md) — generateSW serves SPA shell for /api/* navigations → sign-in 404s for RETURNING users only; curl can't see it; denylist server + sibling-artifact prefixes
+- [Paid upload authorization](paid-upload-authorization.md) — verify payment before parsing bytes; use fixed order slots, actual-content checks, throttling, and a final lock
+- [Mastering cert opt-in](mastering-cert-opt-in.md) — /api/kernel/master never gates on copyright; cert/watermark only with certify=true; masters always stream in-app bytes, never external links

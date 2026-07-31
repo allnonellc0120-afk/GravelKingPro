@@ -1,0 +1,14 @@
+streamlit>=1.36
+numpy>=1.26
+scipy>=1.11
+fastapi>=0.115
+uvicorn>=0.30
+# FastAPI File(...) uploads need this at import time (app.py imports verification_api)
+python-multipart>=0.0.9
+requests>=2.31
+# ITU-R BS.1770 loudness for target_lufs (kernel falls back to RMS without it)
+pyloudnorm>=0.1.1
+# used by app.py for WAV read/write
+soundfile>=0.12
+# OPTIONAL — JIT acceleration; morris_law_kernel auto-falls back to pure NumPy without it
+numba>=0.59
