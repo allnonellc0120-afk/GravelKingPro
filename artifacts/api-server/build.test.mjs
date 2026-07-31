@@ -22,6 +22,7 @@ async function buildTest() {
     entryPoints: [
       path.resolve(artifactDir, "src/__tests__/studio-audio.test.ts"),
       path.resolve(artifactDir, "src/__tests__/whitepaper.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/price-parity.test.ts"),
     ],
     platform: "node",
     bundle: true,

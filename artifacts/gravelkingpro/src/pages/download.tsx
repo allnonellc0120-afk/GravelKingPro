@@ -187,8 +187,8 @@ export default function DownloadPage() {
               </p>
               <div className="space-y-2">
                 {[
-                  { name: "GravelKing Splits", price: "$9.99/mo", color: "text-emerald-400" },
-                  { name: "GravelKing Pro", price: "$39.99/mo", color: "text-amber-400" },
+                  { name: "GravelKing Weekly", price: "$9.99/week", color: "text-emerald-400" },
+                  { name: "GravelKing Pro Plus", price: "$24.99/mo", color: "text-amber-400" },
                   { name: "Node Auditor", price: "$249.50/mo", color: "text-purple-400" },
                 ].map((p) => (
                   <div key={p.name} className="flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/30 border border-border/30">
