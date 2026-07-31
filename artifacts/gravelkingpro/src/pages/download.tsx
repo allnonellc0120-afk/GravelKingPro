@@ -21,8 +21,6 @@ const FREE_LOCAL = [
 
 const PRO_ONLINE = [
   "Full-length Mastering download (Pro)",
-  "Voice Removal — unlimited (Splits+)",
-  "Stem Splitting — unlimited (Splits+)",
   "Full Beat Maker — up to 120s (Pro)",
   "Mix Studio — multi-track (Pro)",
   "Kernel Dashboard + PDF reports (Pro)",

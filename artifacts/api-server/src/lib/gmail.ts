@@ -17,16 +17,37 @@ function base64Url(input: string): string {
     .replace(/=+$/, "");
 }
 
+let cachedAddress: string | null = null;
+
+/**
+ * The authenticated Gmail account's own address — used as the To: header on
+ * BCC bulk sends (Gmail rejects "undisclosed-recipients" headers via the API).
+ */
+export async function getGmailAddress(): Promise<string | null> {
+  if (cachedAddress) return cachedAddress;
+  try {
+    const res = await connectors.proxy("google-mail", "/gmail/v1/users/me/profile", { method: "GET" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { emailAddress?: string };
+    cachedAddress = data.emailAddress ?? null;
+    return cachedAddress;
+  } catch {
+    return null;
+  }
+}
+
 export async function sendGmail(opts: {
   to: string;
   subject: string;
   text: string;
+  bcc?: string;
 }): Promise<boolean> {
   try {
     // RFC 2822 plain-text message. Gmail fills in the authenticated From.
     const raw = base64Url(
       [
         `To: ${opts.to}`,
+        ...(opts.bcc ? [`Bcc: ${opts.bcc}`] : []),
         `Subject: ${opts.subject}`,
         "MIME-Version: 1.0",
         'Content-Type: text/plain; charset="UTF-8"',

@@ -6,6 +6,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID, createHash, createHmac } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
+import { isAdminAuthenticated } from "../lib/adminAuth";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasUnlimitedMasters } from "../lib/entitlement";
@@ -181,6 +182,18 @@ masterRouter.post(
     if (!unlimited) {
       const usageUser = await getUsageUser(req, res);
       usageUserId = usageUser.id;
+
+      // Email gate — free tools require a captured email before any processing.
+      // Admins (gk_admin cookie) bypass it entirely.
+      if (!usageUser.email?.trim() && !isAdminAuthenticated(req)) {
+        res.status(403).json({
+          success: false,
+          code: "EMAIL_REQUIRED",
+          error: "Enter your email to use the free mastering tool.",
+        });
+        return;
+      }
+
       usedTotalDownloads = usageUser.totalDownloads ?? 0;
       const usedDownloads = usageUser.freeMasterDownloads ?? 0;
       const usedPreviews = usageUser.freeMasterPreviews ?? 0;
