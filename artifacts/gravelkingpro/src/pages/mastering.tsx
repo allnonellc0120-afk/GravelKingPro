@@ -45,6 +45,7 @@ export default function Mastering() {
   const [denoiseOn, setDenoiseOn] = useState(false);
   const [certifyOn, setCertifyOn] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [beforeUrl, setBeforeUrl] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -158,8 +159,11 @@ export default function Mastering() {
 
   const handleFile = (files: FileList | null) => {
     if (!files?.length) return;
-    setPendingFile(files[0]);
-    setFileName(files[0].name);
+    const f = files[0];
+    setPendingFile(f);
+    setFileName(f.name);
+    // The user's own upload IS the "before" — playable immediately on selection.
+    setBeforeUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(f); });
     setState("idle");
   };
 
@@ -182,6 +186,7 @@ export default function Mastering() {
     setProgress(0);
     setFileName("");
     setResultUrl(null);
+    setBeforeUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
     setErrorMsg("");
     setPendingFile(null);
   };
@@ -217,14 +222,6 @@ export default function Mastering() {
           </p>
         </div>
 
-        {/* Before / After demo */}
-        <BeforeAfterDemo
-          before={{ label: "Before", sub: "Raw mix", src: "/demo_original.wav" }}
-          after={{ label: "After", sub: "MLK v3 Mastered", src: "/demo_mastered.wav" }}
-          heading="Hear what mastering does"
-          sub="Same 30-second clip — raw upload vs MLK v3 processed."
-        />
-
         {/* File drop / file picked */}
         {!pendingFile && !busy && state !== "done" ? (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -255,6 +252,12 @@ export default function Mastering() {
         {/* Preset selector + settings (shown after file picked, before processing) */}
         {pendingFile && state === "idle" && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            {beforeUrl && (
+              <div className="rounded-lg border border-border/30 bg-card/30 p-3 space-y-2">
+                <p className="text-[11px] font-semibold text-muted-foreground">Your upload — play it to hear the before</p>
+                <audio src={beforeUrl} controls className="w-full h-9" preload="metadata" />
+              </div>
+            )}
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium truncate">{fileName}</span>
               <button onClick={reset} className="text-xs text-muted-foreground hover:text-foreground ml-3 shrink-0">Change</button>
@@ -437,6 +440,15 @@ export default function Mastering() {
                     </Badge>
                   )}
                 </div>
+
+                {beforeUrl && (
+                  <BeforeAfterDemo
+                    before={{ label: "Before", sub: "Your original upload", src: beforeUrl }}
+                    after={{ label: "After", sub: `MLK v3 — ${selectedPreset.label}`, src: resultUrl }}
+                    heading="Hear the difference"
+                    sub="Your track — toggle before vs after mastering."
+                  />
+                )}
 
                 <audio src={resultUrl} controls className="w-full h-10" />
 

@@ -21,7 +21,6 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { generateKernelReport } from "@/lib/generateReport";
-import { MLKComparison } from "@/components/mlk-comparison";
 import { listProjects, loadProject, type ProjectMeta, type SavedProject } from "@/lib/daw/projectStorage";
 
 type RoutingConfig = {
@@ -488,7 +487,6 @@ export default function KernelDashboard() {
         {/* ── PUBLIC: MLK v3 Before/After Demo ── */}
         <Card className="border-amber-500/25 bg-amber-500/5">
           <CardContent className="p-5">
-            <MLKComparison />
           </CardContent>
         </Card>
 
