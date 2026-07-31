@@ -37,7 +37,9 @@ function DemoPlayer({ label, sub, src, isAfter }: { label: string; sub: string; 
 export default function WeekendSpecial() {
   const [checkoutState, setCheckoutState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [orderState, setOrderState] = useState<"sales" | "verifying" | "upload" | "submitted" | "error">("sales");
+  const [orderState, setOrderState] = useState<"sales" | "verifying" | "upload" | "submitted" | "delivered" | "error">("sales");
+  const [masters, setMasters] = useState<Array<{ slot: number; name: string }>>([]);
+  const [downloadingSlot, setDownloadingSlot] = useState<number | null>(null);
   const [files, setFiles] = useState<Array<File | null>>([null, null, null]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -81,9 +83,14 @@ export default function WeekendSpecial() {
     setOrderState("verifying");
     fetch(`/api/weekend-special/order?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}`)
       .then(async (response) => {
-        const data = await response.json() as { paid?: boolean; submitted?: boolean; error?: string };
+        const data = await response.json() as { paid?: boolean; submitted?: boolean; delivered?: boolean; masters?: Array<{ slot: number; name: string }>; error?: string };
         if (!response.ok || !data.paid) throw new Error(data.error ?? "Payment could not be confirmed");
-        setOrderState(data.submitted ? "submitted" : "upload");
+        if (data.delivered) {
+          setMasters(data.masters ?? []);
+          setOrderState("delivered");
+        } else {
+          setOrderState(data.submitted ? "submitted" : "upload");
+        }
       })
       .catch((error: unknown) => {
         setErrorMessage(error instanceof Error ? error.message : "Order lookup failed");
@@ -193,6 +200,55 @@ export default function WeekendSpecial() {
                   {uploading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />{uploadProgress}</> : "Submit all 3 tracks"}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-3 text-center">Keep this page open until all three uploads finish.</p>
+              </div>
+            )}
+            {orderState === "delivered" && (
+              <div className="py-4">
+                <div className="text-center">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
+                  <h1 className="text-3xl font-black mt-5">Your masters are ready</h1>
+                  <p className="text-muted-foreground mt-3 max-w-md mx-auto">
+                    All three finished masters are below. Links are unique to your order — please don't share them.
+                  </p>
+                </div>
+                <div className="space-y-3 mt-8">
+                  {masters.map((master) => (
+                    <div key={master.slot} className="flex items-center gap-3 border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
+                      <FileAudio className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <span className="text-sm font-medium truncate flex-1">{master.name}</span>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
+                        disabled={downloadingSlot !== null}
+                        onClick={async () => {
+                          if (!sessionId || !fulfillmentToken) return;
+                          setDownloadingSlot(master.slot);
+                          setErrorMessage(null);
+                          try {
+                            const response = await fetch(
+                              `/api/weekend-special/master?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}&slot=${master.slot}`,
+                            );
+                            const data = await response.json() as { url?: string; error?: string };
+                            if (!response.ok || !data.url) throw new Error(data.error ?? "Download failed");
+                            window.location.assign(data.url);
+                          } catch (error: unknown) {
+                            setErrorMessage(error instanceof Error ? error.message : "Download failed");
+                          } finally {
+                            setDownloadingSlot(null);
+                          }
+                        }}
+                      >
+                        {downloadingSlot === master.slot ? <Loader2 className="w-4 h-4 animate-spin" /> : "Download"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                {errorMessage && (
+                  <div className="mt-5 border border-red-500/40 bg-red-500/5 p-4 text-sm text-red-300">{errorMessage}</div>
+                )}
+                <p className="text-xs text-muted-foreground mt-5 text-center">
+                  Each track includes one revision — <a href="/contact" className="text-amber-500 underline">contact us</a> if you'd like adjustments.
+                </p>
               </div>
             )}
             {orderState === "submitted" && (

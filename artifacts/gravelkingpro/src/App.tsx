@@ -28,6 +28,7 @@ import ProtectedLyrics from "@/pages/protected-lyrics";
 import VocalBooth from "@/pages/vocal-booth";
 import AdminLabel from "@/pages/admin-label";
 import AdminOps from "@/pages/admin-ops";
+import AdminOrders from "@/pages/admin-orders";
 import PitchPage from "@/pages/pitch";
 import VerifyPage from "@/pages/verify";
 import WhitepaperPage from "@/pages/whitepaper";
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/admin/tracks" component={AdminTracks} />
       <Route path="/admin/label" component={AdminLabel} />
       <Route path="/admin/ops" component={AdminOps} />
+      <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/optimizer" component={Optimizer} />
       <Route path="/label" component={LabelPage} />
       <Route path="/label/:artist" component={LabelArtistPage} />

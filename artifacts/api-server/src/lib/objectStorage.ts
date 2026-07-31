@@ -149,6 +149,33 @@ export class ObjectStorageService {
     return `/objects/${cleanKey}`;
   }
 
+  /**
+   * Produce a short-lived signed GET URL for an EXISTING private object
+   * (addressed by its `/objects/...` path). Optionally stamps a
+   * Content-Disposition so cross-origin anchor downloads land with a sensible
+   * filename (browsers ignore the anchor `download` attribute cross-origin
+   * but honor the stored disposition).
+   */
+  async getSignedDownloadURL(
+    objectPath: string,
+    ttlSec = 3600,
+    downloadFilename?: string,
+  ): Promise<string> {
+    const file = await this.getObjectEntityFile(objectPath);
+    if (downloadFilename) {
+      const safeName = downloadFilename.replace(/[^\w.\- ]+/g, "_");
+      await file.setMetadata({
+        contentDisposition: `attachment; filename="${safeName}"`,
+      });
+    }
+    return signObjectURL({
+      bucketName: file.bucket.name,
+      objectName: file.name,
+      method: "GET",
+      ttlSec,
+    });
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();
