@@ -8,12 +8,16 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { getUncachableStripeClient } from "../stripeClient";
 import { recordAnalyticsEvent } from "../analytics";
 import { rateLimit } from "../lib/rateLimiter";
+import { requireAdmin } from "../lib/adminAuth";
+import { sendGmail } from "../lib/gmail";
+import type Stripe from "stripe";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 const execFileAsync = promisify(execFile);
 
 const WEEKEND_SPECIAL_PRICE_ID = "price_1TzNCQD1aprhezOsuHcySJVo";
+const NOTIFY_EMAIL = process.env.WEEKEND_NOTIFY_EMAIL?.trim() || "allnonellc0120@gmail.com";
 const OFFER_ID = "weekend_3_master_999";
 const MAX_FILE_SIZE = 250 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
@@ -101,9 +105,16 @@ router.get("/weekend-special/order", async (req: Request, res: Response): Promis
       res.status(403).json({ error: "Payment has not been confirmed" });
       return;
     }
+    const meta = paid.session.metadata ?? {};
+    const masters = [1, 2, 3]
+      .filter((slot) => meta[`master_${slot}_path`])
+      .map((slot) => ({ slot, name: meta[`master_${slot}_name`] ?? `master-${slot}.wav` }));
     res.json({
       paid: true,
-      submitted: paid.session.metadata?.fulfillment_status === "files_submitted",
+      submitted:
+        meta.fulfillment_status === "files_submitted" || meta.fulfillment_status === "delivered",
+      delivered: meta.fulfillment_status === "delivered",
+      masters: meta.fulfillment_status === "delivered" ? masters : [],
     });
   } catch (error) {
     req.log.warn({ err: error }, "Weekend special order lookup failed");
@@ -255,11 +266,268 @@ router.post("/weekend-special/submit", async (req: Request, res: Response): Prom
     }
 
     req.log.info({ checkoutSessionId: sessionId }, "Weekend mastering order files submitted");
+
+    // Owner notification — fail-soft, never blocks the customer.
+    const customerEmail = paid.session.customer_details?.email ?? "unknown";
+    void sendGmail({
+      to: NOTIFY_EMAIL,
+      subject: `New weekend mastering order — 3 tracks in (${customerEmail})`,
+      text: [
+        "A paid weekend-special order just submitted all three tracks.",
+        "",
+        `Customer: ${customerEmail}`,
+        `Checkout session: ${sessionId}`,
+        `Track 1: ${paid.session.metadata?.slot_1_name ?? "?"}`,
+        `Track 2: ${paid.session.metadata?.slot_2_name ?? "?"}`,
+        `Track 3: ${paid.session.metadata?.slot_3_name ?? "?"}`,
+        "",
+        "Review and deliver: https://gravelkingpro.it.com/admin/orders",
+      ].join("\n"),
+    }).catch(() => {});
+
     res.json({ success: true });
   } catch (error) {
     req.log.error({ err: error }, "Weekend special submission failed");
     res.status(500).json({ error: "We could not finalize the order. Please retry." });
   }
 });
+
+// ── Customer: download a delivered master (short-lived signed URL) ───────────
+router.get("/weekend-special/master", async (req: Request, res: Response): Promise<void> => {
+  const sessionId = typeof req.query.session_id === "string" ? req.query.session_id : "";
+  const fulfillmentToken =
+    typeof req.query.fulfillment_token === "string" ? req.query.fulfillment_token : "";
+  const slot = Number(req.query.slot);
+  if (!sessionId.startsWith("cs_") || !fulfillmentToken || ![1, 2, 3].includes(slot)) {
+    res.status(400).json({ error: "Invalid download request" });
+    return;
+  }
+  try {
+    const paid = await getPaidOfferSession(sessionId, fulfillmentToken);
+    if (!paid || paid.session.metadata?.fulfillment_status !== "delivered") {
+      res.status(403).json({ error: "This order has no delivered masters yet." });
+      return;
+    }
+    const path = paid.session.metadata?.[`master_${slot}_path`];
+    if (!path) {
+      res.status(404).json({ error: "Master not found for this slot." });
+      return;
+    }
+    const name = paid.session.metadata?.[`master_${slot}_name`] ?? `master-${slot}.wav`;
+    const url = await objectStorageService.getSignedDownloadURL(path, 3600, name);
+    res.json({ url, name });
+  } catch (error) {
+    req.log.warn({ err: error }, "Weekend master download failed");
+    res.status(500).json({ error: "Download is temporarily unavailable. Please retry." });
+  }
+});
+
+// ── Admin: order management ──────────────────────────────────────────────────
+
+async function getAdminOfferSession(sessionId: string) {
+  const stripe = await getUncachableStripeClient();
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (session.metadata?.offer !== OFFER_ID || session.payment_status !== "paid") {
+    return null;
+  }
+  return { stripe, session };
+}
+
+function orderSummary(session: Stripe.Checkout.Session) {
+  const meta = session.metadata ?? {};
+  return {
+    id: session.id,
+    created: session.created,
+    customerEmail: session.customer_details?.email ?? null,
+    amountTotal: session.amount_total,
+    status: meta.fulfillment_status ?? "awaiting_uploads",
+    submittedAt: meta.submitted_at ?? null,
+    deliveredAt: meta.delivered_at ?? null,
+    tracks: [1, 2, 3].map((slot) => ({
+      slot,
+      name: meta[`slot_${slot}_name`] ?? null,
+      uploaded: Boolean(meta[`slot_${slot}_path`]),
+    })),
+    masters: [1, 2, 3].map((slot) => ({
+      slot,
+      name: meta[`master_${slot}_name`] ?? null,
+      uploaded: Boolean(meta[`master_${slot}_path`]),
+    })),
+  };
+}
+
+// List all paid weekend-special orders (newest first).
+router.get("/weekend-special/admin/orders", async (req: Request, res: Response): Promise<void> => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const stripe = await getUncachableStripeClient();
+    const orders: ReturnType<typeof orderSummary>[] = [];
+    let startingAfter: string | undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const batch = await stripe.checkout.sessions.list({
+        limit: 100,
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      for (const session of batch.data) {
+        if (session.metadata?.offer === OFFER_ID && session.payment_status === "paid") {
+          orders.push(orderSummary(session));
+        }
+      }
+      if (!batch.has_more || batch.data.length === 0) break;
+      startingAfter = batch.data[batch.data.length - 1]?.id;
+    }
+    res.json({ orders });
+  } catch (error) {
+    req.log.error({ err: error }, "Weekend admin order list failed");
+    res.status(500).json({ error: "Could not load orders from Stripe." });
+  }
+});
+
+// Signed URL for a customer's SOURCE upload.
+router.get(
+  "/weekend-special/admin/orders/:sessionId/source/:slot",
+  async (req: Request, res: Response): Promise<void> => {
+    if (!(await requireAdmin(req, res))) return;
+    const sessionId = String(req.params.sessionId ?? "");
+    const slot = Number(req.params.slot);
+    if (!sessionId.startsWith("cs_") || ![1, 2, 3].includes(slot)) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    try {
+      const order = await getAdminOfferSession(sessionId);
+      const path = order?.session.metadata?.[`slot_${slot}_path`];
+      if (!order || !path) {
+        res.status(404).json({ error: "No upload found for this slot." });
+        return;
+      }
+      const name = order.session.metadata?.[`slot_${slot}_name`] ?? `track-${slot}`;
+      const url = await objectStorageService.getSignedDownloadURL(path, 3600, name);
+      res.json({ url, name });
+    } catch (error) {
+      req.log.error({ err: error }, "Weekend admin source download failed");
+      res.status(500).json({ error: "Could not create a download link." });
+    }
+  },
+);
+
+// Attach a finished master to an order slot.
+router.post(
+  "/weekend-special/admin/orders/:sessionId/master/:slot",
+  async (req: Request, res: Response, next): Promise<void> => {
+    if (!(await requireAdmin(req, res))) return;
+    next();
+  },
+  upload.single("file"),
+  async (req: Request, res: Response): Promise<void> => {
+    const localPath = req.file?.path;
+    try {
+      const sessionId = String(req.params.sessionId ?? "");
+      const slot = Number(req.params.slot);
+      if (!sessionId.startsWith("cs_") || ![1, 2, 3].includes(slot) || !req.file) {
+        res.status(400).json({ error: "A valid order, slot (1-3), and audio file are required." });
+        return;
+      }
+      if (!ACCEPTED_EXTENSIONS.test(req.file.originalname)) {
+        res.status(400).json({ error: "Choose a WAV, MP3, AIFF, FLAC, or M4A audio file." });
+        return;
+      }
+      const order = await getAdminOfferSession(sessionId);
+      if (!order) {
+        res.status(404).json({ error: "Paid weekend-special order not found." });
+        return;
+      }
+      const objectPath = await objectStorageService.uploadPrivateFile(
+        `weekend-orders/${sessionId}/master-${slot}`,
+        req.file.path,
+        req.file.mimetype || "application/octet-stream",
+        {
+          checkout_session: sessionId,
+          slot: String(slot),
+          kind: "master",
+          original_name: req.file.originalname.slice(0, 200),
+        },
+      );
+      await order.stripe.checkout.sessions.update(sessionId, {
+        metadata: {
+          ...order.session.metadata,
+          [`master_${slot}_path`]: objectPath,
+          [`master_${slot}_name`]: req.file.originalname.slice(0, 300),
+        },
+      });
+      res.json({ objectPath, name: req.file.originalname, slot });
+    } catch (error) {
+      req.log.error({ err: error }, "Weekend admin master upload failed");
+      res.status(500).json({ error: "Could not store the master file." });
+    } finally {
+      if (localPath) void unlink(localPath).catch(() => {});
+    }
+  },
+);
+
+// Mark the order delivered and email the customer their secure download link.
+router.post(
+  "/weekend-special/admin/orders/:sessionId/deliver",
+  async (req: Request, res: Response): Promise<void> => {
+    if (!(await requireAdmin(req, res))) return;
+    const sessionId = String(req.params.sessionId ?? "");
+    if (!sessionId.startsWith("cs_")) {
+      res.status(400).json({ error: "Invalid order" });
+      return;
+    }
+    try {
+      const order = await getAdminOfferSession(sessionId);
+      if (!order) {
+        res.status(404).json({ error: "Paid weekend-special order not found." });
+        return;
+      }
+      const meta = order.session.metadata ?? {};
+      const missing = [1, 2, 3].filter((slot) => !meta[`master_${slot}_path`]);
+      if (missing.length > 0) {
+        res.status(400).json({
+          error: `Attach a finished master for slot${missing.length > 1 ? "s" : ""} ${missing.join(", ")} first.`,
+        });
+        return;
+      }
+      const customerEmail = order.session.customer_details?.email;
+      if (!customerEmail) {
+        res.status(400).json({ error: "This order has no customer email on file." });
+        return;
+      }
+
+      const deliveryLink = `https://gravelkingpro.it.com/weekend-special?session_id=${encodeURIComponent(
+        sessionId,
+      )}&fulfillment_token=${encodeURIComponent(meta.fulfillment_token ?? "")}`;
+      const emailed = await sendGmail({
+        to: customerEmail,
+        subject: "Your 3 mastered tracks are ready — GravelKing Pro",
+        text: [
+          "Your weekend-special mastering order is complete!",
+          "",
+          "All three finished masters are ready to download from your private order page:",
+          deliveryLink,
+          "",
+          "The download links on that page are unique to your order — please don't share them.",
+          "Each track includes one revision; just reply to this email if you'd like adjustments.",
+          "",
+          "— GravelKing Pro",
+        ].join("\n"),
+      });
+
+      await order.stripe.checkout.sessions.update(sessionId, {
+        metadata: {
+          ...meta,
+          fulfillment_status: "delivered",
+          delivered_at: new Date().toISOString(),
+        },
+      });
+      req.log.info({ checkoutSessionId: sessionId, emailed }, "Weekend order delivered");
+      res.json({ success: true, emailed, deliveryLink });
+    } catch (error) {
+      req.log.error({ err: error }, "Weekend admin delivery failed");
+      res.status(500).json({ error: "Could not mark the order delivered." });
+    }
+  },
+);
 
 export default router;
