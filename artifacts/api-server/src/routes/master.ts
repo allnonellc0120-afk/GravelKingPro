@@ -13,7 +13,7 @@ import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } 
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
 import { embedLsbPayload, extractLsbPayload } from "../kernel-v3";
-import { readFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { db, ipCertStubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { styleAuthorshipScore } from "@workspace/authorship";
@@ -310,37 +310,85 @@ masterRouter.post(
       const preKernelBytes = await readFile(kernelInputPath);
 
       // ── Morris Law Kernel v3.5 (Python + Numba) — primary and ONLY DSP ───
-      // There is no ffmpeg approximation fallback: if the kernel cannot run,
-      // the request fails loudly with a clear error.
+      // Primary: the dedicated Cloud Run kernel service (MLK_KERNEL_URL).
+      // Fallback: the local worker subprocess — the SAME kernel code, never an
+      // ffmpeg approximation. If neither can run, the request fails loudly.
       const kp = KERNEL_PRESET_MAP[presetName as MasterPreset];
-      // Resolve relative to this bundle (dist/index.mjs → ../python), never
-      // process.cwd() — the container's cwd is /app, not the package dir.
-      const pyWorker = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
       let pyStats: {
         numba?: boolean; scFreqUsed?: number;
         detectedRmsDb?: number; appliedThresholdDb?: number;
       } = {};
+      let kernelEngine: "cloud-run" | "local" = "local";
+
+      const remoteBase = process.env.MLK_KERNEL_URL?.replace(/\/$/, "");
       try {
-        const { stdout } = await execFileAsync("python3", [
-          pyWorker,
-          "--input", kernelInputPath,
-          "--output", outPath,
-          "--preset", kp.kernel,
-          "--intensity", String(intensity),
-          "--sidechain-filter", sidechainFilter,
-          "--sidechain-freq", String(sidechainFreq),
-          "--stereo-link", stereoLink ? "true" : "false",
-          "--adaptive-mode", adaptiveMode,
-          "--auto-threshold", autoThreshold ? "true" : "false",
-          "--auto-offset", String(autoThresholdOffset),
-          "--target-lufs", String(kp.lufs),
-          "--ceiling-db", String(kp.ceiling),
-        ], { maxBuffer: 10 * 1024 * 1024, timeout: 300_000 });
-        pyStats = JSON.parse(stdout.trim().split("\n").pop() ?? "{}");
+        if (remoteBase) {
+          try {
+            const audioBytes = await readFile(kernelInputPath);
+            const form = new FormData();
+            form.append("audio", new Blob([audioBytes], { type: "audio/wav" }), "input.wav");
+            form.append("preset", kp.kernel);
+            form.append("intensity", String(intensity));
+            form.append("sidechain_filter", sidechainFilter);
+            form.append("sidechain_freq", String(sidechainFreq));
+            form.append("stereo_link", stereoLink ? "true" : "false");
+            form.append("adaptive_mode", adaptiveMode);
+            form.append("auto_threshold", autoThreshold ? "true" : "false");
+            form.append("auto_offset", String(autoThresholdOffset));
+            form.append("target_lufs", String(kp.lufs));
+            form.append("ceiling_db", String(kp.ceiling));
+            const headers: Record<string, string> = {};
+            const apiKey = process.env.REMOTE_KERNEL_API_KEY;
+            if (apiKey) headers["x-api-key"] = apiKey;
+            const resp = await fetch(`${remoteBase}/master`, {
+              method: "POST", headers, body: form,
+              signal: AbortSignal.timeout(280_000),
+            });
+            if (!resp.ok) {
+              throw new Error(`remote kernel HTTP ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
+            }
+            await writeFile(outPath, Buffer.from(await resp.arrayBuffer()));
+            const num = (v: string | null) => { const n = parseFloat(v ?? ""); return isNaN(n) ? undefined : n; };
+            pyStats = {
+              numba: resp.headers.get("x-mlk-numba") === "true",
+              scFreqUsed: num(resp.headers.get("x-mlk-scfreqused")),
+              detectedRmsDb: num(resp.headers.get("x-mlk-detectedrmsdb")),
+              appliedThresholdDb: num(resp.headers.get("x-mlk-appliedthresholddb")),
+            };
+            kernelEngine = "cloud-run";
+          } catch (remoteErr: any) {
+            req.log.warn(
+              { err: String(remoteErr?.message ?? remoteErr).slice(0, 200) },
+              "remote kernel unavailable — falling back to local worker (same kernel code)",
+            );
+          }
+        }
+
+        if (kernelEngine === "local") {
+          // Resolve relative to this bundle (dist/index.mjs → ../python), never
+          // process.cwd() — the container's cwd is /app, not the package dir.
+          const pyWorker = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
+          const { stdout } = await execFileAsync("python3", [
+            pyWorker,
+            "--input", kernelInputPath,
+            "--output", outPath,
+            "--preset", kp.kernel,
+            "--intensity", String(intensity),
+            "--sidechain-filter", sidechainFilter,
+            "--sidechain-freq", String(sidechainFreq),
+            "--stereo-link", stereoLink ? "true" : "false",
+            "--adaptive-mode", adaptiveMode,
+            "--auto-threshold", autoThreshold ? "true" : "false",
+            "--auto-offset", String(autoThresholdOffset),
+            "--target-lufs", String(kp.lufs),
+            "--ceiling-db", String(kp.ceiling),
+          ], { maxBuffer: 10 * 1024 * 1024, timeout: 300_000 });
+          pyStats = JSON.parse(stdout.trim().split("\n").pop() ?? "{}");
+        }
       } catch (err: any) {
         req.log.error(
           { stderr: err?.stderr?.slice?.(-800) ?? String(err?.message ?? err) },
-          "Morris Law Kernel worker failed",
+          "Morris Law Kernel failed (remote and local)",
         );
         res.status(500).json({
           success: false,
@@ -455,7 +503,7 @@ masterRouter.post(
         res.setHeader("X-GK-SidechainFreq",     String(sidechainFreq));
         res.setHeader("X-GK-StereoLink",        stereoLink ? "true" : "false");
         res.setHeader("X-GK-AdaptiveMode",      adaptiveMode);
-        res.setHeader("X-GK-KernelEngine",      pyStats.numba ? "python-numba" : "python");
+        res.setHeader("X-GK-KernelEngine",      `${kernelEngine}${pyStats.numba ? "-numba" : ""}`);
         if (pyStats.scFreqUsed !== undefined) res.setHeader("X-GK-ScFreqUsed", String(pyStats.scFreqUsed));
         res.setHeader("X-GK-AutoThreshold",     autoThreshold ? "true" : "false");
         if (detectedRmsDb !== null)      res.setHeader("X-GK-DetectedRmsDb",      detectedRmsDb.toFixed(1));

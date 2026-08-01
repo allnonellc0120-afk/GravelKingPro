@@ -1,0 +1,23 @@
+{
+  "task": "Create GitHub repository MorrisLawKernel and integrate as the core backend + frontend for GravelKing Pro music & video sound platform",
+  "instructions": {
+    "create_repo": {
+      "name": "MorrisLawKernel",
+      "description": "Morris Law Kernel V3.5 - The moat technology for the best music and video sound application. Numba-accelerated adaptive mastering engine with stereo-linked sidechain, auto-threshold, bass-aware dynamics, and IntelligentMultiBandIsolator. Includes professional Streamlit frontend.",
+      "private": true
+    },
+    "files_to_include": [
+      "morris_law_kernel.py",
+      "app.py",
+      "README.md",
+      "pyproject.toml",
+      "requirements.txt",
+      ".gitignore",
+      "benchmark.py",
+      "LICENSE"
+    ],
+    "commit_message": "Morris Law Kernel V3.5 - Production Ready Moat Technology\n\n- Full Numba accelerated adaptive mastering engine\n- All 3 advanced features (Stereo-linked, Bass-aware, Auto-threshold)\n- IntelligentMultiBandIsolator for fast stem/voice work\n- Professional Streamlit frontend (app.py)\n- Plugin-ready architecture + benchmarking tools\n- Ready to power GravelKing Pro DAW and apps",
+    "integration_notes": "After pushing, this repository becomes the core backend engine. Use MorrisLawKernel.process() for mastering and IntelligentMultiBandIsolator for fast stem/voice features. The included Streamlit app (app.py) provides an immediate professional frontend. Install with: pip install -e '.[accel]'"
+  },
+  "owner": "allnonellc0120-afk"
+}
