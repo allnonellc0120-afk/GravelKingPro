@@ -226,6 +226,15 @@ class MorrisLawKernel:
         if dry_wet < 1.0:
             audio = audio * dry_wet
 
+        # Final ceiling re-enforcement: LUFS staging and output gain run AFTER
+        # the brickwall limiter and can push peaks above the ceiling (or full
+        # scale at max intensity). Scale down as one final pass so the declared
+        # ceiling is a hard guarantee, not a pre-LUFS hint.
+        ceiling_lin = 10 ** (ceiling_db / 20.0)
+        peak_out = float(np.abs(audio).max())
+        if peak_out > ceiling_lin:
+            audio = audio * (ceiling_lin / peak_out)
+
         return np.clip(audio, -1.0, 1.0).astype(np.float32)
 
 
