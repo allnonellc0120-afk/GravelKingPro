@@ -1,0 +1,16 @@
+# Morris Law Kernel V3.5 — Cloud Run mastering service
+# Build:  gcloud builds submit --tag gcr.io/PROJECT_ID/mlk-api -f Dockerfile.mlk-api .
+# Deploy: gcloud run deploy mlk-api --image gcr.io/PROJECT_ID/mlk-api \
+#           --region us-west2 --set-env-vars MLK_API_KEY=<shared-secret> \
+#           --memory 2Gi --timeout 300
+# (No --allow-unauthenticated: only the GravelKing API server calls this,
+#  authenticated with the x-api-key header.)
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir numpy scipy fastapi "uvicorn[standard]" python-multipart numba
+
+WORKDIR /app
+COPY morris_law_kernel.py mlk_api.py ./
+
+ENV PORT=8080
+CMD ["sh", "-c", "uvicorn mlk_api:app --host 0.0.0.0 --port $PORT"]
