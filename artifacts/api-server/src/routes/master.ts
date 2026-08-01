@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { fileURLToPath } from "url";
 import { streamBuffer } from "../lib/streamResponse";
 import multer from "multer";
 import { unlink } from "fs/promises";
@@ -11,7 +12,7 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
-import { applyMLKv3Fast, embedLsbPayload, extractLsbPayload } from "../kernel-v3";
+import { embedLsbPayload, extractLsbPayload } from "../kernel-v3";
 import { readFile } from "fs/promises";
 import { db, ipCertStubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -55,6 +56,29 @@ export type MasterPreset =
 
 const BASELINE_FILTER = "bass=g=1,loudnorm=I=-14:TP=-1:LRA=11";
 const REVERB_SPACE = "aecho=0.8:0.7:40:0.25,extrastereo=m=1.4";
+
+/**
+ * Route presets → Morris Law Kernel (Python) preset id + loudness staging.
+ * The kernel owns EQ shelves, saturation, adaptive sidechain compression, the
+ * brickwall limiter and LUFS staging; each route preset maps onto a kernel
+ * preset plus its platform loudness target.
+ */
+export const KERNEL_PRESET_MAP: Record<
+  MasterPreset,
+  { kernel: string; lufs: number; ceiling: number }
+> = {
+  baseline:   { kernel: "natural_body",   lufs: -14, ceiling: -0.8 },
+  spacious:   { kernel: "spatial_edge",   lufs: -14, ceiling: -0.8 },
+  normal:     { kernel: "natural_body",   lufs: -16, ceiling: -1.0 },
+  broadcast:  { kernel: "gravelking_max", lufs: -23, ceiling: -2.0 },
+  vinyl:      { kernel: "warm_vintage",   lufs: -16, ceiling: -1.0 },
+  podcast:    { kernel: "natural_body",   lufs: -16, ceiling: -1.5 },
+  club:       { kernel: "sub_fire",       lufs: -12, ceiling: -0.5 },
+  film:       { kernel: "natural_body",   lufs: -24, ceiling: -2.0 },
+  youtube:    { kernel: "natural_body",   lufs: -14, ceiling: -1.0 },
+  soundcloud: { kernel: "gravelking_max", lufs: -11, ceiling: -0.5 },
+  apple:      { kernel: "natural_body",   lufs: -16, ceiling: -1.0 },
+};
 
 export const MASTER_PRESETS: Record<
   MasterPreset,
@@ -161,13 +185,11 @@ masterRouter.post(
       return;
     }
 
-    // Intensity 0–100 (default 75). Scales EQ gains and the MLK kernel
-    // multiplier so the user can dial from subtle polish to maximum impact.
+    // Intensity 0–100 (default 75). Passed straight through to the Python
+    // kernel, which scales every EQ/drive/comp parameter by intensity/100.
     const rawIntensity = parseFloat((req.body.intensity as string) || "75");
     const intensity    = Math.min(100, Math.max(0, isNaN(rawIntensity) ? 75 : rawIntensity));
-    const S            = intensity / 100;          // 0.0 – 1.0 scale factor
 
-    const preset          = MASTER_PRESETS[presetName as MasterPreset];
     const denoise         = (req.body.denoise as string) === "true";
 
     // Sidechain compressor params — mirrors MorrisLawKernel.process() signature.
@@ -192,29 +214,6 @@ masterRouter.post(
     const autoThreshold       = (req.body.autoThreshold as string) === "true";
     const rawOffset           = parseFloat((req.body.autoThresholdOffset as string) || "-16");
     const autoThresholdOffset = Math.min(-6, Math.max(-30, isNaN(rawOffset) ? -16 : rawOffset));
-
-    // ── Auto-threshold probe ─────────────────────────────────────────────────
-    // Probes RMS of the SAME detector key chain the compressor will use, so
-    // threshold = detector_rms_db + offset_db is coherent with what
-    // sidechaincompress actually sees. Returns ok=false when the probe fails
-    // so the caller can fall back loudly instead of silently.
-    const probeDetectorRms = async (
-      path: string, keyChain: string,
-    ): Promise<{ rmsDb: number; ok: boolean }> => {
-      try {
-        // ffmpeg writes volumedetect output to stderr; process exits 0.
-        const { stderr } = await execFileAsync("ffmpeg", [
-          "-i", path, "-af", `${keyChain},volumedetect`, "-f", "null", "/dev/null",
-        ], { maxBuffer: 512 * 1024, timeout: 30_000 }).catch((e: any) =>
-          ({ stderr: (e?.stderr as string) ?? "" })
-        );
-        const match = stderr.match(/mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB/);
-        if (!match) return { rmsDb: -18.0, ok: false };
-        return { rmsDb: parseFloat(match[1]), ok: true };
-      } catch {
-        return { rmsDb: -18.0, ok: false };
-      }
-    };
 
     // certify=true → copyright/ownership validation (runs in middleware) plus
     // an embedded IP cert. Default false → master any track, no watermark.
@@ -290,88 +289,75 @@ masterRouter.post(
         return;
       }
 
-      // ── Scale EQ gains by intensity ────────────────────────────────────────
-      // bass=g=N → bass=g=(N×S), treble=g=N → treble=g=(N×S)
-      const scaleFilter = (f: string, s: number) =>
-        f.replace(/\b(bass|treble)=g=(-?[\d.]+)/g, (_m, eq, g) =>
-          `${eq}=g=${(parseFloat(g) * s).toFixed(3)}`
-        );
-      const scaledPreset = S >= 0.99 ? preset.filter : scaleFilter(preset.filter, S);
-      const preChain     = denoise ? `${DENOISE_FILTER},` : "";
-
-      // ── Build the ffmpeg argument set ──────────────────────────────────────
-      // When sidechain is active we need filter_complex (split → detector →
-      // sidechaincompress → preset EQ chain → out).  Plain chain uses -af.
-      let ffmpegArgs: string[];
-      // Observability for the response headers / UI readout.
-      let detectedRmsDb: number | null = null;
-      let appliedThresholdDb: number | null = null;
-      let autoThresholdFallback = false;
-
-      if (sidechainFilter === "none") {
-        // No sidechain — simple linear -af chain.
-        ffmpegArgs = [
+      // ── Pre-pass: 30-sec preview trim + optional denoise via ffmpeg ──────
+      // ffmpeg here is ingest plumbing ONLY (format handling / trimming /
+      // denoise). All DSP — EQ, saturation, adaptive sidechain compression,
+      // limiting, loudness staging — runs in the Python Morris Law Kernel.
+      let kernelInputPath = filePath;
+      let prePassPath: string | null = null;
+      if (isSample || denoise) {
+        prePassPath = `/tmp/gk_master_pre_${randomUUID()}.wav`;
+        await execFileAsync("ffmpeg", [
           "-y", "-i", filePath,
           ...(isSample ? ["-t", "30"] : []),
-          "-af", `${preChain}${scaledPreset}`,
-          "-acodec", "pcm_s16le", "-ar", "44100", outPath,
-        ];
-      } else {
-        // ── Sidechain compressor via filter_complex ───────────────────────
-        // Detector key signal:
-        //   bass_aware → bandpass (sidechainFreq×0.5 – sidechainFreq×2.5) +
-        //                dynaudnorm so it tracks bass energy, not broadband.
-        //   off        → fixed HPF or LPF at sidechainFreq.
-        let scKeyChain: string;
-        if (adaptiveMode === "bass_aware") {
-          const loFreq = Math.max(20, Math.round(sidechainFreq * 0.5));
-          const hiFreq = Math.min(20000, Math.round(sidechainFreq * 2.5));
-          scKeyChain = `highpass=f=${loFreq},lowpass=f=${hiFreq},dynaudnorm=p=0.95:m=5:s=3`;
-        } else {
-          scKeyChain = `${sidechainFilter}=f=${sidechainFreq}`;
-        }
-
-        // Threshold: probe RMS of the SAME key chain the compressor will use
-        // (so bass_aware's bandpass+normalisation is accounted for). On probe
-        // failure we fall back to the conservative -26 dBFS default and flag it
-        // in the response headers + logs instead of failing silently.
-        let threshold = 0.05; // ≈ -26 dBFS conservative default
-        if (autoThreshold) {
-          const probe = await probeDetectorRms(filePath, scKeyChain);
-          if (probe.ok) {
-            detectedRmsDb = probe.rmsDb;
-            const threshDb = Math.min(-3, Math.max(-60, probe.rmsDb + autoThresholdOffset));
-            appliedThresholdDb = threshDb;
-            threshold = Math.min(0.9, Math.max(0.001, Math.pow(10, threshDb / 20)));
-          } else {
-            autoThresholdFallback = true;
-            req.log.warn({ autoThresholdOffset }, "auto-threshold RMS probe failed; using default threshold");
-          }
-        }
-
-        // Stereo link: ffmpeg's `link` option controls whether the average
-        // level across channels (linked, mastering-safe) or the louder channel
-        // (more independent) drives gain reduction.
-        const scLink   = stereoLink ? "average" : "maximum";
-        const scFilter = `sidechaincompress=threshold=${threshold.toFixed(5)}:ratio=2.5:attack=10:release=150:link=${scLink}`;
-
-        const graph = [
-          `asplit=2[sc][main]`,
-          `[sc]${scKeyChain}[key]`,
-          `[main][key]${scFilter}[scc]`,
-          `[scc]${preChain}${scaledPreset}[out]`,
-        ].join(";");
-
-        ffmpegArgs = [
-          "-y", "-i", filePath,
-          ...(isSample ? ["-t", "30"] : []),
-          "-filter_complex", graph,
-          "-map", "[out]",
-          "-ac", "2", "-acodec", "pcm_s16le", "-ar", "44100", outPath,
-        ];
+          ...(denoise ? ["-af", DENOISE_FILTER] : []),
+          "-ac", "2", "-acodec", "pcm_s16le", "-ar", "44100", prePassPath,
+        ], { maxBuffer: 50 * 1024 * 1024, timeout: 60_000 });
+        kernelInputPath = prePassPath;
       }
 
-      await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 120_000 });
+      // Pre-kernel bytes for cert content-hash binding (read before cleanup).
+      const preKernelBytes = await readFile(kernelInputPath);
+
+      // ── Morris Law Kernel v3.5 (Python + Numba) — primary and ONLY DSP ───
+      // There is no ffmpeg approximation fallback: if the kernel cannot run,
+      // the request fails loudly with a clear error.
+      const kp = KERNEL_PRESET_MAP[presetName as MasterPreset];
+      // Resolve relative to this bundle (dist/index.mjs → ../python), never
+      // process.cwd() — the container's cwd is /app, not the package dir.
+      const pyWorker = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
+      let pyStats: {
+        numba?: boolean; scFreqUsed?: number;
+        detectedRmsDb?: number; appliedThresholdDb?: number;
+      } = {};
+      try {
+        const { stdout } = await execFileAsync("python3", [
+          pyWorker,
+          "--input", kernelInputPath,
+          "--output", outPath,
+          "--preset", kp.kernel,
+          "--intensity", String(intensity),
+          "--sidechain-filter", sidechainFilter,
+          "--sidechain-freq", String(sidechainFreq),
+          "--stereo-link", stereoLink ? "true" : "false",
+          "--adaptive-mode", adaptiveMode,
+          "--auto-threshold", autoThreshold ? "true" : "false",
+          "--auto-offset", String(autoThresholdOffset),
+          "--target-lufs", String(kp.lufs),
+          "--ceiling-db", String(kp.ceiling),
+        ], { maxBuffer: 10 * 1024 * 1024, timeout: 300_000 });
+        pyStats = JSON.parse(stdout.trim().split("\n").pop() ?? "{}");
+      } catch (err: any) {
+        req.log.error(
+          { stderr: err?.stderr?.slice?.(-800) ?? String(err?.message ?? err) },
+          "Morris Law Kernel worker failed",
+        );
+        res.status(500).json({
+          success: false,
+          error: "The Morris Law Kernel failed to process this file. Try a different file or contact support.",
+        });
+        return;
+      } finally {
+        if (prePassPath) await unlink(prePassPath).catch(() => {});
+      }
+
+      // Observability surfaced in response headers (mirrors kernel internals).
+      const detectedRmsDb      = autoThreshold ? (pyStats.detectedRmsDb ?? null) : null;
+      const appliedThresholdDb = autoThreshold ? (pyStats.appliedThresholdDb ?? null) : null;
+      const autoThresholdFallback = autoThreshold && detectedRmsDb === null;
+      if (autoThresholdFallback) {
+        req.log.warn({ autoThresholdOffset }, "kernel worker returned no RMS measurement");
+      }
 
       // Count the free user's first full download against their allowance.
       if (!isSample && usageUserId) {
@@ -391,25 +377,22 @@ masterRouter.post(
         await incrementUsage(usageUserId, "totalDownloads");
       }
 
-      // Carve the mastered output through the MLK v3 kernel.
-      // Multiplier scales linearly with intensity: 0.10 at minimum → 0.75 at
-      // full blast, matching the Python kernel's 0–100 intensity parameter.
-      const mlkMultiplier = 0.10 + 0.65 * S;
-      const { buf: carvedBuffer, parity } = await applyMLKv3Fast(outPath, mlkMultiplier);
+      // The mastered WAV on disk IS the kernel output — no second carve stage.
+      const carvedBuffer = Buffer.from(await readFile(outPath));
+      const parity = "MLK_V3.5_PYTHON";
 
       // Certification is opt-in. Plain masters ship the carved audio untouched —
       // no hash, no watermark, no DB record — so karaoke tracks, covers, and
       // reference mixes master cleanly. Only certify=true gets the full
       // nominator/denominator IP cert split.
-      let outBuffer = carvedBuffer;
+      let outBuffer: Buffer = carvedBuffer;
       let certHash: string | null = null;
       let certId: string | null = null;
 
       if (certify) {
-        // Hash the normalized pre-MLK audio — bound to the original mix, not the
-        // MLK-carved output (which varies per kernel version).
-        const preMlkBytes  = await readFile(outPath);
-        const contentHash  = createHash("sha256").update(preMlkBytes).digest("hex");
+        // Hash the pre-kernel audio — bound to the original mix, not the
+        // mastered output (which varies per kernel version).
+        const contentHash  = createHash("sha256").update(preKernelBytes).digest("hex");
 
         // ── Nominator / Denominator cert split ──────────────────────────────
         //   fullHash    = SHA-256(contentHash | artist | certId)
@@ -472,6 +455,8 @@ masterRouter.post(
         res.setHeader("X-GK-SidechainFreq",     String(sidechainFreq));
         res.setHeader("X-GK-StereoLink",        stereoLink ? "true" : "false");
         res.setHeader("X-GK-AdaptiveMode",      adaptiveMode);
+        res.setHeader("X-GK-KernelEngine",      pyStats.numba ? "python-numba" : "python");
+        if (pyStats.scFreqUsed !== undefined) res.setHeader("X-GK-ScFreqUsed", String(pyStats.scFreqUsed));
         res.setHeader("X-GK-AutoThreshold",     autoThreshold ? "true" : "false");
         if (detectedRmsDb !== null)      res.setHeader("X-GK-DetectedRmsDb",      detectedRmsDb.toFixed(1));
         if (appliedThresholdDb !== null) res.setHeader("X-GK-AppliedThresholdDb", appliedThresholdDb.toFixed(1));
