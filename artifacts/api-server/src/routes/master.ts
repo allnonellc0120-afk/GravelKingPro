@@ -161,8 +161,59 @@ masterRouter.post(
       return;
     }
 
-    const preset       = MASTER_PRESETS[presetName as MasterPreset];
-    const denoise      = (req.body.denoise as string) === "true";
+    // Intensity 0–100 (default 75). Scales EQ gains and the MLK kernel
+    // multiplier so the user can dial from subtle polish to maximum impact.
+    const rawIntensity = parseFloat((req.body.intensity as string) || "75");
+    const intensity    = Math.min(100, Math.max(0, isNaN(rawIntensity) ? 75 : rawIntensity));
+    const S            = intensity / 100;          // 0.0 – 1.0 scale factor
+
+    const preset          = MASTER_PRESETS[presetName as MasterPreset];
+    const denoise         = (req.body.denoise as string) === "true";
+
+    // Sidechain compressor params — mirrors MorrisLawKernel.process() signature.
+    // sidechainFilter: 'highpass' | 'lowpass' | 'none'  (default 'highpass')
+    // sidechainFreq:   Hz for the detector HPF/LPF        (default 160)
+    // stereoLink:      both channels track same GR        (default true)
+    const rawScFilter = (req.body.sidechainFilter as string) || "highpass";
+    const sidechainFilter: "highpass" | "lowpass" | "none" =
+      rawScFilter === "lowpass" ? "lowpass" : rawScFilter === "none" ? "none" : "highpass";
+    const sidechainFreq = Math.min(2000, Math.max(20,
+      parseFloat((req.body.sidechainFreq as string) || "160") || 160
+    ));
+    const stereoLink = (req.body.stereoLink as string) !== "false";
+    // adaptive_mode: 'bass_aware' bandpasses the sidechain detector around the
+    // bass range (sidechainFreq × 0.5 – × 2.5) + dynaudnorm so the compressor
+    // tracks bass energy, not broadband level. 'off' = fixed detector filter.
+    const rawAdaptive = (req.body.adaptiveMode as string) || "bass_aware";
+    const adaptiveMode: "off" | "bass_aware" = rawAdaptive === "off" ? "off" : "bass_aware";
+
+    // auto_threshold: run a quick volumedetect pass and set threshold =
+    // (mean RMS dBFS + offset). Saves the user from guessing numeric values.
+    const autoThreshold       = (req.body.autoThreshold as string) === "true";
+    const rawOffset           = parseFloat((req.body.autoThresholdOffset as string) || "-16");
+    const autoThresholdOffset = Math.min(-6, Math.max(-30, isNaN(rawOffset) ? -16 : rawOffset));
+
+    // ── Auto-threshold helper ─────────────────────────────────────────────────
+    // Mirrors MorrisLawKernel._auto_threshold(): probe the track's mean RMS via
+    // ffmpeg volumedetect, then set threshold = mean_rms_db + offset_db.
+    // Returns a linear (0–1) threshold value ready for sidechaincompress.
+    const computeAutoThreshold = async (path: string): Promise<number> => {
+      try {
+        // ffmpeg writes volumedetect output to stderr; process exits 0.
+        const { stderr } = await execFileAsync("ffmpeg", [
+          "-i", path, "-af", "volumedetect", "-f", "null", "/dev/null",
+        ], { maxBuffer: 512 * 1024, timeout: 30_000 }).catch((e: any) =>
+          ({ stderr: (e?.stderr as string) ?? "" })
+        );
+        const match = stderr.match(/mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB/);
+        const rmsDb = match ? parseFloat(match[1]) : -18.0;
+        const threshDb = Math.min(-3, Math.max(-60, rmsDb + autoThresholdOffset));
+        return Math.min(0.9, Math.max(0.001, Math.pow(10, threshDb / 20)));
+      } catch {
+        return 0.05; // safe fallback (~-26 dBFS)
+      }
+    };
+
     // certify=true → copyright/ownership validation (runs in middleware) plus
     // an embedded IP cert. Default false → master any track, no watermark.
     const certify      = (req.body.certify as string) === "true";
@@ -237,16 +288,71 @@ masterRouter.post(
         return;
       }
 
-      const filterChain = denoise ? `${DENOISE_FILTER},${preset.filter}` : preset.filter;
-      const ffmpegArgs = [
-        "-y",
-        "-i", filePath,
-        ...(isSample ? ["-t", "30"] : []),
-        "-af", filterChain,
-        "-acodec", "pcm_s16le",
-        "-ar", "44100",
-        outPath,
-      ];
+      // ── Scale EQ gains by intensity ────────────────────────────────────────
+      // bass=g=N → bass=g=(N×S), treble=g=N → treble=g=(N×S)
+      const scaleFilter = (f: string, s: number) =>
+        f.replace(/\b(bass|treble)=g=(-?[\d.]+)/g, (_m, eq, g) =>
+          `${eq}=g=${(parseFloat(g) * s).toFixed(3)}`
+        );
+      const scaledPreset = S >= 0.99 ? preset.filter : scaleFilter(preset.filter, S);
+      const preChain     = denoise ? `${DENOISE_FILTER},` : "";
+
+      // ── Build the ffmpeg argument set ──────────────────────────────────────
+      // When sidechain is active we need filter_complex (split → detector →
+      // sidechaincompress → preset EQ chain → out).  Plain chain uses -af.
+      let ffmpegArgs: string[];
+
+      if (sidechainFilter === "none") {
+        // No sidechain — simple linear -af chain.
+        ffmpegArgs = [
+          "-y", "-i", filePath,
+          ...(isSample ? ["-t", "30"] : []),
+          "-af", `${preChain}${scaledPreset}`,
+          "-acodec", "pcm_s16le", "-ar", "44100", outPath,
+        ];
+      } else {
+        // ── Sidechain compressor via filter_complex ───────────────────────
+        // Detector key signal:
+        //   bass_aware → bandpass (sidechainFreq×0.5 – sidechainFreq×2.5) +
+        //                dynaudnorm so it tracks bass energy, not broadband.
+        //   off        → fixed HPF or LPF at sidechainFreq.
+        let scKeyChain: string;
+        if (adaptiveMode === "bass_aware") {
+          const loFreq = Math.max(20, Math.round(sidechainFreq * 0.5));
+          const hiFreq = Math.min(20000, Math.round(sidechainFreq * 2.5));
+          scKeyChain = `highpass=f=${loFreq},lowpass=f=${hiFreq},dynaudnorm=p=0.95:m=5:s=3`;
+        } else {
+          scKeyChain = `${sidechainFilter}=f=${sidechainFreq}`;
+        }
+        // stereo_link is the default behaviour of sidechaincompress (both
+        // channels share the same gain reduction signal). When stereoLink=false
+        // we mix down the sidechain to mono so each channel still gets the same
+        // detection level (level_sc=0 disables the secondary-channel detector).
+        // Threshold: probe the track's RMS (one quick ffmpeg pass) when
+        // auto_threshold is on, otherwise fall back to the conservative -26 dBFS
+        // default (0.05 linear).
+        const threshold = autoThreshold
+          ? await computeAutoThreshold(filePath)
+          : 0.05;
+
+        const scLevel  = stereoLink ? "" : ":level_sc=0";
+        const scFilter = `sidechaincompress=threshold=${threshold.toFixed(5)}:ratio=2.5:attack=10:release=150${scLevel}`;
+
+        const graph = [
+          `asplit=2[sc][main]`,
+          `[sc]${scKeyChain}[key]`,
+          `[main][key]${scFilter}[scc]`,
+          `[scc]${preChain}${scaledPreset}[out]`,
+        ].join(";");
+
+        ffmpegArgs = [
+          "-y", "-i", filePath,
+          ...(isSample ? ["-t", "30"] : []),
+          "-filter_complex", graph,
+          "-map", "[out]",
+          "-ac", "2", "-acodec", "pcm_s16le", "-ar", "44100", outPath,
+        ];
+      }
 
       await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 120_000 });
 
@@ -269,7 +375,10 @@ masterRouter.post(
       }
 
       // Carve the mastered output through the MLK v3 kernel.
-      const { buf: carvedBuffer, parity } = await applyMLKv3Fast(outPath);
+      // Multiplier scales linearly with intensity: 0.10 at minimum → 0.75 at
+      // full blast, matching the Python kernel's 0–100 intensity parameter.
+      const mlkMultiplier = 0.10 + 0.65 * S;
+      const { buf: carvedBuffer, parity } = await applyMLKv3Fast(outPath, mlkMultiplier);
 
       // Certification is opt-in. Plain masters ship the carved audio untouched —
       // no hash, no watermark, no DB record — so karaoke tracks, covers, and
@@ -341,6 +450,11 @@ masterRouter.post(
         res.setHeader("X-GK-Preset",            presetName);
         res.setHeader("X-GK-Denoise",           denoise ? "true" : "false");
         res.setHeader("X-GK-Kernel",            "MLK_v3.5");
+        res.setHeader("X-GK-Intensity",         String(intensity));
+        res.setHeader("X-GK-Sidechain",         sidechainFilter);
+        res.setHeader("X-GK-SidechainFreq",     String(sidechainFreq));
+        res.setHeader("X-GK-StereoLink",        stereoLink ? "true" : "false");
+        res.setHeader("X-GK-AdaptiveMode",      adaptiveMode);
         res.setHeader("X-GK-Parity",            parity);
         if (certHash && certId) {
           res.setHeader("X-GK-Cert-Hash",       certHash);
