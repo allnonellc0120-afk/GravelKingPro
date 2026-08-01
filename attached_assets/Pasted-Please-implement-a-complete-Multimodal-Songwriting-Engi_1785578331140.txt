@@ -1,0 +1,80 @@
+Please implement a complete Multimodal Songwriting Engine. We need to upgrade the current lyric generation to handle complex text constraints and raw audio input (humming/singing) using the @google/generative-ai SDK. 
+
+Please install the following dependencies if they aren't already:
+`npm install @google/generative-ai multer express`
+
+Here is the exact code architecture to implement.
+
+### 1. BACKEND ROUTE (Node.js / Express)
+Create or update our API route (e.g., `server.js` or `routes/api.js`) to handle file uploads in memory and send multimodal data to Gemini 1.5 Pro.
+
+```javascript
+const express = require('express');
+const multer = require('multer');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const router = express.Router();
+
+// Set up Multer to store the audio file in memory so we can pass it directly to Gemini
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Initialize Gemini (Must use gemini-1.5-pro for best creative writing + audio support)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+router.post('/generate-lyrics', upload.single('audio'), async (req, res) => {
+    try {
+        const { genre, mood, story, influences, rhymeStyle, seedLyrics } = req.body;
+
+        // 1. Construct the strict System & User Prompt
+        const promptText = `
+You are an elite, award-winning songwriter and lyricist specializing in authentic, raw, evocative storytelling. 
+
+CRITICAL RULES:
+- AVOID CHEESY RHYMES: Never use predictable rhymes (fire/desire, pain/rain, heart/part).
+- USE SLANT & NEAR RHYMES: Prioritize natural speech rhythm (stone/home, grave/came).
+- SHOW, DON'T TELL: Use sensory imagery and gritty details.
+- MATCH CADENCE: If seed lyrics or audio are provided, match that exact meter and syllable rhythm.
+
+SONG SPECIFICATIONS:
+- Genre Blend: ${genre || 'Not specified'}
+- Mood & Setting: ${mood || 'Not specified'}
+- Story / Core Theme: ${story || 'Not specified'}
+- Reference Influences: ${influences || 'Not specified'}
+- Rhyme & Meter Style: ${rhymeStyle || 'Not specified'}
+
+USER SEED LYRICS (Match this cadence and vocabulary):
+"${seedLyrics || 'None provided'}"
+
+AUDIO INSTRUCTIONS (If audio is provided):
+Listen to the audio track. If it's humming, map the rhythm, tempo, and syllable count, and write lyrics that fit that exact melody. If singing, transcribe and expand upon it while keeping the cadence.
+
+Format clearly with [Verse 1], [Chorus], etc.
+        `;
+
+        // 2. Prepare the payload parts for the Gemini API
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const parts = [promptText];
+
+        // 3. If the user recorded audio, attach it as an inline generative part
+        if (req.file) {
+            parts.push({
+                inlineData: {
+                    mimeType: req.file.mimetype,
+                    data: req.file.buffer.toString("base64")
+                }
+            });
+        }
+
+        // 4. Call the Gemini API
+        const result = await model.generateContent(parts);
+        const responseText = result.response.text();
+
+        res.json({ success: true, lyrics: responseText });
+
+    } catch (error) {
+        console.error("Gemini API Error:", error);
+        res.status(500).json({ success: false, error: "Failed to generate lyrics." });
+    }
+});
+
+module.exports = router;

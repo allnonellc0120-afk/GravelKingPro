@@ -427,3 +427,10 @@ uri = "file://deliverables/gravelking-ip-prospects-50.txt"
 type = "text"
 title = "Download: GravelKing Pro 50 IP Prospects Document"
 description = "A plain-text document containing the complete 50-prospect IP-tool pitch list. Tap the file card to save it to your Files or Downloads folder."
+
+[[outputs]]
+id = "XhrcYEnUFGI1SvkhXrWxF"
+uri = "file://deliverables/gravelking-ip-prospects-50-emails.pdf"
+type = "pdf"
+title = "GravelKing Pro — 50 IP Cert Prospects"
+description = "Prospect list with probable person-level emails, LinkedIn references, fit scores, and outreach rationale. Verify each address before sending."

@@ -34,7 +34,7 @@ VALID_PRESETS = set(MorrisLawKernel.PRESETS.keys())
 
 
 def _check_key(req: Request) -> None:
-    expected = os.environ.get("MLK_API_KEY")
+    expected = os.environ.get("MLK_API_KEY") or os.environ.get("API_KEY")
     if expected and req.headers.get("x-api-key") != expected:
         raise HTTPException(status_code=401, detail="invalid api key")
 
