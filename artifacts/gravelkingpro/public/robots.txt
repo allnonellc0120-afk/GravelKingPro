@@ -1,25 +1,17 @@
 User-agent: *
 Allow: /
-Allow: /verify
-Allow: /whitepaper
-Allow: /demo
-Allow: /pricing
-Allow: /mastering
-Allow: /contact
-Allow: /label
-Allow: /library
-Allow: /submit
-Allow: /download
-Allow: /studio
-Allow: /songwriting
-Allow: /vocal-booth
 
-# Block private/authenticated routes from indexing
+# Block private/authenticated and user-specific routes from indexing
 Disallow: /admin
-Disallow: /admin/
 Disallow: /kernel
 Disallow: /account
 Disallow: /api/
 Disallow: /pitch
+Disallow: /library
+Disallow: /report
+Disallow: /protected-lyrics
+Disallow: /weekend-special
+Disallow: /mix
+Disallow: /demo
 
 Sitemap: https://gravelkingpro.it.com/sitemap.xml
