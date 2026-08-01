@@ -193,24 +193,26 @@ masterRouter.post(
     const rawOffset           = parseFloat((req.body.autoThresholdOffset as string) || "-16");
     const autoThresholdOffset = Math.min(-6, Math.max(-30, isNaN(rawOffset) ? -16 : rawOffset));
 
-    // ── Auto-threshold helper ─────────────────────────────────────────────────
-    // Mirrors MorrisLawKernel._auto_threshold(): probe the track's mean RMS via
-    // ffmpeg volumedetect, then set threshold = mean_rms_db + offset_db.
-    // Returns a linear (0–1) threshold value ready for sidechaincompress.
-    const computeAutoThreshold = async (path: string): Promise<number> => {
+    // ── Auto-threshold probe ─────────────────────────────────────────────────
+    // Probes RMS of the SAME detector key chain the compressor will use, so
+    // threshold = detector_rms_db + offset_db is coherent with what
+    // sidechaincompress actually sees. Returns ok=false when the probe fails
+    // so the caller can fall back loudly instead of silently.
+    const probeDetectorRms = async (
+      path: string, keyChain: string,
+    ): Promise<{ rmsDb: number; ok: boolean }> => {
       try {
         // ffmpeg writes volumedetect output to stderr; process exits 0.
         const { stderr } = await execFileAsync("ffmpeg", [
-          "-i", path, "-af", "volumedetect", "-f", "null", "/dev/null",
+          "-i", path, "-af", `${keyChain},volumedetect`, "-f", "null", "/dev/null",
         ], { maxBuffer: 512 * 1024, timeout: 30_000 }).catch((e: any) =>
           ({ stderr: (e?.stderr as string) ?? "" })
         );
         const match = stderr.match(/mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB/);
-        const rmsDb = match ? parseFloat(match[1]) : -18.0;
-        const threshDb = Math.min(-3, Math.max(-60, rmsDb + autoThresholdOffset));
-        return Math.min(0.9, Math.max(0.001, Math.pow(10, threshDb / 20)));
+        if (!match) return { rmsDb: -18.0, ok: false };
+        return { rmsDb: parseFloat(match[1]), ok: true };
       } catch {
-        return 0.05; // safe fallback (~-26 dBFS)
+        return { rmsDb: -18.0, ok: false };
       }
     };
 
@@ -301,6 +303,10 @@ masterRouter.post(
       // When sidechain is active we need filter_complex (split → detector →
       // sidechaincompress → preset EQ chain → out).  Plain chain uses -af.
       let ffmpegArgs: string[];
+      // Observability for the response headers / UI readout.
+      let detectedRmsDb: number | null = null;
+      let appliedThresholdDb: number | null = null;
+      let autoThresholdFallback = false;
 
       if (sidechainFilter === "none") {
         // No sidechain — simple linear -af chain.
@@ -324,19 +330,30 @@ masterRouter.post(
         } else {
           scKeyChain = `${sidechainFilter}=f=${sidechainFreq}`;
         }
-        // stereo_link is the default behaviour of sidechaincompress (both
-        // channels share the same gain reduction signal). When stereoLink=false
-        // we mix down the sidechain to mono so each channel still gets the same
-        // detection level (level_sc=0 disables the secondary-channel detector).
-        // Threshold: probe the track's RMS (one quick ffmpeg pass) when
-        // auto_threshold is on, otherwise fall back to the conservative -26 dBFS
-        // default (0.05 linear).
-        const threshold = autoThreshold
-          ? await computeAutoThreshold(filePath)
-          : 0.05;
 
-        const scLevel  = stereoLink ? "" : ":level_sc=0";
-        const scFilter = `sidechaincompress=threshold=${threshold.toFixed(5)}:ratio=2.5:attack=10:release=150${scLevel}`;
+        // Threshold: probe RMS of the SAME key chain the compressor will use
+        // (so bass_aware's bandpass+normalisation is accounted for). On probe
+        // failure we fall back to the conservative -26 dBFS default and flag it
+        // in the response headers + logs instead of failing silently.
+        let threshold = 0.05; // ≈ -26 dBFS conservative default
+        if (autoThreshold) {
+          const probe = await probeDetectorRms(filePath, scKeyChain);
+          if (probe.ok) {
+            detectedRmsDb = probe.rmsDb;
+            const threshDb = Math.min(-3, Math.max(-60, probe.rmsDb + autoThresholdOffset));
+            appliedThresholdDb = threshDb;
+            threshold = Math.min(0.9, Math.max(0.001, Math.pow(10, threshDb / 20)));
+          } else {
+            autoThresholdFallback = true;
+            req.log.warn({ autoThresholdOffset }, "auto-threshold RMS probe failed; using default threshold");
+          }
+        }
+
+        // Stereo link: ffmpeg's `link` option controls whether the average
+        // level across channels (linked, mastering-safe) or the louder channel
+        // (more independent) drives gain reduction.
+        const scLink   = stereoLink ? "average" : "maximum";
+        const scFilter = `sidechaincompress=threshold=${threshold.toFixed(5)}:ratio=2.5:attack=10:release=150:link=${scLink}`;
 
         const graph = [
           `asplit=2[sc][main]`,
@@ -455,6 +472,10 @@ masterRouter.post(
         res.setHeader("X-GK-SidechainFreq",     String(sidechainFreq));
         res.setHeader("X-GK-StereoLink",        stereoLink ? "true" : "false");
         res.setHeader("X-GK-AdaptiveMode",      adaptiveMode);
+        res.setHeader("X-GK-AutoThreshold",     autoThreshold ? "true" : "false");
+        if (detectedRmsDb !== null)      res.setHeader("X-GK-DetectedRmsDb",      detectedRmsDb.toFixed(1));
+        if (appliedThresholdDb !== null) res.setHeader("X-GK-AppliedThresholdDb", appliedThresholdDb.toFixed(1));
+        if (autoThresholdFallback)       res.setHeader("X-GK-AutoThresholdFallback", "true");
         res.setHeader("X-GK-Parity",            parity);
         if (certHash && certId) {
           res.setHeader("X-GK-Cert-Hash",       certHash);
