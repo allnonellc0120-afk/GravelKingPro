@@ -87,6 +87,7 @@ function getSafeReturnTo(value: unknown): string {
 const LIFETIME_GRANTS: Record<string, { tier: string; isDeveloper: boolean }> = {
   "allnonellc0120@gmail.com": { tier: "node_auditor", isDeveloper: true },
   "kymegky@gmail.com": { tier: "node_auditor", isDeveloper: false },
+  "martypodany63@gmail.com": { tier: "node_auditor", isDeveloper: false },
 };
 
 /** Permanently banned emails — any OIDC login from these is rejected immediately. */
