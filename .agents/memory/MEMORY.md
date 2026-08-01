@@ -7,6 +7,7 @@
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
 - [Gemini transcription dual provider](vertex-ai-gemini-transcription.md) — transcribe tries Vertex first, falls back to Replit Gemini proxy; Vertex 403 (aiplatform API disabled, only user can enable)
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
+- [Python MLK is sole mastering DSP](mlk-python-primary.md) — worker subprocess, no ffmpeg fallback by user directive; handover kernel had signal-nulling bugs (fixed both copies); verify handover code numerically before wiring
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Object storage public prefix](object-storage-public-prefix.md) — public assets must live UNDER the PUBLIC_OBJECT_SEARCH_PATHS prefix, not bucket root, or the serve route 404s
