@@ -2,7 +2,8 @@ import { Router, Request, Response, NextFunction } from "express";
 import { fileURLToPath } from "url";
 import { streamBuffer } from "../lib/streamResponse";
 import multer from "multer";
-import { unlink } from "fs/promises";
+import { unlink, readdir, stat } from "fs/promises";
+import { issueDownloadToken, verifyDownloadToken } from "../lib/downloadGate";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID, createHash, createHmac } from "crypto";
@@ -37,6 +38,20 @@ const upload = multer({
 });
 
 const masterRouter = Router();
+
+/** Delete mastered-download copies older than the 1-hour token TTL. */
+async function sweepStaleDownloads(): Promise<void> {
+  try {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    for (const f of await readdir("/tmp")) {
+      if (!f.startsWith("gk_dl_")) continue;
+      try {
+        const s = await stat(`/tmp/${f}`);
+        if (s.mtimeMs < cutoff) await unlink(`/tmp/${f}`);
+      } catch { /* already gone */ }
+    }
+  } catch { /* /tmp unreadable — nothing to sweep */ }
+}
 
 const masterRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
 const masterConcurrency = concurrencyLimit(3);
@@ -493,6 +508,16 @@ masterRouter.post(
 
       const filename = `gravelking_mastered_${presetName}.wav`;
 
+      // ── Real-URL download path ───────────────────────────────────────────
+      // Large WAVs delivered as blob: URLs are unreliable on mobile browsers
+      // (in-app playback works, but saving the file stalls). Stash a copy and
+      // hand the client a real HTTPS URL guarded by a short-lived HMAC token.
+      const dlFileId = randomUUID();
+      const dlPath   = `/tmp/gk_dl_${dlFileId}.wav`;
+      await writeFile(dlPath, outBuffer);
+      const dlUrl    = `/api/kernel/master-file?file=${dlFileId}&token=${issueDownloadToken(dlFileId)}&name=${encodeURIComponent(filename)}`;
+      sweepStaleDownloads().catch(() => {});
+
       const setResultHeaders = () => {
         res.setHeader("X-GK-Mode",              "master");
         res.setHeader("X-GK-Preset",            presetName);
@@ -510,6 +535,7 @@ masterRouter.post(
         if (appliedThresholdDb !== null) res.setHeader("X-GK-AppliedThresholdDb", appliedThresholdDb.toFixed(1));
         if (autoThresholdFallback)       res.setHeader("X-GK-AutoThresholdFallback", "true");
         res.setHeader("X-GK-Parity",            parity);
+        res.setHeader("X-GK-Download-Url",      dlUrl);
         if (certHash && certId) {
           res.setHeader("X-GK-Cert-Hash",       certHash);
           res.setHeader("X-GK-Artist",          artistHandle);
@@ -646,5 +672,28 @@ masterRouter.post(
     }
   }
 );
+
+// ── GET /api/kernel/master-file ─────────────────────────────────────────────
+// Token-guarded (1h TTL) download of a mastered WAV over real HTTPS — mobile
+// browsers save this reliably where large blob: URLs stall.
+masterRouter.get("/master-file", async (req: Request, res: Response) => {
+  const file  = String(req.query.file ?? "");
+  const token = String(req.query.token ?? "");
+  const name  = String(req.query.name ?? "gravelking_mastered.wav").replace(/[^\w.-]/g, "_");
+  if (!/^[\w-]+$/.test(file) || !verifyDownloadToken(file, token)) {
+    res.status(403).json({ success: false, error: "Download link expired or invalid. Run the master again." });
+    return;
+  }
+  const dlPath = `/tmp/gk_dl_${file}.wav`;
+  try {
+    const buf = await readFile(dlPath);
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+    res.setHeader("Content-Length", String(buf.length));
+    res.end(buf);
+  } catch {
+    res.status(404).json({ success: false, error: "File expired. Run the master again." });
+  }
+});
 
 export default masterRouter;

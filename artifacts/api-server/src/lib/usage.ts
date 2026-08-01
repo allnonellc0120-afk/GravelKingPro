@@ -11,7 +11,7 @@ import { storage } from "../storage";
 export const FREE_LIMITS = {
   freeVoiceRemovals: 1,
   freeStemSplits: 0,
-  freeMasterDownloads: 1,   // 1 free full master download
+  freeMasterDownloads: 0,   // full masters are paid-only; free users get previews
   freeMasterPreviews: 1,    // 1 free 30-sec preview after the full master is used
   totalDownloads: 1,
 } as const;

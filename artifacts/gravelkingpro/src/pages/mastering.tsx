@@ -48,6 +48,7 @@ export default function Mastering() {
   const [denoiseOn, setDenoiseOn] = useState(false);
   const [certifyOn, setCertifyOn] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [downloadHref, setDownloadHref] = useState<string | null>(null);
   const [beforeUrl, setBeforeUrl] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
@@ -162,6 +163,8 @@ export default function Mastering() {
 
       const rem = resp.headers.get("X-GK-Free-Remaining");
       if (rem !== null) setRemaining(parseInt(rem));
+      // Real HTTPS download URL — large blob: URLs stall when saving on mobile.
+      setDownloadHref(resp.headers.get("X-GK-Download-Url"));
 
       // The server always streams the mastered WAV back — it plays and
       // downloads right here in the app, no external link.
@@ -205,7 +208,7 @@ export default function Mastering() {
 
   const download = () => {
     if (!resultUrl) return;
-    downloadUrl(resultUrl, `gravelking_mastered_${preset}.wav`);
+    downloadUrl(downloadHref ?? resultUrl, `gravelking_mastered_${preset}.wav`);
   };
 
   const reset = () => {
