@@ -22,6 +22,8 @@ build = [ "pnpm", "--filter", "@workspace/gravelkingpro", "run", "build" ]
 publicDir = "artifacts/gravelkingpro/dist/public"
 serve = "static"
 
+# Exact rewrites for every prerendered route — each must serve its own
+# route-specific SEO HTML. These MUST stay ahead of the /* fallback.
 [[services.production.rewrites]]
 from = "/pricing"
 to = "/pricing.html"
@@ -35,8 +37,28 @@ from = "/mastering"
 to = "/mastering.html"
 
 [[services.production.rewrites]]
+from = "/studio"
+to = "/studio.html"
+
+[[services.production.rewrites]]
+from = "/songwriting"
+to = "/songwriting.html"
+
+[[services.production.rewrites]]
+from = "/vocal-booth"
+to = "/vocal-booth.html"
+
+[[services.production.rewrites]]
 from = "/download"
 to = "/download.html"
+
+[[services.production.rewrites]]
+from = "/verify"
+to = "/verify.html"
+
+[[services.production.rewrites]]
+from = "/whitepaper"
+to = "/whitepaper.html"
 
 [[services.production.rewrites]]
 from = "/contact"
@@ -51,12 +73,16 @@ from = "/label/*"
 to = "/label.html"
 
 [[services.production.rewrites]]
-from = "/library"
-to = "/library.html"
-
-[[services.production.rewrites]]
 from = "/submit"
 to = "/submit.html"
+
+[[services.production.rewrites]]
+from = "/optimizer"
+to = "/optimizer.html"
+
+[[services.production.rewrites]]
+from = "/convert"
+to = "/convert.html"
 
 [[services.production.rewrites]]
 from = "/*"

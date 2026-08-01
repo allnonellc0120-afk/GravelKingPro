@@ -1,79 +1,97 @@
 {
   "siteUrl": "https://gravelkingpro.it.com",
-  "siteName": "GravelKing Pro | MLK V3.5 Signal-Level Audio Security",
+  "siteName": "GravelKing Pro",
   "locale": "en_US",
   "twitterCard": "summary_large_image",
   "ogImage": "/opengraph.jpg",
-  "ogImageAlt": "GravelKing Pro MLK V3.5 — enterprise audio steganography and IP protection",
+  "ogImageAlt": "GravelKing Pro — AI mastering, vocal recording, and IP certification",
   "ogImageWidth": 1280,
   "ogImageHeight": 720,
-  "defaultTitle": "GravelKing Pro | MLK V3.5 Signal-Level Audio Security & AI Governance Engine",
-  "defaultDescription": "Enterprise audio steganography, dual-anchor cryptographic verification, and signal-level asset protection for publishers, A&Rs, and music tech platforms.",
+  "defaultTitle": "AI Audio Mastering & IP Certification | GravelKing Pro",
+  "defaultDescription": "Master tracks online with the MLK V3.5 kernel, record studio-quality vocals, and protect every release with embedded IP certification. Free previews — no account needed.",
   "routes": [
     {
       "path": "/",
-      "title": "GravelKing Pro | MLK V3.5 Signal-Level Audio Security & AI Governance Engine",
-      "description": "Enterprise audio steganography, dual-anchor cryptographic verification, and signal-level asset protection for publishers, A&Rs, and music tech platforms. Built by All N One LLC.",
-      "ogType": "website"
-    },
-    {
-      "path": "/verify",
-      "title": "Signal Verification Lab — GravelKing Pro MLK V3.5 | Clean Room Audio Cert Check",
-      "description": "Upload a .wav master to verify its MLK V3.5 dual-anchor cryptographic certificate. Public clean-room verification for publishers, A&Rs, and enterprise partners. No account required.",
-      "ogType": "website"
-    },
-    {
-      "path": "/demo",
-      "title": "Live Demo — GravelKing Pro Audio Verification | MLK V3.5",
-      "description": "Test GravelKing Pro's MLK V3.5 signal-level audio verification live. Upload a certified .wav and see Anchor A, Anchor B, and HMAC handshake status in real time.",
-      "ogType": "website"
-    },
-    {
-      "path": "/whitepaper",
-      "title": "Technical Brief — GravelKing Pro MLK V3.5 | LSB Steganography & Chain-of-Custody",
-      "description": "Full technical brief: LSB dual-anchor steganography, HMAC-SHA256 chain-of-custody, FRE 901(b)(9) compliance, and enterprise API integration guide for GravelKing Pro.",
+      "title": "AI Audio Mastering & IP Certification | GravelKing Pro",
+      "description": "Master tracks online with the MLK V3.5 kernel, record studio-quality vocals, and protect every release with embedded IP certification. Free previews — no account needed.",
       "ogType": "website"
     },
     {
       "path": "/pricing",
-      "title": "Pricing — GravelKing Pro | MLK V3.5 Audio Security & Mastering Plans",
-      "description": "Enterprise audio steganography from $39.99/mo. Compare Starter, Pro, and Node Auditor plans. GravelKing Pro protects every master with signal-level IP certification.",
+      "title": "Pricing — Mastering & IP Protection Plans | GravelKing Pro",
+      "description": "Affordable plans for AI mastering, vocal recording, and signal-level IP certification. Cancel anytime. Start with a free 30-second preview.",
       "ogType": "website"
     },
     {
       "path": "/mastering",
-      "title": "Audio Mastering Online — MLK V3.5 Mastering Chain | GravelKing Pro",
-      "description": "Apply a professional mastering chain powered by MLK V3.5. Polished, release-ready masters with embedded IP certification — no upload to third parties.",
+      "title": "Online Audio Mastering — MLK V3.5 Kernel | GravelKing Pro",
+      "description": "Upload a track and get a polished, release-ready master powered by the MLK V3.5 kernel. Free 30-second preview, full masters with embedded IP certification.",
+      "ogType": "website"
+    },
+    {
+      "path": "/studio",
+      "title": "Browser Audio Studio — Record & Mix Online | GravelKing Pro",
+      "description": "A full recording and mixing studio in your browser. Track vocals, shape your mix with pro EQ and effects, and export release-ready audio.",
+      "ogType": "website"
+    },
+    {
+      "path": "/songwriting",
+      "title": "Songwriting Studio with Copyright Proof | GravelKing Pro",
+      "description": "Write lyrics with AI-assisted authorship scoring and a cryptographic certificate of human authorship. Export to Suno or keep them protected in your vault.",
+      "ogType": "website"
+    },
+    {
+      "path": "/vocal-booth",
+      "title": "Vocal Booth — Record Pro Vocals Online Free | GravelKing Pro",
+      "description": "Record studio-quality vocals in your browser with live monitor effects, karaoke mode, and instant mastering. Free — no downloads, no studio needed.",
       "ogType": "website"
     },
     {
       "path": "/download",
       "title": "Download GravelKing Pro — Free Local Audio Tools",
-      "description": "Download GravelKing Pro and run MLK V3.5 audio tools locally for free with ffmpeg. Sign in to unlock cloud-side mastering and IP certification.",
+      "description": "Run GravelKing Pro audio tools locally for free. Sign in to unlock cloud mastering and IP certification for every track you release.",
+      "ogType": "website"
+    },
+    {
+      "path": "/verify",
+      "title": "Verify an Audio Certificate — Public Cert Check | GravelKing Pro",
+      "description": "Check any .wav master for its MLK V3.5 dual-anchor cryptographic certificate. Free public verification — no account required.",
+      "ogType": "website"
+    },
+    {
+      "path": "/whitepaper",
+      "title": "MLK V3.5 Technical Whitepaper | GravelKing Pro",
+      "description": "The engineering behind GravelKing Pro: LSB dual-anchor steganography, HMAC chain-of-custody, and the MLK V3.5 mastering kernel.",
       "ogType": "website"
     },
     {
       "path": "/contact",
-      "title": "Contact GravelKing Pro — All N One LLC | Enterprise Licensing",
-      "description": "Questions about enterprise licensing, API integration, white-label deployment, or the MLK V3.5 kernel? Get in touch with All N One LLC directly.",
+      "title": "Contact GravelKing Pro — All N One LLC",
+      "description": "Questions about plans, licensing, or the MLK V3.5 kernel? Contact the GravelKing Pro team at All N One LLC directly.",
       "ogType": "website"
     },
     {
       "path": "/label",
-      "title": "GravelKing Label — Browse Tracks | GravelKing Pro",
-      "description": "Discover tracks from GravelKing Productions label artists. Purchase, preview, and download high-quality audio.",
-      "ogType": "website"
-    },
-    {
-      "path": "/library",
-      "title": "My Library — GravelKing Pro",
-      "description": "Your purchased tracks from GravelKing Productions label. Stream and download anytime.",
+      "title": "GravelKing Label — Hear & Buy Artist Tracks | GravelKing Pro",
+      "description": "Discover releases from GravelKing Productions label artists. Preview tracks, buy downloads, and support independent music.",
       "ogType": "website"
     },
     {
       "path": "/submit",
-      "title": "Submit Track — GravelKing Pro",
-      "description": "Submit your track to the GravelKing Productions label. Get reviewed and published.",
+      "title": "Submit Your Track — GravelKing Label | GravelKing Pro",
+      "description": "Submit your track to the GravelKing Productions label. Get reviewed, published, and sold with IP certification built in.",
+      "ogType": "website"
+    },
+    {
+      "path": "/optimizer",
+      "title": "Audio Quality Optimizer — Free Online Tool | GravelKing Pro",
+      "description": "Analyze and optimize your audio quality free with the MLK V3.5 kernel. Upload a track and get instant signal-level recommendations.",
+      "ogType": "website"
+    },
+    {
+      "path": "/convert",
+      "title": "Audio File Converter — Free Online | GravelKing Pro",
+      "description": "Convert audio files free in your browser. WAV, MP3, FLAC and more — fast, private, and mastered-quality output.",
       "ogType": "website"
     }
   ]

@@ -69,16 +69,18 @@ function renderRoute(route) {
     return "index.html";
   }
   const rel = route.path.replace(/^\//, "");
-  // Flat file (served via artifact.toml rewrite) ...
+  // Flat file ONLY, served via an exact artifact.toml rewrite. Do NOT also
+  // emit <route>/index.html: a real directory makes the static host 301
+  // /<route> → /<route>/, and that trailing-slash request bypasses the exact
+  // rewrite and lands on the /* fallback — every page then serves the ROOT
+  // SEO block and Google sees the whole site as duplicates of home.
   writeFileSync(join(dist, `${rel}.html`), html);
-  // ... and directory-index form, so /<route>/ also resolves directly.
-  const dir = join(dist, rel);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "index.html"), html);
   return `${rel}.html`;
 }
 
 const written = config.routes.map(renderRoute);
+
+const lastmod = new Date().toISOString().slice(0, 10);
 
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
@@ -88,6 +90,7 @@ const sitemap = [
     return [
       "  <url>",
       `    <loc>${canonicalFor(r.path)}</loc>`,
+      `    <lastmod>${lastmod}</lastmod>`,
       "    <changefreq>weekly</changefreq>",
       `    <priority>${priority}</priority>`,
       "  </url>",
