@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -51,11 +52,24 @@ export default function Mastering() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [intensity, setIntensity] = useState(75);
+  const [sidechainFilter, setSidechainFilter] = useState<"none" | "highpass" | "lowpass">("highpass");
+  const [sidechainFreq, setSidechainFreq] = useState(140);
+  const [stereoLink, setStereoLink] = useState(true);
+  const [adaptiveMode, setAdaptiveMode] = useState<"off" | "bass_aware">("bass_aware");
+  const [autoThreshold, setAutoThreshold] = useState(true);
+  const [autoThresholdOffset, setAutoThresholdOffset] = useState(-16.0);
   const [stylePrompt, setStylePrompt] = useState("");
 
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
 
-  const processFile = useCallback(async (file: File, selectedPreset: PresetId, denoise: boolean, style: string, certify: boolean) => {
+  const processFile = useCallback(async (
+    file: File, selectedPreset: PresetId, denoise: boolean,
+    style: string, certify: boolean, intensityVal: number,
+    scFilter: "none" | "highpass" | "lowpass", scFreq: number,
+    stereoLinkVal: boolean, adaptiveModeVal: "off" | "bass_aware",
+    autoThresholdVal: boolean, autoThresholdOffsetVal: number
+  ) => {
     setFileName(file.name);
     setResultUrl(null);
     setErrorMsg("");
@@ -90,6 +104,13 @@ export default function Mastering() {
     fd.append("mode", "master");
     fd.append("preset", selectedPreset);
     fd.append("denoise", String(denoise));
+    fd.append("intensity", String(intensityVal));
+    fd.append("sidechainFilter", scFilter);
+    fd.append("sidechainFreq", String(scFreq));
+    fd.append("stereoLink", String(stereoLinkVal));
+    fd.append("adaptiveMode", adaptiveModeVal);
+    fd.append("autoThreshold", String(autoThresholdVal));
+    fd.append("autoThresholdOffset", String(autoThresholdOffsetVal));
     fd.append("stylePrompt", style);
     if (certify) {
       fd.append("certify", "true");
@@ -179,7 +200,7 @@ export default function Mastering() {
   };
 
   const startMastering = () => {
-    if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn);
+    if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn, intensity, sidechainFilter, sidechainFreq, stereoLink, adaptiveMode, autoThreshold, autoThresholdOffset);
   };
 
   const download = () => {
@@ -298,6 +319,162 @@ export default function Mastering() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Intensity slider */}
+            <div className="p-3 rounded-lg border border-sky-500/20 bg-sky-500/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-sky-300">Kernel Intensity</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    How hard the MLK v3 mastering chain pushes the signal. 75 is the tuned default.
+                  </p>
+                </div>
+                <span className="text-2xl font-black text-sky-300 leading-none tabular-nums">{intensity}</span>
+              </div>
+              <Slider
+                value={[intensity]}
+                onValueChange={(v) => setIntensity(v[0])}
+                min={0}
+                max={100}
+                step={1}
+                data-testid="slider-master-intensity"
+                className="w-full"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground/50 select-none">
+                <span>Subtle</span>
+                <span>Balanced (75)</span>
+                <span>Maximum</span>
+              </div>
+            </div>
+
+            {/* Sidechain compressor */}
+            <div className="p-3 rounded-lg border border-violet-500/20 bg-violet-500/5 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-violet-300">Sidechain Compressor</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Filters the detector signal so bass/kick don't pump the compressor. Recommended: Highpass at 160 Hz.
+                </p>
+              </div>
+              {/* Filter type buttons */}
+              <div className="flex gap-2">
+                {(["none","highpass","lowpass"] as const).map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => setSidechainFilter(opt)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      sidechainFilter === opt
+                        ? "border-violet-500/60 bg-violet-500/20 text-violet-200"
+                        : "border-border/30 bg-card/20 text-muted-foreground hover:border-border/60"
+                    }`}
+                  >
+                    {opt === "none" ? "Off" : opt === "highpass" ? "Highpass" : "Lowpass"}
+                  </button>
+                ))}
+              </div>
+              {/* Frequency slider — only when a filter is active */}
+              {sidechainFilter !== "none" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Detector cutoff frequency</p>
+                    <span className="text-sm font-black text-violet-300 tabular-nums">{sidechainFreq} Hz</span>
+                  </div>
+                  <Slider
+                    value={[sidechainFreq]}
+                    onValueChange={(v) => setSidechainFreq(v[0])}
+                    min={60}
+                    max={400}
+                    step={5}
+                    data-testid="slider-sidechain-freq"
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground/50 select-none">
+                    <span>60 Hz</span>
+                    <span>Typical: 120–250 Hz</span>
+                    <span>400 Hz</span>
+                  </div>
+                </div>
+              )}
+              {/* Adaptive mode */}
+              {sidechainFilter !== "none" && (
+                <div className="space-y-1 pt-1">
+                  <p className="text-xs font-medium text-violet-300/80">Adaptive Mode</p>
+                  <div className="flex gap-2">
+                    {(["bass_aware","off"] as const).map(opt => (
+                      <button
+                        key={opt}
+                        onClick={() => setAdaptiveMode(opt)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          adaptiveMode === opt
+                            ? "border-violet-500/60 bg-violet-500/20 text-violet-200"
+                            : "border-border/30 bg-card/20 text-muted-foreground hover:border-border/60"
+                        }`}
+                      >
+                        {opt === "bass_aware" ? "Bass Aware ✦" : "Fixed"}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/50">
+                    {adaptiveMode === "bass_aware"
+                      ? "Detector bandpasses around your cutoff frequency — tracks bass energy, not broadband level. Prevents pumping on heavy sub content."
+                      : "Fixed detector at the cutoff frequency. Predictable, consistent behaviour."}
+                  </p>
+                </div>
+              )}
+
+              {/* Auto threshold */}
+              {sidechainFilter !== "none" && (
+                <div className="space-y-2 pt-1 border-t border-violet-500/10">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="autothreshold"
+                      checked={autoThreshold}
+                      onChange={(e) => setAutoThreshold(e.target.checked)}
+                      className="w-4 h-4 accent-violet-500"
+                    />
+                    <label htmlFor="autothreshold" className="text-xs font-medium cursor-pointer text-violet-300">
+                      Auto Threshold <span className="text-muted-foreground/60 font-normal">— measured from your track's RMS (set-and-forget)</span>
+                    </label>
+                  </div>
+                  {autoThreshold && (
+                    <div className="space-y-2 pl-7">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-muted-foreground/70">Offset below RMS</p>
+                        <span className="text-sm font-black text-violet-300 tabular-nums">{autoThresholdOffset.toFixed(1)} dB</span>
+                      </div>
+                      <Slider
+                        value={[autoThresholdOffset]}
+                        onValueChange={(v) => setAutoThresholdOffset(v[0])}
+                        min={-30}
+                        max={-6}
+                        step={0.5}
+                        data-testid="slider-auto-threshold-offset"
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground/50 select-none">
+                        <span>−30 dB (gentle)</span>
+                        <span>Typical: −12 to −18</span>
+                        <span>−6 dB (aggressive)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Stereo link */}
+              <div className="flex items-center gap-3 pt-1">
+                <input
+                  type="checkbox"
+                  id="stereolink"
+                  checked={stereoLink}
+                  onChange={(e) => setStereoLink(e.target.checked)}
+                  className="w-4 h-4 accent-violet-500"
+                />
+                <label htmlFor="stereolink" className="text-xs cursor-pointer text-muted-foreground">
+                  Stereo link <span className="text-muted-foreground/60">— both channels compress together (recommended for mastering)</span>
+                </label>
+              </div>
             </div>
 
             {/* Denoise toggle */}
