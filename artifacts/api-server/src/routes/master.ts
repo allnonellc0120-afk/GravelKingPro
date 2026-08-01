@@ -676,7 +676,7 @@ masterRouter.post(
 // ── GET /api/kernel/master-file ─────────────────────────────────────────────
 // Token-guarded (1h TTL) download of a mastered WAV over real HTTPS — mobile
 // browsers save this reliably where large blob: URLs stall.
-masterRouter.get("/master-file", async (req: Request, res: Response) => {
+masterRouter.get("/kernel/master-file", async (req: Request, res: Response) => {
   const file  = String(req.query.file ?? "");
   const token = String(req.query.token ?? "");
   const name  = String(req.query.name ?? "gravelking_mastered.wav").replace(/[^\w.-]/g, "_");
