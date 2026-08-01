@@ -26,7 +26,7 @@ const ADVERTISED = [
   { product: "Node Auditor", cents: 24950, interval: "month", display: "$249.50" },
 ] as const;
 
-const ALLOWED_TOKENS = new Set(ADVERTISED.map((a) => a.display));
+const ALLOWED_TOKENS = new Set<string>(ADVERTISED.map((a) => a.display));
 
 // UI files that show plan prices, relative to the workspace root.
 const UI_FILES = [
