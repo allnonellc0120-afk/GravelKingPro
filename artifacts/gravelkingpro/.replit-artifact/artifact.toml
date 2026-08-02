@@ -61,6 +61,10 @@ from = "/whitepaper"
 to = "/whitepaper.html"
 
 [[services.production.rewrites]]
+from = "/privacy"
+to = "/privacy.html"
+
+[[services.production.rewrites]]
 from = "/contact"
 to = "/contact.html"
 

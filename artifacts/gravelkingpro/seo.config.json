@@ -65,6 +65,12 @@
       "ogType": "website"
     },
     {
+      "path": "/privacy",
+      "title": "Privacy Policy | GravelKing Pro",
+      "description": "Read the GravelKing Pro privacy policy covering audio uploads, accounts, subscriptions, analytics, data retention, and your privacy rights.",
+      "ogType": "website"
+    },
+    {
       "path": "/contact",
       "title": "Contact GravelKing Pro — All N One LLC",
       "description": "Questions about plans, licensing, or the MLK V3.5 kernel? Contact the GravelKing Pro team at All N One LLC directly.",
