@@ -51,4 +51,5 @@
 - [Two MLK v3.5 products](mlk-naming-collision.md) — audio Morris Law Kernel ≠ mlk-licensing matrix-multiplication site; never mix assets/copy between them
 - [PWA SW navigateFallback hijack](pwa-sw-navigate-fallback.md) — generateSW serves SPA shell for /api/* navigations → sign-in 404s for RETURNING users only; curl can't see it; denylist server + sibling-artifact prefixes
 - [Paid upload authorization](paid-upload-authorization.md) — verify payment before parsing bytes; use fixed order slots, actual-content checks, throttling, and a final lock
+- [Play TWA build](play-twa-build.md) — non-interactive Bubblewrap build + Play internal upload; keystore in android-twa/ is irreplaceable; assetlinks needs republish
 - [Mastering cert opt-in](mastering-cert-opt-in.md) — /api/kernel/master never gates on copyright; cert/watermark only with certify=true; masters always stream in-app bytes, never external links

@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.gravelkingpro.app",
+    "sha256_cert_fingerprints": [
+      "5E:B5:8E:69:50:0E:E4:E1:B4:9E:4C:57:F0:89:9A:10:D3:6D:B6:69:64:22:B8:75:2F:8F:95:9F:8B:9F:B9:A4"
+    ]
+  }
+}]
