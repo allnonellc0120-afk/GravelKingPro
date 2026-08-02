@@ -102,8 +102,8 @@ export default function PrivacyPolicy() {
           <h2 className="text-xl font-semibold mb-3">10. Contact Us</h2>
           <p className="text-muted-foreground leading-relaxed">
             If you have any questions about this Privacy Policy, please contact us at:<br />
-            <a href="mailto:support@gravelkingpro.com" className="text-primary underline">
-              support@gravelkingpro.com
+            <a href="mailto:kevm@gravelkingpro.it.com" className="text-primary underline">
+              kevm@gravelkingpro.it.com
             </a>
           </p>
         </section>
