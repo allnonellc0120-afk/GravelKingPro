@@ -78,6 +78,22 @@ async function geminiGenerate(prompt: string): Promise<string> {
   return Promise.any(candidates);
 }
 
+const GENRE_RULES: Record<string, string> = {
+  rap: "Uncompromising, heavy-leverage, street-level truth and cold execution. Use internal rhymes, heavy cadence, raw storytelling, economic power, survival, loyalty, and strategy. Avoid generic AI metaphors such as shadows in the night, neon lights, or echoes of the street.",
+  trap: "High-velocity, aggressive, dark, heavily rhythmic. Use short punchy lines for 808 syncopation, repetitive high-impact hooks, resilience, and relentless grind. Avoid pop fluff and overly complex multisyllabic poetry.",
+  pop: "Edge-driven, assertive, direct, and catchy without becoming soft. Use melodic structure, real-world edge, power dynamics, self-reliance, and dominant energy.",
+  rock: "Gritty, distorted, driving, and confrontational. Use a strong verse-chorus dynamic, raw tension, friction, breaking systems, pressure, and holding the line.",
+  outlaw_grunge: "Weary, heavy-handed, stripped-down, dirt-road gritty, and unforgiving. Use raw acoustic or distorted feeling, hard lessons, heavy consequences, isolation, and living by your own law.",
+};
+
+function songwritingPolicy(genre: string | undefined, isExplicit: boolean): string {
+  const key = (genre || "pop").toLowerCase().replace(/\s+/g, "_");
+  const genreRule = GENRE_RULES[key] || GENRE_RULES.pop;
+  return `\n\nSONGWRITING SAFETY AND STYLE STANDARD:\n- Genre direction: ${genreRule}\n- ${isExplicit
+    ? "EXPLICIT 18+ artistic mode: raw language may be used for artistic grit, but absolutely no hate speech, slurs, targeted harassment, non-consensual sexual content, sexual violence, or sexual content involving minors."
+    : "RADIO/CLEAN mode: keep language clean for broadcast while preserving grit and emotional impact; no profanity, hate speech, slurs, targeted harassment, or sexual content."}\n- Do not imitate a living artist or reproduce recognizable copyrighted lyrics.\n- If the request asks for disallowed content, refuse that part briefly and provide a safe creative alternative.`;
+}
+
 const DEFAULT_CERTIFICATION = "I certify these lyrics are my original human work and were NOT produced by an AI.";
 
 /** Serialize a lyric_imports row for the client (ISO timestamps). */
@@ -157,6 +173,7 @@ lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, r
   const {
     story, genre, bpm, mode,
     key, vocalType, genreTags,
+    isExplicit,
     timelineBlocks,
   } = req.body as {
     story?: string;
@@ -166,6 +183,7 @@ lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, r
     key?: string;
     vocalType?: string;
     genreTags?: string;
+    isExplicit?: boolean;
     timelineBlocks?: Array<{ timestampMs: number; label: string; sectionType: string }>;
   };
 
@@ -232,7 +250,7 @@ After the lyrics, on the LAST LINE output exactly:
 SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 
   try {
-    const fullText = (await geminiGenerate(prompt)).trim();
+    const fullText = (await geminiGenerate(`${prompt}${songwritingPolicy(genreTags || genre, Boolean(isExplicit))}`)).trim();
     const sunoMatch = fullText.match(/^SUNO_PROMPT:\s*(.+)$/m);
     const stylePrompt = sunoMatch ? sunoMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
     const lyrics = fullText.replace(/^SUNO_PROMPT:.*$/m, "").trim();
