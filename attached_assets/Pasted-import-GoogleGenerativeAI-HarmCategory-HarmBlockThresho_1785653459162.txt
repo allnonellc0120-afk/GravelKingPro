@@ -1,0 +1,67 @@
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// 1. GENRE SYSTEM INSTRUCTIONS
+const GENRE_PROMPTS = {
+  rap: `SYSTEM INSTRUCTION - GENRE: RAP
+- TONE: Uncompromising, heavy leverage, street-level truth, cold execution.
+- RULES: Internal rhymes, heavy cadence, raw storytelling. No pop-rhyme schemes.
+- THEMES: Economic power, survival, loyalty, cold strategy ("Benjis have no pity").
+- FORBIDDEN: Corny AI metaphors ("shadows in the night", "neon lights", "echoes of the street").`,
+
+  trap: `SYSTEM INSTRUCTION - GENRE: TRAP
+- TONE: High velocity, aggressive, dark, heavily rhythmic.
+- RULES: Short, punchy lines for heavy 808 syncopation. Repetitive hooks with high impact.
+- THEMES: Stash management, heavy weight ("swoll money"), resilience, relentless grind.
+- FORBIDDEN: Pop fluff, weak flow switches, overly complex multi-syllabic poetry.`,
+
+  pop: `SYSTEM INSTRUCTION - GENRE: POP
+- TONE: Edge-driven, assertive, direct, catchy without being soft.
+- RULES: Melodic structure with sharp, real-world edge.
+- THEMES: Power dynamics, self-reliance, dominant energy.`,
+
+  rock: `SYSTEM INSTRUCTION - GENRE: ROCK
+- TONE: Gritty, distorted, driving, confrontational.
+- RULES: Strong verse-chorus dynamic driven by raw tension. Unpolished phrasing.
+- THEMES: Friction, breaking systems, pressure, holding the line.`,
+
+  outlaw_grunge: `SYSTEM INSTRUCTION - GENRE: OUTLAW GRUNGE
+- TONE: Weary, heavy-handed, stripped-down, dirt-road gritty, unforgiving.
+- RULES: Raw acoustic/distorted feel. Focus on hard lessons and heavy consequences.
+- THEMES: Isolation, worn leather, high stakes, living by your own law.`
+};
+
+// 2. EXPLICIT MODIFIER
+function getExplicitRule(isExplicit) {
+  if (isExplicit) {
+    return `\n[MODE: EXPLICIT 18+]\n- Raw language allowed for artistic grit.\n- STRICT POLICY: ZERO hate speech, ZERO slurs, ZERO non-consensual explicit content.`;
+  }
+  return `\n[MODE: RADIO / CLEAN]\n- Keep language clean for broadcast. Maintain high grit and heavy tone without profanity.`;
+}
+
+// 3. MAIN GENERATION FUNCTION
+export async function generateLyrics(userPrompt, genre = 'trap', isExplicit = false) {
+  // Pull genre prompt (fallback to trap)
+  const baseInstruction = GENRE_PROMPTS[genre.toLowerCase()] || GENRE_PROMPTS.trap;
+  const explicitInstruction = getExplicitRule(isExplicit);
+  
+  const fullSystemInstruction = `${baseInstruction}\n${explicitInstruction}`;
+
+  // Define safety settings
+  const safetySettings = [
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE }, // Protects against slurs
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  ];
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    systemInstruction: fullSystemInstruction,
+    safetySettings: safetySettings
+  });
+
+  const result = await model.generateContent(userPrompt);
+  return result.response.text();
+}

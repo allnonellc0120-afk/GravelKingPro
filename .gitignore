@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+google-play-service-account.json
+android-twa/*.keystore
+*.jks
+android-twa/.keystore-pass
