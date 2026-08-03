@@ -9,4 +9,6 @@ description: How the GravelKing Pro TWA .aab is built non-interactively and uplo
 - Upload via artifacts/api-server/scripts/play-upload-internal.mjs (GCP_SERVICE_ACCOUNT, androidpublisher v3: edit → upload bundle → PUT tracks/internal → commit). versionCode 1 committed to internal track for com.gravelkingpro.app.
 - Listing (text/images/contact) + production release staged via play-listing-and-release.mjs; a never-published ("draft") app only accepts production releases with status "draft" — status "completed" 400s until first Console publish.
 - Console-only steps the API can't do: content rating questionnaire, data safety form, target audience, app access instructions, and the account owner's identity/payments verification — required before Google review and going live.
+- /tmp/android-sdk gets wiped between sessions — reinstall commandlinetools + licenses + "platforms;android-36" before any gradle bundleRelease; keystore pass lives in android-twa/.keystore-pass.
+- Open-testing (API track id "beta") releases error "doesn't add or remove bundles" when saved empty in Console — fix by bumping versionCode above the highest existing one, rebuilding, and PUT tracks/beta with a draft release via API.
 - **Why:** rebuilds/updates must reuse the same keystore and package id or Play rejects the upload.

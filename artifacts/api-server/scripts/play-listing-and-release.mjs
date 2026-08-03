@@ -87,7 +87,7 @@ const prod = await j(await fetch(`${E}/tracks/production`, {
     track: "production",
     releases: [{
       name: "1.0.0",
-      versionCodes: ["1"],
+      versionCodes: ["2"],
       status: "draft",
       releaseNotes: [{ language: "en-US", text: "GravelKing Pro launch: AI mastering, vocal booth, karaoke DAW, and IP rights certification." }],
     }],
