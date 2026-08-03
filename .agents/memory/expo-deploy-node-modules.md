@@ -13,3 +13,9 @@ The deployment build runs Metro / `expo export` against the **working-tree `node
 - Symptom: deploy build log shows Metro `Unable to resolve module X` even though `git show HEAD:<app>/package.json` and `HEAD:pnpm-lock.yaml` both contain X.
 - Fix: `pnpm install` at repo root to re-materialize `node_modules` (watch for `+N` packages added even when the lockfile is "up to date").
 - Verify before re-publishing: `cd artifacts/<expo-app> && npx expo export --platform ios` and `--platform android` must exit 0 — these run the exact bundling the deploy does. Use a port other than the running expo dev server (8081), or stop it first, to avoid a silent kill.
+
+The mobile artifact's static builder now auto-selects the first available Metro port starting at 8081 and uses it consistently for health checks, bundles, manifests, and asset URLs.
+
+**Why:** The shared component-preview workflow can occupy 8081, causing Expo's non-interactive `expo start` to ask for a port and then exit during deployment.
+
+**How to apply:** Keep `METRO_PORT` available as an override, but let the builder probe and increment automatically for normal publishing.

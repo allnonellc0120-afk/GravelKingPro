@@ -807,10 +807,9 @@ export default function Mastering() {
             <div className="space-y-1">
               <h3 className="font-medium text-foreground/80">Which preset should I choose for Spotify?</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Spotify normalises playback to –14 LUFS (similar to YouTube) so the YouTube preset
-                is a good match. You can also use Baseline, which targets a similar level with a
-                slightly warmer low-end. Avoid very loud presets like SoundCloud (–11 LUFS) if
-                Spotify is your primary platform — they will be turned down during playback.
+                Use the YouTube preset for a –14 LUFS target, or Baseline for a slightly warmer
+                low-end. Choose the preset that matches your actual delivery requirement and
+                review the returned loudness before release.
               </p>
             </div>
           </section>

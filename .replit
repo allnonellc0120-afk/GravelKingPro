@@ -88,6 +88,10 @@ externalPort = 3001
 localPort = 24393
 externalPort = 3003
 
+[[ports]]
+localPort = 26198
+externalPort = 8008
+
 [nix]
 channel = "stable-25_05"
 packages = ["libxcrypt", "pkg-config", "xsimd"]

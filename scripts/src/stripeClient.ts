@@ -2,12 +2,19 @@ import Stripe from 'stripe';
 import { StripeSync } from 'stripe-replit-sync';
 
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
-  // Fast path: env var secret key (set when Replit integration is not used)
-  if (process.env.STRIPE_SECRET_KEY) {
-    return {
-      secretKey: process.env.STRIPE_SECRET_KEY,
-      webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    };
+  // Fast path: env var secret key (set when Replit integration is not used).
+  // Publishable keys (pk_*) cannot make server-side calls — ignore them so we
+  // fall through to the managed-connection lookup instead of failing later.
+  const envKey = process.env.STRIPE_SECRET_KEY;
+  if (envKey) {
+    if (envKey.startsWith("pk_")) {
+      console.warn("[stripe] STRIPE_SECRET_KEY is a publishable key (pk_*); ignoring it and trying the managed connection.");
+    } else {
+      return {
+        secretKey: envKey,
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+      };
+    }
   }
 
   // Replit integration path
@@ -29,12 +36,15 @@ async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecre
       );
 
       if (resp.ok) {
-        const data = await resp.json() as { items?: Array<{ settings?: { secret_key?: string; webhook_secret?: string } }> };
+        const data = await resp.json() as { items?: Array<{ settings?: { secret_key?: string; secret?: string; webhook_secret?: string } }> };
         const settings = data.items?.[0]?.settings;
-        if (settings?.secret_key) {
+        // The connector has shipped the secret under both `secret_key` and
+        // (currently) `secret`; accept either.
+        const managedKey = settings?.secret_key ?? settings?.secret;
+        if (managedKey && !managedKey.startsWith("pk_")) {
           return {
-            secretKey: settings.secret_key,
-            webhookSecret: settings.webhook_secret,
+            secretKey: managedKey,
+            webhookSecret: settings?.webhook_secret,
           };
         }
       }

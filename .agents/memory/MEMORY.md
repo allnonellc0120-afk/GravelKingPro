@@ -26,6 +26,8 @@
 - [stripe-replit-sync esbuild external](stripe-esbuild-external.md) — stripe + stripe-replit-sync must stay external in build.mjs or migrations silently skip (wrong __dirname)
 - [MLK benchmark honesty + dev gating](mlk-benchmark-honesty.md) — benchmark must show only real detected hardware (CPU-only, no GPU; mmap_locked from real mlockall); dev open-usage gate must be fail-closed (NODE_ENV === "development")
 - [Stripe webhook invoice.upcoming fix](stripe-webhook-invoice-upcoming.md) — invoice.upcoming events have null ID; catch err.code=23502+table=invoices+column=id in processWebhook and return early (don't rethrow) so Stripe gets 200 and stops retrying
+- [Stripe connector secret field rename](stripe-connector-secret-field.md) — connector now returns settings.secret (not secret_key); readers must accept both or the managed connection looks "unavailable"
+- [Stripe publish blocker](stripe-publish-blocker.md) — raw STRIPE_SECRET_KEY still exists as a secret; deleteEnvVars cannot remove secrets, so remove it manually before republishing
 - [Subscription DB fallback to Stripe API](subscription-stripe-api-fallback.md) — storage.ts getUserSubscriptionStatus: if stripe.subscriptions mirror empty, dynamic-import stripeClient and list active/trialing subscriptions directly; prevents wrongly-free on webhook delay
 - [Lifetime/owner full access](lifetime-access.md) — owners unlocked via email allowlist in auth.ts upsertUser (self-applies on OIDC login, dev+prod after publish); entitlement keyed by returned row id, not the OIDC sub
 - [Gmail integration](gmail-integration.md) — google-mail connector added via @replit/connectors-sdk; send via POST /gmail/v1/users/me/messages/send with base64url RFC-2822 raw body; only 2 users have emails on file (session-based system)
@@ -53,3 +55,4 @@
 - [Paid upload authorization](paid-upload-authorization.md) — verify payment before parsing bytes; use fixed order slots, actual-content checks, throttling, and a final lock
 - [Play TWA build](play-twa-build.md) — non-interactive Bubblewrap build + Play internal upload; keystore in android-twa/ is irreplaceable; assetlinks needs republish
 - [Mastering cert opt-in](mastering-cert-opt-in.md) — /api/kernel/master never gates on copyright; cert/watermark only with certify=true; masters always stream in-app bytes, never external links
+- [Play reviewer demo account](demo-reviewer-account.md) — customer-only reviewer session must be published and verified publicly before Play receives credentials

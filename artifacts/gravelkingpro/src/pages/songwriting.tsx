@@ -334,7 +334,7 @@ function LyricLineRow({
         </div>
       ) : (
         <div className="flex items-center gap-2 px-3 py-2">
-          {/* Tapping the line text directly enters edit mode — like the Notes app */}
+          {/* Tapping the line text directly enters edit mode. */}
           <p
             className={`flex-1 text-sm font-mono leading-relaxed select-text ${
               line.isHumanEdited ? "text-emerald-300/90" : "text-foreground/85"
@@ -1347,7 +1347,7 @@ export default function SongwritingStudio() {
                   <ProGate feature="Line-by-line surgical editor + AI variations" />
                   <ProGate feature="Rhyming tray — live suggestions while editing" />
                   <ProGate feature="Save Project + Forensic Authorship Ledger" />
-                  <ProGate feature=".lrc Timed Lyric Export (BandLab, StarMaker)" />
+                  <ProGate feature=".lrc Timed Lyric Export" />
                   <ProGate feature="Form PA Copyright PDF with Authorship Log" />
                 </div>
               )}

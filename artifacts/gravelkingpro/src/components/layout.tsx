@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Zap, Menu, X, User, LogIn, Crown, ArrowRight } from "lucide-react";
+import { Zap, Menu, X, User, LogIn, Crown, ArrowRight, ChevronDown, BookOpen, Gavel, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -16,6 +16,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
   const { isPro, isDeveloper, tier } = useAppState();
   const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const tierInfo = tier ? TIER_LABEL[tier] : null;
   const showUpgradeNudge = !tier || tier === "weekly";
@@ -62,6 +63,29 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
                 {link.label}
               </Link>
             ))}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setHelpOpen((open) => !open)}
+                className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-amber-500 ${location.startsWith("/help") ? "text-amber-500" : "text-muted-foreground"}`}
+                aria-expanded={helpOpen}
+              >
+                Help <ChevronDown className={`h-3.5 w-3.5 transition-transform ${helpOpen ? "rotate-180" : ""}`} />
+              </button>
+              {helpOpen && (
+                <div className="absolute right-0 top-8 z-30 w-64 rounded-xl border border-border/60 bg-card p-2 shadow-2xl">
+                  <Link href="/help" onClick={() => setHelpOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-amber-500/10">
+                    <BookOpen className="h-4 w-4 text-amber-400" /><span><strong className="block">Tool guide</strong><small className="text-muted-foreground">Functions and how to use them</small></span>
+                  </Link>
+                  <Link href="/help/ip-rights" onClick={() => setHelpOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-amber-500/10">
+                    <Gavel className="h-4 w-4 text-violet-300" /><span><strong className="block">IP rights</strong><small className="text-muted-foreground">Evidence and legal limits</small></span>
+                  </Link>
+                  <Link href="/help/user-rules" onClick={() => setHelpOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-amber-500/10">
+                    <ShieldAlert className="h-4 w-4 text-rose-300" /><span><strong className="block">User rules</strong><small className="text-muted-foreground">Honest use and account review</small></span>
+                  </Link>
+                </div>
+              )}
+            </div>
             <Link
               href="/download"
               className="text-xs font-semibold text-black bg-amber-500 hover:bg-amber-600 px-3 py-1.5 rounded-md transition-colors"
@@ -142,6 +166,13 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
                   {link.label}
                 </Link>
               ))}
+              <Link
+                href="/help"
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary/60 ${location.startsWith("/help") ? "text-amber-500 bg-secondary/40" : "text-muted-foreground"}`}
+              >
+                <BookOpen className="h-4 w-4" /> Help &amp; Rules
+              </Link>
               <Link
                 href="/download"
                 onClick={() => setMobileOpen(false)}
