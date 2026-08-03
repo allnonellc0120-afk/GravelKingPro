@@ -47,7 +47,10 @@ function verifyEmbedToken(projectId: string, authorshipScore: number, token: str
  */
 async function geminiGenerate(prompt: string): Promise<string> {
   const cfg = { maxOutputTokens: 8192 };
-  const TIMEOUT_MS = 15_000; // 15s max per provider
+  // 45s max per provider. Full-song generations routinely take 12–15s on the
+  // Gemini proxy; a 15s cap sat right on that edge and intermittently killed
+  // otherwise-successful generations ("Lyric generation failed").
+  const TIMEOUT_MS = 45_000;
 
   // Race both providers simultaneously — whichever responds first with a
   // non-empty result wins. MLK v3 kernel runs on the output side regardless

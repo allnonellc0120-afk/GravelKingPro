@@ -120,7 +120,7 @@ function computeWaveformPeaks(file: File, buckets: number): Promise<Float32Array
 }
 
 /**
- * Draw the BandLab-style scrolling waveform on the canvas.
+ * Draw the Vocal Booth scrolling waveform on the canvas.
  * Works in canvas pixel coordinates (canvas.width × canvas.height).
  *
  * Top section: pre-computed timeline waveform (faded past, bright amber runway ahead).
@@ -352,7 +352,7 @@ function VocalBoothInner() {
     if (g) g.muted = !guideAudible;
   }, [guideAudible]);
 
-  // Decode backing audio → pre-compute waveform peaks for the BandLab canvas.
+  // Decode backing audio → pre-compute waveform peaks for the Vocal Booth canvas.
   useEffect(() => {
     if (!backingFile) { setWaveformPeaks(null); return; }
     let cancelled = false;
@@ -362,7 +362,7 @@ function VocalBoothInner() {
     return () => { cancelled = true; };
   }, [backingFile]);
 
-  // Run the BandLab canvas draw loop while the studio is enlarged.
+  // Run the Vocal Booth canvas draw loop while the studio is enlarged.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!enlarged || !canvas) return;
@@ -744,7 +744,7 @@ function VocalBoothInner() {
   }, [guideVocalUrl, guideAudible]);
 
   // Wire the backing <audio> element through an AudioContext + AnalyserNode so the
-  // BandLab canvas can read live waveform data.  Must be called inside a user-gesture
+  // The Vocal Booth canvas can read live waveform data. Must be called inside a user-gesture
   // handler (play/record button) — iOS/Safari only resumes the context in gestures.
   const setupAudioGraph = useCallback(() => {
     if (audioCtxRef.current) {
@@ -1369,7 +1369,7 @@ function VocalBoothInner() {
             </button>
           </div>
 
-          {/* BandLab waveform canvas
+          {/* Vocal Booth waveform canvas
               2400 × 260 native pixels displayed at CSS height 130 px → crisp on HiDPI.
               The rAF loop above writes to this canvas every frame while enlarged. */}
           <div className="px-3 pt-2.5 pb-1 shrink-0">

@@ -37,6 +37,8 @@ import PrivacyPolicy from "@/pages/privacy";
 import WeekendSpecial from "@/pages/weekend-special";
 import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
+import DemoLogin from "@/pages/demo-login";
+import HelpPage from "@/pages/help";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +86,9 @@ function Router() {
       <Route path="/demo" component={VerifyPage} />
       <Route path="/sign-in" component={SignInRedirect} />
       <Route path="/login" component={SignInRedirect} />
+      <Route path="/demo-login" component={DemoLogin} />
+      <Route path="/help/:slug" component={HelpPage} />
+      <Route path="/help" component={HelpPage} />
       <Route component={NotFound} />
     </Switch>
   );

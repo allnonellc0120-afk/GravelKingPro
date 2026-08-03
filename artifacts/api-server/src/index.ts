@@ -4,7 +4,9 @@ import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
 import { submitSitemapToGSC } from "./lib/googleSearchConsole";
 import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { DEMO_EMAIL, DEMO_PASSWORD_HASH, DEMO_USER_ID } from "./lib/auth";
 
 const rawPort = process.env["PORT"];
 
@@ -97,6 +99,10 @@ async function initStripe() {
 async function migrateAppSchema() {
   try {
     await db.execute(sql`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS password_hash text
+    `);
+    await db.execute(sql`
       ALTER TABLE lyric_projects
         ADD COLUMN IF NOT EXISTS mode              text        NOT NULL DEFAULT 'simple',
         ADD COLUMN IF NOT EXISTS story_prompt      text,
@@ -165,6 +171,35 @@ async function migrateAppSchema() {
   }
 }
 
+async function ensureDemoAccount() {
+  await db
+    .insert(usersTable)
+    .values({
+      id: DEMO_USER_ID,
+      email: DEMO_EMAIL,
+      passwordHash: DEMO_PASSWORD_HASH,
+      firstName: "Google Play",
+      lastName: "Reviewer",
+      isPro: true,
+      subscriptionTier: "node_auditor",
+      isDeveloper: false,
+    })
+    .onConflictDoUpdate({
+      target: usersTable.id,
+      set: {
+        email: DEMO_EMAIL,
+        passwordHash: DEMO_PASSWORD_HASH,
+        firstName: "Google Play",
+        lastName: "Reviewer",
+        isPro: true,
+        subscriptionTier: "node_auditor",
+        isDeveloper: false,
+        updatedAt: new Date(),
+      },
+    });
+  logger.info("Play reviewer demo account ready");
+}
+
 /**
  * Submits the sitemap to Google Search Console on startup (production only).
  *
@@ -221,6 +256,7 @@ async function submitSitemapOnStartup(): Promise<void> {
 }
 
 await migrateAppSchema();
+await ensureDemoAccount();
 await initStripe();
 await submitSitemapOnStartup();
 

@@ -179,7 +179,6 @@ function AnalyticsDashboard() {
     { name: "Reddit r/makinghiphop", url: "https://reddit.com/r/makinghiphop/submit", desc: "Hip-hop producers — strong match for mastering + vocal booth", urgent: false },
     { name: "Music Ally", url: "https://musically.com/contact/", desc: "Music tech press — pitch GravelKing as an AI governance story", urgent: false },
     { name: "Hacker News Show HN", url: "https://news.ycombinator.com/submit", desc: "Title: 'Show HN: GravelKing Pro – browser-based audio mastering + IP certification'", urgent: false },
-    { name: "AlternativeTo", url: "https://alternativeto.net/software/add/", desc: "List as alternative to iZotope Ozone, Bandlab Mastering, Landr", urgent: false },
     { name: "Capterra / G2", url: "https://www.capterra.com/vendors/sign-up", desc: "Music production software category", urgent: false },
   ];
 

@@ -26,6 +26,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link href="/benchmark" className={`transition-colors hover:text-foreground/80 ${isActive("/benchmark") ? "text-foreground" : "text-foreground/60"}`}>
                 Benchmark
               </Link>
+              <Link href="/buyers" className={`transition-colors hover:text-foreground/80 ${isActive("/buyers") ? "text-foreground" : "text-foreground/60"}`}>
+                Buyers
+              </Link>
             </nav>
           </div>
           <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">

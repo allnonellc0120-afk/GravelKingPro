@@ -1,17 +1,6 @@
 import Stripe from 'stripe';
 import { StripeSync } from 'stripe-replit-sync';
 
-function getSecretKey(): string {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error(
-      'STRIPE_SECRET_KEY environment variable is not set. ' +
-      'Add it via the Secrets tab in Replit.'
-    );
-  }
-  return key;
-}
-
 /**
  * Returns true when the value looks like a Stripe publishable key (pk_live_... / pk_test_...).
  * Publishable keys cannot make server-side API calls and must be rejected.
@@ -21,28 +10,9 @@ function isPublishableKey(key: string): boolean {
 }
 
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
-  // Fast path: env var secret key — only if it is actually a secret key (sk_*).
-  // If someone accidentally saved a publishable key (pk_*) here, skip it so the
-  // Replit OAuth integration path below can supply the real secret key instead.
-  const envKey = process.env.STRIPE_SECRET_KEY;
-  if (envKey && !isPublishableKey(envKey)) {
-    return {
-      secretKey: envKey,
-      webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    };
-  }
-
-  if (envKey && isPublishableKey(envKey)) {
-    // Log a clear warning so operators can see this in server logs.
-    console.warn(
-      "[stripe] STRIPE_SECRET_KEY is set to a publishable key (pk_*) — " +
-      "falling through to the Replit OAuth integration for the real secret key."
-    );
-  }
-
-  // Replit integration path: the Stripe OAuth connector (status=added) holds the
-  // real sk_* key.  REPLIT_CONNECTORS_HOSTNAME and REPL_IDENTITY are injected at
-  // runtime by the platform — they won't appear in static env-var listings.
+  // Replit's managed Stripe connection is authoritative. It selects the matching
+  // sandbox/live credentials for the environment and lets Stripe's deployment
+  // checks verify that production is wired to a live account.
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? "repl " + process.env.REPL_IDENTITY
@@ -61,23 +31,43 @@ async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecre
       );
 
       if (resp.ok) {
-        const data = await resp.json() as { items?: Array<{ settings?: { secret_key?: string; webhook_secret?: string } }> };
+        const data = await resp.json() as {
+          items?: Array<{
+            settings?: {
+              secret_key?: string;
+              secret?: string;
+              webhook_secret?: string;
+            };
+          }>;
+        };
         const settings = data.items?.[0]?.settings;
-        if (settings?.secret_key) {
+        // The connector schema has shipped the secret under both `secret_key`
+        // and (currently) `secret`; accept either, but never a publishable key.
+        const managedKey = settings?.secret_key ?? settings?.secret;
+        if (managedKey && !isPublishableKey(managedKey)) {
           return {
-            secretKey: settings.secret_key,
-            webhookSecret: settings.webhook_secret,
+            secretKey: managedKey,
+            webhookSecret: settings?.webhook_secret,
           };
         }
       }
-    } catch {
-      // Fall through to error below
+    } catch (err) {
+      console.warn("[stripe] Managed connection lookup failed", err);
     }
   }
 
+  // Local/manual fallback only. Production must not silently fall back to a
+  // manually configured key because that prevents Replit from validating and
+  // promoting the managed live Stripe connection during publish.
+  const envKey = process.env.STRIPE_SECRET_KEY;
+  if (envKey && !isPublishableKey(envKey) && process.env.NODE_ENV !== "production") {
+    console.warn("[stripe] Using local development STRIPE_SECRET_KEY fallback");
+    return { secretKey: envKey, webhookSecret: process.env.STRIPE_WEBHOOK_SECRET };
+  }
+
   throw new Error(
-    'Stripe not configured. Either connect Stripe via the Integrations tab, ' +
-    'or set the STRIPE_SECRET_KEY environment secret to a valid sk_live_* / sk_test_* key.'
+    'Stripe managed connection is unavailable. Reconnect the Stripe integration ' +
+    'before publishing so production can use verified live credentials.'
   );
 }
 

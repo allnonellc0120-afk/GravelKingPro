@@ -8,6 +8,7 @@ import Pricing from "@/pages/pricing";
 import Benchmark from "@/pages/benchmark";
 import Dashboard from "@/pages/dashboard";
 import Activate from "@/pages/activate";
+import Buyers from "@/pages/buyers";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/benchmark" component={Benchmark} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/activate" component={Activate} />
+      <Route path="/buyers" component={Buyers} />
       <Route component={NotFound} />
     </Switch>
   );
