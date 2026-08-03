@@ -71,6 +71,12 @@
       "ogType": "website"
     },
     {
+      "path": "/data-deletion",
+      "title": "Delete Your Data | GravelKing Pro",
+      "description": "Request deletion of your GravelKing Pro account, email, audio, and other applicable personal data.",
+      "ogType": "website"
+    },
+    {
       "path": "/contact",
       "title": "Contact GravelKing Pro — All N One LLC",
       "description": "Questions about plans, licensing, or the MLK V3.5 kernel? Contact the GravelKing Pro team at All N One LLC directly.",

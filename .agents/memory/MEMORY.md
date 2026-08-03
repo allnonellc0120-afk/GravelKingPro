@@ -56,3 +56,4 @@
 - [Play TWA build](play-twa-build.md) — non-interactive Bubblewrap build + Play internal upload; keystore in android-twa/ is irreplaceable; assetlinks needs republish
 - [Mastering cert opt-in](mastering-cert-opt-in.md) — /api/kernel/master never gates on copyright; cert/watermark only with certify=true; masters always stream in-app bytes, never external links
 - [Play reviewer demo account](demo-reviewer-account.md) — customer-only reviewer session must be published and verified publicly before Play receives credentials
+- [Play Data Safety CSV](play-data-safety-csv.md) — Play’s API requires the complete current template, including account creation and deletion rows

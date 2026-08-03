@@ -65,6 +65,10 @@ from = "/privacy"
 to = "/privacy.html"
 
 [[services.production.rewrites]]
+from = "/data-deletion"
+to = "/data-deletion.html"
+
+[[services.production.rewrites]]
 from = "/contact"
 to = "/contact.html"
 

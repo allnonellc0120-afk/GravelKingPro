@@ -53,12 +53,20 @@ def twaManifest = [
 android {
     compileSdkVersion 36
     namespace "com.gravelkingpro.app"
+    signingConfigs {
+        release {
+            storeFile rootProject.file("android.keystore")
+            storePassword System.getenv("BUBBLEWRAP_KEYSTORE_PASSWORD") ?: ""
+            keyAlias "android"
+            keyPassword System.getenv("BUBBLEWRAP_KEY_PASSWORD") ?: System.getenv("BUBBLEWRAP_KEYSTORE_PASSWORD") ?: ""
+        }
+    }
     defaultConfig {
         applicationId "com.gravelkingpro.app"
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 3
+        versionName "1.0.2"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -153,6 +161,7 @@ android {
     buildTypes {
         release {
             minifyEnabled true
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {

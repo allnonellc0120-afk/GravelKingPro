@@ -441,3 +441,10 @@ uri = "file://attached_assets/gravelkingpro-google-outreach.pdf"
 type = "pdf"
 title = "GravelKing Pro — AI Outreach Playbook"
 description = "Verified researcher emails, Google/DeepMind + other AI platform contact routes, copy-paste outreach emails, LinkedIn list with universal message, and a straight assessment of odds and what to ask for."
+
+[[outputs]]
+id = "4vlqZi5uepAehavNsGfKv"
+uri = "file://deliverables/gravelkingpro-google-play-data-safety.csv"
+type = "table"
+title = "Google Play Data Safety CSV"
+description = "Upload this file using Google Play Console’s Data safety → Import from CSV action."
