@@ -57,3 +57,5 @@
 - [Mastering cert opt-in](mastering-cert-opt-in.md) — /api/kernel/master never gates on copyright; cert/watermark only with certify=true; masters always stream in-app bytes, never external links
 - [Play reviewer demo account](demo-reviewer-account.md) — customer-only reviewer session must be published and verified publicly before Play receives credentials
 - [Play Data Safety CSV](play-data-safety-csv.md) — Play’s API requires the complete current template, including account creation and deletion rows
+- [Workspace stability](workspace-stability.md) — keep optional artifact workflows stopped to avoid CPU contention and preview instability
+- [Manual artifact builds](manual-artifact-build-env.md) — path-routed Vite builds need workflow-supplied PORT and BASE_PATH when checked manually

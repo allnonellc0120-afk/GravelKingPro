@@ -448,3 +448,24 @@ uri = "file://deliverables/gravelkingpro-google-play-data-safety.csv"
 type = "table"
 title = "Google Play Data Safety CSV"
 description = "Upload this file using Google Play Console’s Data safety → Import from CSV action."
+
+[[outputs]]
+id = "BVQFVQuTpx_slZ0uCnACL"
+uri = "file://deliverables/joel-api-readiness-and-load-test-report.pdf"
+type = "pdf"
+title = "Joel Meeting — Large-Text API Readiness & Load-Test Report"
+description = "Rebuilt for screen sharing: 13 landscape pages with presentation-sized text, one key point per page, verified metrics, IP-diff explanation, pilot projection, and handoff checklist."
+
+[[outputs]]
+id = "Voq_Q192ylcUqaiXhAYPO"
+uri = "file://deliverables/joel-meeting-opening-one-page.pdf"
+type = "pdf"
+title = "Joel Meeting — Large-Text Opening (PDF)"
+description = "Rebuilt one-page opening slide with oversized headline and metrics for screen sharing."
+
+[[outputs]]
+id = "tmytUyTdmiBWM1_62PbOs"
+uri = "file://deliverables/joel-meeting-opening-one-page.pptx"
+type = "slides"
+title = "Joel Meeting — Large-Text Opening (PowerPoint)"
+description = "Rebuilt editable PowerPoint opening slide with oversized text and metrics."

@@ -49,7 +49,7 @@ interface SignalVerifyResult {
 }
 
 router.post(
-  "/kernel/verify-signal",
+  ["/kernel/verify-signal", "/v1/verify"],
   upload.single("audio"),
   async (req: Request, res: Response): Promise<void> => {
     if (!req.file) {
