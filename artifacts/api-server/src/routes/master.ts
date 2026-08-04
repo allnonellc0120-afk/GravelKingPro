@@ -6,7 +6,7 @@ import { unlink, readdir, stat } from "fs/promises";
 import { issueDownloadToken, verifyDownloadToken } from "../lib/downloadGate";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { randomUUID, createHash, createHmac } from "crypto";
+import { randomUUID, createHash, createHmac, timingSafeEqual } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAuthenticated } from "../lib/adminAuth";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
@@ -55,6 +55,72 @@ async function sweepStaleDownloads(): Promise<void> {
 
 const masterRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 10 });
 const masterConcurrency = concurrencyLimit(3);
+
+/**
+ * B2B partner API key — derived from SESSION_SECRET so the same key is valid
+ * in dev and production without storing another secret. Rotating
+ * SESSION_SECRET rotates every partner key.
+ */
+export function partnerApiKey(): string | null {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return null;
+  return "gkp_live_" + createHmac("sha256", secret).update("partner-api-v1").digest("hex").slice(0, 40);
+}
+
+/** True when the request carries a valid partner API key (x-api-key header). */
+function isPartnerRequest(req: Request): boolean {
+  const key = partnerApiKey();
+  const presented = req.headers["x-api-key"];
+  if (!key || typeof presented !== "string") return false;
+  const a = Buffer.from(presented);
+  const b = Buffer.from(key);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * The documented partner ingestion alias is a credentialed B2B surface.
+ * Reject before Multer parses or writes an upload so an invalid key cannot
+ * consume disk or DSP capacity. The internal /kernel/master route keeps its
+ * existing browser/session behavior.
+ */
+const requirePartnerApiKey = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.path !== "/v1/ingest") {
+    next();
+    return;
+  }
+  if (!isPartnerRequest(req)) {
+    res.setHeader("WWW-Authenticate", "ApiKey");
+    res.status(401).json({ success: false, error: "Valid partner API key required." });
+    return;
+  }
+  next();
+};
+
+/**
+ * Partner-key requests get a much higher, per-key quota (batch ingestion of
+ * hundreds of tracks) instead of the per-IP browser limit — but NOT an
+ * unlimited bypass, so a leaked key can't burn compute forever.
+ * 300 req / 10 min ≈ 500-track batch in ~17 minutes at concurrency 3.
+ */
+const partnerWindow = { count: 0, resetAt: 0 };
+const partnerAwareRateLimit = (req: Request, res: Response, next: NextFunction): void => {
+  if (isPartnerRequest(req)) {
+    const now = Date.now();
+    if (partnerWindow.resetAt <= now) { partnerWindow.count = 0; partnerWindow.resetAt = now + 10 * 60_000; }
+    partnerWindow.count += 1;
+    if (partnerWindow.count > 300) {
+      res.setHeader("Retry-After", String(Math.ceil((partnerWindow.resetAt - now) / 1000)));
+      res.status(429).json({ success: false, error: "Partner quota exceeded (300 requests / 10 min). Retry shortly." });
+      return;
+    }
+    next();
+    return;
+  }
+  // Canonicalize the path so /kernel/master and /v1/ingest share ONE
+  // per-IP bucket — alternating aliases must not double the allowance.
+  const canonical = Object.create(req, { path: { value: "/kernel/master" } }) as Request;
+  masterRateLimit(canonical, res, next);
+};
 
 export type MasterPreset =
   | "baseline"
@@ -174,8 +240,9 @@ const maybeValidateIngestion = (req: Request, res: Response, next: NextFunction)
 };
 
 masterRouter.post(
-  "/kernel/master",
-  masterRateLimit,
+  ["/kernel/master", "/v1/ingest"],
+  requirePartnerApiKey,
+  partnerAwareRateLimit,
   masterConcurrency,
   upload.single("audio"),
   maybeValidateIngestion,
@@ -242,7 +309,7 @@ masterRouter.post(
 
     // weekly+ tiers get unlimited full-length masters. Free users get one full
     // download, then 30-second previews thereafter.
-    const unlimited = await hasUnlimitedMasters(req);
+    const unlimited = isPartnerRequest(req) || await hasUnlimitedMasters(req);
     let isSample = false;
     let usageUserId: string | null = null;
     let usedTotalDownloads = 0;
