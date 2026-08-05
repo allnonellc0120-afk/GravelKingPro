@@ -17,35 +17,16 @@ export function downloadUrl(url: string, name: string): void {
     ReactNativeWebView?: { postMessage: (message: string) => void };
   }).ReactNativeWebView;
   if (nativeBridge) {
-    // The mobile shell cannot save a browser blob/object URL. Send the bytes
-    // through the WebView bridge so the native app can open its Files/Share
-    // sheet instead of navigating to a black download screen.
-    void fetch(url, { credentials: "include" })
-      .then((response) => {
-        if (!response.ok) throw new Error(`Download failed (${response.status})`);
-        return response.blob();
-      })
-      .then((blob) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = String(reader.result ?? "");
-          const comma = result.indexOf(",");
-          if (comma < 0) reject(new Error("Could not read mastered audio"));
-          else resolve(result.slice(comma + 1));
-        };
-        reader.onerror = () => reject(reader.error ?? new Error("Could not read mastered audio"));
-        reader.readAsDataURL(blob);
-      }))
-      .then((base64) => nativeBridge.postMessage(JSON.stringify({
+    // Never marshal audio bytes through postMessage: large base64 payloads can
+    // be truncated by the native WebView and create an empty WAV. The native
+    // shell downloads this HTTPS URL straight to its local cache instead.
+    const downloadUrl = new URL(url, window.location.href).href;
+    nativeBridge.postMessage(JSON.stringify({
         type: "GK_DOWNLOAD",
         name,
         mimeType: blobMimeType(name),
-        base64,
-      })))
-      .catch(() => {
-        // Keep the browser fallback available if the native bridge fails.
-        triggerBrowserDownload(url, name);
-      });
+        url: downloadUrl,
+      }));
     return;
   }
   triggerBrowserDownload(url, name);

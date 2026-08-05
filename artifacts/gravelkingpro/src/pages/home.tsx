@@ -192,6 +192,35 @@ export default function Home() {
         </motion.div>
 
         {/* ══════════════════════════════════════════
+            AWARD RECOGNITION
+        ══════════════════════════════════════════ */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="rounded-2xl border border-orange-500/20 bg-gradient-to-r from-orange-500/8 via-orange-400/5 to-transparent px-6 py-5 sm:px-8"
+        >
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
+            <div className="text-center sm:text-left shrink-0">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-orange-300/70 font-semibold">
+                Award recognition
+              </p>
+              <p className="text-sm font-semibold text-white mt-1">
+                GravelKing Pro was awarded by F6S
+              </p>
+            </div>
+            <div className="h-px w-16 sm:h-12 sm:w-px bg-orange-500/20" />
+            <div className="w-full max-w-[520px] rounded-xl bg-white px-3 py-2 shadow-lg shadow-orange-950/20">
+              <img
+                src="/assets/f6s-award.png"
+                alt="F6S award laurels"
+                className="w-full h-auto object-contain"
+              />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* ══════════════════════════════════════════
             IP RIGHTS — The core message
         ══════════════════════════════════════════ */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/10 via-violet-400/5 to-transparent p-8 space-y-6">
