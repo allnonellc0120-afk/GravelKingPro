@@ -59,3 +59,4 @@
 - [Play Data Safety CSV](play-data-safety-csv.md) — Play’s API requires the complete current template, including account creation and deletion rows
 - [Workspace stability](workspace-stability.md) — keep optional artifact workflows stopped to avoid CPU contention and preview instability
 - [Manual artifact builds](manual-artifact-build-env.md) — path-routed Vite builds need workflow-supplied PORT and BASE_PATH when checked manually
+- [Authorship identity boundary](authorship-identity-boundary.md) — edit ledgers evidence account activity, not proof of who physically typed every character
