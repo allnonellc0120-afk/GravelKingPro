@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { StyleSheet, View, ActivityIndicator, Platform, Alert } from "react-native";
 import { WebView as NativeWebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as FileSystem from "expo-file-system/legacy";
+import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
 const WEB_APP_URL = "https://gravelkingpro.it.com";
@@ -29,15 +29,26 @@ export default function App() {
         type?: string;
         name?: string;
         mimeType?: string;
-        base64?: string;
+        url?: string;
       };
-      if (message.type !== "GK_DOWNLOAD" || !message.base64 || !message.name) return;
-      const uri = `${FileSystem.cacheDirectory ?? ""}${message.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      await FileSystem.writeAsStringAsync(uri, message.base64, {
-        encoding: FileSystem.EncodingType.Base64,
+      if (message.type !== "GK_DOWNLOAD" || !message.url || !message.name) return;
+      const fileName = message.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const destination = new File(Paths.cache, fileName);
+      const downloaded = await File.downloadFileAsync(message.url, destination, {
+        idempotent: true,
       });
+      // Do not offer a save sheet for an HTTP error page, partial file, or an
+      // empty response. A WAV begins RIFF....WAVE and must contain audio bytes.
+      const header = (await downloaded.bytes()).slice(0, 12);
+      const isWav = downloaded.size > 44
+        && String.fromCharCode(...header.slice(0, 4)) === "RIFF"
+        && String.fromCharCode(...header.slice(8, 12)) === "WAVE";
+      if (!isWav) {
+        downloaded.delete();
+        throw new Error("Downloaded file was not a valid WAV");
+      }
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(downloaded.uri, {
           mimeType: message.mimeType ?? "audio/wav",
           UTI: "com.microsoft.waveform-audio",
           dialogTitle: "Save your mastered WAV",
