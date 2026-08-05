@@ -3,3 +3,4 @@ attached_assets/ScreenRecording_06-17-2026_15-25-50_1_1781728403143.mp4 filter=l
 seeds/assets/tgk-superman-full.wav filter=lfs diff=lfs merge=lfs -text
 attached_assets/application-9bbb7a28-916c-49d5-aae8-d61aec9f2717_1784337102513.aab filter=lfs diff=lfs merge=lfs -text
 artifacts/gravelkingpro-promo/public/videos/gravelkingpro_pitch_228.mp4 filter=lfs diff=lfs merge=lfs -text
+artifacts/gravelkingpro-speed-promo/public/videos/gravelkingpro_pitch_228.mp4 filter=lfs diff=lfs merge=lfs -text

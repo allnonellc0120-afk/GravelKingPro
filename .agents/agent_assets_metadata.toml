@@ -469,3 +469,24 @@ uri = "file://deliverables/joel-meeting-opening-one-page.pptx"
 type = "slides"
 title = "Joel Meeting — Large-Text Opening (PowerPoint)"
 description = "Rebuilt editable PowerPoint opening slide with oversized text and metrics."
+
+[[outputs]]
+id = "k2GFB4LY23FgMnEcG-zYz"
+uri = "file://exports/GravelKingPro_MLK_v3.5_Speed_Benchmark.pdf"
+type = "pdf"
+title = "MLK V3.5 Speed Benchmark (PDF)"
+description = "One-pager with real measured speeds vs LANDR, eMastered, CloudBounce, BandLab, and human engineers — with methodology."
+
+[[outputs]]
+id = "IgVr7FsrTcipuZ4uCXFM4"
+uri = "file://exports/GravelKingPro_Speed_Comparison.png"
+type = "image"
+title = "Minutes vs Seconds — social graphic"
+description = "1600×900 comparison image: competitors' bars vs GravelKing Pro's measured 8.5-second full-song master."
+
+[[outputs]]
+id = "tCbbntOAppgbw-fwhedSs"
+uri = "file://exports/GravelKingPro_MLK_v3.5_Metrics_By_Class.pdf"
+type = "pdf"
+title = "MLK V3.5 — Metrics by Class (PDF)"
+description = "2-page breakdown: health check, watermark verify, 30-second master, and full-song master — every run listed with cold/warm state, warm statistics, and industry comparison."

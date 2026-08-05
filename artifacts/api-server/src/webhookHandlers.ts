@@ -1,3 +1,4 @@
+import type Stripe from 'stripe';
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { db, purchasedTracksTable } from '@workspace/db';
 import { sql } from 'drizzle-orm';
@@ -20,14 +21,25 @@ export class WebhookHandlers {
     // processes the webhook (which only mirrors Stripe data into stripe.* tables).
     try {
       const result = await db.execute(
-        sql`SELECT secret FROM stripe._managed_webhooks LIMIT 1`
+        sql`SELECT secret FROM stripe._managed_webhooks ORDER BY created DESC`
       ) as unknown as { rows: { secret: string }[] };
 
-      const signingSecret = result.rows?.[0]?.secret;
-      if (signingSecret) {
+      const secrets = (result.rows ?? []).map((r) => r.secret).filter(Boolean);
+      let event: Stripe.Event | null = null;
+      if (secrets.length > 0) {
         const stripe = await getUncachableStripeClient();
-        const event = stripe.webhooks.constructEvent(payload, signature, signingSecret);
+        for (const signingSecret of secrets) {
+          try {
+            event = stripe.webhooks.constructEvent(payload, signature, signingSecret);
+            break;
+          } catch {
+            // Signed by a different endpoint (e.g. a stale row from a
+            // previously connected Stripe account) — try the next secret.
+          }
+        }
+      }
 
+      if (event) {
         if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           const meta = session.metadata ?? {};

@@ -10,6 +10,25 @@ function isPublishableKey(key: string): boolean {
 }
 
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
+  // An explicitly supplied manual key is an intentional account selection.
+  // This is used when the workspace's managed Stripe connection is still
+  // pointed at a different account/mode than the account the owner supplied.
+  // Keep this opt-in so a stale secret cannot silently override the managed
+  // connection.
+  const manualKey = process.env.STRIPE_SECRET_KEY;
+  if (
+    process.env.STRIPE_USE_MANUAL_KEY === "true" &&
+    manualKey &&
+    !isPublishableKey(manualKey) &&
+    (manualKey.startsWith("sk_") || manualKey.startsWith("rk_"))
+  ) {
+    console.warn("[stripe] Using the explicitly selected STRIPE_SECRET_KEY account");
+    return {
+      secretKey: manualKey,
+      webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    };
+  }
+
   // Replit's managed Stripe connection is authoritative. It selects the matching
   // sandbox/live credentials for the environment and lets Stripe's deployment
   // checks verify that production is wired to a live account.

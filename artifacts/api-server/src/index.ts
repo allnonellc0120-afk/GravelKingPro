@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "stripe-replit-sync";
@@ -79,6 +80,46 @@ async function initStripe() {
     return;
   }
 
+  // When running on an explicitly supplied restricted key, the key may lack the
+  // "Basic business contact information" read permission that
+  // stripe-replit-sync's accounts.retrieve() fallback requires. Seed the
+  // account row (id + key hash) directly so getAccountId() resolves from the
+  // database and never calls that endpoint. Runs in every environment, so a
+  // fresh production database self-seeds on publish.
+  try {
+    const acctId = process.env.STRIPE_ACCOUNT_ID;
+    const manualKey = process.env.STRIPE_SECRET_KEY;
+    if (
+      process.env.STRIPE_USE_MANUAL_KEY === "true" &&
+      manualKey &&
+      acctId?.startsWith("acct_")
+    ) {
+      const keyHash = createHash("sha256").update(manualKey).digest("hex");
+      const rawData = JSON.stringify({ id: acctId, object: "account" });
+      await db.execute(sql`
+        INSERT INTO stripe.accounts ("_raw_data", "api_key_hashes")
+        VALUES (${rawData}::jsonb, ARRAY[${keyHash}])
+        ON CONFLICT (id) DO UPDATE SET
+          api_key_hashes = (
+            SELECT ARRAY(
+              SELECT DISTINCT unnest(
+                COALESCE(stripe.accounts.api_key_hashes, '{}') || ARRAY[${keyHash}]
+              )
+            )
+          ),
+          "_updated_at" = now()
+      `);
+      // Remove managed-webhook rows left over from other Stripe accounts so a
+      // signing-secret lookup can never pick a stale secret.
+      await db.execute(
+        sql`DELETE FROM stripe._managed_webhooks WHERE account_id <> ${acctId}`
+      );
+      logger.info({ account: acctId }, "Stripe account row seeded for manual key");
+    }
+  } catch (err: unknown) {
+    logger.error({ err }, "Failed to seed Stripe account row for manual key");
+  }
+
   try {
     const domain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
     const webhookUrl = `https://${domain}/api/stripe/webhook`;
@@ -88,7 +129,10 @@ async function initStripe() {
     logger.info("Starting Stripe data backfill (runs in background)...");
     const stripeSync = await getStripeSync();
     stripeSync
-      .syncBackfill()
+      // Passing no argument makes syncBackfill a silent no-op in this library
+      // version (the object selector falls through the switch). "all" performs
+      // the real product/price/customer/subscription backfill.
+      .syncBackfill({ object: "all" })
       .then(() => logger.info("Stripe data backfill complete"))
       .catch((err: unknown) => logger.error({ err }, "Stripe backfill error"));
   } catch (err: unknown) {
