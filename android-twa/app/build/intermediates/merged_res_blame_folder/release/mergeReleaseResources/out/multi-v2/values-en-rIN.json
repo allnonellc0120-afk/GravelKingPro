@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.gravelkingpro.app-mergeReleaseResources-23:/values-en-rIN/values-en-rIN.xml",
+            "outputFile": "com.gravelkingpro.app-mergeReleaseResources-27:/values-en-rIN/values-en-rIN.xml",
             "map": [
                 {
                     "source": "/home/runner/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/res/values-en-rIN/values-en-rIN.xml",
@@ -38,7 +38,7 @@
                     }
                 },
                 {
-                    "source": "/home/runner/.gradle/caches/8.11.1/transforms/be57bd43967b699c12a0f6b8bd2f21c6/transformed/browser-1.9.0-alpha04/res/values-en-rIN/values-en-rIN.xml",
+                    "source": "/home/runner/.gradle/caches/8.11.1/transforms/49e33416d546bb21d02889a3b399b693/transformed/browser-1.10.0/res/values-en-rIN/values-en-rIN.xml",
                     "from": {
                         "startLines": "2,3,4,5",
                         "startColumns": "4,4,4,4",

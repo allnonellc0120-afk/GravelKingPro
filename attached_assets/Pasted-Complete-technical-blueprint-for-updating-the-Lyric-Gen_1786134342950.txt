@@ -1,0 +1,52 @@
+Complete technical blueprint for updating the Lyric Generator app, fixing the Vertex AI 404 error, expanding UI controls, configuring parameters, and enforcing non-generic system prompts across both primary (Vertex) and fallback (Replit AI) execution paths.
+
+================================================================================
+1. SCOPE & COST CONTROL CONSTRAINTS
+================================================================================
+- Execute edits strictly within the existing project structure (frontend form component and backend generation route).
+- Do not refactor untouched modules, database schemas, or deployment pipelines.
+- Stop execution immediately after code modification and display git diffs for verification.
+
+================================================================================
+2. FIX VERTEX AI 404 CONNECTION
+================================================================================
+- Correct model endpoint path: Replace deprecated or missing model targets (e.g., text-bison, gemini-1.0-pro) with "gemini-1.5-flash" (or "gemini-1.5-pro").
+- Ensure full resource string formatting: `projects/[PROJECT_ID]/locations/us-central1/publishers/google/models/gemini-1.5-flash`.
+- Hardcode location initialization to `us-central1` (or your active GCP region).
+- Add error logging to output full GCP error payloads to the Cloud Run console upon request failure.
+
+================================================================================
+3. FRONTEND UI EXPANSION
+================================================================================
+Replace the single summary textarea with these dedicated input controls:
+- Genre / Sub-genre (Dropdown or Input): e.g., Hip-Hop/Boom Bap, Country/Americana, Pop-Punk, Metalcore
+- BPM / Rhythm Style (Text Input): e.g., 90 BPM - Heavy Bounce, 140 BPM - Double-time
+- Primary Emotion / Mood (Dropdown or Text Input): e.g., Gritty, Melancholic, Hostile, Nostalgic
+- Vocal Delivery Style (Dropdown or Text Input): e.g., Raw/Rasp, Rapid-fire Cadence, Melodic, Conversational
+- Storyline / Core Theme (Text Area): Specific narrative details, concepts, or raw metaphors
+- Structural Options (Checkboxes): [ ] Verse-Chorus-Verse [ ] Include Bridge [ ] Complex/Internal Rhymes [ ] Raw/Freeform
+
+================================================================================
+4. BACKEND UNIFIED SYSTEM PROMPT & INFERENCE PARAMETERS
+================================================================================
+Apply the exact same system prompt and parameter configuration to BOTH the primary Vertex AI model AND the Replit AI fallback client.
+
+PARAMETER SETTINGS:
+- temperature: 0.75
+- top_p: 0.85
+- max_output_tokens: 1024
+
+SYSTEM PROMPT TEMPLATE:
+"You are an elite, raw lyricist and professional songwriter specializing in [GENRE]. Your task is to write high-impact, authentic song lyrics based on these parameters:
+- Genre/Sub-genre: [GENRE]
+- Tempo/Rhythm: [BPM]
+- Emotion/Mood: [EMOTION]
+- Vocal Delivery: [DELIVERY]
+- Structure Requirements: [STRUCTURE]
+- Theme/Concept: [THEME]
+
+STRICT STYLISTIC DIRECTIVES:
+1. BAN ALL AI CLICHÉS: Absolutely do NOT use overused AI buzzwords, vague filler, or fake deep metaphors. Banned terms include: 'neon', 'shadows', 'echoes', 'whispers', 'tapestry', 'symphony', 'fire in my soul', 'digital streets', 'starlight', 'stumbling in the dark'.
+2. GROUNDED IMAGERY: Use concrete, real-world detail, authentic slang matching the genre, and vivid imagery. Show, don't tell.
+3. CADENCE MATCHING: Tailor line lengths, syllable counts, and rhythm strictly to [BPM] and the [DELIVERY] vocal style so it fits a beat naturally.
+4. FORMATTING: Output strictly formatted song sections with tags (e.g., [Verse 1], [Chorus], [Outro]). No introductory conversational setup or concluding remarks."

@@ -1,10 +1,19 @@
 ---
-name: Gemini transcription dual provider
-description: Audio transcription tries Vertex AI first, falls back to Replit Gemini proxy; Vertex is 403 (aiplatform API disabled in the GCP project)
+name: Gemini transcription provider
+description: Vocal transcription runs on Vertex AI only (Replit proxy fallback removed); shares VERTEX_MODEL with lyrics.
 ---
 
-POST /api/audio/transcribe uses a dual-provider chain: Vertex AI gemini-2.0-flash via GCP_SERVICE_ACCOUNT first, then the Replit AI Integrations Gemini proxy (gemini-2.5-flash) on failure. Only when both fail does it return 502 → client tap-to-time fallback.
+`POST /api/audio/transcribe` uses **Vertex AI Gemini only**, authenticated with
+`GCP_SERVICE_ACCOUNT`. If Vertex fails it throws, and the client degrades to the
+manual tap-to-time flow. There is no Replit-proxy fallback.
 
-**Why:** The GCP project tied to GCP_SERVICE_ACCOUNT has the aiplatform (Agent Platform/Vertex AI) API DISABLED → Vertex returns 403 and cannot be enabled from inside Replit; only the user can enable it in Google Cloud Console. The Replit proxy accepts inlineData audio parts and works in dev; note the earlier memory that the proxy can 401 in production — if prod transcription starts 502ing, that's the first suspect.
+**Why:** The Replit AI Integrations proxy 401s in production ("ApiKey not
+approved"), which is a Replit-billing condition. Keeping it as a fallback both
+made karaoke depend on Replit's invoice status and masked the real Google-side
+error behind a silent provider switch.
 
-**How to apply:** Provider logic lives in the transcription module next to the shared Vertex/proxy clients; both use identical generateContent bodies (mono 16kHz 32kbps MP3 inline, JSON segments response). If the user enables the Vertex API, no code change needed — Vertex automatically wins again.
+**How to apply:** Transcription must import `VERTEX_MODEL` from `geminiVertex.ts`
+rather than hardcoding a model string — it previously pinned its own
+`gemini-2.0-flash`, which is retired on this project and 404s, so the two paths
+drifted and only lyrics got fixed. See `gemini-provider-config.md` for the
+enablement procedure and the 403/404/401 triage table.

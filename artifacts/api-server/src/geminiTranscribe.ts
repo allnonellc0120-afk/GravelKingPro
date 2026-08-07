@@ -1,12 +1,11 @@
 /**
- * GravelKing Productions — Gemini vocal transcription (dual provider).
+ * GravelKing Productions — Gemini vocal transcription (Google Cloud only).
  *
- * Prefers the user's own Google Cloud Vertex AI (GCP_SERVICE_ACCOUNT) and
- * falls back to the Replit AI Integrations Gemini proxy when Vertex is
- * unconfigured or errors (e.g. the aiplatform API is disabled in the GCP
- * project, which returns 403). Only throws when every available provider
- * fails, so the route returns a real transcript instead of the 502
- * tap-to-time fallback whenever ANY provider works.
+ * Runs exclusively on the owner's own Google Cloud Vertex AI via
+ * GCP_SERVICE_ACCOUNT. The Replit AI Integrations Gemini proxy fallback was
+ * removed because it is Replit-billed and returns "401 ApiKey not approved" in
+ * production. If Vertex fails, the route degrades to manual tap-to-time rather
+ * than silently routing the owner's audio through Replit's managed AI.
  */
 
 import { execFile } from "child_process";
@@ -18,8 +17,8 @@ import {
   getVertexAccessToken,
   isVertexConfigured,
   VERTEX_LOCATION,
+  VERTEX_MODEL,
 } from "./geminiVertex";
-import { isProxyConfigured } from "./geminiProxy";
 import { logger } from "./lib/logger";
 
 const execFileAsync = promisify(execFile);
@@ -121,55 +120,36 @@ async function postGenerateContent(
 async function transcribeViaVertex(data: string, mimeType: string): Promise<string> {
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
-  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/gemini-2.0-flash:generateContent`;
+  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
   return postGenerateContent("Vertex AI Gemini", url, { Authorization: `Bearer ${token}` }, buildRequestBody(data, mimeType));
-}
-
-async function transcribeViaProxy(data: string, mimeType: string): Promise<string> {
-  const baseUrl = process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"];
-  const apiKey  = process.env["AI_INTEGRATIONS_GEMINI_API_KEY"];
-  if (!baseUrl || !apiKey) {
-    throw new Error("Replit Gemini proxy not configured (AI_INTEGRATIONS_GEMINI_* missing)");
-  }
-  const url = `${baseUrl}/models/gemini-2.5-flash:generateContent`;
-  return postGenerateContent("Replit Gemini proxy", url, { "x-goog-api-key": apiKey }, buildRequestBody(data, mimeType));
 }
 
 /**
  * Transcribe vocals from an audio file using Gemini.
- * Tries Vertex AI first (user's own GCP billing), then the Replit AI proxy.
- * Returns timed lyric segments suitable for Smule-style karaoke display.
+ *
+ * Google Cloud Vertex AI ONLY (owner's own GCP billing via GCP_SERVICE_ACCOUNT).
+ * The Replit AI Integrations proxy fallback was removed: it 401s in production
+ * ("ApiKey not approved") and made karaoke transcription depend on Replit
+ * billing. If Vertex fails, the caller degrades to manual tap-to-time.
  */
 export async function transcribeWithGemini(
   filePath: string,
 ): Promise<{ segments: TranscriptSegment[]; fullText: string }> {
   const { data, mimeType } = await compressForGemini(filePath);
 
+  if (!isVertexConfigured()) {
+    throw new Error(
+      "Google Cloud Gemini is not configured — GCP_SERVICE_ACCOUNT must hold a valid service-account JSON key.",
+    );
+  }
+
   let rawText = "";
-  let lastErr: unknown = new Error("No AI provider configured (set GCP_SERVICE_ACCOUNT or AI_INTEGRATIONS_GEMINI_*)");
-  let succeeded = false;
-
-  if (isVertexConfigured()) {
-    try {
-      rawText = await transcribeViaVertex(data, mimeType);
-      succeeded = true;
-    } catch (err) {
-      lastErr = err;
-      logger.warn({ err }, "Vertex AI transcription failed; trying Replit Gemini proxy");
-    }
+  try {
+    rawText = await transcribeViaVertex(data, mimeType);
+  } catch (err) {
+    logger.warn({ err }, "Vertex AI transcription failed");
+    throw err instanceof Error ? err : new Error(String(err));
   }
-
-  if (!succeeded && isProxyConfigured()) {
-    try {
-      rawText = await transcribeViaProxy(data, mimeType);
-      succeeded = true;
-    } catch (err) {
-      lastErr = err;
-      logger.warn({ err }, "Replit Gemini proxy transcription failed");
-    }
-  }
-
-  if (!succeeded) throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 
   let segments: TranscriptSegment[] = [];
   try {

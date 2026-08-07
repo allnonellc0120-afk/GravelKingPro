@@ -3,8 +3,17 @@
 -keep class androidx.core.content.FileProvider { <init>(); }
 -keep class androidx.profileinstaller.ProfileInstallReceiver { <init>(); }
 -keep class androidx.startup.InitializationProvider { <init>(); }
+-keep class com.android.billingclient.api.ProxyBillingActivity { <init>(); }
+-keep class com.android.billingclient.api.ProxyBillingActivityV2 { <init>(); }
+-keep class com.google.android.datatransport.runtime.backends.TransportBackendDiscovery { <init>(); }
+-keep class com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver { <init>(); }
+-keep class com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService { <init>(); }
+-keep class com.google.android.gms.common.api.GoogleApiActivity { <init>(); }
+-keep class com.google.androidbrowserhelper.playbilling.provider.PaymentActivity { <init>(); }
+-keep class com.google.androidbrowserhelper.playbilling.provider.PaymentService { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.FocusActivity { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity { <init>(); }
+-keep class com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.WebViewFallbackActivity { <init>(); }
 -keep class com.gravelkingpro.app.Application { <init>(); }
 -keep class com.gravelkingpro.app.DelegationService { <init>(); }
@@ -151,6 +160,50 @@
 -dontnote java.lang.invoke.**
 
 # End of content from /home/runner/workspace/android-twa/app/build/intermediates/default_proguard_files/global/proguard-android.txt-8.9.1
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/737b8dc2f3acbd56f4cbc53741bff7b8/transformed/billing-1.2.0/proguard.txt
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/737b8dc2f3acbd56f4cbc53741bff7b8/transformed/billing-1.2.0/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/a6b9ee7d3c4f1d1a705969bf552db210/transformed/billing-8.3.0/proguard.txt
+# Keep the AIDL interface
+-keep class com.android.vending.billing.** { *; }
+-keep class com.google.android.apps.play.billingtestcompanion.aidl.** { *; }
+
+-dontwarn javax.annotation.**
+-dontwarn org.checkerframework.**
+-dontwarn com.google.android.apps.common.proguard.UsedByReflection
+
+-keepnames class com.android.billingclient.api.ProxyBillingActivity
+-keepnames class com.android.billingclient.api.ProxyBillingActivityV2
+
+# Avoids Proguard warning at build time due to Protobuf use of sun.misc.Unsafe
+# and libcore.io.Memory which are available at runtime.
+-dontwarn libcore.io.Memory
+-dontwarn sun.misc.Unsafe
+
+
+# For Phenotype
+# An unused P/H transitive dependency: com.google.android.libraries.phenotype.registration.PhenotypeResourceReader is stripped out from all Granular normal deps and "can't find reference..." DepsVersionCompat test warning
+# is suppressed by ProGuard -dontwarn config.
+-dontwarn com.google.android.libraries.phenotype.registration.PhenotypeResourceReader
+-dontwarn com.google.android.apps.common.proguard.SideEffectFree
+
+# Uses reflection to determine if these classes are present and has a graceful
+# fallback if they aren't. The test failure it fixes appears to be caused by flogger.
+-dontwarn dalvik.system.VMStack
+-dontwarn com.google.common.flogger.backend.google.GooglePlatform
+-dontwarn com.google.common.flogger.backend.system.DefaultPlatform
+# We keep all fields for every generated proto file as the runtime uses
+# reflection over them that ProGuard cannot detect. Without this keep
+# rule, fields may be removed that would cause runtime failures.
+-keepclassmembers class * extends com.google.android.gms.internal.play_billing.zzfu {
+  <fields>;
+}
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/a6b9ee7d3c4f1d1a705969bf552db210/transformed/billing-8.3.0/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/49e33416d546bb21d02889a3b399b693/transformed/browser-1.10.0/proguard.txt
+# Intentionally empty proguard rules to indicate this library is safe to shrink
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/49e33416d546bb21d02889a3b399b693/transformed/browser-1.10.0/proguard.txt
 # The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/183ebbc8ed821348f80a6d36d20b75e3/transformed/appcompat-1.7.0/proguard.txt
 # Copyright (C) 2018 The Android Open Source Project
 #
@@ -172,6 +225,97 @@
 }
 
 # End of content from /home/runner/.gradle/caches/8.11.1/transforms/183ebbc8ed821348f80a6d36d20b75e3/transformed/appcompat-1.7.0/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/57bacb9ef58048c0e6f8321d8067096b/transformed/play-services-base-18.5.0/proguard.txt
+# b/35135904 Ensure that proguard will not strip the mResultGuardian.
+-keepclassmembers class com.google.android.gms.common.api.internal.BasePendingResult {
+  com.google.android.gms.common.api.internal.BasePendingResult$ReleasableResultGuardian mResultGuardian;
+}
+
+
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/57bacb9ef58048c0e6f8321d8067096b/transformed/play-services-base-18.5.0/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/f2a6b48e9a6cb6e056c7b13574ad3934/transformed/play-services-tasks-18.2.0/proguard.txt
+
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/f2a6b48e9a6cb6e056c7b13574ad3934/transformed/play-services-tasks-18.2.0/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/5846cf32d1d3de8a9759defd4249411a/transformed/play-services-basement-18.9.0/proguard.txt
+# Needed when building against pre-Marshmallow SDK.
+-dontwarn android.security.NetworkSecurityPolicy
+
+# Needed when building against Marshmallow SDK.
+-dontwarn android.app.Notification
+
+# Protobuf has references not on the Android boot classpath
+-dontwarn sun.misc.Unsafe
+-dontwarn libcore.io.Memory
+
+# Annotations used during internal SDK shrinking.
+-dontwarn com.google.android.apps.common.proguard.**
+
+# Annotations referenced by the SDK but whose definitions are contained in
+# non-required dependencies.
+-dontwarn javax.annotation.**
+-dontwarn org.checkerframework.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn org.jspecify.annotations.NullMarked
+
+# Annotations no longer exist. Suppression prevents ProGuard failures in
+# SDKs which depend on earlier versions of play-services-basement.
+-dontwarn com.google.android.gms.common.util.VisibleForTesting
+
+# Proguard flags for consumers of the Google Play services SDK
+# https://developers.google.com/android/guides/setup#add_google_play_services_to_your_project
+
+# Keep SafeParcelable NULL value, needed for reflection by DowngradeableSafeParcel
+-keepclassmembers public class com.google.android.gms.common.internal.safeparcel.SafeParcelable {
+    public static final *** NULL;
+}
+
+# Needed for Parcelable/SafeParcelable classes & their creators to not get renamed, as they are
+# found via reflection.
+-keep class com.google.android.gms.common.internal.ReflectedParcelable
+-keepnames class * implements com.google.android.gms.common.internal.ReflectedParcelable
+-keepclassmembers class * implements android.os.Parcelable {
+  public static final *** CREATOR;
+}
+
+# Keep the classes/members we need for client functionality.
+-keep @interface android.support.annotation.Keep
+-keep @androidx.annotation.Keep class *
+-keepclasseswithmembers class * {
+  @androidx.annotation.Keep <fields>;
+}
+-keepclasseswithmembers class * {
+  @androidx.annotation.Keep <methods>;
+}
+
+# Keep androidX equivalent of above android.support to allow Jetification.
+-keep @interface androidx.annotation.Keep
+-keep @androidx.annotation.Keep class *
+-keepclasseswithmembers class * {
+  @androidx.annotation.Keep <fields>;
+}
+-keepclasseswithmembers class * {
+  @androidx.annotation.Keep <methods>;
+}
+
+# Keep the names of classes/members we need for client functionality.
+-keep @interface com.google.android.gms.common.annotation.KeepName
+-keepnames @com.google.android.gms.common.annotation.KeepName class *
+-keepclassmembernames class * {
+  @com.google.android.gms.common.annotation.KeepName *;
+}
+
+# Keep Dynamite API entry points
+-keep @interface com.google.android.gms.common.util.DynamiteApi
+-keep @com.google.android.gms.common.util.DynamiteApi public class * {
+  public <fields>;
+  public <methods>;
+}
+
+
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/5846cf32d1d3de8a9759defd4249411a/transformed/play-services-basement-18.9.0/proguard.txt
 # The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/48bafeae36779f423d74bd8112b18853/transformed/fragment-1.5.4/proguard.txt
 # Copyright (C) 2020 The Android Open Source Project
 #
@@ -194,10 +338,6 @@
 }
 
 # End of content from /home/runner/.gradle/caches/8.11.1/transforms/48bafeae36779f423d74bd8112b18853/transformed/fragment-1.5.4/proguard.txt
-# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/be57bd43967b699c12a0f6b8bd2f21c6/transformed/browser-1.9.0-alpha04/proguard.txt
-# Intentionally empty proguard rules to indicate this library is safe to shrink
-
-# End of content from /home/runner/.gradle/caches/8.11.1/transforms/be57bd43967b699c12a0f6b8bd2f21c6/transformed/browser-1.9.0-alpha04/proguard.txt
 # The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/e3333dea171f507cf27a6711021ecc98/transformed/vectordrawable-animated-1.1.0/proguard.txt
 # Copyright (C) 2016 The Android Open Source Project
 #
@@ -362,13 +502,19 @@
 # An annotation used for build tooling, won't be directly accessed.
 -dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
 # End of content from /home/runner/.gradle/caches/8.11.1/transforms/72914f9f3b720127a3f2c45793002a9f/transformed/rules/lib/META-INF/com.android.tools/r8/coroutines.pro
-# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/80cbc4dba6c47357d96551e666b341e2/transformed/versionedparcelable-1.1.1/proguard.txt
--keep class * implements androidx.versionedparcelable.VersionedParcelable
--keep public class android.support.**Parcelizer { *; }
--keep public class androidx.**Parcelizer { *; }
--keep public class androidx.versionedparcelable.ParcelImpl
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/85bc3f8cc97bd85b10d760e1ca7886a3/transformed/transport-backend-cct-3.1.8/proguard.txt
+-dontwarn com.google.auto.value.AutoValue
+-dontwarn com.google.auto.value.AutoValue$Builder
 
-# End of content from /home/runner/.gradle/caches/8.11.1/transforms/80cbc4dba6c47357d96551e666b341e2/transformed/versionedparcelable-1.1.1/proguard.txt
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/85bc3f8cc97bd85b10d760e1ca7886a3/transformed/transport-backend-cct-3.1.8/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/697bc74ea5c0de88d2e10b1368645f78/transformed/transport-api-3.0.0/proguard.txt
+-dontwarn com.google.auto.value.AutoValue
+-dontwarn com.google.auto.value.AutoValue$Builder
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/697bc74ea5c0de88d2e10b1368645f78/transformed/transport-api-3.0.0/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/ff5ffd328ca3417fbb38a1e1582cc96d/transformed/firebase-encoders-json-18.0.0/proguard.txt
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/ff5ffd328ca3417fbb38a1e1582cc96d/transformed/firebase-encoders-json-18.0.0/proguard.txt
 # The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/5bcdf0f09e194a9e523c6304a596bf94/transformed/startup-runtime-1.1.1/proguard.txt
 # It's important that we preserve initializer names, given they are used in the AndroidManifest.xml.
 -keepnames class * extends androidx.startup.Initializer
@@ -384,7 +530,14 @@
 -assumenosideeffects class androidx.startup.StartupLogger { public static <methods>; }
 
 # End of content from /home/runner/.gradle/caches/8.11.1/transforms/5bcdf0f09e194a9e523c6304a596bf94/transformed/startup-runtime-1.1.1/proguard.txt
-# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/9cac8bddc36a30251efe77066ef5f0e2/transformed/rules/lib/META-INF/proguard/androidx-annotations.pro
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/80cbc4dba6c47357d96551e666b341e2/transformed/versionedparcelable-1.1.1/proguard.txt
+-keep class * implements androidx.versionedparcelable.VersionedParcelable
+-keep public class android.support.**Parcelizer { *; }
+-keep public class androidx.**Parcelizer { *; }
+-keep public class androidx.versionedparcelable.ParcelImpl
+
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/80cbc4dba6c47357d96551e666b341e2/transformed/versionedparcelable-1.1.1/proguard.txt
+# The proguard configuration file for the following section is /home/runner/.gradle/caches/8.11.1/transforms/68ea1c4df1ff0b8f5c9039ec13ac7bb4/transformed/rules/lib/META-INF/proguard/androidx-annotations.pro
 -keep,allowobfuscation @interface androidx.annotation.Keep
 -keep @androidx.annotation.Keep class * {*;}
 
@@ -404,7 +557,7 @@
   @androidx.annotation.DoNotInline <methods>;
 }
 
-# End of content from /home/runner/.gradle/caches/8.11.1/transforms/9cac8bddc36a30251efe77066ef5f0e2/transformed/rules/lib/META-INF/proguard/androidx-annotations.pro
+# End of content from /home/runner/.gradle/caches/8.11.1/transforms/68ea1c4df1ff0b8f5c9039ec13ac7bb4/transformed/rules/lib/META-INF/proguard/androidx-annotations.pro
 # The proguard configuration file for the following section is <unknown>
 
 # End of content from <unknown>

@@ -33,7 +33,7 @@ def twaManifest = [
     navigationDividerColor: '#000000', // The navbar divider color.
     navigationDividerColorDark: '#000000', // The dark navbar divider color.
     backgroundColor: '#000000', // The color used for the splash screen background.
-    enableNotifications: false, // Set to true to enable notification delegation.
+    enableNotifications: true, // Set to true to enable notification delegation.
     // Every shortcut must include the following fields:
     // - name: String that will show up in the shortcut.
     // - short_name: Shorter string used if |name| is too long.
@@ -53,20 +53,12 @@ def twaManifest = [
 android {
     compileSdkVersion 36
     namespace "com.gravelkingpro.app"
-    signingConfigs {
-        release {
-            storeFile rootProject.file("android.keystore")
-            storePassword System.getenv("BUBBLEWRAP_KEYSTORE_PASSWORD") ?: ""
-            keyAlias "android"
-            keyPassword System.getenv("BUBBLEWRAP_KEY_PASSWORD") ?: System.getenv("BUBBLEWRAP_KEYSTORE_PASSWORD") ?: ""
-        }
-    }
     defaultConfig {
         applicationId "com.gravelkingpro.app"
-        minSdkVersion 21
+        minSdkVersion 23
         targetSdkVersion 36
-        versionCode 3
-        versionName "1.0.2"
+        versionCode 4
+        versionName "1.1.0"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -161,7 +153,6 @@ android {
     buildTypes {
         release {
             minifyEnabled true
-            signingConfig signingConfigs.release
         }
     }
     compileOptions {
@@ -217,6 +208,8 @@ repositories {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     
-        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+        implementation 'com.google.androidbrowserhelper:billing:1.2.0'
+    
+        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.0-alpha02'
     
 }

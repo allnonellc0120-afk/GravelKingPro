@@ -1,8 +1,9 @@
 import type Stripe from 'stripe';
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { db, purchasedTracksTable } from '@workspace/db';
-import { sql } from 'drizzle-orm';
+import { db, purchasedTracksTable, usersTable } from '@workspace/db';
+import { eq, sql } from 'drizzle-orm';
 import type { Request } from 'express';
+import { recordAnalyticsEvent } from './analytics';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string, req?: Request): Promise<void> {
@@ -40,6 +41,19 @@ export class WebhookHandlers {
       }
 
       if (event) {
+        if (event.type === 'checkout.session.completed') {
+          const session = event.data.object;
+          const userId = session.client_reference_id ?? session.metadata?.userId;
+          if (userId && session.mode === "subscription") {
+            await db.update(usersTable).set({ trialUsed: true }).where(eq(usersTable.id, userId));
+            void recordAnalyticsEvent({
+              type: "subscription_activated",
+              sessionId: userId,
+              path: "/pricing",
+              metadata: { plan: session.metadata?.plan ?? "" },
+            }).catch(() => {});
+          }
+        }
         if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           const meta = session.metadata ?? {};

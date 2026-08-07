@@ -42,10 +42,10 @@ const track = await j(await fetch(`${base}/edits/${edit.id}/tracks/internal`, {
   body: JSON.stringify({
     track: "internal",
     releases: [{
-      name: "1.0.0 internal",
+      name: "1.1.0 internal",
       versionCodes: [String(up.versionCode)],
       status: "completed",
-      releaseNotes: [{ language: "en-US", text: "First internal release: GravelKing Pro web app (TWA) — AI mastering, vocal booth, karaoke DAW, IP certification." }],
+      releaseNotes: [{ language: "en-US", text: "Adds Google Play Billing: subscribe to GravelKing Weekly, Studio, or Node Auditor directly in the app. One subscription unlocks web too." }],
     }],
   }),
 }));

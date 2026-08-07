@@ -2,22 +2,8 @@ import Stripe from 'stripe';
 import { StripeSync } from 'stripe-replit-sync';
 
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
-  // Fast path: env var secret key (set when Replit integration is not used).
-  // Publishable keys (pk_*) cannot make server-side calls — ignore them so we
-  // fall through to the managed-connection lookup instead of failing later.
-  const envKey = process.env.STRIPE_SECRET_KEY;
-  if (envKey) {
-    if (envKey.startsWith("pk_")) {
-      console.warn("[stripe] STRIPE_SECRET_KEY is a publishable key (pk_*); ignoring it and trying the managed connection.");
-    } else {
-      return {
-        secretKey: envKey,
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-      };
-    }
-  }
-
-  // Replit integration path
+  // Replit's managed integration is authoritative so development scripts use
+  // sandbox credentials and cannot accidentally mutate the live Stripe account.
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? "repl " + process.env.REPL_IDENTITY
@@ -54,8 +40,7 @@ async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecre
   }
 
   throw new Error(
-    'Stripe not configured. Either connect Stripe via the Integrations tab, ' +
-    'or set the STRIPE_SECRET_KEY environment secret.'
+    'Stripe managed connection is unavailable. Reconnect the Stripe integration.'
   );
 }
 

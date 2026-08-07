@@ -91,7 +91,21 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
 
     const stripe = await getUncachableStripeClient();
 
-    // Trial days: monthly = 7 days, weekly = 3 days; only once per account ever
+    // One subscription per account — creating a second one would double-bill.
+    const existingSubs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 20 });
+    const blocking = existingSubs.data.find((s) => ['active', 'trialing', 'past_due', 'unpaid'].includes(s.status));
+    if (blocking) {
+      res.status(409).json({ error: 'You already have an active subscription. Manage it from your Account page.' });
+      return;
+    }
+
+    // One OPEN checkout at a time — multiple open sessions created while the
+    // trial is still unconsumed would each carry a free trial (trial farming).
+    const openSessions = await stripe.checkout.sessions.list({ customer: customerId, status: 'open', limit: 20 });
+    await Promise.all(openSessions.data.map((s) => stripe.checkout.sessions.expire(s.id).catch(() => undefined)));
+
+    // Trial days: monthly = 7 days, weekly = 3 days; only once per account ever.
+    // Do not mark it consumed here: an open/abandoned Stripe Checkout is not a trial.
     const price = await stripe.prices.retrieve(priceId);
     const interval = price.recurring?.interval;
     const trialDays = dbUser.trialUsed
@@ -107,17 +121,14 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
+      client_reference_id: dbUser.id,
+      metadata: { userId: dbUser.id, plan: plan ?? "" },
       success_url: `${baseUrl}/pricing?checkout=success${plan ? `&plan=${encodeURIComponent(plan)}` : ''}`,
       cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
       ...(trialDays > 0 && { subscription_data: { trial_period_days: trialDays } }),
     };
 
     const session = await stripe.checkout.sessions.create(sessionParams);
-
-    // Mark trial consumed immediately so the user can't claim another one
-    if (trialDays > 0) {
-      await storage.markTrialUsed(dbUser.id);
-    }
 
     // Funnel event — best-effort, must never block checkout
     const visitorId = (req.cookies as Record<string, string>)?.gk_vid ?? null;
@@ -126,7 +137,7 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       visitorId,
       sessionId: dbUser.sessionId ?? dbUser.id,
       path: '/checkout',
-      metadata: { priceId },
+      metadata: { priceId, plan: plan ?? "" },
     }).catch(() => { /* ignore analytics failures */ });
 
     res.json({ url: session.url });
@@ -149,7 +160,7 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
         .where(eq(usersTable.id, req.user.id));
       if (dbUser) {
         const status = await storage.getUserSubscriptionStatus(dbUser);
-        res.json(status);
+        res.json({ ...status, trialEligible: !dbUser.trialUsed });
         return;
       }
       // OIDC user with no DB row yet — respond with free status
@@ -171,7 +182,7 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
     }
 
     const status = await storage.getUserSubscriptionStatus(user);
-    res.json(status);
+    res.json({ ...status, trialEligible: !user.trialUsed });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: message });

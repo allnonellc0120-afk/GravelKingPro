@@ -82,7 +82,41 @@ function monthlyCentsFor(price: Stripe.Price, quantity: number): number {
   }
 }
 
-// ── Public beacon — records pageviews only ───────────────────────────────────
+const FUNNEL_EVENTS = new Set([
+  "landing_cta_clicked",
+  "plan_selected",
+  "signin_required",
+  "checkout_returned",
+]);
+
+function safeCampaignMetadata(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const allowed = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "plan", "outcome"];
+  const metadata: Record<string, string> = {};
+  for (const key of allowed) {
+    const normalized = clampString(source[key], 120);
+    if (normalized) metadata[key] = normalized;
+  }
+  return Object.keys(metadata).length > 0 ? metadata : null;
+}
+
+function ensureVisitorId(req: Request, res: Response): string {
+  const cookies = (req.cookies as Record<string, string>) ?? {};
+  let visitorId = cookies.gk_vid;
+  if (!visitorId) {
+    visitorId = randomUUID();
+    res.cookie("gk_vid", visitorId, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+  }
+  return visitorId;
+}
+
+// ── Public beacons — pageviews plus privacy-safe funnel milestones ──────────
 analyticsRouter.post("/analytics/track", async (req: Request, res: Response) => {
   try {
     const cookies = (req.cookies as Record<string, string>) ?? {};
@@ -93,27 +127,55 @@ analyticsRouter.post("/analytics/track", async (req: Request, res: Response) => 
       return;
     }
 
-    const body = (req.body ?? {}) as { path?: unknown; referrer?: unknown };
+    const body = (req.body ?? {}) as { path?: unknown; referrer?: unknown; metadata?: unknown };
     const path = clampString(body.path, 512);
     const referrer = clampString(body.referrer, 512);
 
-    let visitorId = cookies.gk_vid;
-    if (!visitorId) {
-      visitorId = randomUUID();
-      res.cookie("gk_vid", visitorId, {
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: 365 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
-    }
+    const visitorId = ensureVisitorId(req, res);
     const sessionId = cookies.gk_session ?? null;
 
-    await recordAnalyticsEvent({ type: "pageview", visitorId, sessionId, path, referrer });
+    await recordAnalyticsEvent({
+      type: "pageview",
+      visitorId,
+      sessionId,
+      path,
+      referrer,
+      metadata: safeCampaignMetadata(body.metadata),
+    });
     res.json({ ok: true });
   } catch (err: unknown) {
     req.log?.error({ err }, "analytics track failed");
     // Tracking must never surface as a client error.
+    res.status(200).json({ ok: false });
+  }
+});
+
+analyticsRouter.post("/analytics/event", async (req: Request, res: Response) => {
+  try {
+    const cookies = (req.cookies as Record<string, string>) ?? {};
+    const rateKey = cookies.gk_vid || clientKey(req);
+    if (isRateLimited(rateKey)) {
+      res.status(429).json({ ok: false });
+      return;
+    }
+
+    const body = (req.body ?? {}) as { type?: unknown; path?: unknown; metadata?: unknown };
+    const type = clampString(body.type, 80);
+    if (!type || !FUNNEL_EVENTS.has(type)) {
+      res.status(400).json({ ok: false });
+      return;
+    }
+
+    await recordAnalyticsEvent({
+      type: type as Parameters<typeof recordAnalyticsEvent>[0]["type"],
+      visitorId: ensureVisitorId(req, res),
+      sessionId: cookies.gk_session ?? null,
+      path: clampString(body.path, 512),
+      metadata: safeCampaignMetadata(body.metadata),
+    });
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    req.log?.warn({ err }, "analytics funnel event failed");
     res.status(200).json({ ok: false });
   }
 });
@@ -130,7 +192,12 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
       .select({
         pageviews: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'pageview')`,
         uniqueVisitors: sql<number>`count(distinct ${analyticsEventsTable.visitorId}) filter (where ${analyticsEventsTable.type} = 'pageview')`,
+        landingCtaClicks: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'landing_cta_clicked')`,
+        planSelections: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'plan_selected')`,
+        signinRequired: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'signin_required')`,
         checkoutStarts: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'checkout_started')`,
+        checkoutReturns: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'checkout_returned')`,
+        subscriptionActivations: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'subscription_activated')`,
       })
       .from(analyticsEventsTable)
       .where(gte(analyticsEventsTable.createdAt, since));
@@ -260,7 +327,12 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
         stripeOk,
       },
       conversion: {
+        landingCtaClicks: Number(totals.landingCtaClicks),
+        planSelections: Number(totals.planSelections),
+        signinRequired: Number(totals.signinRequired),
         visitorToCheckoutPct: pct(checkoutStarts, uniqueVisitors),
+        checkoutReturns: Number(totals.checkoutReturns),
+        subscriptionActivations: Number(totals.subscriptionActivations),
         visitorToPaidPct: pct(payingTotal, uniqueVisitors),
         checkoutToPaidPct: pct(payingTotal, checkoutStarts),
       },

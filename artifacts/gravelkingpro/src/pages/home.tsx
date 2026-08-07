@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePlanPrices } from "@/lib/usePlanPrices";
+import { trackFunnelEvent } from "@/lib/useAnalytics";
 
 /* ─── Audio demo component ──────────────────────────────────────────── */
 /* ─── App feature card ───────────────────────────────────────────────── */
@@ -42,11 +43,18 @@ function AppCard({ icon, title, desc, badge, badgeColor, href, cta, accent }: {
   );
 }
 
-/* ─── Email sign-up section ──────────────────────────────────────────── */
+/* ─── Trial CTA + artist list section ────────────────────────────────── */
 function SignUpSection() {
+  const { isAuthenticated } = useAuth();
+  const planPrices = usePlanPrices();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const { toast } = useToast();
+
+  const trialTarget = "/pricing?plan=monthly";
+  const trialHref = isAuthenticated
+    ? trialTarget
+    : `/api/login?returnTo=${encodeURIComponent(trialTarget)}`;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,44 +76,63 @@ function SignUpSection() {
   };
 
   return (
-    <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/10 via-violet-400/5 to-transparent p-8 text-center space-y-5">
+    <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/10 via-violet-400/5 to-transparent p-8 text-center space-y-6">
       <div className="space-y-2">
         <div className="flex items-center justify-center gap-2">
-          <Mail className="w-5 h-5 text-violet-400" />
-          <h2 className="text-2xl font-black">Get 7 Days Free</h2>
+          <Crown className="w-5 h-5 text-amber-400" />
+          <h2 className="text-2xl font-black">Try Pro Plus Free for 7 Days</h2>
         </div>
         <p className="text-muted-foreground text-sm max-w-md mx-auto">
-          Sign up with your email and get a free 7-day Pro Plus trial — full mastering suite, vocal booth, DAW, and IP certification. No card required to start.
+          Full mastering suite, vocal booth, live DAW, and IP certification. Start your trial
+          at checkout — cancel anytime during the 7 days and you pay nothing.
         </p>
       </div>
 
-      {state === "done" ? (
-        <div className="flex items-center justify-center gap-2 py-2">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-          <span className="text-emerald-400 font-semibold">Check your inbox — free trial link sent!</span>
-        </div>
-      ) : (
-        <form onSubmit={submit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-          <Input
-            type="email"
-            placeholder="your@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="bg-background/60 border-violet-500/25 focus-visible:ring-violet-500/30 h-11 text-sm flex-1"
-          />
-          <Button type="submit" disabled={state === "loading"}
-            className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-11 px-7 shrink-0">
-            {state === "loading" ? "…" : "Start Free Trial"}
+      <div className="space-y-2">
+        <a
+          href={trialHref}
+          onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "home_trial_section" })}
+        >
+          <Button className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-12 px-8 text-base shadow-lg shadow-violet-500/25">
+            Start 7-Day Free Trial <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
-        </form>
-      )}
+        </a>
+        <p className="text-xs text-muted-foreground">
+          {planPrices.monthly.label} after your trial · Card required at checkout · One trial per account · Cancel anytime
+        </p>
+      </div>
 
-      <p className="text-xs text-muted-foreground">
-        Already have an account?{" "}
-        <a href="/api/login" className="text-violet-400 underline underline-offset-2">Sign in here</a>
-        {" "}· No commitment · Cancel anytime
-      </p>
+      <div className="border-t border-white/10 pt-5 space-y-3">
+        <div className="flex items-center justify-center gap-2">
+          <Mail className="w-4 h-4 text-violet-400" />
+          <p className="text-sm font-semibold">Not ready yet? Join the artist list.</p>
+        </div>
+        {state === "done" ? (
+          <div className="flex items-center justify-center gap-2 py-1">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <span className="text-emerald-400 font-semibold text-sm">You're on the list — we'll be in touch.</span>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="bg-background/60 border-violet-500/25 focus-visible:ring-violet-500/30 h-11 text-sm flex-1"
+            />
+            <Button type="submit" disabled={state === "loading"} variant="outline"
+              className="border-violet-500/30 text-violet-300 hover:bg-violet-500/10 font-semibold h-11 px-6 shrink-0">
+              {state === "loading" ? "…" : "Join the List"}
+            </Button>
+          </form>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Occasional product updates and artist offers — no spam.{" "}
+          <a href="/api/login" className="text-violet-400 underline underline-offset-2">Already have an account? Sign in</a>
+        </p>
+      </div>
     </div>
   );
 }
@@ -156,12 +183,24 @@ export default function Home() {
             {/* CTA buttons */}
             <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
               <Link href="/songwriting">
-                <Button className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-13 px-8 text-base shadow-lg shadow-violet-500/25 h-12">
+                <Button
+                  onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_certify" })}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-13 px-8 text-base shadow-lg shadow-violet-500/25 h-12">
                   <ShieldCheck className="w-4 h-4 mr-2" /> Certify My IP — Free
                 </Button>
               </Link>
+              <Link href="/pricing">
+                <Button
+                  onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_trial" })}
+                  className="bg-amber-500 hover:bg-amber-400 text-black font-bold h-12 px-8 text-base shadow-lg shadow-amber-500/25">
+                  <Crown className="w-4 h-4 mr-2" /> Start Free Trial
+                </Button>
+              </Link>
               <Link href="/mastering">
-                <Button variant="outline" className="h-12 px-8 text-base border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/60 font-bold">
+                <Button
+                  variant="outline"
+                  onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_master" })}
+                  className="h-12 px-8 text-base border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/60 font-bold">
                   <Wand2 className="w-4 h-4 mr-2" /> Master a Track Free
                 </Button>
               </Link>

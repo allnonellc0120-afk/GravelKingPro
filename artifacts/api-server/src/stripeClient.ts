@@ -1,34 +1,7 @@
 import Stripe from 'stripe';
 import { StripeSync } from 'stripe-replit-sync';
 
-/**
- * Returns true when the value looks like a Stripe publishable key (pk_live_... / pk_test_...).
- * Publishable keys cannot make server-side API calls and must be rejected.
- */
-function isPublishableKey(key: string): boolean {
-  return key.startsWith("pk_live_") || key.startsWith("pk_test_");
-}
-
 async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecret?: string }> {
-  // An explicitly supplied manual key is an intentional account selection.
-  // This is used when the workspace's managed Stripe connection is still
-  // pointed at a different account/mode than the account the owner supplied.
-  // Keep this opt-in so a stale secret cannot silently override the managed
-  // connection.
-  const manualKey = process.env.STRIPE_SECRET_KEY;
-  if (
-    process.env.STRIPE_USE_MANUAL_KEY === "true" &&
-    manualKey &&
-    !isPublishableKey(manualKey) &&
-    (manualKey.startsWith("sk_") || manualKey.startsWith("rk_"))
-  ) {
-    console.warn("[stripe] Using the explicitly selected STRIPE_SECRET_KEY account");
-    return {
-      secretKey: manualKey,
-      webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    };
-  }
-
   // Replit's managed Stripe connection is authoritative. It selects the matching
   // sandbox/live credentials for the environment and lets Stripe's deployment
   // checks verify that production is wired to a live account.
@@ -63,7 +36,11 @@ async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecre
         // The connector schema has shipped the secret under both `secret_key`
         // and (currently) `secret`; accept either, but never a publishable key.
         const managedKey = settings?.secret_key ?? settings?.secret;
-        if (managedKey && !isPublishableKey(managedKey)) {
+        if (
+          managedKey &&
+          !managedKey.startsWith("pk_live_") &&
+          !managedKey.startsWith("pk_test_")
+        ) {
           return {
             secretKey: managedKey,
             webhookSecret: settings?.webhook_secret,
@@ -73,15 +50,6 @@ async function getStripeCredentials(): Promise<{ secretKey: string; webhookSecre
     } catch (err) {
       console.warn("[stripe] Managed connection lookup failed", err);
     }
-  }
-
-  // Local/manual fallback only. Production must not silently fall back to a
-  // manually configured key because that prevents Replit from validating and
-  // promoting the managed live Stripe connection during publish.
-  const envKey = process.env.STRIPE_SECRET_KEY;
-  if (envKey && !isPublishableKey(envKey) && process.env.NODE_ENV !== "production") {
-    console.warn("[stripe] Using local development STRIPE_SECRET_KEY fallback");
-    return { secretKey: envKey, webhookSecret: process.env.STRIPE_WEBHOOK_SECRET };
   }
 
   throw new Error(
