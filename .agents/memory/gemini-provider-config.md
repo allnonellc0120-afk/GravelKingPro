@@ -1,40 +1,46 @@
 ---
 name: Gemini provider config
-description: How GravelKingPro's Gemini features (lyrics/songwriter, transcription, Firestore) are wired to Google Cloud vs the Replit AI proxy, and why they silently degrade.
+description: GravelKingPro's Gemini features run on the owner's Google Cloud Vertex AI only; the Replit AI proxy was removed, plus the model/API pitfalls that broke it.
 ---
 
 # Gemini provider configuration
 
-The product is *meant* to run its Gemini features on the user's OWN Google Cloud
-via the `GCP_SERVICE_ACCOUNT` secret (a service-account JSON key). That one secret
-powers three things: lyrics/songwriter text generation (Vertex AI), vocal
-transcription (Vertex AI, `/api/audio/transcribe`), and Firestore (studio library).
+All Gemini features (songwriter/lyrics, vocal transcription) run **exclusively on
+the owner's own Google Cloud Vertex AI** via the `GCP_SERVICE_ACCOUNT`
+service-account JSON key. There is no second provider.
 
-**Gotcha — the credential is a placeholder, not a real key.** In BOTH dev and prod,
-`GCP_SERVICE_ACCOUNT` holds a short non-JSON token, so `JSON.parse` fails and
-`isVertexConfigured()` returns false. Consequences seen in production:
-- transcription 502s → client falls back to manual tap-to-time
-- Firestore `getDb()` silently returns null
-- lyrics generation falls back to the Replit AI proxy
+**Why:** The Replit AI Integrations Gemini proxy (`AI_INTEGRATIONS_GEMINI_*`) was
+previously wired as a fallback/race partner. In production it returns
+`401 ApiKey not approved`, which is a Replit-billing/approval condition. That
+made a core paid product feature depend on Replit's invoice status — the
+songwriter went down in the published Google Play app for exactly this reason.
+Owner directive: no Replit AI dependency in production.
 
-**The Replit AI Integrations Gemini proxy is flaky in production.** It intermittently
-returns `401 "ApiKey not approved"` (Apigee `oauth.v2.ApiKeyNotApproved`) and
-sometimes recovers after a redeploy. Do NOT treat it as a reliable sole provider —
-that flakiness was the original "lyrics broken in prod" report.
+## Two failure modes that both had to be fixed
 
-**Design (resilient provider selection).** `geminiGenerate()` in `routes/lyrics.ts`
-prefers Vertex when `isVertexConfigured()`, and falls back to the proxy on error OR
-empty output; if Vertex isn't configured it goes straight to the proxy. Vertex auth
-+ token cache + `generateVertexContent/Text` live in `geminiVertex.ts` and are shared
-with `geminiTranscribe.ts`.
+1. **Vertex API disabled.** `aiplatform.googleapis.com` was DISABLED on the GCP
+   project, so every Vertex call returned 403 and traffic silently fell through
+   to the Replit proxy. This is enableable from inside the workspace — the
+   service account has Service Usage permission. Enable it by POSTing to
+   `https://serviceusage.googleapis.com/v1/projects/<project_id>/services/aiplatform.googleapis.com:enable`
+   with a `google-auth-library` client scoped to `cloud-platform`, then poll the
+   returned operation until `done`.
+2. **Retired model name.** `gemini-2.0-flash` 404s on this project
+   ("Publisher model ... was not found"). `gemini-2.5-flash` works. `VERTEX_MODEL`
+   in `geminiVertex.ts` is the single source of truth — transcription previously
+   hardcoded its own model string and drifted; it now imports `VERTEX_MODEL`.
 
-**Why:** keeps lyrics working today (placeholder credential → proxy) with zero
-regression, while auto-routing to the user's Google Cloud the moment a real
-service-account JSON is supplied — no code change needed.
+**How to apply:** If lyrics or transcription start failing, curl the Vertex
+`generateContent` endpoint directly with the service account before touching app
+code — it distinguishes "API disabled" (403), "model retired" (404), and
+"credential bad" (401) instantly. Never re-add a Replit-proxy fallback to make a
+failure disappear; it hides the Google-side cause and reintroduces the billing
+dependency. `geminiProxy.ts` still exists but is intentionally unreferenced.
 
-**How to apply — when a real `GCP_SERVICE_ACCOUNT` is provided:** update it in dev
-AND prod (redeploy for prod), then smoke-test `/api/lyrics/generate` and
-`/api/audio/transcribe`. Verify the Vertex model (`VERTEX_MODEL`, currently
-`gemini-2.0-flash`) is still served on Vertex — it may be retired by 2026; bump if
-the call 404s. Note a model mismatch by design: Vertex path uses `gemini-2.0-flash`,
-proxy fallback uses `gemini-3-flash-preview`, so lyric style differs between paths.
+## Running scripts against Google from the workspace
+`google-auth-library` resolves from `artifacts/api-server/node_modules`, so a
+one-off script must live **inside that package directory** — running it from
+`/tmp` fails with `ERR_MODULE_NOT_FOUND` because Node resolves imports relative
+to the script's own path, not the cwd. The CodeExecution sandbox was erroring
+("durable ptc") during this work; a plain Node script via shell was the reliable
+path.

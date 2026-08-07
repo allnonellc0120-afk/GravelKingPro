@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { StyleSheet, View, ActivityIndicator, Platform, Alert } from "react-native";
 import { WebView as NativeWebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { File, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 
 const WEB_APP_URL = "https://gravelkingpro.it.com";
@@ -33,31 +33,44 @@ export default function App() {
       };
       if (message.type !== "GK_DOWNLOAD" || !message.url || !message.name) return;
       const fileName = message.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const destination = new File(Paths.cache, fileName);
-      const downloaded = await File.downloadFileAsync(message.url, destination, {
-        idempotent: true,
+      const documentDirectory = FileSystem.documentDirectory;
+      if (!documentDirectory) throw new Error("Device documents storage is unavailable");
+
+      // The legacy downloader uses the OS background transfer manager, which is
+      // reliable for large HTTPS WAVs on Android and iOS. Save into documents,
+      // not cache, so the File URI remains valid when the system share picker
+      // opens and the user chooses Downloads / Files.
+      const destination = `${documentDirectory}${Date.now()}_${fileName}`;
+      const response = await FileSystem.downloadAsync(message.url, destination);
+      const info = await FileSystem.getInfoAsync(response.uri);
+      const headerBase64 = await FileSystem.readAsStringAsync(response.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+        position: 0,
+        length: 12,
       });
+      const header = globalThis.atob(headerBase64);
       // Do not offer a save sheet for an HTTP error page, partial file, or an
       // empty response. A WAV begins RIFF....WAVE and must contain audio bytes.
-      const header = (await downloaded.bytes()).slice(0, 12);
-      const isWav = downloaded.size > 44
-        && String.fromCharCode(...header.slice(0, 4)) === "RIFF"
-        && String.fromCharCode(...header.slice(8, 12)) === "WAVE";
+      const isWav = info.exists
+        && (info.size ?? 0) > 44
+        && header.slice(0, 4) === "RIFF"
+        && header.slice(8, 12) === "WAVE";
       if (!isWav) {
-        downloaded.delete();
-        throw new Error("Downloaded file was not a valid WAV");
+        await FileSystem.deleteAsync(response.uri, { idempotent: true });
+        throw new Error("Download did not produce a valid WAV");
       }
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloaded.uri, {
+        await Sharing.shareAsync(response.uri, {
           mimeType: message.mimeType ?? "audio/wav",
           UTI: "com.microsoft.waveform-audio",
           dialogTitle: "Save your mastered WAV",
         });
       } else {
-        Alert.alert("Master downloaded", "Open the Files app to save or move your mastered WAV.");
+        Alert.alert("Master ready", "Your verified WAV is saved in the GravelKing Pro documents folder.");
       }
-    } catch {
-      Alert.alert("Download failed", "The mastered WAV could not be saved. Please try again.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unknown download error";
+      Alert.alert("Download failed", `The mastered WAV was not saved: ${detail}`);
     }
   };
 

@@ -42,7 +42,9 @@ export function isVertexConfigured(): boolean {
 }
 
 export const VERTEX_LOCATION = "us-central1";
-export const VERTEX_MODEL = "gemini-2.0-flash";
+// gemini-2.0-flash is retired on this project and 404s ("Publisher model ...
+// was not found"). gemini-2.5-flash is the model Vertex actually serves here.
+export const VERTEX_MODEL = "gemini-2.5-flash";
 
 let _cachedToken: { token: string; expiry: number } | null = null;
 
@@ -74,7 +76,12 @@ type VertexPart =
 interface GenerationConfig {
   maxOutputTokens?: number;
   temperature?: number;
+  topP?: number;
   responseMimeType?: string;
+  /** gemini-2.5-* models think by default and thinking tokens count against
+   * maxOutputTokens; pass { thinkingBudget: 0 } when a tight token cap must go
+   * entirely to the answer. */
+  thinkingConfig?: { thinkingBudget: number };
 }
 
 interface VertexResponse {

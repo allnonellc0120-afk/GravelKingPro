@@ -43,6 +43,35 @@ const GENRES = [
   "Country", "Rock", "Afrobeats", "Reggae", "Lo-Fi", "EDM",
 ];
 
+// Sub-genre suggestions for the free-text Genre / Sub-genre input (simple mode).
+const GENRE_SUGGESTIONS = [
+  ...GENRES,
+  "Hip-Hop/Boom Bap", "Hip-Hop/Drill", "Country/Americana",
+  "Pop-Punk", "Metalcore", "Outlaw Grunge", "Neo-Soul", "Trap/Rage",
+];
+
+const EMOTION_SUGGESTIONS = [
+  "Gritty", "Melancholic", "Hostile", "Nostalgic",
+  "Defiant", "Triumphant", "Heartbroken", "Menacing", "Hopeful",
+];
+
+const DELIVERY_SUGGESTIONS = [
+  "Raw/Rasp", "Rapid-fire Cadence", "Melodic", "Conversational",
+  "Half-sung/Half-rapped", "Whispered intensity", "Belted power",
+];
+
+const STRUCTURE_OPTIONS = [
+  "Verse-Chorus-Verse", "Include Bridge", "Complex/Internal Rhymes", "Raw/Freeform",
+] as const;
+
+/** Pull a usable numeric BPM out of a free-text rhythm description
+ *  ("90 BPM - Heavy Bounce" → 90). Undefined when no number is present,
+ *  so we never send NaN→null to the API. */
+function bpmNumberFrom(value: string): number | undefined {
+  const m = value.match(/\d{2,3}/);
+  return m ? parseInt(m[0], 10) : undefined;
+}
+
 const SECTION_TYPES = ["intro", "verse", "pre-chorus", "chorus", "bridge", "outro"];
 
 const KEYS = [
@@ -374,6 +403,9 @@ export default function SongwritingStudio() {
   const [story, setStory] = useState("");
   const [genre, setGenre] = useState("Hip-Hop");
   const [bpm, setBpm] = useState("");
+  const [emotion, setEmotion] = useState("");
+  const [vocalDelivery, setVocalDelivery] = useState("");
+  const [structureOptions, setStructureOptions] = useState<string[]>([]);
   // Advanced mode
   const [advKey, setAdvKey] = useState("C Minor");
   const [advVocalType, setAdvVocalType] = useState("Male tenor");
@@ -453,6 +485,7 @@ export default function SongwritingStudio() {
       const d = JSON.parse(raw) as {
         lyricsMode?: "simple" | "advanced";
         story?: string; genre?: string; bpm?: string;
+        emotion?: string; vocalDelivery?: string; structureOptions?: string[];
         advKey?: string; advVocalType?: string;
         timelineBlocks?: TimelineBlock[];
         styleInput?: string; convertedStyle?: string; stylePrompt?: string;
@@ -465,6 +498,9 @@ export default function SongwritingStudio() {
       if (d.story !== undefined) setStory(d.story);
       if (d.genre) setGenre(d.genre);
       if (d.bpm !== undefined) setBpm(d.bpm);
+      if (d.emotion !== undefined) setEmotion(d.emotion);
+      if (d.vocalDelivery !== undefined) setVocalDelivery(d.vocalDelivery);
+      if (d.structureOptions?.length) setStructureOptions(d.structureOptions);
       if (d.advKey) setAdvKey(d.advKey);
       if (d.advVocalType) setAdvVocalType(d.advVocalType);
       if (d.timelineBlocks?.length) setTimelineBlocks(d.timelineBlocks);
@@ -493,6 +529,7 @@ export default function SongwritingStudio() {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
           lyricsMode, story, genre, bpm,
+          emotion, vocalDelivery, structureOptions,
           advKey, advVocalType, timelineBlocks,
           styleInput, convertedStyle, stylePrompt,
           aiDraft, lines,
@@ -504,7 +541,8 @@ export default function SongwritingStudio() {
       }
     }, 800);
     return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
-  }, [aiDraft, lines, story, genre, bpm, lyricsMode, advKey, advVocalType,
+  }, [aiDraft, lines, story, genre, bpm, emotion, vocalDelivery, structureOptions,
+      lyricsMode, advKey, advVocalType,
       timelineBlocks, styleInput, convertedStyle, stylePrompt,
       projectId, generationCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -558,10 +596,18 @@ export default function SongwritingStudio() {
     try {
       const body =
         lyricsMode === "simple"
-          ? { mode: "simple", story: story.trim(), genre, bpm: bpm ? parseInt(bpm) : undefined }
+          ? {
+              mode: "simple", story: story.trim(), genre,
+              bpm: bpmNumberFrom(bpm),
+              rhythmStyle: bpm.trim() || undefined,
+              emotion: emotion.trim() || undefined,
+              vocalDelivery: vocalDelivery.trim() || undefined,
+              structureOptions: structureOptions.length ? structureOptions : undefined,
+            }
           : {
               mode: "advanced",
-              genre, bpm: bpm ? parseInt(bpm) : undefined,
+              genre, bpm: bpmNumberFrom(bpm),
+              rhythmStyle: bpm.trim() || undefined,
               key: advKey, vocalType: advVocalType, genreTags: genre,
               timelineBlocks: timelineBlocks.filter((b) => b.label.trim()).map((b, i) => ({
                 timestampMs: b.timestampMs, label: b.label, sectionType: b.sectionType, sortOrder: i,
@@ -585,7 +631,7 @@ export default function SongwritingStudio() {
     } finally {
       setIsGenerating(false);
     }
-  }, [lyricsMode, story, genre, bpm, advKey, advVocalType, timelineBlocks, generationCount, isPro, toast]);
+  }, [lyricsMode, story, genre, bpm, emotion, vocalDelivery, structureOptions, advKey, advVocalType, timelineBlocks, generationCount, isPro, toast]);
 
   // ── Fetch rhymes ──────────────────────────────────────────────────────────
   const fetchRhymes = useCallback(async (word: string) => {
@@ -756,7 +802,7 @@ export default function SongwritingStudio() {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             aiDraft, title: story.slice(0, 40) || "Untitled", genre,
-            bpm: bpm ? parseInt(bpm) : undefined,
+            bpm: bpmNumberFrom(bpm),
             mode: lyricsMode,
             storyPrompt: story || undefined,
             key: lyricsMode === "advanced" ? advKey : undefined,
@@ -945,23 +991,88 @@ export default function SongwritingStudio() {
           {/* Simple mode */}
           {lyricsMode === "simple" && (
             <div className="space-y-4">
-              <Textarea
-                placeholder="What is your song about? Describe a feeling, story, moment, relationship. The more real, the better the lyrics."
-                className="min-h-[110px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50"
-                value={story}
-                onChange={(e) => setStory(e.target.value)}
-                maxLength={1000}
-              />
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground font-medium">Storyline / Core Theme</label>
+                <Textarea
+                  placeholder="Concrete plot, narrative details, or specific metaphors. The more real, the better the lyrics."
+                  className="min-h-[110px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50"
+                  value={story}
+                  onChange={(e) => setStory(e.target.value)}
+                  maxLength={1000}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">Genre</label>
-                  <select className="w-full rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm focus:outline-none focus:border-amber-500/50" value={genre} onChange={(e) => setGenre(e.target.value)}>
-                    {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                  <label className="text-xs text-muted-foreground font-medium">Genre / Sub-genre</label>
+                  <Input
+                    list="gk-genre-suggestions"
+                    placeholder="e.g. Hip-Hop/Boom Bap, Country/Americana"
+                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
+                    value={genre}
+                    onChange={(e) => setGenre(e.target.value)}
+                    maxLength={60}
+                  />
+                  <datalist id="gk-genre-suggestions">
+                    {GENRE_SUGGESTIONS.map((g) => <option key={g} value={g} />)}
+                  </datalist>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">BPM <span className="font-normal">(optional)</span></label>
-                  <Input type="number" placeholder="e.g. 90" className="bg-background/60 border-border/50 focus:border-amber-500/50" value={bpm} onChange={(e) => setBpm(e.target.value)} min={40} max={200} />
+                  <label className="text-xs text-muted-foreground font-medium">BPM / Rhythm Style <span className="font-normal">(optional)</span></label>
+                  <Input
+                    placeholder="e.g. 90 BPM - Heavy Bounce"
+                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
+                    value={bpm}
+                    onChange={(e) => setBpm(e.target.value)}
+                    maxLength={60}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground font-medium">Primary Emotion / Mood <span className="font-normal">(optional)</span></label>
+                  <Input
+                    list="gk-emotion-suggestions"
+                    placeholder="e.g. Gritty, Melancholic, Hostile"
+                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
+                    value={emotion}
+                    onChange={(e) => setEmotion(e.target.value)}
+                    maxLength={60}
+                  />
+                  <datalist id="gk-emotion-suggestions">
+                    {EMOTION_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
+                  </datalist>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground font-medium">Vocal Delivery Style <span className="font-normal">(optional)</span></label>
+                  <Input
+                    list="gk-delivery-suggestions"
+                    placeholder="e.g. Raw/Rasp, Rapid-fire Cadence"
+                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
+                    value={vocalDelivery}
+                    onChange={(e) => setVocalDelivery(e.target.value)}
+                    maxLength={60}
+                  />
+                  <datalist id="gk-delivery-suggestions">
+                    {DELIVERY_SUGGESTIONS.map((d) => <option key={d} value={d} />)}
+                  </datalist>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground font-medium">Structural Options</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {STRUCTURE_OPTIONS.map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm cursor-pointer hover:border-amber-500/40 transition-colors">
+                      <input
+                        type="checkbox"
+                        className="accent-amber-500"
+                        checked={structureOptions.includes(opt)}
+                        onChange={(e) =>
+                          setStructureOptions((prev) =>
+                            e.target.checked ? [...prev, opt] : prev.filter((o) => o !== opt),
+                          )
+                        }
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>
@@ -978,8 +1089,8 @@ export default function SongwritingStudio() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">BPM</label>
-                  <Input type="number" placeholder="e.g. 90" className="bg-background/60 border-border/50" value={bpm} onChange={(e) => setBpm(e.target.value)} min={40} max={200} />
+                  <label className="text-xs text-muted-foreground font-medium">BPM / Rhythm Style</label>
+                  <Input placeholder="e.g. 90 BPM - Heavy Bounce" className="bg-background/60 border-border/50" value={bpm} onChange={(e) => setBpm(e.target.value)} maxLength={60} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs text-muted-foreground font-medium">Key</label>

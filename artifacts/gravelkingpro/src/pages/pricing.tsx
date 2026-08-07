@@ -8,7 +8,16 @@ import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, Arro
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { usePlanPrices } from "@/lib/usePlanPrices";
+import { usePlanPrices, FALLBACK_PRICES, type PlanPrice } from "@/lib/usePlanPrices";
+import { trackFunnelEvent } from "@/lib/useAnalytics";
+import {
+  getPlayBillingService,
+  purchasePlaySubscription,
+  restorePlayPurchases,
+  formatPlayPrice,
+  PLAN_PLAY_SKUS,
+  type PlayItemDetails,
+} from "@/lib/playBilling";
 
 type PlanId = "weekly" | "monthly" | "node_auditor";
 
@@ -61,9 +70,16 @@ const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref
 
 export default function Pricing() {
   const { tier, activePromo, redeemPromo, revokePromo, isLoadingSubscription, refreshSubscription } = useAppState();
-  const planPrices = usePlanPrices();
+  const stripePlanPrices = usePlanPrices();
   const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanId | null>(null);
+  // Non-null when running inside the Android app installed from Google Play —
+  // purchases then go through Google Play Billing instead of Stripe.
+  const [playPrices, setPlayPrices] = useState<Partial<Record<PlanId, PlayItemDetails>> | null>(null);
+  const [playBillingChecked, setPlayBillingChecked] = useState(false);
+  const [playEnvDetected, setPlayEnvDetected] = useState(false);
+  const [trialEligible, setTrialEligible] = useState(true);
+  const playMode = playPrices !== null;
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo>(null);
@@ -78,6 +94,77 @@ export default function Pricing() {
       .then((d: { user?: unknown } | null) => setIsSignedIn(d?.user != null))
       .catch(() => setIsSignedIn(false));
   }, []);
+
+  // Trial eligibility (server truth) — never promise a free trial to an
+  // account that already consumed its one trial.
+  useEffect(() => {
+    fetch("/api/subscription/status", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { trialEligible?: boolean } | null) => {
+        if (d && d.trialEligible === false) setTrialEligible(false);
+      })
+      .catch(() => { /* default: show trial copy */ });
+  }, []);
+
+  // Detect Google Play Billing (only exists inside the Play-installed app).
+  useEffect(() => {
+    getPlayBillingService().then(async (service) => {
+      if (!service) return;
+      setPlayEnvDetected(true);
+      try {
+        const details = await service.getDetails(Object.values(PLAN_PLAY_SKUS));
+        const byPlan: Partial<Record<PlanId, PlayItemDetails>> = {};
+        (Object.entries(PLAN_PLAY_SKUS) as Array<[PlanId, string]>).forEach(([planId, sku]) => {
+          const d = details.find((x) => x.itemId === sku);
+          if (d) byPlan[planId] = d;
+        });
+        // Require the FULL catalog: with a partial result we'd render some
+        // cards with Stripe prices whose buttons buy unavailable Play SKUs.
+        const allPresent = (Object.keys(PLAN_PLAY_SKUS) as PlanId[]).every((p) => byPlan[p]);
+        if (!allPresent) return; // stay on Stripe
+        setPlayPrices(byPlan);
+      } catch {
+        /* stay on Stripe */
+      }
+    }).finally(() => setPlayBillingChecked(true));
+  }, []);
+
+  const verifyPlayToken = async (purchaseToken: string): Promise<boolean> => {
+    const r = await fetch("/api/play/verify-purchase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ purchaseToken }),
+    });
+    return r.ok;
+  };
+
+  // Auto-restore: a signed-in free-tier user inside the Play app may have an
+  // existing purchase (reinstall, or verification failed right after buying).
+  const restoreAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!playMode || isSignedIn !== true || tier !== null || restoreAttemptedRef.current) return;
+    restoreAttemptedRef.current = true;
+    restorePlayPurchases(verifyPlayToken)
+      .then((restored) => { if (restored > 0) refreshSubscription(); })
+      .catch(() => {});
+  }, [playMode, isSignedIn, tier]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Prices shown on the cards: Google Play's when inside the Play app
+  // (Google is the merchant of record there), Stripe's otherwise.
+  const planPrices: Record<PlanId, PlanPrice> = playMode
+    ? {
+        weekly: playPrices?.weekly
+          ? { amount: formatPlayPrice(playPrices.weekly), period: "/week", label: `${formatPlayPrice(playPrices.weekly)}/week` }
+          : FALLBACK_PRICES.weekly,
+        monthly: playPrices?.monthly
+          ? { amount: formatPlayPrice(playPrices.monthly), period: "/mo", label: `${formatPlayPrice(playPrices.monthly)}/mo` }
+          : FALLBACK_PRICES.monthly,
+        node_auditor: playPrices?.node_auditor
+          ? { amount: formatPlayPrice(playPrices.node_auditor), period: "/mo", label: `${formatPlayPrice(playPrices.node_auditor)}/mo` }
+          : FALLBACK_PRICES.node_auditor,
+      }
+    : stripePlanPrices;
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -96,6 +183,7 @@ export default function Pricing() {
     const checkout = params.get("checkout");
 
     if (checkout === "success") {
+      trackFunnelEvent("checkout_returned", { outcome: "success" });
       const planParam = params.get("plan") as PlanId | null;
       window.history.replaceState({}, "", "/pricing");
       refreshSubscription().then(({ tier: freshTier }) => {
@@ -115,15 +203,77 @@ export default function Pricing() {
         setSuccessInfo({ planId: fallbackId, ...PLAN_SUCCESS[fallbackId] });
       });
     } else if (checkout === "cancelled") {
+      trackFunnelEvent("checkout_returned", { outcome: "cancelled" });
       toast({ title: "Checkout cancelled", description: "No charge was made.", variant: "destructive" });
       window.history.replaceState({}, "", "/pricing");
     }
   }, [location]);
 
+  // After sign-in returns to /pricing?plan=X, resume the checkout the visitor
+  // already chose — one less click between intent and Stripe. Waits for Play
+  // Billing detection so a Play-app visitor is never routed to Stripe.
+  const autoResumeRef = useRef(false);
+  useEffect(() => {
+    if (autoResumeRef.current || isSignedIn !== true) return;
+    // Fail closed for ANY detected Play environment (even if its catalog
+    // failed to load) — auto-resuming into Stripe there breaks Play policy.
+    if (!playBillingChecked || playEnvDetected) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout")) return; // success/cancelled flows own this URL
+    const planParam = params.get("plan") as PlanId | null;
+    if (!planParam || !(planParam in PLAN_PRODUCT_NAMES)) return;
+    autoResumeRef.current = true;
+    window.history.replaceState({}, "", "/pricing");
+    void refreshSubscription()
+      .then(({ tier: freshTier }) => {
+        if (!freshTier) void handleCheckout(planParam);
+      })
+      .catch(() => { /* leave the page interactive — visitor can click the plan */ });
+  }, [isSignedIn, playBillingChecked, playEnvDetected]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleCheckout = async (planId: PlanId) => {
-    // Require sign-in before checkout
+    trackFunnelEvent("plan_selected", { plan: planId });
+    // Require sign-in before checkout — the purchase must attach to an
+    // account so it unlocks every platform, not just this device.
     if (!isSignedIn) {
-      window.location.href = `/api/login?returnTo=${encodeURIComponent("/pricing")}`;
+      trackFunnelEvent("signin_required", { plan: planId });
+      const search = new URLSearchParams(window.location.search);
+      const utm = new URLSearchParams();
+      search.forEach((value, key) => { if (key.startsWith("utm_")) utm.set(key, value); });
+      const utmSuffix = utm.toString();
+      const returnTo = `/pricing?plan=${encodeURIComponent(planId)}${utmSuffix ? `&${utmSuffix}` : ""}`;
+      window.location.href = `/api/login?returnTo=${encodeURIComponent(returnTo)}`;
+      return;
+    }
+
+    // Inside the Play app, purchases go through Google Play Billing
+    // (required by Play policy for digital subscriptions).
+    if (playMode) {
+      setLoadingTier(planId);
+      try {
+        await purchasePlaySubscription(PLAN_PLAY_SKUS[planId], verifyPlayToken);
+        await refreshSubscription();
+        setSuccessInfo({ planId, ...PLAN_SUCCESS[planId] });
+      } catch (err) {
+        // AbortError = user closed the Play sheet — not an error worth a toast.
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          const message = err instanceof Error ? err.message : "Something went wrong";
+          toast({ title: "Purchase error", description: message, variant: "destructive" });
+        }
+      } finally {
+        setLoadingTier(null);
+      }
+      return;
+    }
+
+    // Fail closed inside the Play app: if the Play catalog didn't load we must
+    // NOT fall back to Stripe — Play policy requires Play Billing in-app.
+    if (playEnvDetected) {
+      toast({
+        title: "Google Play billing unavailable",
+        description: "The Play catalog hasn't loaded. Close and reopen the app, then try again.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -158,7 +308,7 @@ export default function Pricing() {
       if (!checkoutRes.ok) {
         const errData = await checkoutRes.json() as { error?: string; authRequired?: boolean };
         if (errData.authRequired) {
-          window.location.href = `/api/login?returnTo=${encodeURIComponent("/pricing")}`;
+          window.location.href = `/api/login?returnTo=${encodeURIComponent(`/pricing?plan=${planId}`)}`;
           return;
         }
         throw new Error(errData.error ?? "Checkout failed");
@@ -282,12 +432,25 @@ export default function Pricing() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
-          {[
-            "Sign in to start your free trial",
-            "Cancel anytime — 1-click in app",
-            "7-day free trial on Pro Plus",
-            "One trial per account, ever",
-          ].map((t) => (
+          {(playMode
+            ? [
+                "Billed securely through Google Play",
+                "Cancel anytime in the Play Store",
+                "One subscription — unlocks web too",
+              ]
+            : trialEligible
+              ? [
+                  "Sign in to start your free trial",
+                  "Cancel anytime — 1-click in app",
+                  "7-day free trial on Pro Plus",
+                  "One trial per account, ever",
+                ]
+              : [
+                  "Cancel anytime — 1-click in app",
+                  "Your one free trial has been used",
+                  "Subscriptions start right away",
+                ]
+          ).map((t) => (
             <span key={t} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground border border-border/30 rounded-full px-3 py-1">
               <Check className="w-3 h-3 text-emerald-500" />{t}
             </span>
@@ -372,7 +535,7 @@ export default function Pricing() {
                 </div>
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Zap className="w-3 h-3 text-emerald-400" />
-                  <span className="text-xs text-emerald-400 font-medium">3-day free trial · Cancel anytime</span>
+                  <span className="text-xs text-emerald-400 font-medium">{playMode ? "Billed via Google Play · Cancel anytime" : trialEligible ? "3-day free trial · Cancel anytime" : "Cancel anytime"}</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
@@ -401,7 +564,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-weekly"
                   >
-                    {loadingTier === "weekly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? "Sign in for 3-day trial" : "Get Weekly"}
+                    {loadingTier === "weekly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 3-day trial") : "Get Weekly"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
@@ -424,7 +587,7 @@ export default function Pricing() {
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold">{planPrices.monthly.amount}</span>
                   <span className="text-muted-foreground text-sm">{planPrices.monthly.period}</span>
-                  <span className="text-xs text-emerald-400 font-medium ml-1">7-day free trial</span>
+                  {!playMode && trialEligible && <span className="text-xs text-emerald-400 font-medium ml-1">7-day free trial</span>}
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500">
@@ -465,7 +628,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-studio"
                   >
-                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? "Sign in for 7-day trial" : "Start Free Trial — Get Pro Plus"}
+                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 7-day trial") : playMode || !trialEligible ? "Get Pro Plus" : "Start Free Trial — Get Pro Plus"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>

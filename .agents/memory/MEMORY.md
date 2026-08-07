@@ -5,7 +5,7 @@
 - [getUserMedia exact deviceId fallback](getusermedia-exact-fallback.md) — exact deviceId throws OverconstrainedError if device gone; retry without constraint to fall back to default
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
 - [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
-- [Gemini transcription dual provider](vertex-ai-gemini-transcription.md) — transcribe tries Vertex first, falls back to Replit Gemini proxy; Vertex 403 (aiplatform API disabled, only user can enable)
+- [Gemini transcription provider](vertex-ai-gemini-transcription.md) — Vertex-only (proxy fallback removed); must import VERTEX_MODEL, never hardcode a model
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [Python MLK is sole mastering DSP](mlk-python-primary.md) — worker subprocess, no ffmpeg fallback by user directive; handover kernel had signal-nulling bugs (fixed both copies); verify handover code numerically before wiring
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
@@ -40,7 +40,7 @@
 - [Web iOS download + playback](web-ios-download-playback.md) — web downloads must use anchor download attr via lib/download.ts (never window.open → opens in 3rd-party app); Web Audio play handlers must await ctx.resume() inside the gesture or iOS plays silently; a 2nd synced <audio>.play() must launch in the same gesture (Promise.allSettled), not after an await
 - [Vocal Booth karaoke invariants](vocal-booth-karaoke.md) — guide vocal NEVER in mixdown; lrclib search gives ms-accurate LRC sync (label "Precise synced timing"); energy-based is honest fallback (label "approximate")
 - [Studio library Firestore linkage](studio-library-firestore.md) — song_drafts must key by PG project id (not random draftId) or certification updates a ghost doc; paid artifact-minting (IP cert) must verify server-side, not UI-only
-- [Gemini provider config](gemini-provider-config.md) — lyrics/transcription/Firestore use GCP_SERVICE_ACCOUNT; if placeholder, features degrade to the Replit AI proxy
+- [Gemini provider config](gemini-provider-config.md) — Gemini runs on owner's Vertex AI only, no Replit proxy; enable aiplatform via serviceusage; gemini-2.0-flash is retired (404)
 - [Vocal effects recording pattern](vocal-effects-recording.md) — bake monitor effects into the recording itself, not just live playback
 - [Admin purge-user endpoint](admin-purge-user.md) — deleting a user needs FK-safe order (process_runs → tracks → users); admin-cookie gated; run against prod after deploy
 - [Lyric import possession stamp](lyric-import-possession-stamp.md) — self-written lyrics = SEPARATE IP track (lyric_imports + stampType), never merged with AI-collab scoring; cert canonical server-side
@@ -60,3 +60,5 @@
 - [Workspace stability](workspace-stability.md) — keep optional artifact workflows stopped to avoid CPU contention and preview instability
 - [Manual artifact builds](manual-artifact-build-env.md) — path-routed Vite builds need workflow-supplied PORT and BASE_PATH when checked manually
 - [Authorship identity boundary](authorship-identity-boundary.md) — edit ledgers evidence account activity, not proof of who physically typed every character
+- [Google Play Billing](play-billing.md) — Stripe on web + Play Billing in TWA; server verifies tokens via subscriptionsv2; TWA needs alpha deps, notifications on, minSdk 23
+- [Funnel + trial integrity](funnel-trial-integrity.md) — trials consumed on webhook only; checkout blocks dup subs + expires open sessions; Play fails closed; copy follows trialEligible

@@ -1,7 +1,8 @@
-import { db, usersTable } from '@workspace/db';
-import { eq, sql } from 'drizzle-orm';
+import { db, usersTable, playSubscriptionsTable } from '@workspace/db';
+import { desc, eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import type { User } from '@workspace/db';
+import { verifyPlaySubscription, PlayTokenInvalidError } from './lib/playBilling';
 
 /** Map a subscription's price/product into a canonical tier string. */
 function deriveTier(
@@ -53,6 +54,18 @@ export class Storage {
         : null;
       return { isPro: true, plan, tier: t, isDeveloper: user.isDeveloper ?? false };
     }
+
+    // Google Play subscription (purchased inside the Android app). Checked
+    // before Stripe so Play-only users — who have no stripeCustomerId — get
+    // their entitlement on every platform, web included.
+    // Errors in the Play path must never block the Stripe evaluation below.
+    let play: { isPro: boolean; plan: string | null; tier: string } | null = null;
+    try {
+      play = await this.getPlaySubscriptionStatus(user.id);
+    } catch {
+      play = null;
+    }
+    if (play) return { ...play, isDeveloper: user.isDeveloper ?? false };
 
     if (!user.stripeCustomerId) {
       return { isPro: false, plan: null, tier: null };
@@ -124,6 +137,96 @@ export class Storage {
             : null;
 
     return { isPro: tier !== 'free', plan, tier };
+  }
+
+  /**
+   * Active Google Play entitlement for a user, or null.
+   *
+   * There is no realtime notification pipeline from Google, so renewals are
+   * picked up lazily: when the cached expiryTime has passed, the freshest
+   * token is re-verified against the Play Developer API (throttled to once
+   * per 5 minutes) — a renewed subscription extends expiryTime, an expired
+   * one gets its state persisted so we stop asking.
+   */
+  private async getPlaySubscriptionStatus(
+    userId: string,
+  ): Promise<{ isPro: boolean; plan: string | null; tier: string } | null> {
+    // One verification ATTEMPT (success or failure) per window — a Google
+    // outage must not turn every status read into an API call.
+    const VERIFY_THROTTLE_MS = 5 * 60_000;
+    // Bounded fail-open: when Google can't be reached to confirm a renewal,
+    // a subscription last confirmed entitled keeps access this long past its
+    // cached expiry. Real renewals are confirmed on the first successful
+    // retry; real lapses are revoked the moment Google answers "expired".
+    const OUTAGE_GRACE_MS = 48 * 60 * 60 * 1000;
+
+    const rows = await db
+      .select()
+      .from(playSubscriptionsTable)
+      .where(eq(playSubscriptionsTable.userId, userId))
+      .orderBy(desc(playSubscriptionsTable.expiryTime));
+    // "canceled" = auto-renew off but paid period still running.
+    const candidates = rows.filter((r) => ['active', 'grace', 'canceled'].includes(r.state));
+    if (candidates.length === 0) return null;
+
+    const now = Date.now();
+    const live = candidates.find((r) => r.expiryTime && r.expiryTime.getTime() > now);
+    if (live) return this.playTierStatus(live.tier);
+
+    // Cached expiry passed — the subscription may have renewed (no RTDN
+    // pipeline; renewals are picked up lazily here).
+    const stale = candidates[0];
+    const inOutageGrace =
+      stale.expiryTime !== null && now - stale.expiryTime.getTime() < OUTAGE_GRACE_MS;
+    if (now - stale.lastVerifiedAt.getTime() < VERIFY_THROTTLE_MS) {
+      return inOutageGrace ? this.playTierStatus(stale.tier) : null;
+    }
+
+    try {
+      const v = await verifyPlaySubscription(stale.purchaseToken);
+      await db
+        .update(playSubscriptionsTable)
+        .set({
+          state: v.state,
+          expiryTime: v.expiryTime,
+          autoRenewing: v.autoRenewing,
+          productId: v.productId ?? stale.productId,
+          tier: v.tier ?? stale.tier,
+          lastVerifiedAt: new Date(),
+        })
+        .where(eq(playSubscriptionsTable.id, stale.id));
+      // Google answered: entitle or revoke immediately — no grace needed.
+      if (v.entitled && v.tier) return this.playTierStatus(v.tier);
+      return null;
+    } catch (err) {
+      if (err instanceof PlayTokenInvalidError) {
+        await db
+          .update(playSubscriptionsTable)
+          .set({ state: 'invalid', lastVerifiedAt: new Date() })
+          .where(eq(playSubscriptionsTable.id, stale.id));
+        return null;
+      }
+      // Transient Google failure: record the attempt so the throttle holds,
+      // and keep the prior entitlement within the bounded grace window.
+      try {
+        await db
+          .update(playSubscriptionsTable)
+          .set({ lastVerifiedAt: new Date() })
+          .where(eq(playSubscriptionsTable.id, stale.id));
+      } catch {
+        /* best effort — never let bookkeeping break the status read */
+      }
+      return inOutageGrace ? this.playTierStatus(stale.tier) : null;
+    }
+  }
+
+  private playTierStatus(tier: string): { isPro: boolean; plan: string | null; tier: string } {
+    const plan =
+      tier === 'node_auditor' ? 'Node Auditor'
+      : tier === 'monthly'    ? 'Studio'
+      : tier === 'weekly'     ? 'Weekly'
+      : null;
+    return { isPro: plan !== null, plan, tier };
   }
 
   async linkStripeCustomer(userId: string, stripeCustomerId: string): Promise<User> {

@@ -17,8 +17,6 @@ import { randomUUID, createHmac, createHash } from "crypto";
 import type { LineState } from "@workspace/db";
 import { authorshipScore } from "@workspace/authorship";
 import { generateVertexText, isVertexConfigured } from "../geminiVertex";
-import { generateProxyText, isProxyConfigured } from "../geminiProxy";
-import { logger } from "../lib/logger";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 
@@ -37,48 +35,103 @@ function verifyEmbedToken(projectId: string, authorshipScore: number, token: str
 }
 
 /**
- * Lyric/songwriter generation — resilient dual-provider.
+ * Lyric/songwriter generation — Google Cloud Vertex AI ONLY.
  *
- * Prefers the user's own Google Cloud Vertex AI when GCP_SERVICE_ACCOUNT holds
- * a valid service-account credential. If that credential is absent/invalid, or
- * the Vertex call errors or returns nothing, it falls back to Replit's managed
- * Gemini proxy so the songwriter keeps working. Only if the active provider(s)
- * fail does it throw, so the route returns a 500 instead of a fake result.
+ * Runs exclusively on the owner's own Google Cloud account via
+ * GCP_SERVICE_ACCOUNT. The Replit AI Integrations Gemini proxy is deliberately
+ * NOT used here: it is a Replit-billed managed sidecar that returns
+ * "401 ApiKey not approved" in production, which previously took the songwriter
+ * down in the published Play app. Keeping it as a fallback made the songwriter
+ * depend on Replit billing, so it is removed.
+ *
+ * Failures surface as a real error naming the Google-side cause rather than a
+ * generic 500, so misconfiguration is diagnosable from the logs.
  */
-async function geminiGenerate(prompt: string): Promise<string> {
-  const cfg = { maxOutputTokens: 8192 };
-  // 45s max per provider. Full-song generations routinely take 12–15s on the
-  // Gemini proxy; a 15s cap sat right on that edge and intermittently killed
-  // otherwise-successful generations ("Lyric generation failed").
-  const TIMEOUT_MS = 45_000;
-
-  // Race both providers simultaneously — whichever responds first with a
-  // non-empty result wins. MLK v3 kernel runs on the output side regardless
-  // of which provider answered.
-  const candidates: Promise<string>[] = [];
-
-  if (isVertexConfigured()) {
-    candidates.push(
-      generateVertexText(prompt, { ...cfg, responseMimeType: "text/plain" })
-        .then(t => { if (!t.trim()) throw new Error("vertex:empty"); return t; })
-        .catch(err => { logger.warn({ err }, "Vertex AI race lost or failed"); throw err; })
+async function geminiGenerate(
+  prompt: string,
+  config?: {
+    temperature?: number;
+    topP?: number;
+    maxOutputTokens?: number;
+    thinkingConfig?: { thinkingBudget: number };
+  },
+): Promise<string> {
+  if (!isVertexConfigured()) {
+    throw new Error(
+      "Google Cloud Gemini is not configured — GCP_SERVICE_ACCOUNT must hold a valid service-account JSON key.",
     );
   }
 
-  if (isProxyConfigured()) {
-    candidates.push(
-      generateProxyText(prompt, cfg, TIMEOUT_MS)
-        .then(t => { if (!t.trim()) throw new Error("proxy:empty"); return t; })
-        .catch(err => { logger.warn({ err }, "Replit proxy race lost or failed"); throw err; })
+  const text = await generateVertexText(prompt, {
+    maxOutputTokens: 8192,
+    responseMimeType: "text/plain",
+    ...config,
+  });
+
+  if (!text.trim()) {
+    throw new Error("Google Cloud Gemini returned an empty response.");
+  }
+  return text;
+}
+
+/**
+ * Inference parameters for full-song generation (per owner's blueprint):
+ * temperature 0.75 / top_p 0.85 for grounded-but-creative output, 1024 output
+ * tokens (a full song is ~400–600). thinkingBudget 0 keeps gemini-2.5-flash
+ * from spending that budget on hidden reasoning tokens.
+ */
+const SONG_GENERATION_CONFIG = {
+  temperature: 0.75,
+  topP: 0.85,
+  maxOutputTokens: 1024,
+  thinkingConfig: { thinkingBudget: 0 },
+};
+
+/**
+ * Anti-"plastic" stylistic directives applied to every full-song generation
+ * (both simple and advanced/timeline modes). Verbatim from the owner's
+ * blueprint — do not soften the cliché ban.
+ */
+function strictStylisticDirectives(bpmLabel: string, delivery: string): string {
+  return `
+STRICT STYLISTIC DIRECTIVES:
+1. BAN ALL AI CLICHÉS: Absolutely do NOT use overused AI buzzwords, vague filler, or fake deep metaphors. Banned terms include: 'neon', 'shadows', 'echoes', 'whispers', 'tapestry', 'symphony', 'fire in my soul', 'digital streets', 'starlight', 'stumbling in the dark'.
+2. GROUNDED IMAGERY: Use concrete, real-world detail, authentic slang matching the genre, and vivid imagery. Show, don't tell.
+3. CADENCE MATCHING: Tailor line lengths, syllable counts, and rhythm strictly to ${bpmLabel} and the ${delivery} vocal style so it fits a beat naturally.
+4. FORMATTING: Output strictly formatted song sections with tags (e.g., [Verse 1], [Chorus], [Outro]). No introductory conversational text or concluding remarks.`;
+}
+
+/** Translate the form's structure checkboxes into explicit structure requirements. */
+function buildStructureRequirement(structureOptions: string[] | undefined): {
+  sections: string;
+  directives: string[];
+} {
+  const opts = new Set((structureOptions ?? []).map((o) => o.toLowerCase()));
+  const wantsBridge = opts.has("include bridge");
+  const directives: string[] = [];
+
+  let sections: string;
+  if (opts.has("raw/freeform")) {
+    sections =
+      "Freeform — let the narrative dictate the section flow, but still tag every section (e.g., [Verse 1], [Hook], [Outro])." +
+      (wantsBridge ? " Include a [Bridge]." : "");
+  } else if (opts.has("verse-chorus-verse")) {
+    sections = wantsBridge
+      ? "[Verse 1]\n[Chorus]\n[Verse 2]\n[Chorus]\n[Bridge]\n[Chorus]\n[Outro]"
+      : "[Verse 1]\n[Chorus]\n[Verse 2]\n[Chorus]\n[Outro]";
+  } else {
+    sections = wantsBridge
+      ? "[Intro]\n[Verse 1]\n[Pre-Chorus]\n[Chorus]\n[Verse 2]\n[Pre-Chorus]\n[Chorus]\n[Bridge]\n[Outro/Chorus]"
+      : "[Intro]\n[Verse 1]\n[Pre-Chorus]\n[Chorus]\n[Verse 2]\n[Pre-Chorus]\n[Chorus]\n[Bridge]\n[Outro/Chorus]";
+  }
+
+  if (opts.has("complex/internal rhymes")) {
+    directives.push(
+      "Use complex rhyme craft: internal rhymes, multisyllabic rhymes, and slant rhymes woven inside lines — not just end-of-line rhymes.",
     );
   }
 
-  if (candidates.length === 0) {
-    throw new Error("No AI provider configured (set GCP_SERVICE_ACCOUNT or AI_INTEGRATIONS_GEMINI_*)");
-  }
-
-  // Promise.any: first fulfillment wins; only throws AggregateError if ALL fail
-  return Promise.any(candidates);
+  return { sections, directives };
 }
 
 const GENRE_RULES: Record<string, string> = {
@@ -176,6 +229,7 @@ lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, r
   const {
     story, genre, bpm, mode,
     key, vocalType, genreTags,
+    emotion, vocalDelivery, rhythmStyle, structureOptions,
     isExplicit,
     timelineBlocks,
   } = req.body as {
@@ -186,6 +240,10 @@ lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, r
     key?: string;
     vocalType?: string;
     genreTags?: string;
+    emotion?: string;
+    vocalDelivery?: string;
+    rhythmStyle?: string;
+    structureOptions?: string[];
     isExplicit?: boolean;
     timelineBlocks?: Array<{ timestampMs: number; label: string; sectionType: string }>;
   };
@@ -204,6 +262,14 @@ lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, r
     }
   }
 
+  // Shared prompt ingredients (blueprint placeholders).
+  const genreLabel = (genreTags || genre || "Pop").trim();
+  const bpmLabel = (rhythmStyle?.trim() || (bpm ? `${bpm} BPM` : "") || "moderate tempo").trim();
+  const emotionLabel = (emotion?.trim() || "authentic to the theme").trim();
+  const deliveryLabel = (vocalDelivery?.trim() || vocalType?.trim() || "natural, genre-appropriate").trim();
+
+  const { sections, directives: structureDirectives } = buildStructureRequirement(structureOptions);
+
   const structure = isAdvanced
     ? timelineBlocks!
         .sort((a, b) => a.timestampMs - b.timestampMs)
@@ -213,47 +279,49 @@ lyricsRouter.post("/lyrics/generate", lyricsGenRateLimit, async (req: Request, r
           return `${m}:${String(s).padStart(2, "0")} [${label}] (${sectionType})`;
         })
         .join("\n")
-    : "[Intro]\n[Verse 1]\n[Pre-Chorus]\n[Chorus]\n[Verse 2]\n[Pre-Chorus]\n[Chorus]\n[Bridge]\n[Outro/Chorus]";
+    : sections;
+
+  const extraDirectives = structureDirectives.length
+    ? `\n${structureDirectives.map((d) => `- ${d}`).join("\n")}`
+    : "";
 
   const prompt = isAdvanced
-    ? `You are a professional songwriter. Write lyrics that strictly match this song timeline.
-
-Global parameters:
-- Genre: ${genreTags || genre || "Pop"}
-- BPM: ${bpm || "moderate tempo"}
+    ? `You are an elite, raw lyricist and professional songwriter specializing in ${genreLabel}. Your task is to write high-impact, authentic song lyrics that strictly match this song timeline:
+- Genre/Sub-genre: ${genreLabel}
+- Tempo/Rhythm: ${bpmLabel}
 - Key: ${key || "not specified"}
-- Vocal type: ${vocalType || "not specified"}
+- Emotion/Mood: ${emotionLabel}
+- Vocal Delivery: ${deliveryLabel}
+- Theme/Concept: follow the timeline block labels
 
 Timeline (align lyrics cadence, syllable pacing, and emotional delivery to each block):
 ${structure}
 
-Rules:
-- Write lyrics for every timeline block in order, labeling each exactly as: [$LABEL]
-- Match syllable pacing to the BPM and emotional tone of each block
-- Do NOT include explanatory text — output lyrics only
-- After the lyrics, on the LAST LINE output exactly:
-  SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] [vocal type] vocals`
-    : `You are a professional songwriter.
+- Write lyrics for every timeline block in order, labeling each exactly as: [$LABEL]${extraDirectives}
+${strictStylisticDirectives(bpmLabel, deliveryLabel)}
 
-The user's story or idea: "${story!.trim()}"
-Genre: ${genre || "Pop"}
-BPM: ${bpm ? `${bpm} BPM` : "moderate tempo"}
-
-Generate a complete, singable song with this exact structure:
+After the lyrics, on the LAST LINE output exactly:
+SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] [vocal type] vocals`
+    : `You are an elite, raw lyricist and professional songwriter specializing in ${genreLabel}. Your task is to write high-impact, authentic song lyrics based on these parameters:
+- Genre/Sub-genre: ${genreLabel}
+- Tempo/Rhythm: ${bpmLabel}
+- Emotion/Mood: ${emotionLabel}
+- Vocal Delivery: ${deliveryLabel}
+- Structure Requirements:
 ${structure}
-
-Rules:
-- Rhyme scheme: consistent ABAB or AABB within each section
-- Line length: 8-12 syllables, optimized for singing
-- Chorus must be a strong, memorable hook
-- Stay true to the emotional tone of the story
-- Do NOT include explanatory text — output lyrics only
+- Theme/Concept: "${story!.trim()}"${extraDirectives}
+${strictStylisticDirectives(bpmLabel, deliveryLabel)}
 
 After the lyrics, on the LAST LINE output exactly:
 SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 
   try {
-    const fullText = (await geminiGenerate(`${prompt}${songwritingPolicy(genreTags || genre, Boolean(isExplicit))}`)).trim();
+    const fullText = (
+      await geminiGenerate(
+        `${prompt}${songwritingPolicy(genreTags || genre, Boolean(isExplicit))}`,
+        SONG_GENERATION_CONFIG,
+      )
+    ).trim();
     const sunoMatch = fullText.match(/^SUNO_PROMPT:\s*(.+)$/m);
     const stylePrompt = sunoMatch ? sunoMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
     const lyrics = fullText.replace(/^SUNO_PROMPT:.*$/m, "").trim();

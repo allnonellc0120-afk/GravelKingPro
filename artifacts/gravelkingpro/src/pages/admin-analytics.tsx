@@ -21,7 +21,11 @@ interface Summary {
     active: number; trialing: number; pastDue: number; total: number;
     mrr: number; recentRevenue: number; lifetimeRevenue: number; stripeOk: boolean;
   };
-  conversion: { visitorToCheckoutPct: number; visitorToPaidPct: number; checkoutToPaidPct: number };
+  conversion: {
+    landingCtaClicks: number; planSelections: number; signinRequired: number;
+    checkoutReturns: number; subscriptionActivations: number;
+    visitorToCheckoutPct: number; visitorToPaidPct: number; checkoutToPaidPct: number;
+  };
   series: Array<{ day: string; pageviews: number; visitors: number; checkoutStarts: number }>;
   topPaths: Array<{ path: string | null; count: number }>;
   topReferrers: Array<{ referrer: string | null; count: number }>;
@@ -31,6 +35,8 @@ const RANGES = [7, 30, 90] as const;
 type AdminTab = "analytics" | "grow";
 
 const fmt = (n: number): string => n.toLocaleString();
+const pctOf = (num: number, den: number): number =>
+  den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
 const money = (n: number): string =>
   `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -451,7 +457,7 @@ function AnalyticsDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               <StatCard icon={<Users className="w-4 h-4" />} label="Visitors" value={fmt(data.totals.uniqueVisitors)} sub={`last ${data.rangeDays}d`} />
               <StatCard icon={<Eye className="w-4 h-4" />} label="Pageviews" value={fmt(data.totals.pageviews)} sub={`last ${data.rangeDays}d`} />
-              <StatCard icon={<CreditCard className="w-4 h-4" />} label="Trial Starts" value={fmt(data.totals.checkoutStarts)} sub="checkout opened" />
+              <StatCard icon={<CreditCard className="w-4 h-4" />} label="Checkouts Opened" value={fmt(data.totals.checkoutStarts)} sub="Stripe session created" />
               <StatCard icon={<Crown className="w-4 h-4 text-amber-500" />} label="Active Subs" value={fmt(data.subscriptions.active)} sub={data.subscriptions.pastDue > 0 ? `+ ${data.subscriptions.pastDue} past due` : "paying"} accent="text-amber-500" />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -467,14 +473,22 @@ function AnalyticsDashboard() {
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-4">Conversion funnel · {data.rangeDays}d</div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <FunnelStep label="Unique Visitors" value={fmt(data.totals.uniqueVisitors)} />
-                  <FunnelArrow pct={data.conversion.visitorToCheckoutPct} />
-                  <FunnelStep label="Trial Starts" value={fmt(data.totals.checkoutStarts)} />
-                  <FunnelArrow pct={data.conversion.checkoutToPaidPct} />
-                  <FunnelStep label="Paying" value={fmt(data.subscriptions.total)} accent="text-amber-500" />
+                  <FunnelArrow pct={pctOf(data.conversion.planSelections, data.totals.uniqueVisitors)} />
+                  <FunnelStep label="Plan Selected" value={fmt(data.conversion.planSelections)} />
+                  <FunnelArrow pct={pctOf(data.totals.checkoutStarts, data.conversion.planSelections)} />
+                  <FunnelStep label="Checkout Opened" value={fmt(data.totals.checkoutStarts)} />
+                  <FunnelArrow pct={pctOf(data.conversion.subscriptionActivations, data.totals.checkoutStarts)} />
+                  <FunnelStep label="Activated" value={fmt(data.conversion.subscriptionActivations)} accent="text-amber-500" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-4">
-                  Visitor → paid: <span className="text-foreground font-semibold">{data.conversion.visitorToPaidPct}%</span>
-                  {" · "}Paying counts current active + trialing subscriptions (all-time), not just this window.
+                  Landing CTA clicks: <span className="text-foreground font-semibold">{fmt(data.conversion.landingCtaClicks)}</span>
+                  {" · "}Hit sign-in wall: <span className="text-foreground font-semibold">{fmt(data.conversion.signinRequired)}</span>
+                  {" · "}Returned from checkout: <span className="text-foreground font-semibold">{fmt(data.conversion.checkoutReturns)}</span>
+                  {" · "}Activations (webhook): <span className="text-foreground font-semibold">{fmt(data.conversion.subscriptionActivations)}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Current paying subs (all-time): <span className="text-foreground font-semibold">{fmt(data.subscriptions.total)}</span>
+                  {" · "}Activations count webhook-confirmed subscriptions in this window (tracking began Aug 7, 2026).
                 </p>
               </CardContent>
             </Card>

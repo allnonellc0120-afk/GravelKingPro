@@ -1,25 +1,8 @@
 {
     "logs": [
         {
-            "outputFile": "com.gravelkingpro.app-mergeReleaseResources-23:/values-pt/values-pt.xml",
+            "outputFile": "com.gravelkingpro.app-mergeReleaseResources-27:/values-pt/values-pt.xml",
             "map": [
-                {
-                    "source": "/home/runner/.gradle/caches/8.11.1/transforms/be57bd43967b699c12a0f6b8bd2f21c6/transformed/browser-1.9.0-alpha04/res/values-pt/values-pt.xml",
-                    "from": {
-                        "startLines": "2,3,4,5",
-                        "startColumns": "4,4,4,4",
-                        "startOffsets": "55,170,269,381",
-                        "endColumns": "114,98,111,105",
-                        "endOffsets": "165,264,376,482"
-                    },
-                    "to": {
-                        "startLines": "36,37,38,39",
-                        "startColumns": "4,4,4,4",
-                        "startOffsets": "3578,3693,3792,3904",
-                        "endColumns": "114,98,111,105",
-                        "endOffsets": "3688,3787,3899,4005"
-                    }
-                },
                 {
                     "source": "/home/runner/.gradle/caches/8.11.1/transforms/a5429f7b20c607b890f08b5283ad4ec0/transformed/core-1.13.0/res/values-pt/values-pt.xml",
                     "from": {
@@ -52,6 +35,23 @@
                         "startOffsets": "105,225,331,438,527,628,747,832,912,1003,1096,1191,1285,1385,1478,1573,1668,1759,1850,1935,2042,2153,2255,2363,2471,2581,2743,4010",
                         "endColumns": "119,105,106,88,100,118,84,79,90,92,94,93,99,92,94,94,90,90,84,106,110,101,107,107,109,161,99,85",
                         "endOffsets": "220,326,433,522,623,742,827,907,998,1091,1186,1280,1380,1473,1568,1663,1754,1845,1930,2037,2148,2250,2358,2466,2576,2738,2838,4091"
+                    }
+                },
+                {
+                    "source": "/home/runner/.gradle/caches/8.11.1/transforms/49e33416d546bb21d02889a3b399b693/transformed/browser-1.10.0/res/values-pt/values-pt.xml",
+                    "from": {
+                        "startLines": "2,3,4,5",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "55,170,269,381",
+                        "endColumns": "114,98,111,105",
+                        "endOffsets": "165,264,376,482"
+                    },
+                    "to": {
+                        "startLines": "36,37,38,39",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "3578,3693,3792,3904",
+                        "endColumns": "114,98,111,105",
+                        "endOffsets": "3688,3787,3899,4005"
                     }
                 }
             ]

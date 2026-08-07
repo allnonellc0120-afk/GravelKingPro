@@ -2,8 +2,13 @@ import { db, analyticsEventsTable } from "@workspace/db";
 
 export type AnalyticsEventType =
   | "pageview"
+  | "landing_cta_clicked"
+  | "plan_selected"
+  | "signin_required"
+  | "checkout_returned"
   | "checkout_started"
-  | "subscription_activated";
+  | "subscription_activated"
+  | "subscription_payment_failed";
 
 export interface RecordEventInput {
   type: AnalyticsEventType;
