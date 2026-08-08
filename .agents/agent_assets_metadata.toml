@@ -490,3 +490,24 @@ uri = "file://exports/GravelKingPro_MLK_v3.5_Metrics_By_Class.pdf"
 type = "pdf"
 title = "MLK V3.5 — Metrics by Class (PDF)"
 description = "2-page breakdown: health check, watermark verify, 30-second master, and full-song master — every run listed with cold/warm state, warm statistics, and industry comparison."
+
+[[outputs]]
+id = "TzMGtmtDFA2oagM0-s94n"
+uri = "file://screenshots/mlk-v35-overview.jpg"
+type = "image"
+title = "Morris Law Kernel V3.5 — Overview"
+description = "Product overview screenshot for the F6S listing."
+
+[[outputs]]
+id = "r__XbA5S52rmDgMFuKvvx"
+uri = "file://screenshots/mlk-v35-benchmark.jpg"
+type = "image"
+title = "Morris Law Kernel V3.5 — Live Benchmark"
+description = "Live benchmark interface screenshot for the F6S listing."
+
+[[outputs]]
+id = "vPaBWMHuYY28AyRWaaIi6"
+uri = "file://screenshots/mlk-v35-licensing.jpg"
+type = "image"
+title = "Morris Law Kernel V3.5 — Commercial Licensing"
+description = "Enterprise licensing page screenshot for the F6S listing."
