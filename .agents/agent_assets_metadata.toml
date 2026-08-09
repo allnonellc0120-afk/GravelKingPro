@@ -88,13 +88,15 @@ title = "gravelking_pro_soundtrack"
 id = "dLolvStuoJdfJufxjGvra"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_WhitePaper.pdf"
 type = "pdf"
-title = "GravelKingPro MLK v3 White Paper (PDF)"
+title = "Morris Law Kernel V3.5 — White Paper (PDF)"
+description = "Technical white paper on the Morris Law Kernel v3.5 mastering and IP certification system."
 
 [[outputs]]
 id = "Kap8xFsaJ_kX--TvbfwwH"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_PitchDeck.pdf"
 type = "pdf"
-title = "GravelKing Pro Pitch Deck PDF"
+title = "Morris Law Kernel V3 — Technical Pitch Deck (PDF)"
+description = "Technical pitch deck focused on the Morris Law Kernel v3 audio mastering engine."
 
 [[outputs]]
 id = "jwWuoMhaW3zvW94AARX9Z"
@@ -202,7 +204,8 @@ title = "Admin Strategy Brief"
 id = "JhrDqk3q2QqzbVsJgmnrb"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_PromoPitchDeck.pdf"
 type = "pdf"
-title = "GravelKing Pro — Promo Pitch Deck (from video slides)"
+title = "GravelKing Pro — Promo Pitch Deck (PDF)"
+description = "Shorter promotional pitch deck for partners, accelerators, and deal platforms."
 
 [[outputs]]
 id = "g9MMHbFDDRI_8GHuMHC2p"
@@ -214,7 +217,8 @@ title = "GravelKing Pro — Admin Strategy Brief"
 id = "VO4iK_qXPSA_TARiKvUxM"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_DetailedPitchDeck.pdf"
 type = "pdf"
-title = "GravelKing Pro — Detailed Investor Pitch Deck"
+title = "GravelKing Pro — Detailed Pitch Deck (PDF)"
+description = "Full detailed pitch deck covering IP certification, mastering kernel, Vocal Booth, DAW, and market opportunity."
 
 [[outputs]]
 id = "m1HEWpTw36naLxPC_sq9D"
@@ -511,3 +515,31 @@ uri = "file://screenshots/mlk-v35-licensing.jpg"
 type = "image"
 title = "Morris Law Kernel V3.5 — Commercial Licensing"
 description = "Enterprise licensing page screenshot for the F6S listing."
+
+[[outputs]]
+id = "QgAhwTY9Bjeb6Ddz1aSJB"
+uri = "file://.local/outputs/GravelKingPro-PitchDeck.pdf"
+type = "pdf"
+title = "GravelKing Pro — Pitch Deck (PDF)"
+description = "9-slide investor pitch deck for GravelKing Pro. Covers the product, technology, market, and team."
+
+[[outputs]]
+id = "pxBnq3S23M_7Hn0ZAflFn"
+uri = "file://screenshots/gravelkingpro-home.jpg"
+type = "image"
+title = "GravelKing Pro — Homepage Screenshot"
+description = "Live product screenshot of the GravelKing Pro homepage showing IP certification, mastering, and DAW."
+
+[[outputs]]
+id = "wmTyED5XypxSqXFmFqpjb"
+uri = "file://screenshots/gravelkingpro-pricing.jpg"
+type = "image"
+title = "GravelKing Pro — Pricing Page Screenshot"
+description = "Live pricing page showing Starter (free), Weekly ($9.99), Pro Plus ($24.99/mo), and Node Auditor ($249.50/mo) tiers."
+
+[[outputs]]
+id = "0XdjqpnoggqQcXope4plj"
+uri = "file://.local/outputs/GravelKing-Productions-F6S-Investor-Deck.pdf"
+type = "pdf"
+title = "GravelKing Productions — F6S Investor Deck (New PDF)"
+description = "Fresh PDF export with a new filename for uploading to F6S."

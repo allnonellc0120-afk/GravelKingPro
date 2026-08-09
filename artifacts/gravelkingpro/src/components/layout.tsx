@@ -250,6 +250,21 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
               </span>
             </Link>
             <a href="https://gravelkingpro.it.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition-colors">gravelkingpro.it.com</a>
+            <a
+              href="https://www.f6s.com/member/kevin-mo?follow=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Follow Kevin Morris on F6S"
+              className="inline-flex items-center shrink-0"
+            >
+              <img
+                src="https://www.f6s.com/images/f6s-follow-primary.png"
+                width="78"
+                height="22"
+                alt="Follow Kevin Morris on F6S"
+                className="block"
+              />
+            </a>
           </div>
         </div>
       </footer>
