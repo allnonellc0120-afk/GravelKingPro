@@ -12,15 +12,18 @@ const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
 // Bundles the integration test the same way build.mjs bundles the server: workspace
 // deps (@workspace/db, etc.) are bundled, only true native modules are external, and
-// the pino plugin handles pino's worker transport. Output goes to dist/test so the
-// existing `dist` .gitignore covers it.
+// the pino plugin handles pino's worker transport. Output goes to dist-test/ —
+// deliberately OUTSIDE dist/, because build.mjs rm -rf's dist/ on every dev
+// rebuild and would delete test bundles mid-run when the dev workflow rebuilds
+// concurrently with the test suite.
 async function buildTest() {
-  const outDir = path.resolve(artifactDir, "dist/test");
+  const outDir = path.resolve(artifactDir, "dist-test");
   await rm(outDir, { recursive: true, force: true });
 
   await esbuild({
     entryPoints: [
       path.resolve(artifactDir, "src/__tests__/studio-audio.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/master-kernel.test.ts"),
       path.resolve(artifactDir, "src/__tests__/whitepaper.test.ts"),
       path.resolve(artifactDir, "src/__tests__/price-parity.test.ts"),
       path.resolve(artifactDir, "src/__tests__/download-gate.test.ts"),

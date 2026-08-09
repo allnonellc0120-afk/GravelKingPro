@@ -261,7 +261,13 @@ masterRouter.post(
       return;
     }
 
-    const presetName    = (req.body.preset as string) || "baseline";
+    // Multipart fields are client-controlled: a repeated field arrives as an
+    // array, and anything non-string is malformed. Coerce defensively so bad
+    // input can never throw (→ 500); strict numeric fields reject with 400.
+    const asStr = (v: unknown): string | undefined =>
+      typeof v === "string" ? v : undefined;
+
+    const presetName    = asStr(req.body.preset) || "baseline";
     if (!VALID_PRESETS.has(presetName)) {
       res.status(400).json({ success: false, error: `Unknown preset "${presetName}".` });
       return;
@@ -269,42 +275,64 @@ masterRouter.post(
 
     // Intensity 0–100 (default 75). Passed straight through to the Python
     // kernel, which scales every EQ/drive/comp parameter by intensity/100.
-    const rawIntensity = parseFloat((req.body.intensity as string) || "75");
-    const intensity    = Math.min(100, Math.max(0, isNaN(rawIntensity) ? 75 : rawIntensity));
+    // Malformed or out-of-range values are a client bug → 400, never a silent
+    // clamp (a clamped -1 would master at intensity 0 and confuse the user).
+    if (req.body.intensity !== undefined && typeof req.body.intensity !== "string") {
+      res.status(400).json({ success: false, error: "Invalid intensity: expected a single numeric value." });
+      return;
+    }
+    const rawIntensityStr = (asStr(req.body.intensity) ?? "").trim();
+    const rawIntensity    = rawIntensityStr === "" ? 75 : Number(rawIntensityStr);
+    if (!Number.isFinite(rawIntensity) || rawIntensity < 0 || rawIntensity > 100) {
+      res.status(400).json({ success: false, error: `Invalid intensity "${rawIntensityStr}". Expected a number between 0 and 100.` });
+      return;
+    }
+    const intensity = rawIntensity;
 
-    const denoise         = (req.body.denoise as string) === "true";
+    const denoise         = asStr(req.body.denoise) === "true";
 
     // Sidechain compressor params — mirrors MorrisLawKernel.process() signature.
     // sidechainFilter: 'highpass' | 'lowpass' | 'none'  (default 'highpass')
     // sidechainFreq:   Hz for the detector HPF/LPF        (default 160)
     // stereoLink:      both channels track same GR        (default true)
-    const rawScFilter = (req.body.sidechainFilter as string) || "highpass";
+    const rawScFilter = asStr(req.body.sidechainFilter) || "highpass";
     const sidechainFilter: "highpass" | "lowpass" | "none" =
       rawScFilter === "lowpass" ? "lowpass" : rawScFilter === "none" ? "none" : "highpass";
-    const sidechainFreq = Math.min(2000, Math.max(20,
-      parseFloat((req.body.sidechainFreq as string) || "160") || 160
-    ));
-    const stereoLink = (req.body.stereoLink as string) !== "false";
+    // Malformed (non-numeric / non-finite) detector frequency → 400. In-range
+    // numeric values pass through; numeric-but-extreme values clamp to the
+    // kernel's supported 20–2000 Hz detector band.
+    if (req.body.sidechainFreq !== undefined && typeof req.body.sidechainFreq !== "string") {
+      res.status(400).json({ success: false, error: "Invalid sidechainFreq: expected a single numeric value." });
+      return;
+    }
+    const rawScFreqStr = (asStr(req.body.sidechainFreq) ?? "").trim();
+    const rawScFreq    = rawScFreqStr === "" ? 160 : Number(rawScFreqStr);
+    if (!Number.isFinite(rawScFreq) || rawScFreq <= 0) {
+      res.status(400).json({ success: false, error: `Invalid sidechainFreq "${rawScFreqStr}". Expected a positive frequency in Hz.` });
+      return;
+    }
+    const sidechainFreq = Math.min(2000, Math.max(20, rawScFreq));
+    const stereoLink = asStr(req.body.stereoLink) !== "false";
     // adaptive_mode: 'bass_aware' bandpasses the sidechain detector around the
     // bass range (sidechainFreq × 0.5 – × 2.5) + dynaudnorm so the compressor
     // tracks bass energy, not broadband level. 'off' = fixed detector filter.
-    const rawAdaptive = (req.body.adaptiveMode as string) || "bass_aware";
+    const rawAdaptive = asStr(req.body.adaptiveMode) || "bass_aware";
     const adaptiveMode: "off" | "bass_aware" = rawAdaptive === "off" ? "off" : "bass_aware";
 
     // auto_threshold: run a quick volumedetect pass and set threshold =
     // (mean RMS dBFS + offset). Saves the user from guessing numeric values.
-    const autoThreshold       = (req.body.autoThreshold as string) === "true";
-    const rawOffset           = parseFloat((req.body.autoThresholdOffset as string) || "-16");
+    const autoThreshold       = asStr(req.body.autoThreshold) === "true";
+    const rawOffset           = parseFloat(asStr(req.body.autoThresholdOffset) || "-16");
     const autoThresholdOffset = Math.min(-6, Math.max(-30, isNaN(rawOffset) ? -16 : rawOffset));
 
     // certify=true → copyright/ownership validation (runs in middleware) plus
     // an embedded IP cert. Default false → master any track, no watermark.
-    const certify      = (req.body.certify as string) === "true";
+    const certify      = asStr(req.body.certify) === "true";
     // Artist handle attached to every cert
-    const artistHandle = ((req.body.artist as string) || "Unknown Artist")
+    const artistHandle = (asStr(req.body.artist) || "Unknown Artist")
       .trim().slice(0, 64).replace(/[^\w\s@._-]/g, "");
     // Style prompt — human creative direction for the instrumental
-    const rawStylePrompt = ((req.body.stylePrompt as string) || "").trim().slice(0, 1000);
+    const rawStylePrompt = (asStr(req.body.stylePrompt) || "").trim().slice(0, 1000);
     const styleScore     = styleAuthorshipScore(rawStylePrompt);
 
     // weekly+ tiers get unlimited full-length masters. Free users get one full
