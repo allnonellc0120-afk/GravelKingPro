@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const TABS = [
@@ -19,15 +19,26 @@ const TABS = [
 export function AdminNav({ children }: { children?: React.ReactNode }) {
   const [location] = useLocation();
   const [readyCount, setReadyCount] = useState<number>(0);
+  // When the admin key isn't unlocked the endpoint returns 401. Remember that
+  // and skip the periodic refetch (a window focus retries, in case the admin
+  // unlocked in another tab).
+  const lockedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+
+    const refresh = async () => {
       try {
         const res = await fetch("/api/weekend-special/admin/orders", {
           credentials: "include",
         });
+        if (res.status === 401) {
+          lockedRef.current = true;
+          if (!cancelled) setReadyCount(0);
+          return;
+        }
         if (!res.ok) return;
+        lockedRef.current = false;
         const json = (await res.json()) as {
           orders?: Array<{ status: string }>;
         };
@@ -36,9 +47,23 @@ export function AdminNav({ children }: { children?: React.ReactNode }) {
       } catch {
         // Badge is best-effort; ignore failures silently.
       }
-    })();
+    };
+
+    void refresh();
+
+    const interval = window.setInterval(() => {
+      if (!lockedRef.current) void refresh();
+    }, 60_000);
+
+    const onFocus = () => {
+      void refresh();
+    };
+    window.addEventListener("focus", onFocus);
+
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
