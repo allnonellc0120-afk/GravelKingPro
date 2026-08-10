@@ -245,6 +245,13 @@ masterRouter.post(
   partnerAwareRateLimit,
   masterConcurrency,
   upload.single("audio"),
+  // Timing instrumentation: multer has just finished writing the upload, so
+  // (now − request arrival) is the multipart upload + parse cost.
+  (_req: Request, res: Response, next: NextFunction) => {
+    const t0 = (res.locals as { requestStartMs?: number }).requestStartMs ?? performance.now();
+    res.locals.gkUploadMs = performance.now() - t0;
+    next();
+  },
   maybeValidateIngestion,
   async (req: Request, res: Response) => {
     // Log the moment the request enters the handler — if a crash happens before
@@ -431,6 +438,8 @@ masterRouter.post(
       let kernelEngine: "cloud-run" | "local" = "local";
 
       const remoteBase = process.env.MLK_KERNEL_URL?.replace(/\/$/, "");
+      const kernelStart = performance.now();
+      let kernelMs: number | null = null;
       try {
         if (remoteBase) {
           try {
@@ -506,6 +515,7 @@ masterRouter.post(
         });
         return;
       } finally {
+        kernelMs = performance.now() - kernelStart;
         if (prePassPath) await unlink(prePassPath).catch(() => {});
       }
 
@@ -630,6 +640,13 @@ masterRouter.post(
         if (appliedThresholdDb !== null) res.setHeader("X-GK-AppliedThresholdDb", appliedThresholdDb.toFixed(1));
         if (autoThresholdFallback)       res.setHeader("X-GK-AutoThresholdFallback", "true");
         res.setHeader("X-GK-Parity",            parity);
+        // Measured timing decomposition (ms): multipart upload+parse, kernel
+        // processing, and total server time up to response start.
+        const reqStart = (res.locals as { requestStartMs?: number }).requestStartMs;
+        const uploadMs = (res.locals as { gkUploadMs?: number }).gkUploadMs;
+        if (uploadMs !== undefined) res.setHeader("X-GK-Timing-Upload-Ms", uploadMs.toFixed(1));
+        if (kernelMs !== null)      res.setHeader("X-GK-Timing-Kernel-Ms", kernelMs.toFixed(1));
+        if (reqStart !== undefined) res.setHeader("X-GK-Timing-Server-Ms", (performance.now() - reqStart).toFixed(1));
         res.setHeader("X-GK-Download-Url",      dlUrl);
         if (certHash && certId) {
           res.setHeader("X-GK-Cert-Hash",       certHash);

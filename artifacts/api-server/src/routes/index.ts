@@ -25,6 +25,7 @@ import verifySignalRouter from "./verify-signal";
 import leadCaptureRouter from "./lead-capture";
 import weekendSpecialRouter from "./weekend-special";
 import emailCaptureRouter from "./email-capture";
+import benchmarkRouter from "./benchmark";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use(verifySignalRouter);
 router.use(leadCaptureRouter);
 router.use(weekendSpecialRouter);
 router.use(emailCaptureRouter);
+router.use(benchmarkRouter);
 
 export default router;

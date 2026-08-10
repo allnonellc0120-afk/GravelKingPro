@@ -13,8 +13,61 @@ interface Health {
   state: HealthState;
   statusCode: number | null;
   latencyMs: number | null;
+  serverMs: number | null;
   checkedAt: Date | null;
   message?: string;
+}
+
+interface KernelBenchResult {
+  measuredAt: string;
+  fixture: { durationS: number; bytes: number; kind: string };
+  kernel: string;
+  engine: string;
+  completedLocally: boolean;
+  runs: Array<{ run: number; processingMs: number; engine: string; numba: boolean; completedAt: string }>;
+  summary: { runs: number; minMs: number; medianMs: number; maxMs: number; realtimeMultiplier: number | null };
+  note: string;
+}
+
+interface E2eBenchResult {
+  measuredAt: string;
+  fixture: { durationS: number; bytes: number; kind: string };
+  endpoint: string;
+  kernelEngine: string | null;
+  outputBytes: number;
+  timings: {
+    totalMs: number;
+    uploadAndParseMs: number | null;
+    kernelMs: number | null;
+    serverOtherMs: number | null;
+    serverTotalMs: number | null;
+    networkAndResponseMs: number | null;
+  };
+  note: string;
+}
+
+type BenchState<T> =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "done"; result: T }
+  | { status: "error"; error: string };
+
+async function postBenchmark<T>(path: string): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const json = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string } & T;
+  if (!res.ok || json.success === false) {
+    throw new Error(json.error ?? `HTTP ${res.status}`);
+  }
+  return json;
+}
+
+function fmtMs(v: number | null | undefined): string {
+  return v == null ? "—" : `${v.toLocaleString()} ms`;
 }
 
 function EvidenceBadge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "good" | "warn" | "neutral" }) {
@@ -66,8 +119,29 @@ function IntegrationDemoDashboard() {
     state: "checking",
     statusCode: null,
     latencyMs: null,
+    serverMs: null,
     checkedAt: null,
   });
+  const [kernelBench, setKernelBench] = useState<BenchState<KernelBenchResult>>({ status: "idle" });
+  const [e2eBench, setE2eBench] = useState<BenchState<E2eBenchResult>>({ status: "idle" });
+
+  const runKernelBench = useCallback(async () => {
+    setKernelBench({ status: "running" });
+    try {
+      setKernelBench({ status: "done", result: await postBenchmark<KernelBenchResult>("/api/admin/benchmark/kernel") });
+    } catch (err) {
+      setKernelBench({ status: "error", error: err instanceof Error ? err.message : "Benchmark failed" });
+    }
+  }, []);
+
+  const runE2eBench = useCallback(async () => {
+    setE2eBench({ status: "running" });
+    try {
+      setE2eBench({ status: "done", result: await postBenchmark<E2eBenchResult>("/api/admin/benchmark/e2e") });
+    } catch (err) {
+      setE2eBench({ status: "error", error: err instanceof Error ? err.message : "Test failed" });
+    }
+  }, []);
 
   const checkHealth = useCallback(async () => {
     const started = performance.now();
@@ -78,10 +152,12 @@ function IntegrationDemoDashboard() {
         headers: { "Cache-Control": "no-cache" },
       });
       const latencyMs = Math.round(performance.now() - started);
+      const body = (await response.json().catch(() => ({}))) as { serverMs?: number };
       setHealth({
         state: response.ok ? "ok" : "error",
         statusCode: response.status,
         latencyMs,
+        serverMs: typeof body.serverMs === "number" ? body.serverMs : null,
         checkedAt: new Date(),
         message: response.ok ? undefined : `HTTP ${response.status}`,
       });
@@ -90,6 +166,7 @@ function IntegrationDemoDashboard() {
         state: "error",
         statusCode: null,
         latencyMs: Math.round(performance.now() - started),
+        serverMs: null,
         checkedAt: new Date(),
         message: error instanceof Error ? error.message : "Network error",
       });
@@ -146,7 +223,8 @@ function IntegrationDemoDashboard() {
 
         <nav aria-label="Demo sections" className="flex flex-wrap gap-2">
           <JumpLink href="#live">Live check</JumpLink>
-          <JumpLink href="#evidence">Measured evidence</JumpLink>
+          <JumpLink href="#benchmark">Live benchmark</JumpLink>
+          <JumpLink href="#evidence">Historical evidence</JumpLink>
           <JumpLink href="#capacity">Capacity boundary</JumpLink>
           <JumpLink href="#ip-validation">IP verification</JumpLink>
           <JumpLink href="#pilot">Pilot plan</JumpLink>
@@ -163,19 +241,24 @@ function IntegrationDemoDashboard() {
               </div>
               <div className={`mt-6 text-4xl font-black tracking-tight ${healthColor}`}>{healthLabel}</div>
               <div className="mt-2 font-mono text-sm text-muted-foreground">GET /api/healthz</div>
-              <div className="mt-8 grid grid-cols-2 gap-5 border-t border-border/40 pt-5">
+              <div className="mt-8 grid grid-cols-3 gap-5 border-t border-border/40 pt-5">
                 <div>
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">HTTP status</div>
                   <div className="mt-1 text-2xl font-mono font-bold">{health.statusCode ?? "—"}</div>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Round trip</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Browser → API round trip</div>
                   <div className="mt-1 text-2xl font-mono font-bold">{health.latencyMs == null ? "—" : `${health.latencyMs} ms`}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Server handler time</div>
+                  <div className="mt-1 text-2xl font-mono font-bold">{health.serverMs == null ? "—" : `${health.serverMs} ms`}</div>
                 </div>
               </div>
               <div className="mt-5 text-xs text-muted-foreground">
                 Last checked: {health.checkedAt ? health.checkedAt.toLocaleTimeString() : "waiting"}
                 {health.message ? ` · ${health.message}` : ""}
+                {" · "}Round trip includes network + proxy; server handler time is what the API itself spent. Neither is kernel processing speed.
               </div>
             </CardContent>
           </Card>
@@ -203,17 +286,90 @@ function IntegrationDemoDashboard() {
           </Card>
         </section>
 
-        <section id="evidence" className="scroll-mt-6 space-y-4">
-          <SectionLabel eyebrow="Measured evidence" title="The API has been exercised under load">
-            <EvidenceBadge tone="good">Verified test results</EvidenceBadge>
+        <section id="benchmark" className="scroll-mt-6 space-y-4">
+          <SectionLabel eyebrow="Live measurement" title="Measure the kernel and the partner path now">
+            <EvidenceBadge tone="neutral">Runs against this server, on demand</EvidenceBadge>
           </SectionLabel>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Card className="border-border/50 bg-card/60">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl"><Zap className="h-5 w-5 text-amber-500" /> Kernel processing benchmark</CardTitle>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Runs the real Morris Law Kernel v3.5 execution path (the same remote-first / local-fallback selection mastering uses) on a bounded generated WAV fixture. Kernel time only — no network or upload.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button onClick={() => void runKernelBench()} disabled={kernelBench.status === "running"} className="gap-2 bg-amber-500 font-semibold text-black hover:bg-amber-600">
+                  {kernelBench.status === "running" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                  {kernelBench.status === "running" ? "Measuring… (runs 3 passes)" : "Run kernel benchmark"}
+                </Button>
+                {kernelBench.status === "error" && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">Benchmark failed: {kernelBench.error}. No result is shown because no measurement completed.</div>
+                )}
+                {kernelBench.status === "done" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <Metric value={fmtMs(kernelBench.result.summary.minMs)} label="Min" detail={`${kernelBench.result.summary.runs} runs`} />
+                      <Metric value={fmtMs(kernelBench.result.summary.medianMs)} label="Median" detail="kernel processing" />
+                      <Metric value={fmtMs(kernelBench.result.summary.maxMs)} label="Max" detail="per run" />
+                    </div>
+                    <div className="rounded-lg border border-border/40 bg-secondary/20 p-4 text-sm leading-relaxed text-muted-foreground">
+                      <div><strong className="text-foreground">{kernelBench.result.summary.realtimeMultiplier == null ? "—" : `${kernelBench.result.summary.realtimeMultiplier}× realtime`}</strong> on a {kernelBench.result.fixture.durationS}s fixture ({(kernelBench.result.fixture.bytes / 1024).toFixed(0)} KB, {kernelBench.result.fixture.kind}).</div>
+                      <div className="mt-1">Engine: <span className="font-mono text-xs text-amber-300">{kernelBench.result.engine}{kernelBench.result.runs.some((r) => r.numba) ? " (numba)" : ""}</span> · {kernelBench.result.completedLocally ? "completed locally" : "completed remotely"} · measured {new Date(kernelBench.result.measuredAt).toLocaleTimeString()}</div>
+                      <div className="mt-1 text-xs">{kernelBench.result.note}</div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50 bg-card/60">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl"><ArrowRight className="h-5 w-5 text-violet-400" /> End-to-end partner path</CardTitle>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Sends the fixture through the real <span className="font-mono text-xs text-amber-300">POST /api/v1/ingest</span> partner route (key-gated, multipart, mastered WAV back) and splits the wall-clock time.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button onClick={() => void runE2eBench()} disabled={e2eBench.status === "running"} variant="outline" className="gap-2">
+                  {e2eBench.status === "running" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
+                  {e2eBench.status === "running" ? "Processing fixture…" : "Run partner-path test"}
+                </Button>
+                {e2eBench.status === "error" && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">Test failed: {e2eBench.error}. No result is shown because no measurement completed.</div>
+                )}
+                {e2eBench.status === "done" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <Metric value={fmtMs(e2eBench.result.timings.uploadAndParseMs)} label="Upload + parse" detail="multipart receive" />
+                      <Metric value={fmtMs(e2eBench.result.timings.kernelMs)} label="Kernel" detail="MLK v3.5 processing" />
+                      <Metric value={fmtMs(e2eBench.result.timings.networkAndResponseMs)} label="Response + network" detail="stream back" />
+                      <Metric value={fmtMs(e2eBench.result.timings.totalMs)} label="Total" detail="wall clock" />
+                    </div>
+                    <div className="rounded-lg border border-border/40 bg-secondary/20 p-4 text-xs leading-relaxed text-muted-foreground">
+                      {e2eBench.result.fixture.durationS}s fixture → {(e2eBench.result.outputBytes / 1024).toFixed(0)} KB mastered WAV · engine <span className="font-mono text-amber-300">{e2eBench.result.kernelEngine ?? "unknown"}</span> · measured {new Date(e2eBench.result.measuredAt).toLocaleTimeString()} · {e2eBench.result.note}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section id="evidence" className="scroll-mt-6 space-y-4">
+          <SectionLabel eyebrow="Historical evidence" title="Earlier load-test results (not live data)">
+            <EvidenceBadge tone="warn">Recorded Aug 4, 2026 · scripted load test</EvidenceBadge>
+          </SectionLabel>
+          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            These counts come from a scripted load test run against the development server on August 4, 2026. They show the API held up under repetition at that time — they are <strong className="text-foreground">not</strong> measurements from this session. Use the live cards above for current numbers.
+          </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Metric value="1,000 / 1,000" label="Health requests returned 200" detail="Repeated health probes completed cleanly." />
-            <Metric value="500 / 500" label="MLK v3 processing returned 200" detail="Audio processing path remained available through the run." />
-            <Metric value="1,000 / 1,000" label="Raw processing returned 200" detail="Baseline API processing completed without failed responses." />
-            <Metric value="200 / 200" label="Invalid payloads returned 400" detail="Bad input was rejected cleanly rather than crashing." />
-            <Metric value="200 / 200" label="Missing routes returned 404" detail="Unknown paths returned expected not-found responses." />
-            <Metric value="74 / 74" label="Automated API checks passed" detail="Whitepaper, studio, pricing, download, and security checks." />
+            <Metric value="1,000 / 1,000" label="Health requests returned 200" detail="Historical: repeated health probes completed cleanly (Aug 4, 2026 load test)." />
+            <Metric value="500 / 500" label="MLK v3 processing returned 200" detail="Historical: audio processing path remained available through the run (Aug 4, 2026 load test)." />
+            <Metric value="1,000 / 1,000" label="Raw processing returned 200" detail="Historical: baseline API processing completed without failed responses (Aug 4, 2026 load test)." />
+            <Metric value="200 / 200" label="Invalid payloads returned 400" detail="Historical: bad input was rejected cleanly rather than crashing (Aug 4, 2026 load test)." />
+            <Metric value="200 / 200" label="Missing routes returned 404" detail="Historical: unknown paths returned expected not-found responses (Aug 4, 2026 load test)." />
+            <Metric value="74 / 74" label="Automated API checks passed" detail="Historical: whitepaper, studio, pricing, download, and security checks (Aug 4, 2026 suite)." />
           </div>
         </section>
 
@@ -243,9 +399,9 @@ function IntegrationDemoDashboard() {
           <Card className="border-border/50 bg-card/60">
             <CardHeader><CardTitle className="flex items-center gap-2 text-xl"><Activity className="h-5 w-5 text-violet-400" /> Performance context</CardTitle></CardHeader>
             <CardContent className="space-y-4 text-sm leading-relaxed text-muted-foreground">
-              <p>The separate DSP benchmark measured approximately <strong className="text-foreground">109× realtime</strong> on its test environment.</p>
-              <p><strong className="text-foreground">That is not an end-to-end API SLA.</strong> Network time, file upload, concurrency, and worker capacity still need production measurement.</p>
-              <div className="flex items-center gap-2"><EvidenceBadge tone="warn">Projection / context</EvidenceBadge><span>Not a promise</span></div>
+              <p>A separate DSP benchmark historically measured approximately <strong className="text-foreground">109× realtime</strong> on its own test environment (recorded before Aug 10, 2026 — not this server, not this session).</p>
+              <p><strong className="text-foreground">That is not an end-to-end API SLA.</strong> Run the live kernel benchmark above to get the current, measured multiplier on this hardware. Network time, file upload, concurrency, and worker capacity still need production measurement.</p>
+              <div className="flex items-center gap-2"><EvidenceBadge tone="warn">Historical / context</EvidenceBadge><span>Not a live measurement</span></div>
             </CardContent>
           </Card>
         </section>
