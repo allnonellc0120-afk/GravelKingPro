@@ -19,7 +19,13 @@ Information requested:
 Additional details (optional):`;
 const accessHref = `mailto:${deletionEmail}?subject=${encodeURIComponent(accessSubject)}&body=${encodeURIComponent(accessBody)}`;
 
-export default function DataDeletion() {
+/**
+ * Public, unauthenticated request page for users and app-store reviewers.
+ * Reachable at /data-deletion without signing in.
+ * This is intentionally a mailto flow: deletion is reviewed manually rather
+ * than performed automatically, including any third-party billing records.
+ */
+export default function DataDeletionPage() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-2 py-8 sm:px-6 sm:py-16">
@@ -31,7 +37,7 @@ export default function DataDeletion() {
           <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Delete your GravelKing Pro data</h1>
           <p className="mt-3 max-w-2xl text-muted-foreground leading-relaxed">
             You may ask us to delete personal information associated with your use of GravelKing Pro.
-            This page explains what to send and what happens next.
+            This public page explains what to send and what happens next; no sign-in is required.
           </p>
         </div>
 
@@ -55,7 +61,7 @@ export default function DataDeletion() {
             <a className="text-amber-400 underline underline-offset-4" href={`mailto:${deletionEmail}`}>
               {deletionEmail}
             </a>{" "}
-            with the subject “{requestSubject}”.
+            with the subject "{requestSubject}".
           </p>
         </section>
 
@@ -125,7 +131,7 @@ export default function DataDeletion() {
             <p>
               Stripe processes payment information. We do not receive or store full payment-card
               numbers. Subscription, invoice, and payment records held by Stripe are subject to
-              Stripe’s own retention and deletion procedures.
+              Stripe's own retention and deletion procedures.
             </p>
             <p>
               A certification record may have a backup in Google Cloud Firestore to preserve a
@@ -141,10 +147,10 @@ export default function DataDeletion() {
             Transfer security
           </h2>
           <p className="mt-3 text-muted-foreground leading-relaxed">
-            Data sent between your browser or app and GravelKing Pro is protected with HTTPS/TLS.
+            Data sent between your browser or app and GravelKing Pro uses HTTPS/TLS where supported.
             Our connections to providers such as Stripe and Google Cloud also use their HTTPS/TLS
-            interfaces. This is transport encryption, not end-to-end encryption: audio is processed
-            by our service, and temporary local processing is not a network transfer.
+            interfaces where supported. This is transport encryption, not end-to-end encryption:
+            audio is processed by our service, and temporary local processing is not a network transfer.
           </p>
         </section>
 
