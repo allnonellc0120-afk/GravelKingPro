@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
     <Layout>
       <div className="max-w-3xl mx-auto px-6 py-16">
         <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground text-sm mb-10">Last updated: August 3, 2026</p>
+        <p className="text-muted-foreground text-sm mb-10">Last updated: August 10, 2026</p>
 
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">1. Overview</h2>
@@ -100,9 +100,9 @@ export default function PrivacyPolicy() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">9. Security and Data Transfers</h2>
           <p className="text-muted-foreground leading-relaxed">
-            Data sent between your browser or app and GravelKing Pro is protected using HTTPS/TLS.
-            Our connections to Stripe and Google Cloud use their HTTPS/TLS interfaces. This is
-            transport encryption, not end-to-end encryption: audio is processed by our service,
+            Data sent between your browser or app and GravelKing Pro uses HTTPS/TLS where supported.
+            Our connections to Stripe and Google Cloud use their HTTPS/TLS interfaces where supported.
+            This is transport encryption, not end-to-end encryption: audio is processed by our service,
             and temporary local processing is not a network transfer.
           </p>
         </section>

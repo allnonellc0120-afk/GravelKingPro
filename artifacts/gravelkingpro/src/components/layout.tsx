@@ -243,7 +243,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
             <Link href="/download" className="hover:text-amber-500 transition-colors">Download</Link>
             <Link href="/pricing" className="hover:text-amber-500 transition-colors">Pricing</Link>
             <Link href="/privacy" className="hover:text-amber-500 transition-colors">Privacy</Link>
-            <Link href="/data-deletion" className="hover:text-amber-500 transition-colors">Delete data</Link>
+            <Link href="/data-deletion" className="hover:text-amber-500 transition-colors">Data deletion</Link>
             <Link href="/account" className="hover:text-amber-500 transition-colors">
               <span className="flex items-center gap-1">
                 <User className="w-3 h-3" />Account
