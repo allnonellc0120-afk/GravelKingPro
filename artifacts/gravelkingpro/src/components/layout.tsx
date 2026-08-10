@@ -11,7 +11,15 @@ const TIER_LABEL: Record<string, { label: string; className: string }> = {
   node_auditor: { label: "Node Auditor", className: "bg-amber-500/20 text-amber-300 border-amber-400/40" },
 };
 
-export function Layout({ children, noPadding }: { children: ReactNode; noPadding?: boolean }) {
+export function Layout({
+  children,
+  noPadding,
+  hideChrome = false,
+}: {
+  children: ReactNode;
+  noPadding?: boolean;
+  hideChrome?: boolean;
+}) {
   const [location] = useLocation();
   const { isPro, isDeveloper, tier } = useAppState();
   const { user } = useAuth();
@@ -41,7 +49,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
-      <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+      {!hideChrome && <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <Zap className="w-6 h-6 text-amber-500" />
@@ -220,13 +228,13 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
             </nav>
           </div>
         )}
-      </header>
+      </header>}
 
       <main className={noPadding ? "flex-1 flex flex-col overflow-hidden" : "flex-1 container mx-auto px-4 py-8"}>
         {children}
       </main>
 
-      <footer className="border-t border-border/20 bg-card/30 py-4">
+      {!hideChrome && <footer className="border-t border-border/20 bg-card/30 py-4">
         <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
             © {new Date().getFullYear()} GravelKing Productions · All N One LLC
@@ -267,7 +275,7 @@ export function Layout({ children, noPadding }: { children: ReactNode; noPadding
             </a>
           </div>
         </div>
-      </footer>
+      </footer>}
     </div>
   );
 }
