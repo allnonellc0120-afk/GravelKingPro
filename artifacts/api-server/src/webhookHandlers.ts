@@ -5,8 +5,34 @@ import { eq, sql } from 'drizzle-orm';
 import type { Request } from 'express';
 import { recordAnalyticsEvent } from './analytics';
 
+/**
+ * Loads the managed webhook signing secrets from stripe._managed_webhooks.
+ * Exposed as a type so tests can inject a deterministic implementation.
+ */
+export type SecretsLoader = () => Promise<string[]>;
+
+async function defaultSecretsLoader(): Promise<string[]> {
+  // Read ALL secrets ordered newest-first so stale rows are tried last.
+  // This is the same table stripe-replit-sync populates via findOrCreateManagedWebhook.
+  const result = await db.execute(
+    sql`SELECT secret FROM stripe._managed_webhooks ORDER BY created DESC`,
+  ) as unknown as { rows: { secret: string }[] };
+  return (result.rows ?? []).map((r) => r.secret).filter(Boolean);
+}
+
 export class WebhookHandlers {
-  static async processWebhook(payload: Buffer, signature: string, req?: Request): Promise<void> {
+  /**
+   * @param payload   Raw request body Buffer (must NOT be parsed by express.json()).
+   * @param signature Stripe-Signature header value.
+   * @param req       Optional Express request for structured logging.
+   * @param _loadSecrets  Override the signing-secret source (production: DB; tests: injected).
+   */
+  static async processWebhook(
+    payload: Buffer,
+    signature: string,
+    req?: Request,
+    _loadSecrets?: SecretsLoader,
+  ): Promise<void> {
     if (!Buffer.isBuffer(payload)) {
       throw new Error(
         'STRIPE WEBHOOK ERROR: Payload must be a Buffer. ' +
@@ -16,16 +42,14 @@ export class WebhookHandlers {
       );
     }
 
+    const loadSecrets = _loadSecrets ?? defaultSecretsLoader;
+
     // Intercept checkout.session.completed for track one-time purchases.
     // We retrieve the signing secret from the stripe._managed_webhooks table so we
     // can construct a verified Stripe event ourselves before stripe-replit-sync
     // processes the webhook (which only mirrors Stripe data into stripe.* tables).
     try {
-      const result = await db.execute(
-        sql`SELECT secret FROM stripe._managed_webhooks ORDER BY created DESC`
-      ) as unknown as { rows: { secret: string }[] };
-
-      const secrets = (result.rows ?? []).map((r) => r.secret).filter(Boolean);
+      const secrets = await loadSecrets();
       let event: Stripe.Event | null = null;
       if (secrets.length > 0) {
         const stripe = await getUncachableStripeClient();

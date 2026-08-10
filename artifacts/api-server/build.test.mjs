@@ -27,6 +27,7 @@ async function buildTest() {
       path.resolve(artifactDir, "src/__tests__/whitepaper.test.ts"),
       path.resolve(artifactDir, "src/__tests__/price-parity.test.ts"),
       path.resolve(artifactDir, "src/__tests__/download-gate.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/webhook-track-purchase.test.ts"),
     ],
     platform: "node",
     bundle: true,
