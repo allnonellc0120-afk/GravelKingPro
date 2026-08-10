@@ -69,10 +69,15 @@ export async function getStripeSync(): Promise<StripeSync> {
     throw new Error('DATABASE_URL environment variable is required');
   }
 
-  const { secretKey, webhookSecret } = await getStripeCredentials();
+  const { secretKey } = await getStripeCredentials();
+  // Intentionally omit stripeWebhookSecret so stripe-replit-sync always reads
+  // the signing secret from stripe._managed_webhooks on every processWebhook call.
+  // Passing a secret here (even from the connector or STRIPE_WEBHOOK_SECRET env var)
+  // would bypass that DB lookup and cause StripeSignatureVerificationError whenever
+  // the env-var value is stale or absent — which is the normal state once
+  // findOrCreateManagedWebhook has taken ownership of the endpoint.
   return new StripeSync({
     poolConfig: { connectionString: databaseUrl },
     stripeSecretKey: secretKey,
-    stripeWebhookSecret: webhookSecret ?? '',
   });
 }
