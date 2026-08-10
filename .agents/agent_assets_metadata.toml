@@ -550,3 +550,17 @@ uri = "file://attached_assets/generated/gravelking-play-promo-90s.mp4"
 type = "video"
 title = "GravelKing Pro — Google Play Promo (97s)"
 description = "Vertical 1080x1920 promo cut from your real footage: music video hook, Kevin reaction, sub-second speed demo, export flow, Google Play download CTA, and music video outro. Loudness-normalized for social."
+
+[[outputs]]
+id = "J3GBKkWQg5uUdnK2KY_ad"
+uri = "file://attached_assets/generated_audio/gk_narration.mp3"
+type = "audio"
+title = "GravelKing Pro narration"
+description = "Text-to-speech audio: I used to make music on my couch — just me, my phone, and a dream. I wanted that studio sound — the kind you hear on real records. So I built it. GravelKing Pro gives you studio…"
+
+[[outputs]]
+id = "O9NbgO-_0LN9ybGPP4Yqy"
+uri = "file://attached_assets/gkpro_google_play_promo.mp4"
+type = "video"
+title = "GravelKing Pro — Google Play Promo Video"
+description = "84-second vertical (1080×1920, 30fps) promo. Couch-to-studio story with AI fill shots, real app footage, music-video clips, DAW screen recording, and a Google Play end card. AI-generated narration (labeled)."
