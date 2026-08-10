@@ -62,3 +62,4 @@
 - [Authorship identity boundary](authorship-identity-boundary.md) — edit ledgers evidence account activity, not proof of who physically typed every character
 - [Google Play Billing](play-billing.md) — Stripe on web + Play Billing in TWA; server verifies tokens via subscriptionsv2; TWA needs alpha deps, notifications on, minSdk 23
 - [Funnel + trial integrity](funnel-trial-integrity.md) — trials consumed on webhook only; checkout blocks dup subs + expires open sessions; Play fails closed; copy follows trialEligible
+- [presentAsset null result](present-asset-null.md) — presentAsset returning null usually means the file is missing on disk; verify with ffprobe/ls and re-export before re-presenting
