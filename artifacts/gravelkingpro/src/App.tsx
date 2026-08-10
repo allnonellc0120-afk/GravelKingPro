@@ -41,6 +41,7 @@ import { PageTracker } from "@/lib/useAnalytics";
 import { RouteSeo } from "@/lib/seo";
 import DemoLogin from "@/pages/demo-login";
 import HelpPage from "@/pages/help";
+import AdminPublishChecklist from "@/pages/admin-publish-checklist";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,7 @@ function Router() {
       <Route path="/demo-login" component={DemoLogin} />
       <Route path="/help/:slug" component={HelpPage} />
       <Route path="/help" component={HelpPage} />
+      <Route path="/admin/publish-checklist" component={AdminPublishChecklist} />
       <Route component={NotFound} />
     </Switch>
   );

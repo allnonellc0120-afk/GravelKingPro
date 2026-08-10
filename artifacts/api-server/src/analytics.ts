@@ -5,8 +5,10 @@ export type AnalyticsEventType =
   | "landing_cta_clicked"
   | "plan_selected"
   | "signin_required"
+  | "signup_completed"
   | "checkout_returned"
   | "checkout_started"
+  | "checkout_error"
   | "subscription_activated"
   | "subscription_payment_failed";
 

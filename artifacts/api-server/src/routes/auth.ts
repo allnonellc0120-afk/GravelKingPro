@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { recordAnalyticsEvent } from "../analytics";
 import {
   clearSession,
   getOidcConfig,
@@ -359,6 +360,17 @@ router.get("/callback", async (req: Request, res: Response) => {
 
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
+
+  // Record signup completion event — best-effort, never block the redirect.
+  const visitorId = (req.cookies as Record<string, string>)?.gk_vid ?? null;
+  void recordAnalyticsEvent({
+    type: "signup_completed",
+    visitorId,
+    sessionId: dbUser.id,
+    path: "/callback",
+    metadata: { returnTo },
+  }).catch(() => {});
+
   res.redirect(returnTo);
 });
 

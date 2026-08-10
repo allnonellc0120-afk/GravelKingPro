@@ -16,19 +16,22 @@ import { useLocation } from "wouter";
 
 interface Summary {
   rangeDays: number;
-  totals: { pageviews: number; uniqueVisitors: number; checkoutStarts: number };
+  totals: { pageviews: number; uniqueVisitors: number; externalVisitors: number; checkoutStarts: number };
   subscriptions: {
     active: number; trialing: number; pastDue: number; total: number;
     mrr: number; recentRevenue: number; lifetimeRevenue: number; stripeOk: boolean;
   };
   conversion: {
     landingCtaClicks: number; planSelections: number; signinRequired: number;
-    checkoutReturns: number; subscriptionActivations: number;
+    signupCompleted: number; checkoutStarts: number;
+    checkoutReturns: number; checkoutErrors: number; subscriptionActivations: number;
     visitorToCheckoutPct: number; visitorToPaidPct: number; checkoutToPaidPct: number;
+    externalVisitorToPaidPct: number;
   };
   series: Array<{ day: string; pageviews: number; visitors: number; checkoutStarts: number }>;
   topPaths: Array<{ path: string | null; count: number }>;
   topReferrers: Array<{ referrer: string | null; count: number }>;
+  utmSources: Array<{ source: string; visitors: number; events: number }>;
 }
 
 const RANGES = [7, 30, 90] as const;
@@ -455,9 +458,9 @@ function AnalyticsDashboard() {
           <>
             {/* Stat cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              <StatCard icon={<Users className="w-4 h-4" />} label="Visitors" value={fmt(data.totals.uniqueVisitors)} sub={`last ${data.rangeDays}d`} />
+              <StatCard icon={<Users className="w-4 h-4" />} label="All Visitors" value={fmt(data.totals.uniqueVisitors)} sub={`last ${data.rangeDays}d (incl. internal)`} />
+              <StatCard icon={<Users className="w-4 h-4 text-amber-400" />} label="External Visitors" value={fmt(data.totals.externalVisitors ?? data.totals.uniqueVisitors)} sub="excl. admin-only sessions" accent="text-amber-400" />
               <StatCard icon={<Eye className="w-4 h-4" />} label="Pageviews" value={fmt(data.totals.pageviews)} sub={`last ${data.rangeDays}d`} />
-              <StatCard icon={<CreditCard className="w-4 h-4" />} label="Checkouts Opened" value={fmt(data.totals.checkoutStarts)} sub="Stripe session created" />
               <StatCard icon={<Crown className="w-4 h-4 text-amber-500" />} label="Active Subs" value={fmt(data.subscriptions.active)} sub={data.subscriptions.pastDue > 0 ? `+ ${data.subscriptions.pastDue} past due` : "paying"} accent="text-amber-500" />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -473,6 +476,8 @@ function AnalyticsDashboard() {
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-4">Conversion funnel · {data.rangeDays}d</div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <FunnelStep label="Unique Visitors" value={fmt(data.totals.uniqueVisitors)} />
+                  <FunnelArrow pct={pctOf(data.conversion.signupCompleted ?? 0, data.totals.uniqueVisitors)} />
+                  <FunnelStep label="Signed Up / In" value={fmt(data.conversion.signupCompleted ?? 0)} />
                   <FunnelArrow pct={pctOf(data.conversion.planSelections, data.totals.uniqueVisitors)} />
                   <FunnelStep label="Plan Selected" value={fmt(data.conversion.planSelections)} />
                   <FunnelArrow pct={pctOf(data.totals.checkoutStarts, data.conversion.planSelections)} />
@@ -484,14 +489,42 @@ function AnalyticsDashboard() {
                   Landing CTA clicks: <span className="text-foreground font-semibold">{fmt(data.conversion.landingCtaClicks)}</span>
                   {" · "}Hit sign-in wall: <span className="text-foreground font-semibold">{fmt(data.conversion.signinRequired)}</span>
                   {" · "}Returned from checkout: <span className="text-foreground font-semibold">{fmt(data.conversion.checkoutReturns)}</span>
+                  {" · "}Checkout errors: <span className="text-foreground font-semibold">{fmt(data.conversion.checkoutErrors ?? 0)}</span>
                   {" · "}Activations (webhook): <span className="text-foreground font-semibold">{fmt(data.conversion.subscriptionActivations)}</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Current paying subs (all-time): <span className="text-foreground font-semibold">{fmt(data.subscriptions.total)}</span>
-                  {" · "}Activations count webhook-confirmed subscriptions in this window (tracking began Aug 7, 2026).
+                  {" · "}External visitor→paid: <span className="text-foreground font-semibold">{data.conversion.externalVisitorToPaidPct ?? 0}%</span>
+                  {" · "}Activations count webhook-confirmed subscriptions in this window.
                 </p>
               </CardContent>
             </Card>
+
+            {/* UTM source breakdown */}
+            {data.utmSources && data.utmSources.length > 0 && (
+              <Card className="border-border/40 bg-card/40">
+                <CardContent className="pt-5">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-4">Traffic by UTM source · {data.rangeDays}d</div>
+                  <div className="space-y-2">
+                    {data.utmSources.map((s) => {
+                      const maxV = Math.max(...data.utmSources.map((x) => x.visitors));
+                      return (
+                        <div key={s.source}>
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="truncate text-foreground/90 max-w-[60%]">{s.source}</span>
+                            <span className="text-muted-foreground tabular-nums">{s.visitors.toLocaleString()} visitors</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-secondary/40 overflow-hidden">
+                            <div className="h-full bg-violet-500/70 rounded-full" style={{ width: `${maxV > 0 ? (s.visitors / maxV) * 100 : 0}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">UTM parameters survive the full visitor → sign-in journey when appended to the site URL (e.g. <code className="font-mono text-foreground/70">?utm_source=youtube&utm_campaign=gp_launch</code>).</p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Traffic chart */}
             <Card className="border-border/40 bg-card/40">
