@@ -39,3 +39,5 @@ and run env), so `=== "development"` is safe and frictionless (no extra secret t
 
 **How to apply:** Any future dev/owner bypass of a paid boundary uses the same fail-closed
 `=== "development"` check, defaulting to demo/paid gating otherwise.
+
+- Cloud Run kernel first hit after idle is a cold start (~13s vs ~0.3s warm); on-demand benchmarks must report min/median/max per run so a cold start is visible, not averaged away.

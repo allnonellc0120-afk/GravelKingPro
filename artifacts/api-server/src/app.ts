@@ -14,6 +14,13 @@ process.on("unhandledRejection", (reason) => logger.fatal({ reason }, "unhandled
 
 const app: Express = express();
 
+// Stamp request arrival so routes can report true server-side handler time
+// (health.ts serverMs, master.ts X-GK-Timing-* headers).
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.locals.requestStartMs = performance.now();
+  next();
+});
+
 app.use(
   pinoHttp({
     logger,
