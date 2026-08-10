@@ -6,4 +6,4 @@ description: What a null return from presentAsset means and how to recover
 
 **Why:** The Google Play promo card came back null twice; the underlying MP4 in both /tmp and attached_assets/generated had been wiped, so re-calling presentAsset alone could never work.
 
-**How to apply:** Before (re)presenting a media asset, verify with `ls`/`ffprobe` and a quick decode check (sample frames at start/middle/end). If missing, re-export from source footage first, then present. A successful call prints a result instead of null.
+**How to apply:** Before (re)presenting a media asset, verify with `ls`/`ffprobe` and a quick decode check (sample frames at start/middle/end). If missing, re-export from source footage first, then present. A successful call prints a result instead of null. Note: null can also be transient — a retry with the file verified intact has succeeded, so verify then retry once before re-exporting.
