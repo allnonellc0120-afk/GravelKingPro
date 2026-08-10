@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, ArrowRight, CheckCircle2, Clock3, FileCheck2, LockKeyhole, RefreshCw, Server, ShieldCheck, TriangleAlert, XCircle, Zap } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, Clock3, FileCheck2, Fullscreen, LockKeyhole, Minimize2, RefreshCw, Server, ShieldCheck, TriangleAlert, XCircle, Zap } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { AdminGate, useAdminAuth } from "@/components/admin-gate";
 import { AdminNav } from "@/components/admin-nav";
@@ -26,6 +26,17 @@ function EvidenceBadge({ children, tone = "neutral" }: { children: React.ReactNo
   return <Badge variant="outline" className={styles[tone]}>{children}</Badge>;
 }
 
+function JumpLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      className="rounded-md border border-border/50 bg-secondary/20 px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-amber-500/50 hover:text-amber-300"
+    >
+      {children}
+    </a>
+  );
+}
+
 function Metric({ value, label, detail }: { value: string; label: string; detail: string }) {
   return (
     <div className="rounded-xl border border-border/50 bg-secondary/20 p-5">
@@ -50,6 +61,7 @@ function SectionLabel({ eyebrow, title, children }: { eyebrow: string; title: st
 
 function IntegrationDemoDashboard() {
   const { logout } = useAdminAuth();
+  const [screenShare, setScreenShare] = useState(false);
   const [health, setHealth] = useState<Health>({
     state: "checking",
     statusCode: null,
@@ -99,29 +111,48 @@ function IntegrationDemoDashboard() {
   const healthColor = health.state === "ok" ? "text-emerald-300" : health.state === "checking" ? "text-amber-300" : "text-red-300";
 
   return (
-    <Layout>
-      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
-        <AdminNav />
+    <Layout hideChrome={screenShare}>
+      <main className={`mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6 ${screenShare ? "max-w-7xl py-10 sm:px-10 lg:py-14" : ""}`}>
+        {!screenShare && <AdminNav />}
 
         <header className="flex flex-col justify-between gap-5 border-b border-border/40 pb-7 lg:flex-row lg:items-end">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-amber-500">
               <Zap className="h-4 w-4" /> Partner integration brief
             </div>
-            <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-foreground sm:text-5xl">
+            <h1 className={`mt-3 max-w-3xl font-black tracking-tight text-foreground ${screenShare ? "text-5xl sm:text-7xl" : "text-4xl sm:text-5xl"}`}>
               A fast, verifiable audio API.
             </h1>
-            <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            <p className={`mt-3 max-w-2xl leading-relaxed text-muted-foreground ${screenShare ? "text-lg sm:text-xl" : "text-base"}`}>
               A screen-share view for Joel and Sink Tank: what is live, what has been measured, and what must be completed before a production handoff.
             </p>
           </div>
-          <Button variant="outline" onClick={() => void checkHealth()} disabled={health.state === "checking"} className="shrink-0 gap-2">
-            <RefreshCw className={health.state === "checking" ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-            Check now
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setScreenShare((current) => !current)}
+              className="shrink-0 gap-2"
+              aria-pressed={screenShare}
+            >
+              {screenShare ? <Minimize2 className="h-4 w-4" /> : <Fullscreen className="h-4 w-4" />}
+              {screenShare ? "Exit screen-share" : "Screen-share mode"}
+            </Button>
+            <Button variant="outline" onClick={() => void checkHealth()} disabled={health.state === "checking"} className="shrink-0 gap-2">
+              <RefreshCw className={health.state === "checking" ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+              Check now
+            </Button>
+          </div>
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <nav aria-label="Demo sections" className="flex flex-wrap gap-2">
+          <JumpLink href="#live">Live check</JumpLink>
+          <JumpLink href="#evidence">Measured evidence</JumpLink>
+          <JumpLink href="#capacity">Capacity boundary</JumpLink>
+          <JumpLink href="#ip-validation">IP verification</JumpLink>
+          <JumpLink href="#pilot">Pilot plan</JumpLink>
+        </nav>
+
+        <section id="live" className="scroll-mt-6 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className={`border-2 ${health.state === "ok" ? "border-emerald-500/35" : health.state === "error" ? "border-red-500/35" : "border-amber-500/30"} bg-card/60`}>
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-start justify-between gap-4">
@@ -172,7 +203,7 @@ function IntegrationDemoDashboard() {
           </Card>
         </section>
 
-        <section className="space-y-4">
+        <section id="evidence" className="scroll-mt-6 space-y-4">
           <SectionLabel eyebrow="Measured evidence" title="The API has been exercised under load">
             <EvidenceBadge tone="good">Verified test results</EvidenceBadge>
           </SectionLabel>
@@ -186,7 +217,7 @@ function IntegrationDemoDashboard() {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <section id="capacity" className="scroll-mt-6 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className="border-amber-500/25 bg-amber-500/[0.04]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl"><TriangleAlert className="h-5 w-5 text-amber-400" /> Current capacity boundary</CardTitle>
@@ -214,12 +245,12 @@ function IntegrationDemoDashboard() {
             <CardContent className="space-y-4 text-sm leading-relaxed text-muted-foreground">
               <p>The separate DSP benchmark measured approximately <strong className="text-foreground">109× realtime</strong> on its test environment.</p>
               <p><strong className="text-foreground">That is not an end-to-end API SLA.</strong> Network time, file upload, concurrency, and worker capacity still need production measurement.</p>
-              <div className="flex items-center gap-2"><EvidenceBadge>Benchmark context</EvidenceBadge><span>Not a promise</span></div>
+              <div className="flex items-center gap-2"><EvidenceBadge tone="warn">Projection / context</EvidenceBadge><span>Not a promise</span></div>
             </CardContent>
           </Card>
         </section>
 
-        <section className="space-y-4">
+        <section id="ip-validation" className="scroll-mt-6 space-y-4">
           <SectionLabel eyebrow="IP validation" title="The certificate uses two anchors, not one claim">
             <EvidenceBadge tone="good">Explainable to partners</EvidenceBadge>
           </SectionLabel>
@@ -231,12 +262,30 @@ function IntegrationDemoDashboard() {
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-4"><CheckCircle2 className="h-5 w-5 text-blue-400" /><div className="mt-3 font-semibold">HMAC-SHA256</div><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Binds both anchors and produces INTACT, TAMPERED, or NO_WATERMARK.</p></div>
             </CardContent>
           </Card>
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              ["INTACT", "Anchor A, Anchor B, and the HMAC binding all agree.", "good"],
+              ["TAMPERED", "An anchor is missing, malformed, or no longer matches the proof.", "warn"],
+              ["NO_WATERMARK", "No GravelKing signal anchor is present in the submitted file.", "neutral"],
+            ].map(([verdict, explanation, tone]) => (
+              <div key={verdict} className="rounded-xl border border-border/50 bg-secondary/20 p-4">
+                <EvidenceBadge tone={tone as "good" | "warn" | "neutral"}>{verdict}</EvidenceBadge>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{explanation}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <section id="pilot" className="scroll-mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <Card className="border-border/50 bg-card/60">
-            <CardHeader><CardTitle className="text-xl">Pilot recommendation</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-xl">Partner integration summary</CardTitle>
+              <p className="text-sm leading-relaxed text-muted-foreground">Intended use: Sink Tank submits audio for mastering, receives the output and certificate ID, then uses public verification to confirm the issued signal.</p>
+            </CardHeader>
             <CardContent className="space-y-3">
+              <div className="rounded-lg border border-border/40 bg-secondary/20 p-4 text-sm leading-relaxed text-muted-foreground">
+                <strong className="text-foreground">Supported flow:</strong> key-gated <span className="font-mono text-xs text-amber-300">POST /api/v1/ingest</span> → mastered WAV + headers → public <span className="font-mono text-xs text-amber-300">POST /api/v1/verify</span>.
+              </div>
               {[
                 ["10 tracks", "Confirm auth, file shape, output headers, and certificate handling."],
                 ["50 tracks", "Measure real end-to-end latency and observe back-pressure."],
@@ -250,7 +299,10 @@ function IntegrationDemoDashboard() {
             </CardContent>
           </Card>
           <Card className="border-red-500/25 bg-red-500/[0.03]">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-xl"><FileCheck2 className="h-5 w-5 text-red-300" /> Handoff gates before real credentials</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl"><FileCheck2 className="h-5 w-5 text-red-300" /> Remaining handoff gates</CardTitle>
+              <p className="text-sm leading-relaxed text-muted-foreground">These are next steps, not completed evidence.</p>
+            </CardHeader>
             <CardContent className="space-y-3">
               {[
                 "Publish and verify /api/v1/ingest and /api/v1/verify on the public deployment.",
