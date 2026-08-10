@@ -19,7 +19,7 @@ async function createAdminStrategyPDF() {
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const italic = await pdf.embedFont(StandardFonts.HelveticaOblique);
 
-  let page: ReturnType<typeof pdf.addPage>;
+  let page!: ReturnType<typeof pdf.addPage>;
   let y: number;
 
   function newPage(bg = white) {

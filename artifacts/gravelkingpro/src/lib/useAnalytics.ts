@@ -13,7 +13,13 @@ function campaignMetadata(): Record<string, string> | undefined {
 
 /** Records a privacy-safe conversion milestone. */
 export function trackFunnelEvent(
-  type: "landing_cta_clicked" | "plan_selected" | "signin_required" | "checkout_returned",
+  type:
+    | "landing_cta_clicked"
+    | "plan_selected"
+    | "signin_required"
+    | "checkout_returned"
+    | "signup_completed"
+    | "checkout_error",
   metadata?: Record<string, string>,
 ): void {
   void fetch("/api/analytics/event", {

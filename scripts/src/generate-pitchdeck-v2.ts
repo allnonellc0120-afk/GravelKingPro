@@ -19,7 +19,8 @@ async function createPitchDeckV2() {
   const italic = await pdf.embedFont(StandardFonts.HelveticaOblique);
 
   let y = pageH - margin;
-  let page: ReturnType<typeof pdf.addPage>;
+  // Definite assignment: newPage() is always called before any use of `page`.
+  let page!: ReturnType<typeof pdf.addPage>;
 
   function newPage(bg = dark) {
     page = pdf.addPage([pageW, pageH]);

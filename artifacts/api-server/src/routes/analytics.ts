@@ -86,13 +86,15 @@ const FUNNEL_EVENTS = new Set([
   "landing_cta_clicked",
   "plan_selected",
   "signin_required",
+  "signup_completed",
   "checkout_returned",
+  "checkout_error",
 ]);
 
 function safeCampaignMetadata(value: unknown): Record<string, string> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const source = value as Record<string, unknown>;
-  const allowed = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "plan", "outcome"];
+  const allowed = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "plan", "outcome", "cta", "error"];
   const metadata: Record<string, string> = {};
   for (const key of allowed) {
     const normalized = clampString(source[key], 120);
@@ -116,6 +118,25 @@ function ensureVisitorId(req: Request, res: Response): string {
   return visitorId;
 }
 
+/**
+ * Internal/preview traffic detection — flags rows so the admin funnel can
+ * report external (qualified) visitors separately from the owner's own
+ * browsing. Internal = the request arrives from the Replit dev preview
+ * domain, localhost, or a browser carrying the admin session cookie.
+ */
+function isInternalTraffic(req: Request): boolean {
+  const cookies = (req.cookies as Record<string, string>) ?? {};
+  if (cookies.gk_admin) return true; // owner's browser
+  const origin = String(req.headers.origin ?? req.headers.referer ?? "");
+  if (!origin) return false;
+  if (/localhost|127\.0\.0\.1/.test(origin)) return true;
+  const devDomain = process.env.REPLIT_DEV_DOMAIN;
+  if (devDomain && origin.includes(devDomain)) return true;
+  // Any *.replit.dev / *.repl.co preview host that is NOT the production domain
+  if (/\.replit\.dev|\.repl\.co/.test(origin)) return true;
+  return false;
+}
+
 // ── Public beacons — pageviews plus privacy-safe funnel milestones ──────────
 analyticsRouter.post("/analytics/track", async (req: Request, res: Response) => {
   try {
@@ -134,13 +155,16 @@ analyticsRouter.post("/analytics/track", async (req: Request, res: Response) => 
     const visitorId = ensureVisitorId(req, res);
     const sessionId = cookies.gk_session ?? null;
 
+    const metadata = safeCampaignMetadata(body.metadata) ?? {};
+    if (isInternalTraffic(req)) metadata.internal = "1";
+
     await recordAnalyticsEvent({
       type: "pageview",
       visitorId,
       sessionId,
       path,
       referrer,
-      metadata: safeCampaignMetadata(body.metadata),
+      metadata: Object.keys(metadata).length > 0 ? metadata : null,
     });
     res.json({ ok: true });
   } catch (err: unknown) {
@@ -166,12 +190,15 @@ analyticsRouter.post("/analytics/event", async (req: Request, res: Response) => 
       return;
     }
 
+    const metadata = safeCampaignMetadata(body.metadata) ?? {};
+    if (isInternalTraffic(req)) metadata.internal = "1";
+
     await recordAnalyticsEvent({
       type: type as Parameters<typeof recordAnalyticsEvent>[0]["type"],
       visitorId: ensureVisitorId(req, res),
       sessionId: cookies.gk_session ?? null,
       path: clampString(body.path, 512),
-      metadata: safeCampaignMetadata(body.metadata),
+      metadata: Object.keys(metadata).length > 0 ? metadata : null,
     });
     res.json({ ok: true });
   } catch (err: unknown) {
@@ -192,11 +219,15 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
       .select({
         pageviews: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'pageview')`,
         uniqueVisitors: sql<number>`count(distinct ${analyticsEventsTable.visitorId}) filter (where ${analyticsEventsTable.type} = 'pageview')`,
+        // External = visitors never flagged internal (dev preview origin / admin cookie at record time)
+        externalVisitors: sql<number>`count(distinct ${analyticsEventsTable.visitorId}) filter (where ${analyticsEventsTable.type} = 'pageview' and coalesce(${analyticsEventsTable.metadata}->>'internal', '0') <> '1')`,
         landingCtaClicks: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'landing_cta_clicked')`,
         planSelections: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'plan_selected')`,
         signinRequired: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'signin_required')`,
+        signupCompleted: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'signup_completed')`,
         checkoutStarts: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'checkout_started')`,
         checkoutReturns: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'checkout_returned')`,
+        checkoutErrors: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'checkout_error')`,
         subscriptionActivations: sql<number>`count(*) filter (where ${analyticsEventsTable.type} = 'subscription_activated')`,
       })
       .from(analyticsEventsTable)
@@ -241,6 +272,20 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
       .groupBy(analyticsEventsTable.referrer)
       .orderBy(desc(sql`count(*)`))
       .limit(10);
+
+    // UTM source breakdown — how many unique visitors arrived per source
+    const utmSourceRows = await db.execute(
+      sql`SELECT metadata->>'utm_source' AS utm_source,
+                 count(distinct visitor_id) AS visitors,
+                 count(*) AS events
+          FROM analytics_events
+          WHERE created_at >= ${since}
+            AND type = 'pageview'
+            AND metadata->>'utm_source' IS NOT NULL
+          GROUP BY metadata->>'utm_source'
+          ORDER BY visitors DESC
+          LIMIT 20`,
+    ) as unknown as { rows: { utm_source: string; visitors: string; events: string }[] };
 
     // Live subscription / MRR snapshot from Stripe (all-time, current state).
     let activeSubs = 0;
@@ -307,6 +352,7 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
 
     const pageviews = Number(totals?.pageviews ?? 0);
     const uniqueVisitors = Number(totals?.uniqueVisitors ?? 0);
+    const externalVisitors = Number(totals?.externalVisitors ?? 0);
     const checkoutStarts = Number(totals?.checkoutStarts ?? 0);
     const payingTotal = activeSubs + trialingSubs;
 
@@ -315,7 +361,7 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
 
     res.json({
       rangeDays: days,
-      totals: { pageviews, uniqueVisitors, checkoutStarts },
+      totals: { pageviews, uniqueVisitors, externalVisitors, checkoutStarts },
       subscriptions: {
         active: activeSubs,
         trialing: trialingSubs,
@@ -330,11 +376,15 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
         landingCtaClicks: Number(totals.landingCtaClicks),
         planSelections: Number(totals.planSelections),
         signinRequired: Number(totals.signinRequired),
+        signupCompleted: Number(totals.signupCompleted ?? 0),
+        checkoutStarts,
         visitorToCheckoutPct: pct(checkoutStarts, uniqueVisitors),
         checkoutReturns: Number(totals.checkoutReturns),
+        checkoutErrors: Number(totals.checkoutErrors ?? 0),
         subscriptionActivations: Number(totals.subscriptionActivations),
         visitorToPaidPct: pct(payingTotal, uniqueVisitors),
         checkoutToPaidPct: pct(payingTotal, checkoutStarts),
+        externalVisitorToPaidPct: pct(payingTotal, externalVisitors),
       },
       series: seriesRows.map((r) => ({
         day: r.day,
@@ -344,6 +394,11 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
       })),
       topPaths: topPaths.map((r) => ({ path: r.path, count: Number(r.count) })),
       topReferrers: topReferrers.map((r) => ({ referrer: r.referrer, count: Number(r.count) })),
+      utmSources: (utmSourceRows.rows ?? []).map((r) => ({
+        source: r.utm_source,
+        visitors: Number(r.visitors),
+        events: Number(r.events),
+      })),
     });
   } catch (err: unknown) {
     req.log?.error({ err }, "analytics summary failed");

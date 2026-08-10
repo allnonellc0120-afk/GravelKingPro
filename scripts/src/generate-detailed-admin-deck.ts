@@ -28,7 +28,7 @@ async function createDetailedAdminDeck() {
   const fb = await pdf.embedFont(bold);
   const fi = await pdf.embedFont(italic);
 
-  let page: ReturnType<typeof pdf.addPage>;
+  let page!: ReturnType<typeof pdf.addPage>;
   let y: number;
 
   function newPage(bg = white) {

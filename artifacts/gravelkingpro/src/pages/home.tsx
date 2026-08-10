@@ -51,10 +51,11 @@ function SignUpSection() {
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const { toast } = useToast();
 
-  const trialTarget = "/pricing?plan=monthly";
-  const trialHref = isAuthenticated
-    ? trialTarget
-    : `/api/login?returnTo=${encodeURIComponent(trialTarget)}`;
+  // Route to pricing with Studio plan pre-selected; sign-in preserves that intent
+  const studioTarget = "/pricing?plan=monthly";
+  const studioHref = isAuthenticated
+    ? studioTarget
+    : `/api/login?returnTo=${encodeURIComponent(studioTarget)}`;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,25 +81,25 @@ function SignUpSection() {
       <div className="space-y-2">
         <div className="flex items-center justify-center gap-2">
           <Crown className="w-5 h-5 text-amber-400" />
-          <h2 className="text-2xl font-black">Try Pro Plus Free for 7 Days</h2>
+          <h2 className="text-2xl font-black">Start your GravelKing Studio trial</h2>
         </div>
         <p className="text-muted-foreground text-sm max-w-md mx-auto">
-          Full mastering suite, vocal booth, live DAW, and IP certification. Start your trial
-          at checkout — cancel anytime during the 7 days and you pay nothing.
+          Full mastering suite, vocal booth, live DAW, and IP certification.
+          A 7-day free trial is available at checkout for new accounts — card required, cancel anytime.
         </p>
       </div>
 
       <div className="space-y-2">
         <a
-          href={trialHref}
-          onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "home_trial_section" })}
+          href={studioHref}
+          onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "home_studio_section" })}
         >
           <Button className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-12 px-8 text-base shadow-lg shadow-violet-500/25">
-            Start 7-Day Free Trial <ArrowRight className="w-4 h-4 ml-2" />
+            See Plans &amp; Start Trial <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </a>
         <p className="text-xs text-muted-foreground">
-          {planPrices.monthly.label} after your trial · Card required at checkout · One trial per account · Cancel anytime
+          {planPrices.monthly.label} · Card required at checkout · One trial per account · Cancel anytime
         </p>
       </div>
 
@@ -182,26 +183,26 @@ export default function Home() {
 
             {/* CTA buttons */}
             <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
-              <Link href="/songwriting">
-                <Button
-                  onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_certify" })}
-                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-13 px-8 text-base shadow-lg shadow-violet-500/25 h-12">
-                  <ShieldCheck className="w-4 h-4 mr-2" /> Certify My IP — Free
-                </Button>
-              </Link>
-              <Link href="/pricing">
-                <Button
-                  onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_trial" })}
-                  className="bg-amber-500 hover:bg-amber-400 text-black font-bold h-12 px-8 text-base shadow-lg shadow-amber-500/25">
-                  <Crown className="w-4 h-4 mr-2" /> Start Free Trial
-                </Button>
-              </Link>
               <Link href="/mastering">
                 <Button
-                  variant="outline"
                   onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_master" })}
-                  className="h-12 px-8 text-base border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/60 font-bold">
-                  <Wand2 className="w-4 h-4 mr-2" /> Master a Track Free
+                  className="bg-amber-500 hover:bg-amber-400 text-black font-bold h-12 px-8 text-base shadow-lg shadow-amber-500/25">
+                  <Wand2 className="w-4 h-4 mr-2" /> Master a Track — Free
+                </Button>
+              </Link>
+              <Link href="/pricing?plan=monthly">
+                <Button
+                  onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_pricing" })}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-12 px-8 text-base shadow-lg shadow-violet-500/25">
+                  <Crown className="w-4 h-4 mr-2" /> See Studio Plans
+                </Button>
+              </Link>
+              <Link href="/songwriting">
+                <Button
+                  variant="outline"
+                  onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "hero_certify" })}
+                  className="h-12 px-8 text-base border-violet-500/40 text-violet-300 hover:bg-violet-500/10 hover:border-violet-500/60 font-bold">
+                  <ShieldCheck className="w-4 h-4 mr-2" /> Certify My IP
                 </Button>
               </Link>
             </div>
@@ -224,7 +225,7 @@ export default function Home() {
             {!isAuthenticated && (
               <p className="text-xs text-muted-foreground pt-1">
                 <button onClick={login} className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</button>{" "}
-                to save your work and unlock your free trial.
+                to save your work and manage your subscription.
               </p>
             )}
           </div>
@@ -313,10 +314,12 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-violet-500/15">
-            <p className="text-sm text-muted-foreground">IP certification included in GravelKing Pro Plus — <strong className="text-white">7-day free trial</strong></p>
-            <Link href="/pricing">
-              <Button className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-6 h-10 shrink-0">
-                <Crown className="w-3.5 h-3.5 mr-1.5" /> Start Free Trial
+            <p className="text-sm text-muted-foreground">IP certification included in GravelKing Studio — trial available at checkout for new accounts</p>
+            <Link href="/pricing?plan=monthly">
+              <Button
+                onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: "ip_section_plans" })}
+                className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-6 h-10 shrink-0">
+                <Crown className="w-3.5 h-3.5 mr-1.5" /> See Studio Plans
               </Button>
             </Link>
           </div>
@@ -487,22 +490,26 @@ export default function Home() {
                 cta: "Start Weekly", ctaStyle: "outline" as const,
               },
               {
-                name: "Pro Plus", price: planPrices.monthly.amount, period: planPrices.monthly.period,
+                name: "GravelKing Studio", price: planPrices.monthly.amount, period: planPrices.monthly.period,
                 color: "border-amber-500/40 bg-amber-500/5",
-                badge: "Most Popular", badgeColor: "bg-amber-500 text-black",
-                features: ["Everything in Weekly", "IP certificate", "7-day free trial"],
-                cta: "Start Free Trial", ctaStyle: "default" as const,
+                badge: "Artist Plan", badgeColor: "bg-amber-500 text-black",
+                features: ["Everything in Weekly", "IP certificate", "Trial at checkout for new accounts"],
+                cta: "Get Studio", ctaStyle: "default" as const,
                 highlight: true,
               },
               {
                 name: "Node Auditor", price: planPrices.node_auditor.amount, period: planPrices.node_auditor.period,
                 color: "border-purple-500/40 bg-purple-500/5",
                 badge: "Enterprise", badgeColor: "bg-purple-500 text-white",
-                features: ["Everything in Pro Plus", "MLK V3.5 optimizer", "White-label exports"],
+                features: ["Everything in Studio", "MLK V3.5 optimizer", "White-label exports"],
                 cta: "Contact Us", ctaStyle: "outline" as const,
               },
             ].map((plan) => (
-              <Link key={plan.name} href={plan.name === "Node Auditor" ? "/contact" : "/pricing"}>
+              <Link
+                key={plan.name}
+                href={plan.name === "Node Auditor" ? "/contact" : plan.name === "GravelKing Studio" ? "/pricing?plan=monthly" : "/pricing"}
+                onClick={() => trackFunnelEvent("landing_cta_clicked", { cta: `pricing_strip_${plan.name.toLowerCase().replace(/\s+/g, "_")}` })}
+              >
                 <div className={`rounded-xl border p-5 space-y-4 h-full ${plan.color} hover:border-amber-500/30 transition-colors cursor-pointer`}>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between gap-2">

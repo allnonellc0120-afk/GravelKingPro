@@ -21,6 +21,7 @@ import {
 
 type PlanId = "weekly" | "monthly" | "node_auditor";
 
+// Product names must match Stripe product names exactly (as seeded by seed-products.ts)
 const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
   weekly: "GravelKing Weekly",
   monthly: "GravelKing Studio",
@@ -57,9 +58,9 @@ const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref
     ctaHref: "/mastering",
   },
   monthly: {
-    planName: "GravelKing Pro Plus",
-    ctaLabel: "Launch the Quality Optimizer",
-    ctaHref: "/optimizer",
+    planName: "GravelKing Studio",
+    ctaLabel: "Open the Studio DAW",
+    ctaHref: "/studio",
   },
   node_auditor: {
     planName: "Node Auditor",
@@ -311,7 +312,9 @@ export default function Pricing() {
           window.location.href = `/api/login?returnTo=${encodeURIComponent(`/pricing?plan=${planId}`)}`;
           return;
         }
-        throw new Error(errData.error ?? "Checkout failed");
+        const errMsg = errData.error ?? "Checkout failed";
+        trackFunnelEvent("checkout_error", { plan: planId, error: errMsg.slice(0, 100) });
+        throw new Error(errMsg);
       }
       const { url } = await checkoutRes.json() as { url: string };
       if (url) window.location.href = url;
@@ -406,14 +409,14 @@ export default function Pricing() {
           )}
         </AnimatePresence>
 
-        {/* Sales headline — Fortune 500 proven pattern: problem → agitation → solution */}
+        {/* Sales headline — problem → solution */}
         <div className="text-center mb-10">
           <motion.h1
             className="text-3xl sm:text-4xl font-bold tracking-tight mb-3"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            Stop paying $200+/track for mastering.
+            Choose your plan.
           </motion.h1>
           <motion.p
             className="text-muted-foreground text-lg max-w-2xl mx-auto"
@@ -421,7 +424,12 @@ export default function Pricing() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            GravelKing Studio delivers pro-level stems, mastering, and a live DAW — for less than a single coffee per week.
+            GravelKing Studio is the recommended plan for independent artists — pro-level mastering, live DAW, vocal booth, and IP certification in one subscription.
+            {trialEligible && !playMode && (
+              <span className="block text-sm text-emerald-400 font-medium mt-2">
+                New accounts get a 7-day free trial on Studio. Card required at checkout — cancel anytime during the trial.
+              </span>
+            )}
           </motion.p>
         </div>
 
@@ -442,7 +450,7 @@ export default function Pricing() {
               ? [
                   "Sign in to start your free trial",
                   "Cancel anytime — 1-click in app",
-                  "7-day free trial on Pro Plus",
+                  "7-day free trial on Studio",
                   "One trial per account, ever",
                 ]
               : [
@@ -577,13 +585,13 @@ export default function Pricing() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <Card className="flex flex-col h-full border-amber-500/40 bg-amber-500/[0.03] relative overflow-hidden ring-1 ring-amber-500/20">
               <div className="absolute top-0 right-0 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg flex items-center gap-1">
-                <Star className="w-3 h-3" /> MOST POPULAR
+                <Star className="w-3 h-3" /> ARTIST PLAN
               </div>
               <CardHeader>
                 <CardTitle className="text-lg text-amber-500 flex items-center gap-2">
-                  <Crown className="w-4 h-4" /> GravelKing Pro Plus
+                  <Crown className="w-4 h-4" /> GravelKing Studio
                 </CardTitle>
-                <CardDescription>Studio tools + the MLK V3.5 Quality Optimizer that tunes your separation settings</CardDescription>
+                <CardDescription>Everything an independent artist needs — mastering, DAW, vocal booth, IP cert</CardDescription>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold">{planPrices.monthly.amount}</span>
                   <span className="text-muted-foreground text-sm">{planPrices.monthly.period}</span>
@@ -628,7 +636,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-studio"
                   >
-                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 7-day trial") : playMode || !trialEligible ? "Get Pro Plus" : "Start Free Trial — Get Pro Plus"}
+                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 7-day trial") : playMode || !trialEligible ? "Get Studio" : "Start Free Trial — Get Studio"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
@@ -650,7 +658,7 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Everything in Pro Plus</FeatureRow>
+                  <FeatureRow yes>Everything in Studio</FeatureRow>
                   <FeatureRow yes>Unlimited MLK V3.5 optimizer runs</FeatureRow>
                   <FeatureRow yes>Up to 100 devices optimized</FeatureRow>
                   <FeatureRow yes>White-label WAV &amp; PDF exports</FeatureRow>
