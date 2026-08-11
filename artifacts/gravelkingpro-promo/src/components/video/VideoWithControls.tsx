@@ -152,7 +152,7 @@ export default function VideoWithControls() {
   const [tapPinned, setTapPinned] = useState(false);
   const [mp4Url, setMp4Url] = useState<string | null>(null);
   const hideTimerRef = useRef<number | null>(null);
-  const mp4Path = `${import.meta.env.BASE_URL}videos/gravelkingpro_lyrics_generator_30s_16x9.mp4`;
+  const mp4Path = `${import.meta.env.BASE_URL}videos/gravelkingpro_lyrics_generator_59s_16x9.mp4`;
 
   const resetHideTimer = useCallback(() => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);

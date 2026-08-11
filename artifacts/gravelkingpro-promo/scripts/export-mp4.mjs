@@ -15,15 +15,19 @@ const root = path.resolve(__dirname, '..');
 const dist = path.resolve(root, 'dist/public');
 const isVertical = process.argv[3] === 'vertical';
 const output = path.resolve(root, process.argv[2] || (isVertical
-  ? 'public/videos/gravelkingpro_lyrics_generator_30s_9x16.mp4'
-  : 'public/videos/gravelkingpro_lyrics_generator_30s_16x9.mp4'));
+  ? 'public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4'
+  : 'public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4'));
 const tmpDir = path.resolve(root, '.tmp-export');
 fs.mkdirSync(tmpDir, { recursive: true });
+for (const entry of fs.readdirSync(tmpDir)) {
+  fs.rmSync(path.join(tmpDir, entry), { recursive: true, force: true });
+}
 
-const WIDTH = isVertical ? 1080 : 1920;
-const HEIGHT = isVertical ? 1920 : 1080;
+const WIDTH = isVertical ? 2160 : 3840;
+const HEIGHT = isVertical ? 3840 : 2160;
 const FPS = 30;
-const DURATION_MS = 30000; // matches SCENE_DURATIONS total
+const DURATION_MS = 59000; // matches SCENE_DURATIONS total
+const EXPORT_PORT = Number(process.env.EXPORT_PORT || 5001);
 
 const CANDIDATE_CHROMIUMS = [
   '/nix/store/hvv3n9pvjfq0x8wjw8f3igsyvlaz1ngr-playwright-browsers-chromium/chromium-1091/chrome-linux/chrome',
@@ -83,7 +87,7 @@ async function startStaticServer() {
       fs.createReadStream(file).pipe(res);
     });
   });
-  await new Promise(r => server.listen(5000, '127.0.0.1', r));
+  await new Promise(r => server.listen(EXPORT_PORT, '127.0.0.1', r));
   return server;
 }
 
@@ -91,8 +95,8 @@ async function mixAudio() {
   const audioPath = path.join(tmpDir, 'audio.m4a');
   const soundtrack = path.join(root, 'public/audio/gravelking_pro_soundtrack.mp3');
   execFileSync('ffmpeg', [
-    '-y', '-stream_loop', '-1', '-i', soundtrack, '-t', '30',
-    '-af', 'volume=0.18,afade=t=in:st=0:d=0.5,afade=t=out:st=28.5:d=1.5',
+    '-y', '-stream_loop', '-1', '-i', soundtrack, '-t', '59',
+    '-af', 'volume=0.2,afade=t=in:st=0:d=0.5,afade=t=out:st=57.5:d=1.5',
     '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
     audioPath,
   ], { stdio: 'inherit' });
@@ -113,7 +117,7 @@ async function recordVideo() {
   });
   const page = await ctx.newPage();
   const formatQuery = isVertical ? '&format=vertical' : '';
-  await page.goto(`http://127.0.0.1:5000/gravelkingpro-promo/?export=1${formatQuery}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(`http://127.0.0.1:${EXPORT_PORT}/gravelkingpro-promo/?export=1${formatQuery}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   // Wait for the first frame to render.
   await page.waitForTimeout(1000);
@@ -135,8 +139,8 @@ async function recordVideo() {
     await page.waitForTimeout(Math.min(10000, DURATION_MS - elapsed));
   }
   await page.waitForTimeout(500);
-  await ctx.close();
-  await browser.close();
+  try { await ctx.close(); } catch {}
+  try { await browser.close(); } catch {}
   await new Promise((r, e) => server.close(err => (err ? e(err) : r())));
 
   const videoFile = fs.readdirSync(tmpDir).find(f => f.endsWith('.webm'));
@@ -159,7 +163,7 @@ async function main() {
   const audioPath = await mixAudio();
   console.log('Audio:', audioPath);
 
-  console.log('Recording video at 1920x1080, 30fps for', DURATION_MS / 1000, 's...');
+  console.log(`Recording video at ${WIDTH}x${HEIGHT}, 30fps for`, DURATION_MS / 1000, 's...');
   const videoPath = await recordVideo();
   console.log('Video:', videoPath);
 
