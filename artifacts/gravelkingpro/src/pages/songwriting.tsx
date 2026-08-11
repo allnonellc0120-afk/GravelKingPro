@@ -13,7 +13,7 @@ import {
   FileText, Clock, Wand2, Check, RefreshCw, Plus, Trash2,
   ChevronRight, Mic, X, Share2, Shield, ShieldCheck, Fingerprint, ArrowRight,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { authorshipScore as computeAuthorshipScore } from "@workspace/authorship";
 
@@ -110,6 +110,82 @@ function getLastWord(text: string): string {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+/**
+ * Self-contained "Generate with MLK v3.5" button (Task #73).
+ * Sends the lyrics to POST /api/mlk/v35/generate-master, which generates the
+ * song with Vertex AI Lyria, masters it through the real MLK v3.5 kernel,
+ * issues a Dual-Anchor IP cert, and saves the track to the user's vault.
+ * On success it redirects straight into the EXISTING Mastering Tool
+ * (/mastering?gkTrack=…) — no new player or screen here. The Mastering Tool
+ * owns all playback, mastering, and download UI for the generated track.
+ */
+function MlkGenerateCard({ lyrics, projectId, stylePrompt }: { lyrics: string; projectId: string | null; stylePrompt: string }) {
+  const [, navigate] = useLocation();
+  const { isPro, isDeveloper } = useAppState();
+  const { toast } = useToast();
+  // Admin/developer accounts (email-allowlisted on the server, surfaced as
+  // isDeveloper) ALWAYS bypass the Pro paywall regardless of Stripe status.
+  const hasAccess = isPro || isDeveloper;
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    // Strict UI paywall: generation + kernel mastering is Pro-only.
+    if (!hasAccess) {
+      toast({
+        title: "GravelKing Pro required",
+        description: "Upgrade to GravelKing Pro to generate and master AI tracks.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/mlk/v35/generate-master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ lyricId: projectId, text: lyrics, stylePrompt }),
+      });
+      const data = (await res.json()) as { error?: string; trackId?: string; title?: string };
+      if (!res.ok || !data.trackId) throw new Error(data.error || `Generation failed (HTTP ${res.status})`);
+      // Force the user into the Mastering Tool pipeline with the generated track.
+      navigate(`/mastering?gkTrack=${encodeURIComponent(data.trackId)}&gkTitle=${encodeURIComponent(data.title ?? "Generated Track")}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Generation failed.");
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-3">
+      <Button
+        onClick={() => void handleGenerate()}
+        disabled={isGenerating || lyrics.trim().length < 5}
+        aria-disabled={!hasAccess}
+        className={`w-full font-bold ${hasAccess
+          ? "bg-emerald-500 hover:bg-emerald-600 text-black"
+          : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed hover:bg-muted"}`}
+      >
+        {isGenerating
+          ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating + mastering (2–4 min)…</>
+          : <><Music2 className="w-4 h-4 mr-2" />Generate with MLK v3.5{!hasAccess && " — Pro"}</>}
+      </Button>
+      <p className="text-[11px] text-muted-foreground leading-relaxed text-center">
+        {hasAccess
+          ? "Your lyrics are hash-stamped, sung by AI in-house, mastered through the MLK v3.5 kernel, and IP-certified — then you're taken to the Mastering Tool to work with your track."
+          : "Upgrade to GravelKing Pro to generate and master AI tracks."}
+      </p>
+      {error && (
+        <p className="text-xs text-rose-400 flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function AuthorshipMeter({ score }: { score: number }) {
   const eligible = score >= 25;
@@ -456,7 +532,6 @@ export default function SongwritingStudio() {
   // ── Saving ────────────────────────────────────────────────────────────────
   const [projectId, setProjectId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [copiedAll, setCopiedAll] = useState(false);
 
   // ── IP Embed ───────────────────────────────────────────────────────────────
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
@@ -778,19 +853,6 @@ export default function SongwritingStudio() {
     }
   }, [styleInput, toast]);
 
-  // ── Push to Suno / Udio ───────────────────────────────────────────────────
-  const handlePushTo = useCallback(async (platform: "suno" | "udio") => {
-    const styleText = convertedStyle || styleInput || stylePrompt;
-    const lyricsText = lyricsFromLines(lines);
-    const clip = `Style: ${styleText}\n\nLyrics:\n${lyricsText}`;
-    try {
-      await navigator.clipboard.writeText(clip);
-      setCopiedAll(true); setTimeout(() => setCopiedAll(false), 2500);
-      toast({ title: "Copied!", description: `Opening ${platform === "suno" ? "Suno" : "Udio"} — paste in Style + Lyrics fields.` });
-    } catch { /* fallback */ }
-    window.open(platform === "suno" ? "https://suno.com/create" : "https://udio.com", "_blank", "noopener");
-  }, [convertedStyle, styleInput, stylePrompt, lines, toast]);
-
   // ── Save project ──────────────────────────────────────────────────────────
   const handleSaveProject = useCallback(async () => {
     if (!aiDraft) return;
@@ -960,12 +1022,12 @@ export default function SongwritingStudio() {
               steps={[
                 "Enter a theme, mood or lyric seed and pick a genre.",
                 "Generate — Gemini writes the complete song.",
-                "Pro: edit line-by-line, certify your human–AI authorship, and send it to Suno.",
+                "Pro: edit line-by-line, certify your human–AI authorship, and generate + master it in-house with MLK v3.5.",
               ]}
               note="Free drafts carry no IP rights — only Pro edits establish certified authorship."
             />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Build it here. Send it to Suno.</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Write it. Generate it. Master it. All in-house.</h1>
           <p className="text-muted-foreground text-sm max-w-lg mx-auto">
             Gemini writes the full song. Pro users edit line-by-line and lock in their IP. Free users get the AI draft — no IP rights.
           </p>
@@ -1207,7 +1269,7 @@ export default function SongwritingStudio() {
             maxLength={500}
           />
           <Button onClick={handleConvertStyle} disabled={isConvertingStyle || styleInput.trim().length < 3} variant="outline" className="w-full border-amber-500/40 text-amber-400 hover:bg-amber-500/10 font-semibold">
-            {isConvertingStyle ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Converting…</> : <><Wand2 className="w-4 h-4 mr-2" />Convert to Suno Style Tags</>}
+            {isConvertingStyle ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Converting…</> : <><Wand2 className="w-4 h-4 mr-2" />Convert to Style Tags</>}
           </Button>
           {convertedStyle && (
             <div className="space-y-1.5">
@@ -1330,41 +1392,13 @@ export default function SongwritingStudio() {
               />
             )}
 
-            {/* Style display */}
+            {/* Style display — feeds the in-house MLK v3.5 generator */}
             {effectiveStyle && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-1">
-                <p className="text-xs font-semibold text-amber-500/70 uppercase tracking-wide">Style prompt for Suno</p>
+                <p className="text-xs font-semibold text-amber-500/70 uppercase tracking-wide">Style prompt</p>
                 <p className="text-sm text-foreground/80 font-mono">{effectiveStyle}</p>
               </div>
             )}
-
-            {/* Push to Suno */}
-            <div className="rounded-xl border border-border/40 bg-card/60 p-5 space-y-4">
-              <p className="text-sm font-semibold flex items-center gap-2"><Music2 className="w-4 h-4 text-amber-500" />Push to Suno</p>
-              <ol className="space-y-2">
-                {[
-                  "Open Suno → Create → switch to Advanced mode",
-                  "Optional: upload an instrumental from Voice Splitter as audio reference",
-                  "Paste style tags into the Style field, use the Audio/Style influence slider",
-                  "Paste your lyrics into the Lyrics field → Generate",
-                ].map((step, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
-                    <span className="text-xs text-muted-foreground leading-relaxed">{step}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="grid grid-cols-2 gap-3">
-                <Button onClick={() => void handlePushTo("suno")} className="bg-amber-500 hover:bg-amber-600 text-black font-bold">
-                  {copiedAll ? <><Check className="w-4 h-4 mr-2" />Copied!</> : <><Copy className="w-4 h-4 mr-2" />Copy + Open Suno</>}
-                  <ExternalLink className="w-3 h-3 ml-1.5 opacity-60" />
-                </Button>
-                <Button onClick={() => void handlePushTo("udio")} variant="outline" className="font-semibold border-border/50">
-                  <Copy className="w-4 h-4 mr-2" />Copy + Open Udio
-                  <ExternalLink className="w-3 h-3 ml-1.5 opacity-50" />
-                </Button>
-              </div>
-            </div>
 
             {/* Pro features */}
             <div className="space-y-3">
@@ -1383,6 +1417,7 @@ export default function SongwritingStudio() {
                       <Clock className="w-3 h-3 inline mr-1" />Forensic revision history is being recorded.
                     </p>
                   )}
+                  <MlkGenerateCard lyrics={lyricsFromLines(lines)} projectId={projectId} stylePrompt={effectiveStyle} />
                   {isEligible ? (
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">

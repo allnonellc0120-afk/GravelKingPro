@@ -1,0 +1,29 @@
+IMPLEMENT TASK #73: Add MLK v3.5 Orchestration Endpoint for In-House Audio Generation
+
+CRITICAL LOCKDOWN DIRECTIVE - ZERO COLLATERAL DAMAGE:
+- DO NOT modify, refactor, or delete any existing C/DSP kernel files, database schemas, API controllers, or core app logic.
+- DO NOT update `package.json` or install new dependencies unless absolutely required to authenticate with Vertex AI.
+- All existing tools (transcription, lyric certification, MLK v3.5 mastering engine, vault logic) MUST remain 100% operational.
+- EXECUTION LIMIT: Do not spin in loops. If this takes more than two attempts to wire up, STOP and ask for clarification to prevent wasting compute credits.
+
+SPECIFICATIONS:
+
+1. STANDALONE ORCHESTRATOR MODULE (`/server/services/mlkOrchestrator.js`):
+   - Create this single NEW service file dedicated ONLY to orchestrating the MLK v3.5 pipeline.
+   - Build an async function `generateAndMasterTrack(lyricId, text, userId)` that executes as a read-only pass-through:
+     a) Call the existing Lyric Certifier to generate the SHA256 Lyric Hash.
+     b) Use existing GCP environment variables to send the prompt to Vertex AI (`lyria-3-pro-preview`) and receive the raw uncompressed audio buffer.
+     c) Pass the returned audio buffer directly to the existing MLK v3.5 DSP mastering process.
+     d) Package the finalized audio output and Dual-Anchor HMAC certificate payload, then post it to the existing User Vault database endpoint.
+
+2. NEW API ENDPOINT:
+   - Expose this orchestrator via ONE new route: `POST /api/mlk/v35/generate-master`.
+   - Ensure the route reads existing Vertex AI/GCP credentials without requiring new global configuration files.
+
+3. FRONTEND UI ISOLATION (MINIMAL TOUCH):
+   - Add a single action button ("Generate with MLK v3.5") inside the Lyric Studio UI.
+   - Point this button directly to the new `POST /api/mlk/v35/generate-master` route.
+   - Keep all logic for this button entirely self-contained. Do not edit shared UI layout components, CSS, or navigation logic.
+
+STRICT RULE:
+This is a quick, isolated integration. Build the new route, connect the pipes, and do not touch the existing engine.

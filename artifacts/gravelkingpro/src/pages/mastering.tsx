@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { styleAuthorshipScore } from "@workspace/authorship";
 import { BeforeAfterDemo } from "@/components/before-after-demo";
 import { Layout } from "@/components/layout";
@@ -196,6 +196,43 @@ export default function Mastering() {
     setBeforeUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(f); });
     setState("idle");
   };
+
+  // MLK v3.5 generate-master handoff: when the Lyric Studio finishes an
+  // in-house generation it redirects here with ?gkTrack=<vault track id>.
+  // Pull the generated audio from the user's vault and preload it as the
+  // selected input — the existing Mastering Tool UI handles everything else
+  // (playback, re-mastering, WAV download).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gkTrack = params.get("gkTrack");
+    if (!gkTrack) return;
+    const gkTitle = params.get("gkTitle") || "Generated Track";
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/tracks/${encodeURIComponent(gkTrack)}/download`, { credentials: "include" });
+        if (!res.ok) throw new Error(`Could not load your generated track (HTTP ${res.status}).`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        const safe = gkTitle.replace(/[^\w\s.-]/g, "").trim() || "Generated Track";
+        const file = new File([blob], `${safe}.wav`, { type: blob.type || "audio/wav" });
+        setPendingFile(file);
+        setFileName(file.name);
+        setBeforeUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+        setState("idle");
+        // Clean the query only after a successful preload so refresh retries.
+        window.history.replaceState({}, "", window.location.pathname);
+        toast({ title: "Generated track loaded", description: `“${safe}” is ready in the Mastering Tool.` });
+      } catch (err) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : "Could not load your generated track.";
+        setErrorMsg(msg);
+        toast({ title: "Track load failed", description: msg, variant: "destructive" });
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();

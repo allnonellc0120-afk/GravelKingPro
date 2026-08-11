@@ -564,3 +564,10 @@ uri = "file://attached_assets/gkpro_google_play_promo.mp4"
 type = "video"
 title = "GravelKing Pro — Google Play Promo Video"
 description = "84-second vertical (1080×1920, 30fps) promo. Couch-to-studio story with AI fill shots, real app footage, music-video clips, DAW screen recording, and a Google Play end card. AI-generated narration (labeled)."
+
+[[outputs]]
+id = "IZW3zZE_Elo91UV6V0gnd"
+uri = "file://artifacts/api-server/local_masters/mlk_v35_08026afe-e332-4fcb-9e32-60260e536041.wav"
+type = "audio"
+title = "MLK v3.5 Test Master — Dark Cinematic R&B"
+description = "Lyria 3 Pro vocals from your test lyrics, mastered through the real MLK v3.5 kernel (baseline preset) with the Dual-Anchor cert nominator embedded. 2:36, 44.1 kHz stereo WAV."

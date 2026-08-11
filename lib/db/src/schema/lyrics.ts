@@ -23,7 +23,7 @@ export const lyricProjectsTable = pgTable("lyric_projects", {
   // ── Generated content ─────────────────────────────────────────────────────
   aiDraft: text("ai_draft").notNull(),            // original Gemini output — never mutated
   currentContent: text("current_content").notNull(), // full text reconstructed from lines
-  stylePrompt: text("style_prompt"),              // Gemini-generated Suno/Udio style prompt
+  stylePrompt: text("style_prompt"),              // Gemini-generated style prompt for the in-house MLK v3.5 generator
 
   // ── Line-by-line state (jsonb) ────────────────────────────────────────────
   // Array of LineState objects. Shape:
@@ -45,7 +45,7 @@ export const lyricProjectsTable = pgTable("lyric_projects", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 
   // ── Legacy ────────────────────────────────────────────────────────────────
-  sunoPrompt: text("suno_prompt"),  // kept for back-compat; new code uses stylePrompt
+  sunoPrompt: text("suno_prompt"),  // LEGACY column name kept to avoid a migration; mirrors stylePrompt
   genre: text("genre"),             // kept for back-compat; new code uses genreTags
 });
 

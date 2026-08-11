@@ -301,7 +301,7 @@ ${structure}
 ${strictStylisticDirectives(bpmLabel, deliveryLabel)}
 
 After the lyrics, on the LAST LINE output exactly:
-SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] [vocal type] vocals`
+STYLE_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] [vocal type] vocals`
     : `You are an elite, raw lyricist and professional songwriter specializing in ${genreLabel}. Your task is to write high-impact, authentic song lyrics based on these parameters:
 - Genre/Sub-genre: ${genreLabel}
 - Tempo/Rhythm: ${bpmLabel}
@@ -313,7 +313,7 @@ ${structure}
 ${strictStylisticDirectives(bpmLabel, deliveryLabel)}
 
 After the lyrics, on the LAST LINE output exactly:
-SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
+STYLE_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 
   try {
     const fullText = (
@@ -322,9 +322,9 @@ SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
         SONG_GENERATION_CONFIG,
       )
     ).trim();
-    const sunoMatch = fullText.match(/^SUNO_PROMPT:\s*(.+)$/m);
-    const stylePrompt = sunoMatch ? sunoMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
-    const lyrics = fullText.replace(/^SUNO_PROMPT:.*$/m, "").trim();
+    const styleMatch = fullText.match(/^STYLE_PROMPT:\s*(.+)$/m);
+    const stylePrompt = styleMatch ? styleMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
+    const lyrics = fullText.replace(/^STYLE_PROMPT:.*$/m, "").trim();
     const lines = parseToLines(lyrics);
 
     // Note: the library entry is created when the user SAVES a project
@@ -363,13 +363,13 @@ Complete and expand into a full song. Rules:
 - Output ONLY the lyrics
 
 After the lyrics, on the LAST LINE output exactly:
-SUNO_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
+STYLE_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 
   try {
     const fullText = (await geminiGenerate(prompt)).trim();
-    const sunoMatch = fullText.match(/^SUNO_PROMPT:\s*(.+)$/m);
-    const stylePrompt = sunoMatch ? sunoMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
-    const lyrics = fullText.replace(/^SUNO_PROMPT:.*$/m, "").trim();
+    const styleMatch = fullText.match(/^STYLE_PROMPT:\s*(.+)$/m);
+    const stylePrompt = styleMatch ? styleMatch[1].trim() : `${genre || "Pop"} emotional vocals`;
+    const lyrics = fullText.replace(/^STYLE_PROMPT:.*$/m, "").trim();
     const lines = parseToLines(lyrics);
     res.json({ lyrics, stylePrompt, lines });
   } catch (err) {
@@ -477,7 +477,7 @@ lyricsRouter.post("/lyrics/convert-style", lyricsAiRateLimit, async (req: Reques
     return;
   }
 
-  const prompt = `Convert this music style description into Suno AI style tags.
+  const prompt = `Convert this music style description into concise style tags for the in-house MLK v3.5 music generator.
 
 Description: "${styleDescription.trim()}"
 
@@ -634,7 +634,7 @@ lyricsRouter.post("/lyrics/forensic-entry", async (req: Request, res: Response) 
 // ─── POST /api/lyrics/project ────────────────────────────────────────────────
 lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
   const {
-    aiDraft, title, genre, bpm, sunoPrompt,
+    aiDraft, title, genre, bpm,
     mode, storyPrompt, key, vocalType, genreTags,
     linesState, stylePrompt, generationCount,
   } = req.body as {
@@ -642,7 +642,6 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
     title?: string;
     genre?: string;
     bpm?: number;
-    sunoPrompt?: string;
     mode?: string;
     storyPrompt?: string;
     key?: string;
@@ -675,8 +674,9 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
     currentContent: aiDraft,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     linesState: (linesState ?? null) as any,
-    stylePrompt: stylePrompt ?? sunoPrompt ?? null,
-    sunoPrompt: sunoPrompt ?? stylePrompt ?? null,
+    stylePrompt: stylePrompt ?? null,
+    // Legacy column (historic name) — mirrors stylePrompt for old readers.
+    sunoPrompt: stylePrompt ?? null,
     genre: genre ?? null,
     authorshipScore: 0,
     isCopyrightEligible: false,
@@ -696,7 +696,7 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
       genre: genre ?? undefined,
       storyPrompt: storyPrompt ?? undefined,
       aiDraft,
-      stylePrompt: stylePrompt ?? sunoPrompt ?? undefined,
+      stylePrompt: stylePrompt ?? undefined,
       authorshipScore: 0,
       isCopyrightEligible: false,
       is_certified: false,
