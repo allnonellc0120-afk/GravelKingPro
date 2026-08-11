@@ -27,6 +27,7 @@ import leadCaptureRouter from "./lead-capture";
 import weekendSpecialRouter from "./weekend-special";
 import emailCaptureRouter from "./email-capture";
 import benchmarkRouter from "./benchmark";
+import referralsRouter from "./referrals";
 
 const router: IRouter = Router();
 
@@ -58,5 +59,6 @@ router.use(leadCaptureRouter);
 router.use(weekendSpecialRouter);
 router.use(emailCaptureRouter);
 router.use(benchmarkRouter);
+router.use(referralsRouter);
 
 export default router;
