@@ -17,14 +17,14 @@ const playBillingRouter = Router();
 // which is how "restore purchases" works after a reinstall.
 playBillingRouter.post('/play/verify-purchase', async (req: Request, res: Response) => {
   try {
-    if (!req.isAuthenticated()) {
+    if (!req.dbUser) {
       res.status(401).json({
         error: 'Sign in required to activate a Google Play purchase',
         authRequired: true,
       });
       return;
     }
-    const userId = req.user.id;
+    const userId = req.dbUser.id;
 
     const { purchaseToken } = req.body as { purchaseToken?: string };
     if (!purchaseToken || typeof purchaseToken !== 'string') {

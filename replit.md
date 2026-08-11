@@ -23,7 +23,7 @@ A gravel-optimisation benchmarking tool with real Stripe subscription payments.
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
 - Payments: Stripe Checkout (subscriptions) via Replit integration + `stripe-replit-sync`
-- Session tracking: `gk_session` cookie (no auth system)
+- Auth: Clerk (Replit-managed) — `@clerk/express` on the server, `@clerk/react` on the web frontend; legacy `gk_session` cookie still used for anonymous checkout sessions and the Play reviewer demo account
 - Build: esbuild
 
 ## Where things live
@@ -35,7 +35,7 @@ A gravel-optimisation benchmarking tool with real Stripe subscription payments.
 
 ## Architecture decisions
 
-- **Session-based subscriptions (no auth)**: Users are tracked via a `gk_session` cookie set on first checkout. The backend looks up the session → user → Stripe customer → subscription.
+- **Auth is Clerk (migrated from Replit Auth)**: Clerk session claims carry `sessionClaims.userId` = original Replit sub ID for migrated users / Clerk native ID for new users; this is the `users.id` bridge. `loadAuthUser` middleware JIT-provisions `req.dbUser` on every request; routes check `req.dbUser` instead of `req.isAuthenticated()`. Anonymous purchases still fall back to the `gk_session` cookie path.
 - **Stripe data lives in stripe.* schema**: `stripe-replit-sync` auto-creates and manages all Stripe tables. Never create product/price tables manually.
 - **Webhook must precede express.json()**: Stripe webhooks require raw Buffer body. The webhook route in `app.ts` is registered before any body parsers.
 - **Seed products once**: Run `pnpm --filter @workspace/scripts run seed-products` once in dev to create GravelKing Pro ($39.99/mo) and Node Auditor ($499/mo) products in Stripe.

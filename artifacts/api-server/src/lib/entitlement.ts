@@ -61,23 +61,20 @@ export function normalizeTier(raw: string | null | undefined): Tier {
 export async function resolveTier(req: Request): Promise<Tier> {
   let best: Tier = "free";
 
-  if (req.isAuthenticated()) {
-    const [dbUser] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, req.user.id));
+  if (req.dbUser) {
+    const dbUser = req.dbUser;
 
     // Permanent ban enforcement — force free tier, ignore any stored tier.
-    if (dbUser?.email && BANNED_EMAILS.has(dbUser.email.toLowerCase().trim())) {
+    if (dbUser.email && BANNED_EMAILS.has(dbUser.email.toLowerCase().trim())) {
       return "free";
     }
 
     // Lifetime email bypass — no Stripe check needed, no stale DB tier.
-    if (dbUser?.email && LIFETIME_EMAILS.has(dbUser.email.toLowerCase().trim())) {
+    if (dbUser.email && LIFETIME_EMAILS.has(dbUser.email.toLowerCase().trim())) {
       return "node_auditor";
     }
 
-    const t = normalizeTier(dbUser?.subscriptionTier);
+    const t = normalizeTier(dbUser.subscriptionTier);
     if (TIER_RANK[t] > TIER_RANK[best]) best = t;
   }
 

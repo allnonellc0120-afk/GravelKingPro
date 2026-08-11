@@ -147,7 +147,10 @@ export default function PromotersPage() {
           <Card>
             <CardContent className="p-8 text-center space-y-4">
               <p>Sign in to register as a promoter and get your tracked link.</p>
-              <Button onClick={() => (window.location.href = "/api/login")}>Sign in</Button>
+              <Button onClick={() => {
+                const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+                window.location.href = `${base}/sign-in?redirect_url=${encodeURIComponent(`${base}/promoters`)}`;
+              }}>Sign in</Button>
             </CardContent>
           </Card>
         ) : !promoter ? (

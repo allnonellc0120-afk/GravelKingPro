@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,7 @@ function AppCard({ icon, title, desc, badge, badgeColor, href, cta, accent }: {
 
 /* ─── Trial CTA + artist list section ────────────────────────────────── */
 function SignUpSection() {
-  const { isAuthenticated } = useAuth();
+  const { isSignedIn } = useAuth();
   const planPrices = usePlanPrices();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
@@ -53,9 +53,9 @@ function SignUpSection() {
 
   // Route to pricing with Studio plan pre-selected; sign-in preserves that intent
   const studioTarget = "/pricing?plan=monthly";
-  const studioHref = isAuthenticated
+  const studioHref = isSignedIn
     ? studioTarget
-    : `/api/login?returnTo=${encodeURIComponent(studioTarget)}`;
+    : `/sign-in?redirect_url=${encodeURIComponent(studioTarget)}`;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +131,7 @@ function SignUpSection() {
         )}
         <p className="text-xs text-muted-foreground">
           Occasional product updates and artist offers — no spam.{" "}
-          <a href="/api/login" className="text-violet-400 underline underline-offset-2">Already have an account? Sign in</a>
+          <Link href="/sign-in" className="text-violet-400 underline underline-offset-2">Already have an account? Sign in</Link>
         </p>
       </div>
     </div>
@@ -140,7 +140,7 @@ function SignUpSection() {
 
 /* ─── Main page ──────────────────────────────────────────────────────── */
 export default function Home() {
-  const { isAuthenticated, login } = useAuth();
+  const { isSignedIn } = useAuth();
   const planPrices = usePlanPrices();
 
   return (
@@ -222,9 +222,9 @@ export default function Home() {
               ))}
             </div>
 
-            {!isAuthenticated && (
+            {!isSignedIn && (
               <p className="text-xs text-muted-foreground pt-1">
-                <button onClick={login} className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</button>{" "}
+                <Link href="/sign-in" className="text-amber-500 underline underline-offset-2 cursor-pointer">Sign in</Link>{" "}
                 to save your work and manage your subscription.
               </p>
             )}

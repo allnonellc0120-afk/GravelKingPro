@@ -32,9 +32,8 @@ const COLUMN = {
  * `gk_session` cookie (created here if absent) so free limits survive reloads.
  */
 export async function getUsageUser(req: Request, res: Response): Promise<User> {
-  if (req.isAuthenticated()) {
-    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
-    if (u) return u;
+  if (req.dbUser) {
+    return req.dbUser;
   }
 
   let sessionId = (req.cookies as Record<string, string>)?.gk_session;

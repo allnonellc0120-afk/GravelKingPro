@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
 import { usePlanPrices } from "@/lib/usePlanPrices";
 import { useAppState } from "@/lib/context";
-import { useAuth } from "@workspace/replit-auth-web";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +20,7 @@ import { ToolHelp } from "@/components/tool-help";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth, useClerk, useUser } from "@clerk/react";
 import { generateKernelReport } from "@/lib/generateReport";
 import { listProjects, loadProject, type ProjectMeta, type SavedProject } from "@/lib/daw/projectStorage";
 
@@ -375,7 +375,9 @@ function TrackOptimizer({ isNodeAuditor }: { isNodeAuditor: boolean }) {
 export default function KernelDashboard() {
   const { isPro, tier, results, setResults, hasRun, setHasRun } = useAppState();
   const planPrices = usePlanPrices();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user } = useUser();
+  const { isSignedIn } = useAuth();
+  const { signOut } = useClerk();
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [multiplier, setMultiplier] = useState([0.75]);
@@ -397,12 +399,12 @@ export default function KernelDashboard() {
   }, [hasAccess]);
 
   useEffect(() => {
-    if (!hasAccess || !isAuthenticated) return;
+    if (!hasAccess || !isSignedIn) return;
     fetch("/api/kernel/history", { credentials: "include" })
       .then((r) => r.json())
       .then((d) => setHistory(d.runs ?? []))
       .catch(() => {});
-  }, [hasAccess, isAuthenticated, hasRun]);
+  }, [hasAccess, isSignedIn, hasRun]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -547,12 +549,12 @@ export default function KernelDashboard() {
                 <p className="text-muted-foreground text-sm">GravelKing Kernel — MLK v3 amplitude carving engine.</p>
               </div>
               <div className="flex items-center gap-2">
-                {user?.profileImageUrl
-                  ? <img src={user.profileImageUrl} className="w-7 h-7 rounded-full" alt="avatar" />
+                 {user?.imageUrl
+                   ? <img src={user.imageUrl} className="w-7 h-7 rounded-full" alt="avatar" />
                   : <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center"><User className="w-4 h-4 text-muted-foreground" /></div>
                 }
-                <span className="text-sm text-muted-foreground hidden sm:block">{user?.firstName ?? user?.email ?? "Account"}</span>
-                <Button variant="ghost" size="sm" onClick={logout} className="text-xs text-muted-foreground h-8 px-2">
+                 <span className="text-sm text-muted-foreground hidden sm:block">{user?.firstName ?? user?.primaryEmailAddress?.emailAddress ?? "Account"}</span>
+                 <Button variant="ghost" size="sm" onClick={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })} className="text-xs text-muted-foreground h-8 px-2">
                   <LogOut className="w-3.5 h-3.5 mr-1" />Log out
                 </Button>
               </div>
@@ -715,7 +717,7 @@ export default function KernelDashboard() {
                 </div>
 
                 {/* Processing history */}
-                {isAuthenticated && history.length > 0 && (
+                {isSignedIn && history.length > 0 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                     <Card className="border-border/40 bg-card/30">
                       <CardContent className="p-5">

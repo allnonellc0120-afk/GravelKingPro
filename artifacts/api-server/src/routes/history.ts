@@ -6,14 +6,14 @@ import { desc, eq } from "drizzle-orm";
 const historyRouter = Router();
 
 historyRouter.get("/kernel/history", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
+  if (!req.dbUser) {
     res.json({ runs: [] });
     return;
   }
   const runs = await db
     .select()
     .from(processRunsTable)
-    .where(eq(processRunsTable.userId, req.user.id))
+    .where(eq(processRunsTable.userId, req.dbUser.id))
     .orderBy(desc(processRunsTable.createdAt))
     .limit(20);
   res.json({ runs });

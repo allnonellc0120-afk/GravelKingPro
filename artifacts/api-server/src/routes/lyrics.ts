@@ -559,7 +559,7 @@ lyricsRouter.post("/lyrics/import", lyricsAiRateLimit, async (req: Request, res:
 // newest first. Read-only. Does not create an identity for cookieless callers.
 lyricsRouter.get("/lyrics/imports", async (req: Request, res: Response) => {
   const hasSession = Boolean((req.cookies as Record<string, string> | undefined)?.["gk_session"]);
-  if (!req.isAuthenticated() && !hasSession) {
+  if (!req.dbUser && !hasSession) {
     res.json({ imports: [] });
     return;
   }

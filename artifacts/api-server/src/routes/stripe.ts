@@ -52,7 +52,7 @@ stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
 stripeRouter.post('/checkout', async (req: Request, res: Response) => {
   try {
     // Auth required — trial eligibility is tracked per account
-    if (!req.isAuthenticated()) {
+    if (!req.dbUser) {
       res.status(401).json({ error: 'Sign in required to subscribe', authRequired: true });
       return;
     }
@@ -64,17 +64,7 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       return;
     }
 
-    // Get the authenticated user's DB row
-    const [dbUser] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, req.user.id));
-
-    if (!dbUser) {
-      res.status(404).json({ error: 'User record not found' });
-      return;
-    }
-
+    const dbUser = req.dbUser;
     let customerId = dbUser.stripeCustomerId;
     if (!customerId) {
       const stripe = await getUncachableStripeClient();
@@ -175,21 +165,10 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
 // Get subscription status for the current session cookie
 stripeRouter.get('/subscription/status', async (req: Request, res: Response) => {
   try {
-    // 1. OIDC-authenticated user (Replit Sign-in) — check their DB row directly.
-    //    This path is used when the user is signed in via Replit OAuth; they
-    //    won't have a gk_session cookie, so the cookie path below never fires.
-    if (req.isAuthenticated()) {
-      const [dbUser] = await db
-        .select()
-        .from(usersTable)
-        .where(eq(usersTable.id, req.user.id));
-      if (dbUser) {
-        const status = await storage.getUserSubscriptionStatus(dbUser);
-        res.json({ ...status, trialEligible: !dbUser.trialUsed });
-        return;
-      }
-      // OIDC user with no DB row yet — respond with free status
-      res.json({ isPro: false, plan: null });
+    // 1. Clerk-authenticated user — check their DB row directly.
+    if (req.dbUser) {
+      const status = await storage.getUserSubscriptionStatus(req.dbUser);
+      res.json({ ...status, trialEligible: !req.dbUser.trialUsed });
       return;
     }
 
@@ -219,9 +198,8 @@ stripeRouter.post('/stripe/portal', async (req: Request, res: Response) => {
   try {
     let user: Awaited<ReturnType<typeof storage.getUserBySession>> | null = null;
 
-    if (req.isAuthenticated()) {
-      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.user.id));
-      if (dbUser) user = dbUser;
+    if (req.dbUser) {
+      user = req.dbUser;
     } else {
       const sessionId = (req.cookies as Record<string, string>)?.gk_session;
       if (sessionId) user = await storage.getUserBySession(sessionId);

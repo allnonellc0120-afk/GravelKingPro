@@ -70,12 +70,8 @@ emailRouter.get("/email-capture/status", async (req: Request, res: Response) => 
       res.json({ hasEmail: true });
       return;
     }
-    if (req.isAuthenticated()) {
-      const [u] = await db
-        .select({ email: usersTable.email })
-        .from(usersTable)
-        .where(eq(usersTable.id, req.user.id));
-      res.json({ hasEmail: Boolean(u?.email?.trim()) });
+    if (req.dbUser) {
+      res.json({ hasEmail: Boolean(req.dbUser.email?.trim()) });
       return;
     }
     const sessionId = (req.cookies as Record<string, string>)?.gk_session;

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { useAppState } from "@/lib/context";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,7 +59,8 @@ const TIER_FEATURES: Record<string, string[]> = {
 };
 
 export default function Account() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const { tier, isDeveloper, activePromo } = useAppState();
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -84,7 +85,7 @@ export default function Account() {
     }
   };
 
-  if (isLoading) {
+  if (!isLoaded) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[50vh]">
@@ -105,9 +106,9 @@ export default function Account() {
             <h2 className="text-xl font-bold mb-2">Sign in to view your account</h2>
             <p className="text-muted-foreground text-sm">Create an account or sign in to track your subscription, manage billing, and access all your tools.</p>
           </div>
-          <a href="/api/login">
+          <a href="/sign-in">
             <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold px-8">
-              Sign In with Replit
+              Sign In
             </Button>
           </a>
         </div>
@@ -115,7 +116,8 @@ export default function Account() {
     );
   }
 
-  const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
+  const email = user.primaryEmailAddress?.emailAddress;
+  const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || email || "User";
   const initials = [user.firstName?.[0], user.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "U";
 
   return (
@@ -132,8 +134,8 @@ export default function Account() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex items-center gap-4">
-              {user.profileImageUrl ? (
-                <img src={user.profileImageUrl} alt={displayName} className="w-14 h-14 rounded-full object-cover border border-border/40" />
+              {user.imageUrl ? (
+                <img src={user.imageUrl} alt={displayName} className="w-14 h-14 rounded-full object-cover border border-border/40" />
               ) : (
                 <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-lg">
                   {initials}
@@ -141,16 +143,19 @@ export default function Account() {
               )}
               <div>
                 <p className="font-semibold text-base">{displayName}</p>
-                {user.email && <p className="text-sm text-muted-foreground mt-0.5">{user.email}</p>}
-                <p className="text-xs text-muted-foreground mt-1 font-mono opacity-60">{user.id}</p>
+                {email && <p className="text-sm text-muted-foreground mt-0.5">{email}</p>}
+                <p className="text-xs text-muted-foreground mt-1 font-mono opacity-60">{user.externalId ?? user.id}</p>
               </div>
               <div className="ml-auto">
-                <a href="/api/logout">
-                  <Button variant="outline" size="sm" className="text-xs gap-1.5">
-                    <LogOut className="w-3.5 h-3.5" />
-                    Sign out
-                  </Button>
-                </a>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-1.5"
+                  onClick={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })}
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign out
+                </Button>
               </div>
             </CardContent>
           </Card>

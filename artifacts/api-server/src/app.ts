@@ -2,11 +2,18 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
+import { clerkMiddleware } from "@clerk/express";
+import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { authMiddleware } from "./middlewares/authMiddleware";
+import { loadAuthUser } from "./middlewares/authMiddleware";
 import { maintenanceModeMiddleware } from "./middlewares/maintenanceMode";
 import { WebhookHandlers } from "./webhookHandlers";
+import {
+  CLERK_PROXY_PATH,
+  clerkProxyMiddleware,
+  getClerkProxyHost,
+} from "./middlewares/clerkProxyMiddleware";
 
 // Log crashes before the process dies — helps diagnose production "Processing failed" with no log entry.
 process.on("uncaughtException", (err) => logger.fatal({ err }, "uncaughtException"));
@@ -34,6 +41,9 @@ app.use(
     },
   }),
 );
+
+// Clerk proxy MUST be mounted before body parsers — it streams raw bytes.
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 // Webhook route MUST be registered before express.json() so the raw Buffer body is preserved
 app.post(
@@ -93,7 +103,20 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(authMiddleware);
+
+// Clerk session validation — resolves the publishable key from the request host
+// so the same server can handle multiple custom domains.
+app.use(
+  clerkMiddleware((req) => ({
+    publishableKey: publishableKeyFromHost(
+      getClerkProxyHost(req) ?? "",
+      process.env.CLERK_PUBLISHABLE_KEY,
+    ),
+  })),
+);
+
+// Load authenticated user into req.dbUser (optional — does not reject requests).
+app.use(loadAuthUser);
 app.use(maintenanceModeMiddleware);
 
 app.use("/api", router);

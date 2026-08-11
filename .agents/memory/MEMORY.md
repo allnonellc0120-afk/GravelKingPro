@@ -11,7 +11,8 @@
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
 - [Object storage public prefix](object-storage-public-prefix.md) — public assets must live UNDER the PUBLIC_OBJECT_SEARCH_PATHS prefix, not bucket root, or the serve route 404s
-- [OIDC vs gk_session subscription status](oidc-subscription-status.md) — /api/subscription/status must check req.isAuthenticated() FIRST; OIDC users never get a gk_session cookie so they always showed isPro:false without this fix
+- [Clerk auth migration](clerk-auth-migration.md) — users.id bridge = sessionClaims.userId; req.dbUser replaces req.isAuthenticated(); gk_session + Bearer-sid fallbacks must survive
+- [Clerk vs gk_session subscription status](oidc-subscription-status.md) — /api/subscription/status must check req.dbUser FIRST; Clerk users never get a gk_session cookie so they'd show isPro:false without this
 - [Dev vs prod separate DBs](dev-prod-separate-dbs.md) — dev and prod use different Postgres instances; executeSql() hits dev, executeSql({environment:"production"}) hits prod; grant-access must be called against production API after deploy to fix prod rows
 - [Stripe session-cookie pattern](stripe-session-cookie.md) — subscription gated by gk_session cookie (no auth); set on POST /api/checkout, read on GET /api/subscription/status
 - [Stripe + stripe-replit-sync setup](stripe-setup.md) — packages at workspace root only; webhook BEFORE express.json(); runMigrations → getStripeSync → findOrCreateManagedWebhook → syncBackfill on startup; seed products once with scripts/seed-products.ts
