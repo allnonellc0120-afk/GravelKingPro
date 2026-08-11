@@ -597,15 +597,15 @@ description = "30-second 1920×1080 H.264/AAC promo video for YouTube and Facebo
 id = "wqqr0zn-KHh53yW2FvXfu"
 uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4"
 type = "video"
-title = "Lyrics Generator promo — 59s landscape (4K)"
-description = "3840×2160, H.264+AAC, exactly 59 seconds."
+title = "GravelKing Pro promo — 4K landscape (59s)"
+description = "Smooth 30fps 4K master with real people, large spoken headlines, warm voiceover, and a welcoming soundtrack."
 
 [[outputs]]
 id = "lQ0VLh22k8Ekb__dMmnKj"
 uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4"
 type = "video"
-title = "Lyrics Generator promo — 59s vertical (4K)"
-description = "2160×3840, H.264+AAC, exactly 59 seconds."
+title = "GravelKing Pro promo — 4K vertical (59s)"
+description = "Vertical 2160x3840 master for Shorts/Reels/TikTok with the same voiceover, wording, and soundtrack."
 
 [[outputs]]
 id = "9L4b2LEcYndlME5VXalyT"
@@ -613,3 +613,73 @@ uri = "file://screenshots/live-songwriting-generator.png"
 type = "image"
 title = "LIVE proof — song generator on gravelkingpro.it.com"
 description = "Real browser session on the published site: lyrics generated, then the Generate with MLK v3.5 card rendered below them (build v08/11/26 12:11 visible in footer)."
+
+[[outputs]]
+id = "J6m62bPXrxwCjiFz9enKz"
+uri = "file://attached_assets/generated_videos/promo_v2/soundtrack_warm.mp3"
+type = "audio"
+title = "warm welcoming promo bed"
+description = "Generated music: Warm welcoming uplifting modern pop instrumental, soft felt piano chords, warm acoustic guitar strums, gentle hand claps, airy synth pads, positive hopeful friendly feeling, smooth g…"
+
+[[outputs]]
+id = "PwUSIOVoHqSBrnCN6XIg2"
+uri = "file://attached_assets/generated_audio/promo_v2/vo1.mp3"
+type = "audio"
+title = "vo1"
+description = "Text-to-speech audio: Got a song stuck in your head?"
+
+[[outputs]]
+id = "ZG-U1DhdlewPTJWvHkz_l"
+uri = "file://attached_assets/generated_audio/promo_v2/vo2.mp3"
+type = "audio"
+title = "vo2"
+description = "Text-to-speech audio: Bring it to GravelKing Pro."
+
+[[outputs]]
+id = "rHj1Rjsp7Z8DNTHY0kLtP"
+uri = "file://attached_assets/generated_audio/promo_v2/vo3.mp3"
+type = "audio"
+title = "vo3"
+description = "Text-to-speech audio: Turn your lyrics into a full song — your words, your style."
+
+[[outputs]]
+id = "GE36Y8hx6kjhB3IUdqDBH"
+uri = "file://attached_assets/generated_audio/promo_v2/vo5.mp3"
+type = "audio"
+title = "vo5"
+description = "Text-to-speech audio: Master your track with a single click."
+
+[[outputs]]
+id = "OLaRBFOVmmNlHYVRJjnTd"
+uri = "file://attached_assets/generated_audio/promo_v2/vo4.mp3"
+type = "audio"
+title = "vo4"
+description = "Text-to-speech audio: Step into the vocal booth, and record."
+
+[[outputs]]
+id = "JWz8E7t_062qgTEB1UHSE"
+uri = "file://attached_assets/generated_audio/promo_v2/vo6.mp3"
+type = "audio"
+title = "vo6"
+description = "Text-to-speech audio: Then certify it, so the world knows it's yours."
+
+[[outputs]]
+id = "yvGJcQVhfAjlK_aRLZcA7"
+uri = "file://attached_assets/generated_audio/promo_v2/vo7.mp3"
+type = "audio"
+title = "vo7"
+description = "Text-to-speech audio: GravelKing Pro. Your song starts today."
+
+[[outputs]]
+id = "TbnhXvhgy6JFIJZJMRRYt"
+uri = "file://attached_assets/final_promos/gravelkingpro_promo_59s_16x9.mp4"
+type = "video"
+title = "GravelKing Pro Promo — Landscape 4K (59s)"
+description = "3840×2160, 30fps, voiceover + warm soundtrack, verified smooth playback"
+
+[[outputs]]
+id = "WCjCBW6waaa1RSl6uiNBv"
+uri = "file://attached_assets/final_promos/gravelkingpro_promo_59s_9x16.mp4"
+type = "video"
+title = "GravelKing Pro Promo — Vertical 4K (59s)"
+description = "2160×3840, 30fps, voiceover + warm soundtrack, verified smooth playback"
