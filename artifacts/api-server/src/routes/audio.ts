@@ -511,9 +511,9 @@ audioRouter.post(
         };
         telemetryBus.emit("run", event);
 
-        if (req.isAuthenticated()) {
+        if (req.dbUser) {
           db.insert(processRunsTable).values({
-            userId: req.user.id,
+            userId: req.dbUser.id,
             routing,
             parity: kernelParity,
             efficiency: 1,
@@ -675,9 +675,9 @@ audioRouter.post(
         };
         telemetryBus.emit("run", event);
 
-        if (req.isAuthenticated()) {
+        if (req.dbUser) {
           db.insert(processRunsTable).values({
-            userId: req.user.id,
+            userId: req.dbUser.id,
             routing: stemRouting,
             parity: stemResult.kernelParity,
             efficiency: 1,
@@ -748,9 +748,9 @@ audioRouter.post(
       };
       telemetryBus.emit("run", event);
 
-      if (req.isAuthenticated()) {
+      if (req.dbUser) {
         db.insert(processRunsTable).values({
-          userId: req.user.id,
+          userId: req.dbUser.id,
           routing: "local",
           parity,
           efficiency: parseFloat(efficiency),

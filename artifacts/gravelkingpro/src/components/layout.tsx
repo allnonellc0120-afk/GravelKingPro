@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Zap, Menu, X, User, LogIn, Crown, ArrowRight, ChevronDown, BookOpen, Gavel, ShieldAlert, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/lib/context";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useUser } from "@clerk/react";
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
   weekly:       { label: "Weekly",       className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -22,7 +22,7 @@ export function Layout({
 }) {
   const [location] = useLocation();
   const { isPro, isDeveloper, tier } = useAppState();
-  const { user } = useAuth();
+  const { user } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -40,8 +40,9 @@ export function Layout({
     ...(isDeveloper ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
+  const email = user?.primaryEmailAddress?.emailAddress;
   const displayName = user
-    ? ([user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Account")
+    ? ([user.firstName, user.lastName].filter(Boolean).join(" ") || email || "Account")
     : null;
   const initials = user
     ? ([user.firstName?.[0], user.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "U")
@@ -114,12 +115,12 @@ export function Layout({
             )}
 
             {/* User avatar / sign in */}
-            {user ? (
+    {user ? (
               <Link href="/account">
                 <div className={`flex items-center gap-2 cursor-pointer group ${location === "/account" ? "opacity-100" : "opacity-80 hover:opacity-100"} transition-opacity`}>
-                  {user.profileImageUrl ? (
+                  {user.imageUrl ? (
                     <img
-                      src={user.profileImageUrl}
+                      src={user.imageUrl}
                       alt={displayName ?? ""}
                       className="w-8 h-8 rounded-full object-cover border-2 border-border/40 group-hover:border-amber-500/60 transition-colors"
                     />
@@ -141,10 +142,10 @@ export function Layout({
                 </div>
               </Link>
             ) : (
-              <a href="/api/login" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors">
+              <Link href="/sign-in" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors">
                 <LogIn className="w-4 h-4" />
                 <span>Sign in</span>
-              </a>
+              </Link>
             )}
           </nav>
 
@@ -199,8 +200,8 @@ export function Layout({
                     location === "/account" ? "text-amber-500 bg-secondary/40" : "text-muted-foreground"
                   }`}
                 >
-                  {user.profileImageUrl ? (
-                    <img src={user.profileImageUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                  {user.imageUrl ? (
+                    <img src={user.imageUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
                   ) : (
                     <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 font-bold text-[10px]">
                       {initials}
@@ -209,14 +210,14 @@ export function Layout({
                   <span>My Account</span>
                 </Link>
               ) : (
-                <a
-                  href="/api/login"
+                <Link
+                  href="/sign-in"
                   className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary/60 text-muted-foreground mt-1"
                   onClick={() => setMobileOpen(false)}
                 >
                   <LogIn className="w-4 h-4" />
                   Sign in
-                </a>
+                </Link>
               )}
 
               <Link

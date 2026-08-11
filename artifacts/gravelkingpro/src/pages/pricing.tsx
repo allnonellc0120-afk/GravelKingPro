@@ -8,6 +8,7 @@ import { Check, Loader2, X, Gift, CheckCircle2, Sparkles, Zap, Crown, Star, Arro
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useAuth } from "@clerk/react";
 import { usePlanPrices, FALLBACK_PRICES, type PlanPrice } from "@/lib/usePlanPrices";
 import { trackFunnelEvent } from "@/lib/useAnalytics";
 import {
@@ -85,16 +86,11 @@ export default function Pricing() {
   const [promoError, setPromoError] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo>(null);
   const [unseeded, setUnseeded] = useState(false);
-  const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null);
+  const { isLoaded: authLoaded, isSignedIn: clerkSignedIn } = useAuth();
+  // null = still loading (preserves the old tri-state semantics)
+  const isSignedIn: boolean | null = authLoaded ? clerkSignedIn : null;
   const inputRef = useRef<HTMLInputElement>(null);
   const [location] = useLocation();
-
-  useEffect(() => {
-    fetch("/api/auth/user", { credentials: "include" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((d: { user?: unknown } | null) => setIsSignedIn(d?.user != null))
-      .catch(() => setIsSignedIn(false));
-  }, []);
 
   // Trial eligibility (server truth) — never promise a free trial to an
   // account that already consumed its one trial.
@@ -242,8 +238,9 @@ export default function Pricing() {
       const utm = new URLSearchParams();
       search.forEach((value, key) => { if (key.startsWith("utm_")) utm.set(key, value); });
       const utmSuffix = utm.toString();
-      const returnTo = `/pricing?plan=${encodeURIComponent(planId)}${utmSuffix ? `&${utmSuffix}` : ""}`;
-      window.location.href = `/api/login?returnTo=${encodeURIComponent(returnTo)}`;
+      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const returnTo = `${base}/pricing?plan=${encodeURIComponent(planId)}${utmSuffix ? `&${utmSuffix}` : ""}`;
+      window.location.href = `${base}/sign-in?redirect_url=${encodeURIComponent(returnTo)}`;
       return;
     }
 
@@ -309,7 +306,8 @@ export default function Pricing() {
       if (!checkoutRes.ok) {
         const errData = await checkoutRes.json() as { error?: string; authRequired?: boolean };
         if (errData.authRequired) {
-          window.location.href = `/api/login?returnTo=${encodeURIComponent(`/pricing?plan=${planId}`)}`;
+          const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+          window.location.href = `${base}/sign-in?redirect_url=${encodeURIComponent(`${base}/pricing?plan=${planId}`)}`;
           return;
         }
         const errMsg = errData.error ?? "Checkout failed";

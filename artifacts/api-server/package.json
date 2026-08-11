@@ -7,12 +7,15 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --max-old-space-size=2048 --enable-source-maps ./dist/index.mjs",
-    "test": "node ./build.test.mjs && node --enable-source-maps ./dist-test/whitepaper.test.mjs && node --enable-source-maps ./dist-test/studio-audio.test.mjs && node --enable-source-maps ./dist-test/master-kernel.test.mjs && node --enable-source-maps ./dist-test/price-parity.test.mjs && node --enable-source-maps ./dist-test/download-gate.test.mjs && node --enable-source-maps ./dist-test/webhook-track-purchase.test.mjs && node --enable-source-maps ./dist-test/referral-commission.test.mjs && node --enable-source-maps ./dist-test/benchmark.test.mjs",
+    "test": "node ./build.test.mjs && node --enable-source-maps ./dist-test/whitepaper.test.mjs && node --enable-source-maps ./dist-test/studio-audio.test.mjs && node --enable-source-maps ./dist-test/master-kernel.test.mjs && node --enable-source-maps ./dist-test/price-parity.test.mjs && node --enable-source-maps ./dist-test/download-gate.test.mjs && node --enable-source-maps ./dist-test/webhook-track-purchase.test.mjs && node --enable-source-maps ./dist-test/referral-commission.test.mjs && node --enable-source-maps ./dist-test/benchmark.test.mjs && node --enable-source-maps ./dist-test/clerk-jit-provision.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.52",
+    "@clerk/shared": "^4.27.1",
     "@google-cloud/firestore": "^8.6.0",
     "@google-cloud/storage": "^7.21.0",
+    "@replit/connectors-sdk": "^0.4.1",
     "@workspace/api-zod": "workspace:*",
     "@workspace/authorship": "workspace:*",
     "@workspace/db": "workspace:*",
@@ -22,13 +25,12 @@
     "express": "^5.2.1",
     "fflate": "^0.8.3",
     "google-auth-library": "^10.7.0",
+    "http-proxy-middleware": "^4.2.0",
     "jspdf": "^4.2.1",
     "multer": "^2.2.0",
-    "openid-client": "^6.8.4",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
-    "resend": "^6.12.4",
-    "@replit/connectors-sdk": "^0.4.1"
+    "resend": "^6.12.4"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

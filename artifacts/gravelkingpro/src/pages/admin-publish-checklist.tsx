@@ -147,10 +147,9 @@ const MANUAL_ITEMS = [
 // ── Auto-verifiable checks ────────────────────────────────────────────────────
 
 async function runChecks(): Promise<ChecklistData> {
-  const [productsRes, analyticsRes, authRes] = await Promise.allSettled([
+  const [productsRes, analyticsRes] = await Promise.allSettled([
     fetch("/api/stripe/products", { credentials: "include" }).then((r) => r.json()) as Promise<{ data?: unknown[]; warning?: string }>,
     fetch("/api/analytics/summary?days=7", { credentials: "include" }).then((r) => r.json()) as Promise<{ totals?: { pageviews: number }; conversion?: unknown }>,
-    fetch("/api/auth/user", { credentials: "include" }).then((r) => r.json()),
   ]);
 
   const products = productsRes.status === "fulfilled" ? productsRes.value : null;

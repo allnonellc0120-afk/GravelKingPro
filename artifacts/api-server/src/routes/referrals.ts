@@ -81,7 +81,7 @@ referralsRouter.post('/referral/click', async (req: Request, res: Response) => {
 // ── Promoter: register ───────────────────────────────────────────────────────
 referralsRouter.post('/promoter/register', async (req: Request, res: Response) => {
   try {
-    if (!req.isAuthenticated()) {
+    if (!req.dbUser) {
       res.status(401).json({ error: 'Sign in required to become a promoter', authRequired: true });
       return;
     }
@@ -94,7 +94,7 @@ referralsRouter.post('/promoter/register', async (req: Request, res: Response) =
     const [existing] = await db
       .select()
       .from(promotersTable)
-      .where(eq(promotersTable.userId, req.user.id));
+      .where(eq(promotersTable.userId, req.dbUser.id));
     if (existing) {
       res.json({ promoter: existing, existing: true });
       return;
@@ -106,7 +106,7 @@ referralsRouter.post('/promoter/register', async (req: Request, res: Response) =
         const [promoter] = await db
           .insert(promotersTable)
           .values({
-            userId: req.user.id,
+            userId: req.dbUser.id,
             code: generateCode(),
             displayName: displayName?.slice(0, 100) ?? null,
             payoutDetails: payoutDetails?.slice(0, 500) ?? null,
@@ -128,7 +128,7 @@ referralsRouter.post('/promoter/register', async (req: Request, res: Response) =
 // ── Promoter: dashboard data ─────────────────────────────────────────────────
 referralsRouter.get('/promoter/me', async (req: Request, res: Response) => {
   try {
-    if (!req.isAuthenticated()) {
+    if (!req.dbUser) {
       res.status(401).json({ error: 'Sign in required', authRequired: true });
       return;
     }
@@ -136,7 +136,7 @@ referralsRouter.get('/promoter/me', async (req: Request, res: Response) => {
     const [promoter] = await db
       .select()
       .from(promotersTable)
-      .where(eq(promotersTable.userId, req.user.id));
+      .where(eq(promotersTable.userId, req.dbUser.id));
 
     if (!promoter) {
       res.json({ promoter: null });

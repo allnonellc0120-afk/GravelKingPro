@@ -1,5 +1,8 @@
-import { useEffect } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useEffect, useRef } from "react";
+import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
+import { publishableKeyFromHost } from "@clerk/react/internal";
+import { shadcn } from "@clerk/themes";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -67,12 +70,102 @@ function RefCapture() {
 
 const queryClient = new QueryClient();
 
-function SignInRedirect() {
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || "/"
+    : path;
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: "clerk",
+  options: {
+    logoPlacement: "inside" as const,
+    logoLinkUrl: basePath || "/",
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: "#f59e0b",
+    colorForeground: "#fafafa",
+    colorMutedForeground: "#a1a1aa",
+    colorDanger: "#fb7185",
+    colorBackground: "#18181b",
+    colorInput: "#27272a",
+    colorInputForeground: "#fafafa",
+    colorNeutral: "#3f3f46",
+    fontFamily: "Inter, sans-serif",
+    borderRadius: "0.75rem",
+  },
+  elements: {
+    rootBox: "w-full flex justify-center",
+    cardBox: "bg-zinc-900 rounded-2xl w-[440px] max-w-full overflow-hidden",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    headerTitle: "text-zinc-50",
+    headerSubtitle: "text-zinc-400",
+    socialButtonsBlockButtonText: "text-zinc-100",
+    formFieldLabel: "text-zinc-300",
+    footerActionLink: "text-amber-400 hover:text-amber-300",
+    footerActionText: "text-zinc-400",
+    dividerText: "text-zinc-400",
+    identityPreviewEditButton: "text-amber-400",
+    formFieldSuccessText: "text-emerald-400",
+    alertText: "text-rose-300",
+    logoBox: "rounded-xl overflow-hidden",
+    logoImage: "rounded-xl",
+    socialButtonsBlockButton: "border-zinc-700 bg-zinc-800 hover:bg-zinc-700",
+    formButtonPrimary: "bg-amber-500 text-zinc-950 hover:bg-amber-400",
+    formFieldInput: "bg-zinc-800 border-zinc-700 text-zinc-50",
+    footerAction: "text-zinc-400",
+    dividerLine: "bg-zinc-700",
+    alert: "bg-rose-950/40 border-rose-800",
+    otpCodeFieldInput: "bg-zinc-800 border-zinc-700 text-zinc-50",
+    formFieldRow: "text-zinc-300",
+    main: "bg-transparent",
+  },
+};
+
+function SignInPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+    </div>
+  );
+}
+
+function SignUpPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+    </div>
+  );
+}
+
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const previousUserId = useRef<string | null | undefined>(undefined);
+
   useEffect(() => {
-    window.location.href = "/api/login";
-  }, []);
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (previousUserId.current !== undefined && previousUserId.current !== userId) {
+        queryClient.clear();
+      }
+      previousUserId.current = userId;
+    });
+    return unsubscribe;
+  }, [addListener]);
+
   return null;
 }
+
 
 function Router() {
   return (
@@ -112,8 +205,9 @@ function Router() {
       <Route path="/data-deletion" component={DataDeletionPage} />
       <Route path="/weekend-special" component={WeekendSpecial} />
       <Route path="/demo" component={VerifyPage} />
-      <Route path="/sign-in" component={SignInRedirect} />
-      <Route path="/login" component={SignInRedirect} />
+      <Route path="/sign-in/*?" component={SignInPage} />
+      <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route path="/login" component={SignInPage} />
       <Route path="/demo-login" component={DemoLogin} />
       <Route path="/help/:slug" component={HelpPage} />
       <Route path="/help" component={HelpPage} />
@@ -127,19 +221,46 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AppProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+    <WouterRouter base={basePath}>
+      <ClerkProviderWithRoutes />
+    </WouterRouter>
+  );
+}
+
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+
+  if (!clerkPubKey) {
+    throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in .env file");
+  }
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      localization={{
+        signIn: { start: { title: "Welcome back", subtitle: "Sign in to GravelKing Pro" } },
+        signUp: { start: { title: "Create your account", subtitle: "Start building with GravelKing Pro" } },
+      }}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ClerkQueryClientCacheInvalidator />
+        <TooltipProvider>
+          <AppProvider>
             <RouteSeo />
             <PageTracker />
             <RefCapture />
             <Router />
-          </WouterRouter>
-          <Toaster />
-        </AppProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+            <Toaster />
+          </AppProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
   );
 }
 

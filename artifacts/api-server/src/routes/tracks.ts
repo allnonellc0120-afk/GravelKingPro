@@ -76,12 +76,11 @@ async function saveFileToBucket(buffer: Buffer, key: string, contentType: string
 
 /** Derive gk_session-based userId. Returns null if no session cookie present. */
 async function resolveSessionUser(req: Request): Promise<{ sessionId: string; userId: string } | null> {
-  // OIDC-signed-in users FIRST — they never carry a gk_session cookie, so
+  // Clerk-signed-in users FIRST — they never carry a gk_session cookie, so
   // without this check every vault/download route 401'd for logged-in users
   // (same bug class as the subscription-status fix).
-  const authReq = req as Request & { isAuthenticated?: () => boolean; user?: { id?: string } };
-  if (authReq.isAuthenticated?.() && authReq.user?.id) {
-    return { sessionId: "", userId: authReq.user.id };
+  if (req.dbUser) {
+    return { sessionId: "", userId: req.dbUser.id };
   }
   const sessionId = (req.cookies as Record<string, string>)?.gk_session;
   if (!sessionId) return null;
@@ -157,8 +156,8 @@ router.get("/tracks/submit-eligibility", async (req: Request, res: Response) => 
 
   // weekly / monthly — check 7-day cooldown
   let userId: string | null = null;
-  if (req.isAuthenticated()) {
-    userId = req.user.id;
+  if (req.dbUser) {
+    userId = req.dbUser.id;
   } else {
     const sessionId = (req.cookies as Record<string, string>)?.gk_session;
     if (sessionId) {
@@ -273,10 +272,9 @@ router.post(
     // Resolve the submitting user. OIDC auth takes priority; fall back to gk_session.
     let user: Awaited<ReturnType<typeof storage.getOrCreateUser>> | null = null;
     let userId: string | null = null;
-    if (req.isAuthenticated()) {
-      userId = req.user.id;
-      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-      if (dbUser) user = dbUser;
+    if (req.dbUser) {
+      userId = req.dbUser.id;
+      user = req.dbUser;
     } else {
       const sessionId = (req.cookies as Record<string, string>)?.gk_session;
       if (sessionId) {

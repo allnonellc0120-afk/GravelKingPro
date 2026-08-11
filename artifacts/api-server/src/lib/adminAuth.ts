@@ -64,17 +64,9 @@ export function isAdminAuthenticated(req: Request): boolean {
   return req.headers["x-admin-key"] === adminKey;
 }
 
-/** Returns true if the request is from an OIDC user with isDeveloper=true. */
+/** Returns true if the request is from a Clerk-authenticated user with isDeveloper=true. */
 export async function isDeveloperAuthenticated(req: Request): Promise<boolean> {
-  if (!req.isAuthenticated()) return false;
-  try {
-    const { db, usersTable } = await import("@workspace/db");
-    const { eq } = await import("drizzle-orm");
-    const [u] = await db.select({ isDeveloper: usersTable.isDeveloper }).from(usersTable).where(eq(usersTable.id, req.user.id));
-    return u?.isDeveloper === true;
-  } catch {
-    return false;
-  }
+  return req.dbUser?.isDeveloper === true;
 }
 
 /**
