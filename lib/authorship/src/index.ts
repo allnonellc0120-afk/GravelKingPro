@@ -93,7 +93,7 @@ export function authorshipScore(aiDraft: string, finalText: string): number {
 // ── Style / Instrumental Authorship Scorer ────────────────────────────────────
 //
 // Measures how much HUMAN creative specificity went into a style prompt used
-// to generate an instrumental (Suno, Udio, etc.). The more specific the prompt,
+// to generate an instrumental (the in-house MLK v3.5 generator). The more specific the prompt,
 // the stronger the copyright claim on the resulting arrangement.
 //
 // Thresholds:

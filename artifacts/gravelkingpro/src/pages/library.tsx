@@ -114,10 +114,10 @@ export default function LibraryPage() {
     loadStudio();
   }, []);
 
-  const download = async (trackId: string) => {
-    setDownloading(trackId);
+  const download = async (trackId: string, format: "wav" | "mp3" = "wav") => {
+    setDownloading(`${trackId}:${format}`);
     try {
-      const r = await fetch(`/api/tracks/${trackId}/download`, { credentials: "include" });
+      const r = await fetch(`/api/tracks/${trackId}/download${format === "mp3" ? "?format=mp3" : ""}`, { credentials: "include" });
       if (!r.ok) {
         const data = (await r.json().catch(() => ({}))) as { error?: string };
         toast({ title: "Download failed", description: data.error || "Please try again.", variant: "destructive" });
@@ -203,10 +203,16 @@ export default function LibraryPage() {
                       <div className="text-xs text-muted-foreground truncate">{t.artistName}</div>
                       <div className="flex items-center justify-between mt-3">
                         <span className="text-xs text-muted-foreground">Purchased</span>
-                        <Button size="sm" variant="outline" className="gap-1" disabled={downloading === t.id} onClick={() => download(t.id)}>
-                          {downloading === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                          Download
-                        </Button>
+                        <div className="flex items-center gap-1.5">
+                          <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:wav`} onClick={() => download(t.id, "wav")}>
+                            {downloading === `${t.id}:wav` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            WAV
+                          </Button>
+                          <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:mp3`} onClick={() => download(t.id, "mp3")}>
+                            {downloading === `${t.id}:mp3` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            MP3
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

@@ -479,13 +479,29 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
 
   // Stream the file directly — no redirect, no signed URL, file lands on device.
   const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
-  const file = objectStorageClient.bucket(bucketId).file(track.audioFullKey);
+
+  // Optional ?format=mp3 — serve the 320 kbps MP3 sibling (audio_full.mp3)
+  // when it exists; older tracks without one silently fall back to WAV.
+  let audioKey = track.audioFullKey;
+  let contentType = "audio/wav";
+  if (req.query.format === "mp3") {
+    const mp3Key = track.audioFullKey.replace(/\.[^./]+$/, ".mp3");
+    if (mp3Key !== track.audioFullKey) {
+      const [mp3Exists] = await objectStorageClient.bucket(bucketId).file(mp3Key).exists()
+        .catch(() => [false] as [boolean]);
+      if (mp3Exists) {
+        audioKey = mp3Key;
+        contentType = "audio/mpeg";
+      }
+    }
+  }
+  const file = objectStorageClient.bucket(bucketId).file(audioKey);
 
   const safeTitle = track.title.replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "track";
-  const ext = track.audioFullKey.split(".").pop() ?? "wav";
+  const ext = audioKey.split(".").pop() ?? "wav";
   const filename = `${safeTitle}.${ext}`;
 
-  res.setHeader("Content-Type", "audio/wav");
+  res.setHeader("Content-Type", contentType);
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
   file.createReadStream()
