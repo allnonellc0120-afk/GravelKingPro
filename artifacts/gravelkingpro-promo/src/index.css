@@ -109,8 +109,12 @@
 }
 
 .hero-type {
-  font-size: 8.5cqw;
+  font-size: 16cqw;
   line-height: .78;
+}
+
+.vertical .hero-type {
+  font-size: 26cqw;
 }
 
 .scene-copy {

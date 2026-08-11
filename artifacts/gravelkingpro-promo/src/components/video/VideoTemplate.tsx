@@ -95,7 +95,7 @@ export default function VideoTemplate({
         </AnimatePresence>
         <audio
           ref={musicRef}
-          src={`${import.meta.env.BASE_URL}audio/gravelking_pro_soundtrack.mp3`}
+          src={`${import.meta.env.BASE_URL}audio/gravelking_pro_soundtrack_warm.mp3`}
           preload="auto"
           autoPlay
           loop

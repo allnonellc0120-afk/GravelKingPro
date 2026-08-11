@@ -12,3 +12,11 @@ description: How the promo video artifact maps product/marketing requirements to
 - Scene content must track the real product: removed-bloat features (AI beat maker, songwriter/lyrics generator) must not appear in any scene. Selling points = voice removal, stem splitting, preset + adjustable mastering, live DAW recording, per-stem metering/knobs.
 
 - Use `vw`-based font sizes and container `px-[Nvw]` padding to avoid cut-off text across viewport sizes; verify a scene visually by temporarily rendering it directly from `App.tsx` (then revert) since the player auto-loops and screenshots usually land on Scene1.
+
+- **4K master exports: use the ffmpeg compositing pipeline, NOT browser canvas capture.** Browser capture at 4K stalls the rAF loop and produces files with ~29 unique frames in 59s (visible skipping) despite valid 30fps container metadata — always verify exports with `ffmpeg -vf mpdecimate` (expect >1400 unique frames/59s).
+  **Why:** the 2026-08 "skipping" masters were browser-captured; re-encoding can't recover frames never captured.
+  **How to apply:** render per-beat segments with ffmpeg (fps=30, scale/crop to 4K, drawtext for kinetic headlines sized off min(W,H) so 9:16 doesn't overflow), concat, then mux a separate audio mix (VO adelay per beat + sidechaincompress-ducked music). Escape drawtext apostrophes or avoid them. Chunk long renders (<5 min per shell call) with a per-beat cache; interrupted ffmpeg leaves moov-less truncated files — probe each beat before concat.
+
+- **In-page preview of finished promos needs lightweight dual-format files.** Pointing `<video>` at the 4K masters (200MB+) stalls forever on spinners, and the preview/test browser lacks H.264 High-profile decode — plays only WebM (VP8/Vorbis). Serve ~1080p preview copies with BOTH `<source>` mp4 + webm children plus a poster frame; keep 4K masters separate for delivery.
+
+- **Never name a bash array `LINES`** — the terminal-height env var silently clobbers it, so every drawtext beat renders empty (video looks fine but has no headlines). Use a name like `BEATTXT`, and QA at least one extracted frame per format before concat.

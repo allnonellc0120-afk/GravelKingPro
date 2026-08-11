@@ -4,3 +4,7 @@ seeds/assets/tgk-superman-full.wav filter=lfs diff=lfs merge=lfs -text
 attached_assets/application-9bbb7a28-916c-49d5-aae8-d61aec9f2717_1784337102513.aab filter=lfs diff=lfs merge=lfs -text
 artifacts/gravelkingpro-promo/public/videos/gravelkingpro_pitch_228.mp4 filter=lfs diff=lfs merge=lfs -text
 artifacts/gravelkingpro-speed-promo/public/videos/gravelkingpro_pitch_228.mp4 filter=lfs diff=lfs merge=lfs -text
+artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4 filter=lfs diff=lfs merge=lfs -text
+artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4 filter=lfs diff=lfs merge=lfs -text
+attached_assets/final_promos/gravelkingpro_promo_59s_16x9.mp4 filter=lfs diff=lfs merge=lfs -text
+attached_assets/final_promos/gravelkingpro_promo_59s_9x16.mp4 filter=lfs diff=lfs merge=lfs -text
