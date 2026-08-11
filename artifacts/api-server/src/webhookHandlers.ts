@@ -1,6 +1,13 @@
 import type Stripe from 'stripe';
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { db, purchasedTracksTable, usersTable } from '@workspace/db';
+import {
+  db,
+  purchasedTracksTable,
+  usersTable,
+  promotersTable,
+  referralAttributionsTable,
+  commissionsTable,
+} from '@workspace/db';
 import { eq, sql } from 'drizzle-orm';
 import type { Request } from 'express';
 import { recordAnalyticsEvent } from './analytics';
@@ -102,12 +109,102 @@ export class WebhookHandlers {
             return;
           }
         }
+        // ── Referral commission accrual ──────────────────────────────────
+        // Commission only on actually-paid invoices ($0 trial invoices are
+        // skipped by the amount_paid > 0 check). Attribution comes from our
+        // own DB (written server-side at checkout), never from the client.
+        if (event.type === 'invoice.paid') {
+          const invoice = event.data.object;
+          const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+          if (customerId && invoice.amount_paid > 0 && invoice.id) {
+            const [user] = await db
+              .select({ id: usersTable.id })
+              .from(usersTable)
+              .where(eq(usersTable.stripeCustomerId, customerId));
+            if (user) {
+              const [attribution] = await db
+                .select()
+                .from(referralAttributionsTable)
+                .where(eq(referralAttributionsTable.userId, user.id));
+              if (attribution) {
+                const [promoter] = await db
+                  .select()
+                  .from(promotersTable)
+                  .where(eq(promotersTable.id, attribution.promoterId));
+                // Fraud basics: promoter must still be approved, and
+                // self-referral never accrues (defense in depth — checkout
+                // already refuses to write such an attribution).
+                if (promoter && promoter.status === 'approved' && promoter.userId !== user.id) {
+                  const commissionCents = Math.floor((invoice.amount_paid * promoter.commissionRate) / 100);
+                  if (commissionCents > 0) {
+                    // Idempotent — one commission per Stripe invoice.
+                    await db
+                      .insert(commissionsTable)
+                      .values({
+                        promoterId: promoter.id,
+                        userId: user.id,
+                        stripeInvoiceId: invoice.id,
+                        invoiceAmountCents: invoice.amount_paid,
+                        commissionCents,
+                        originalCommissionCents: commissionCents,
+                        currency: invoice.currency ?? 'usd',
+                      })
+                      .onConflictDoNothing();
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Refunded charge → adjust the matching commission. charge.refunded
+        // fires for BOTH partial and full refunds; charge.amount_refunded is
+        // the CUMULATIVE refunded total, so repeated deliveries and multiple
+        // partial refunds are naturally idempotent (we always recompute the
+        // net commission from the original accrual and the cumulative total).
+        // Full refund → status 'reversed' (even if already marked paid, so
+        // the admin can see the overpayment); partial refund → commission
+        // reduced proportionally, status unchanged.
+        if (event.type === 'charge.refunded') {
+          const charge = event.data.object as Stripe.Charge & { invoice?: string | { id: string } | null };
+          const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : charge.invoice?.id;
+          if (invoiceId) {
+            const [commission] = await db
+              .select()
+              .from(commissionsTable)
+              .where(eq(commissionsTable.stripeInvoiceId, invoiceId));
+            if (commission) {
+              const refundedCents = Math.min(
+                Math.max(charge.amount_refunded ?? 0, 0),
+                commission.invoiceAmountCents,
+              );
+              // Original accrual basis (rows created before this column existed
+              // have 0 — fall back to the current commission).
+              const original = commission.originalCommissionCents || commission.commissionCents;
+              const fullyRefunded = refundedCents >= commission.invoiceAmountCents;
+              const netCommission = fullyRefunded
+                ? 0
+                : Math.floor(
+                    (original * (commission.invoiceAmountCents - refundedCents)) /
+                      commission.invoiceAmountCents,
+                  );
+              await db
+                .update(commissionsTable)
+                .set({
+                  refundedCents,
+                  commissionCents: netCommission,
+                  ...(fullyRefunded && { status: 'reversed' }),
+                })
+                .where(eq(commissionsTable.stripeInvoiceId, invoiceId));
+            }
+          }
+        }
       }
     } catch (err) {
       // Log so the error is observable, but never block stripe-replit-sync processing
       // if our track handler fails.
       const log = req?.log ?? { error: console.error };
-      log.error({ err }, 'Track purchase webhook handler failed');
+      log.error({ err }, 'Custom webhook handler failed');
     }
 
     const sync = await getStripeSync();

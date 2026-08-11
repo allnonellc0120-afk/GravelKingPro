@@ -42,6 +42,28 @@ import { RouteSeo } from "@/lib/seo";
 import DemoLogin from "@/pages/demo-login";
 import HelpPage from "@/pages/help";
 import AdminPublishChecklist from "@/pages/admin-publish-checklist";
+import PromotersPage from "@/pages/promoters";
+import AdminPromoters from "@/pages/admin-promoters";
+
+/**
+ * Referral link capture: if the URL carries ?ref=CODE, report it to the server
+ * once so it can set the httpOnly attribution cookie (survives the Stripe
+ * checkout redirect). Best-effort; never blocks rendering.
+ */
+function RefCapture() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("ref");
+    if (!code) return;
+    void fetch("/api/referral/click", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    }).catch(() => {});
+  }, []);
+  return null;
+}
 
 const queryClient = new QueryClient();
 
@@ -96,6 +118,8 @@ function Router() {
       <Route path="/help/:slug" component={HelpPage} />
       <Route path="/help" component={HelpPage} />
       <Route path="/admin/publish-checklist" component={AdminPublishChecklist} />
+      <Route path="/promoters" component={PromotersPage} />
+      <Route path="/admin/promoters" component={AdminPromoters} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -109,6 +133,7 @@ function App() {
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <RouteSeo />
             <PageTracker />
+            <RefCapture />
             <Router />
           </WouterRouter>
           <Toaster />

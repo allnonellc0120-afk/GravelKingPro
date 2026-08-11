@@ -7,7 +7,7 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --max-old-space-size=2048 --enable-source-maps ./dist/index.mjs",
-    "test": "node ./build.test.mjs && node --enable-source-maps ./dist-test/whitepaper.test.mjs && node --enable-source-maps ./dist-test/studio-audio.test.mjs && node --enable-source-maps ./dist-test/master-kernel.test.mjs && node --enable-source-maps ./dist-test/price-parity.test.mjs && node --enable-source-maps ./dist-test/download-gate.test.mjs && node --enable-source-maps ./dist-test/webhook-track-purchase.test.mjs && node --enable-source-maps ./dist-test/benchmark.test.mjs",
+    "test": "node ./build.test.mjs && node --enable-source-maps ./dist-test/whitepaper.test.mjs && node --enable-source-maps ./dist-test/studio-audio.test.mjs && node --enable-source-maps ./dist-test/master-kernel.test.mjs && node --enable-source-maps ./dist-test/price-parity.test.mjs && node --enable-source-maps ./dist-test/download-gate.test.mjs && node --enable-source-maps ./dist-test/webhook-track-purchase.test.mjs && node --enable-source-maps ./dist-test/referral-commission.test.mjs && node --enable-source-maps ./dist-test/benchmark.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

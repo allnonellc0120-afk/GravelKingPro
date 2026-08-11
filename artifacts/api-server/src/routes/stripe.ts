@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { storage } from '../storage';
-import { db, usersTable } from '@workspace/db';
+import { db, usersTable, promotersTable, referralAttributionsTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
 import { getUncachableStripeClient } from '../stripeClient';
 import { recordAnalyticsEvent } from '../analytics';
@@ -116,13 +116,38 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
           ? 3
           : 0;
 
+    // Referral attribution — read the httpOnly gk_ref cookie (set server-side
+    // on tracked-link clicks), validate the promoter, and record first-touch
+    // attribution in our DB. Commission accrual happens only on the verified
+    // invoice.paid webhook, never from client claims.
+    let referralCode = '';
+    const refCookie = (req.cookies as Record<string, string>)?.gk_ref;
+    if (refCookie) {
+      try {
+        const [promoter] = await db
+          .select()
+          .from(promotersTable)
+          .where(eq(promotersTable.code, refCookie.toUpperCase()));
+        // Fraud basics: promoter must be approved and cannot refer themselves.
+        if (promoter && promoter.status === 'approved' && promoter.userId !== dbUser.id) {
+          await db
+            .insert(referralAttributionsTable)
+            .values({ userId: dbUser.id, promoterId: promoter.id })
+            .onConflictDoNothing(); // first-touch wins
+          referralCode = promoter.code;
+        }
+      } catch (refErr) {
+        console.error('Referral attribution failed (non-blocking):', refErr);
+      }
+    }
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
       client_reference_id: dbUser.id,
-      metadata: { userId: dbUser.id, plan: plan ?? "" },
+      metadata: { userId: dbUser.id, plan: plan ?? "", ...(referralCode && { referralCode }) },
       success_url: `${baseUrl}/pricing?checkout=success${plan ? `&plan=${encodeURIComponent(plan)}` : ''}`,
       cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
       ...(trialDays > 0 && { subscription_data: { trial_period_days: trialDays } }),
