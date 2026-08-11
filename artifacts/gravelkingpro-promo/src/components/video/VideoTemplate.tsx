@@ -6,24 +6,30 @@ import { Scene2 } from './video_scenes/Scene2';
 import { Scene3 } from './video_scenes/Scene3';
 import { Scene4 } from './video_scenes/Scene4';
 import { Scene5 } from './video_scenes/Scene5';
+import { Scene6 } from './video_scenes/Scene6';
+import { Scene7 } from './video_scenes/Scene7';
 
 const QUERY = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 
 export const SCENE_DURATIONS = {
-  origin: 4500,
-  spark: 5500,
-  generate: 7000,
-  own: 7000,
-  workflow: 6000,
+  idea: 7000,
+  shape: 7500,
+  generate: 8500,
+  edit: 9000,
+  document: 8000,
+  workflow: 9000,
+  finish: 10000,
 } as const;
 
 type SceneProps = { vertical?: boolean };
 const SCENE_COMPONENTS: Record<string, ComponentType<SceneProps>> = {
-  origin: Scene1,
-  spark: Scene2,
+  idea: Scene1,
+  shape: Scene2,
   generate: Scene3,
-  own: Scene4,
+  edit: Scene4,
   workflow: Scene5,
+  document: Scene6,
+  finish: Scene7,
 };
 
 export default function VideoTemplate({
@@ -57,13 +63,13 @@ export default function VideoTemplate({
   }, [hasEnded, muted]);
 
   return (
-    <div className="video-root w-screen h-[100dvh] flex items-center justify-center overflow-hidden bg-[#18120f]">
-      <div className={`video-frame ${vertical ? 'vertical' : 'landscape'} relative w-full h-auto max-h-[100dvh] overflow-hidden bg-[#18120f] text-[#f3eadb]`}>
+    <div className="video-root w-screen h-[100dvh] flex items-center justify-center overflow-hidden bg-[#111514]">
+      <div className={`video-frame ${vertical ? 'vertical' : 'landscape'} relative w-full h-auto max-h-[100dvh] overflow-hidden bg-[#111514] text-[#f6f2e9]`}>
         <div className="noise-overlay absolute inset-0 z-50" />
         <div className="film-grain absolute inset-0 z-40 pointer-events-none opacity-20" />
-        <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(circle_at_16%_20%,rgba(210,105,42,.26),transparent_35%),radial-gradient(circle_at_88%_82%,rgba(236,182,60,.17),transparent_34%),linear-gradient(125deg,#18120f,#2a1811_55%,#17110e)]" />
+        <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(circle_at_16%_20%,rgba(255,93,71,.22),transparent_35%),radial-gradient(circle_at_88%_82%,rgba(244,196,68,.18),transparent_34%),linear-gradient(125deg,#111514,#19322f_55%,#101816)]" />
         <motion.div
-          className="absolute -left-[16%] -top-[26%] z-0 h-[80%] w-[62%] rounded-full bg-[#d66d35]/10 blur-[70px]"
+          className="absolute -left-[16%] -top-[26%] z-0 h-[80%] w-[62%] rounded-full bg-[#ff5d47]/20 blur-[70px]"
           animate={{
             x: ['0%', '24%', '-8%', '0%'][currentScene % 4],
             y: ['0%', '10%', '24%', '0%'][currentScene % 4],
@@ -72,7 +78,7 @@ export default function VideoTemplate({
           transition={{ duration: 7, ease: [0.16, 1, 0.3, 1] }}
         />
         <motion.div
-          className="absolute -right-[20%] -bottom-[30%] z-0 h-[70%] w-[55%] rounded-full bg-[#eab83f]/10 blur-[90px]"
+          className="absolute -right-[20%] -bottom-[30%] z-0 h-[70%] w-[55%] rounded-full bg-[#f4c444]/20 blur-[90px]"
           animate={{
             x: ['0%', '-18%', '8%', '0%'][currentScene % 4],
             y: ['0%', '-12%', '-4%', '0%'][currentScene % 4],
@@ -80,9 +86,9 @@ export default function VideoTemplate({
           }}
           transition={{ duration: 8.5, ease: [0.16, 1, 0.3, 1] }}
         />
-        <div className="absolute left-[4.5%] top-[4.5%] z-45 flex items-center gap-2 font-mono text-[clamp(7px,0.7vw,12px)] uppercase tracking-[0.24em] text-[#e7c56d]/85">
-          <span className="h-2 w-2 rounded-full bg-[#e5a62e] shadow-[0_0_12px_rgba(229,166,46,.6)]" />
-          GravelKing Pro / Lyrics Generator
+        <div className="absolute left-[4.5%] top-[4.5%] z-45 flex items-center gap-[.55cqw] font-mono text-[1.05cqw] uppercase tracking-[0.2em] text-[#f4c444]/90">
+          <span className="h-[.55cqw] w-[.55cqw] rounded-full bg-[#ff5d47] shadow-[0_0_12px_rgba(255,93,71,.7)]" />
+          GKP / Lyrics Generator
         </div>
         <AnimatePresence mode="sync">
           {SceneComponent && <SceneComponent key={currentSceneKey} vertical={vertical} />}

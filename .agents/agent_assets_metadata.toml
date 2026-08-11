@@ -585,3 +585,17 @@ uri = "file://attached_assets/promo/songwriting-studio-in-action.jpg"
 type = "image"
 title = "The Tool in Action — Songwriting Studio"
 description = "Real screenshot of the in-house studio UI, ready to attach to the post."
+
+[[outputs]]
+id = "phROa3TdjHWtJ3RCMJ-ML"
+uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_30s.mp4"
+type = "video"
+title = "GravelKing Pro Lyrics Generator — 30s HD Promo"
+description = "30-second 1920×1080 H.264/AAC promo video for YouTube and Facebook."
+
+[[outputs]]
+id = "wqqr0zn-KHh53yW2FvXfu"
+uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4"
+type = "video"
+title = "GravelKing Pro Lyrics Generator — 59s 4K Landscape Promo"
+description = "Verified 59.000-second 3840×2160 H.264/AAC master for YouTube and Facebook."

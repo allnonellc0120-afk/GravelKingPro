@@ -1476,7 +1476,18 @@ export default function SongwritingStudio() {
               </div>
             )}
 
-            {/* Pro features */}
+         {/* Song generator — always visible. Access is enforced by the card
+             itself so the tool never disappears when entitlement data is
+             delayed or a returning session is not yet hydrated. */}
+         <MlkGenerateCard
+           lyrics={lyricsFromLines(lines)}
+           projectId={projectId}
+           stylePrompt={effectiveStyle}
+           vocalMode={genVocalMode}
+           onVocalModeChange={setGenVocalMode}
+         />
+
+         {/* Pro features */}
             <div className="space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pro Features</p>
               {isPro ? (
@@ -1493,13 +1504,6 @@ export default function SongwritingStudio() {
                       <Clock className="w-3 h-3 inline mr-1" />Forensic revision history is being recorded.
                     </p>
                   )}
-                  <MlkGenerateCard
-                    lyrics={lyricsFromLines(lines)}
-                    projectId={projectId}
-                    stylePrompt={effectiveStyle}
-                    vocalMode={genVocalMode}
-                    onVocalModeChange={setGenVocalMode}
-                  />
                   {isEligible ? (
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
