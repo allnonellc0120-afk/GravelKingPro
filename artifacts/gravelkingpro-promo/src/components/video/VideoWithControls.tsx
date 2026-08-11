@@ -152,7 +152,7 @@ export default function VideoWithControls() {
   const [tapPinned, setTapPinned] = useState(false);
   const [mp4Url, setMp4Url] = useState<string | null>(null);
   const hideTimerRef = useRef<number | null>(null);
-  const mp4Path = `${import.meta.env.BASE_URL}videos/gravelkingpro_pitch_228.mp4`;
+  const mp4Path = `${import.meta.env.BASE_URL}videos/gravelkingpro_lyrics_generator_30s_16x9.mp4`;
 
   const resetHideTimer = useCallback(() => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
@@ -226,8 +226,8 @@ export default function VideoWithControls() {
   const barVisible = !collapsed || hovering || tapPinned;
   const showGestureOverlay = needsGesture;
 
-  // Export path: clean, no controls, unmuted audio.
-  if (isExport) return <VideoTemplate />;
+  // Export path: clean, no controls, unmuted audio. Add ?format=vertical for 9:16.
+  if (isExport) return <VideoTemplate muted={false} />;
 
   return (
     <div className="relative w-full h-screen">

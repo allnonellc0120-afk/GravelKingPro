@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Zap, Menu, X, User, LogIn, Crown, ArrowRight, ChevronDown, BookOpen, Gavel, ShieldAlert } from "lucide-react";
+import { Zap, Menu, X, User, LogIn, Crown, ArrowRight, ChevronDown, BookOpen, Gavel, ShieldAlert, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/lib/context";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -33,7 +33,7 @@ export function Layout({
     { href: "/mastering", label: "Mastering" },
     { href: "/vocal-booth", label: "Vocal Booth" },
     { href: "/studio", label: "DAW" },
-    { href: "/songwriting", label: "Songwriting" },
+    { href: "/songwriting", label: "Lyrics Generator", icon: Sparkles },
     { href: "/label", label: "Label" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
@@ -171,6 +171,7 @@ export function Layout({
                     location === link.href ? "text-amber-500 bg-secondary/40" : "text-muted-foreground"
                   }`}
                 >
+                  {link.icon && <link.icon className="w-4 h-4 text-amber-500" />}
                   {link.label}
                 </Link>
               ))}
