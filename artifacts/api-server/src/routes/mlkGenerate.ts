@@ -10,7 +10,7 @@ import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { getUsageUser } from "../lib/usage";
 import { isVertexConfigured } from "../geminiVertex";
-import { generateAndMasterTrack } from "../services/mlkOrchestrator";
+import { generateAndMasterTrack, remixTrack, type VocalMode } from "../services/mlkOrchestrator";
 
 const mlkGenerateRouter = Router();
 
@@ -41,9 +41,16 @@ mlkGenerateRouter.post(
       title?: string;
       artistName?: string;
       stylePrompt?: string;
+      vocalMode?: string;
     };
+    const vocalMode: VocalMode =
+      body.vocalMode === "instrumental" || body.vocalMode === "random"
+        ? body.vocalMode
+        : "lyrics";
     const text = (body.text ?? "").toString();
-    if (text.replace(/\s/g, "").length < 5) {
+    // Lyrics are only required when the user is supplying their own —
+    // "random" (model-written) and "instrumental" runs need none.
+    if (vocalMode === "lyrics" && text.replace(/\s/g, "").length < 5) {
       res.status(400).json({ error: "Lyrics text is required (min 5 characters)." });
       return;
     }
@@ -53,13 +60,93 @@ mlkGenerateRouter.post(
         title: body.title,
         artistName: body.artistName,
         stylePrompt: body.stylePrompt,
+        vocalMode,
       });
       res.json({ success: true, ...result });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      // Full raw error (stack, upstream JSON) stays in the server logs ONLY.
       req.log.error({ err }, "MLK v3.5 generate-master failed");
-      // Fail loudly with the real upstream error — never a silent fallback.
-      res.status(502).json({ error: `Generate + master failed: ${message.slice(0, 500)}` });
+      const friendly = userFacingGenerationError(message);
+      res.status(friendly.status).json({ error: friendly.error, ...(friendly.code ? { code: friendly.code } : {}) });
+    }
+  },
+);
+
+/** Google's upstream safety filter rejected the prompt — a user-input problem, not a server fault. */
+function isContentPolicyBlock(message: string): boolean {
+  return /content_blocked|blocked for an unspecified policy|safety (filter|system|policy)/i.test(message);
+}
+
+const PROMPT_FLAGGED_MESSAGE =
+  "Prompt flagged by AI safety filter. Try selecting from the preset style tags or softening your prompt.";
+
+/**
+ * Error shield: every failure maps to a clean, human-readable message.
+ * Raw engine errors, upstream JSON, and stack traces never reach the UI —
+ * they are logged server-side by the caller before this mapping.
+ */
+function userFacingGenerationError(message: string): { status: number; error: string; code?: string } {
+  if (isContentPolicyBlock(message)) {
+    return { status: 422, error: PROMPT_FLAGGED_MESSAGE, code: "content_blocked" };
+  }
+  // These messages are already written for humans — pass them through.
+  if (/Storage Configuration Error/i.test(message)) return { status: 502, error: message };
+  if (/not found|own vault/i.test(message)) return { status: 404, error: message };
+  if (/Lyrics text is required/i.test(message)) return { status: 400, error: message };
+  return {
+    status: 502,
+    error:
+      "The music engine hit a temporary issue while producing your track. " +
+      "Nothing was recorded or charged — please try again in a moment.",
+  };
+}
+
+/**
+ * POST /api/mlk/v35/remix — MLK v3.5 Remix Engine.
+ *
+ * Takes an existing vault track, anchors on its original style prompt, blends
+ * the user's new twist, regenerates via Lyria, masters through the real MLK
+ * v3.5 kernel, and issues a CHILD IP cert linked to the parent (chain of
+ * title). Same cost profile as generation → same rate/concurrency limits.
+ */
+mlkGenerateRouter.post(
+  "/mlk/v35/remix",
+  generateRateLimit,
+  generateConcurrency,
+  async (req: Request, res: Response) => {
+    const user = await getUsageUser(req, res);
+
+    if (!isVertexConfigured()) {
+      res.status(503).json({ error: "Vertex AI is not configured on this server." });
+      return;
+    }
+
+    const body = req.body as {
+      parentTrackId?: string;
+      twist?: string;
+      vocalsOn?: boolean;
+      artistName?: string;
+    };
+    const parentTrackId = (body.parentTrackId ?? "").toString().trim();
+    if (!parentTrackId) {
+      res.status(400).json({ error: "parentTrackId is required." });
+      return;
+    }
+
+    try {
+      const result = await remixTrack(parentTrackId, user.id, {
+        twist: (body.twist ?? "").toString(),
+        vocalsOn: body.vocalsOn === true,
+        artistName: body.artistName,
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Full raw error (stack, upstream JSON) stays in the server logs ONLY.
+      req.log.error({ err }, "MLK v3.5 remix failed");
+      const friendly = userFacingGenerationError(message);
+      res.status(friendly.status).json({ error: friendly.error, ...(friendly.code ? { code: friendly.code } : {}) });
     }
   },
 );

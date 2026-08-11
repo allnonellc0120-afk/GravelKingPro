@@ -1,6 +1,7 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
+import { readFile as fsReadFile } from "fs/promises";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -28,6 +29,159 @@ export const objectStorageClient = new Storage({
   },
   projectId: "",
 });
+
+// ── Fallback storage (owner's GCP project) ──────────────────────────────────
+// Replit's managed bucket has a broken platform-side IAM grant (the sidecar
+// service account gets 403 storage.objects.create in BOTH dev and prod).
+// Until Replit repairs it, writes that fail on the primary bucket land in a
+// bucket in the owner's own GCP project (same service account that runs
+// Lyria/Vertex), and reads check the primary first, then the fallback.
+// This is a loud, logged fallback — never a silent mock.
+
+interface GcpSaCredentials {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+}
+
+let fallbackCache: { client: Storage; bucketName: string } | null | undefined;
+
+export function getFallbackStorage(): { client: Storage; bucketName: string } | null {
+  if (fallbackCache !== undefined) return fallbackCache;
+  try {
+    const raw = process.env.GCP_SERVICE_ACCOUNT;
+    if (!raw) {
+      fallbackCache = null;
+      return null;
+    }
+    const creds = JSON.parse(raw) as GcpSaCredentials;
+    if (!creds.project_id || !creds.client_email || !creds.private_key) {
+      fallbackCache = null;
+      return null;
+    }
+    fallbackCache = {
+      client: new Storage({ credentials: creds, projectId: creds.project_id }),
+      bucketName: `gkp-vault-${creds.project_id}`,
+    };
+  } catch {
+    fallbackCache = null;
+  }
+  return fallbackCache;
+}
+
+/**
+ * Save an object to the primary (Replit-managed) bucket; if that write fails
+ * (e.g. the platform-side 403 IAM breakage), save the SAME objectName into the
+ * owner-project fallback bucket instead. Throws loudly if both fail.
+ * Returns which backend the bytes landed in.
+ */
+/**
+ * Cached (5 min) probe of whether the primary bucket currently accepts
+ * writes. Used to decide which backend presigned browser PUT URLs should
+ * target — a sidecar-signed URL for a bucket that 403s every write would
+ * fail only at upload time, where the server can no longer intervene.
+ */
+let primaryWriteHealth: { ok: boolean; at: number } | null = null;
+export async function primaryWriteHealthy(): Promise<boolean> {
+  if (primaryWriteHealth && Date.now() - primaryWriteHealth.at < 5 * 60_000) {
+    return primaryWriteHealth.ok;
+  }
+  try {
+    const dir = process.env.PRIVATE_OBJECT_DIR || "";
+    if (!dir) throw new Error("PRIVATE_OBJECT_DIR not set");
+    const probePath = `${dir.replace(/\/+$/, "")}/.write-health-probe`;
+    const { bucketName, objectName } = parseObjectPath(probePath);
+    await objectStorageClient
+      .bucket(bucketName)
+      .file(objectName)
+      .save(Buffer.from("ok"), { contentType: "text/plain" });
+    primaryWriteHealth = { ok: true, at: Date.now() };
+  } catch (err) {
+    console.warn(
+      `[objectStorage] primary bucket write-health probe FAILED (${String((err as Error)?.message ?? err).slice(0, 160)}) — presigned uploads will target the fallback bucket for the next 5 minutes`,
+    );
+    primaryWriteHealth = { ok: false, at: Date.now() };
+  }
+  return primaryWriteHealth.ok;
+}
+
+export async function saveObjectWithFallback(
+  bucketName: string,
+  objectName: string,
+  buffer: Buffer,
+  options: { contentType: string; metadata?: Record<string, unknown> },
+): Promise<"primary" | "fallback"> {
+  const saveOpts = {
+    contentType: options.contentType,
+    ...(options.metadata ? { metadata: options.metadata } : {}),
+  };
+  try {
+    await objectStorageClient.bucket(bucketName).file(objectName).save(buffer, saveOpts);
+    return "primary";
+  } catch (primaryErr) {
+    const fallback = getFallbackStorage();
+    if (!fallback) throw primaryErr;
+    console.warn(
+      `[objectStorage] primary bucket write failed (${String((primaryErr as Error)?.message ?? primaryErr).slice(0, 160)}) — using fallback bucket ${fallback.bucketName} for ${objectName}`,
+    );
+    await fallback.client.bucket(fallback.bucketName).file(objectName).save(buffer, saveOpts);
+    return "fallback";
+  }
+}
+
+/**
+ * Resolve an object for reading: primary bucket first, then the fallback
+ * bucket (same objectName). Returns null if it exists in neither.
+ */
+export async function getObjectFileWithFallback(
+  bucketName: string,
+  objectName: string,
+): Promise<File | null> {
+  let backendError: unknown = null;
+  try {
+    const primary = objectStorageClient.bucket(bucketName).file(objectName);
+    const [exists] = await primary.exists();
+    if (exists) return primary;
+  } catch (err) {
+    backendError = err;
+  }
+  const fallback = getFallbackStorage();
+  if (fallback) {
+    try {
+      const file = fallback.client.bucket(fallback.bucketName).file(objectName);
+      const [exists] = await file.exists();
+      if (exists) return file;
+    } catch (err) {
+      backendError = backendError ?? err;
+    }
+  }
+  // If a backend could not even be CHECKED, this is a storage incident, not a
+  // confirmed absence — fail loudly instead of masking it as "not found".
+  if (backendError) throw backendError;
+  return null;
+}
+
+/**
+ * Signed GET URL that works for BOTH backends: sidecar signing for the
+ * primary bucket, service-account V4 signing for the fallback bucket.
+ */
+export async function signObjectURLAnyBackend(file: File, ttlSec: number): Promise<string> {
+  const fallback = getFallbackStorage();
+  if (fallback && file.bucket.name === fallback.bucketName) {
+    const [url] = await file.getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: Date.now() + ttlSec * 1000,
+    });
+    return url;
+  }
+  return signObjectURL({
+    bucketName: file.bucket.name,
+    objectName: file.name,
+    method: "GET",
+    ttlSec,
+  });
+}
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -75,11 +229,11 @@ export class ObjectStorageService {
       const fullPath = `${searchPath}/${filePath}`;
 
       const { bucketName, objectName } = parseObjectPath(fullPath);
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
-
-      const [exists] = await file.exists();
-      if (exists) {
+      // Primary bucket first, then the owner-project fallback bucket (same
+      // objectName) — public assets written during a primary-bucket outage
+      // land there and must still be servable.
+      const file = await getObjectFileWithFallback(bucketName, objectName);
+      if (file) {
         return file;
       }
     }
@@ -120,6 +274,19 @@ export class ObjectStorageService {
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
+    // If the primary bucket is currently rejecting writes (platform 403), a
+    // sidecar-signed URL would only fail later at the browser's PUT — where
+    // the server can no longer fall back. Sign against the fallback bucket
+    // instead; reads resolve both backends, so the object stays reachable.
+    const fallback = getFallbackStorage();
+    if (fallback && !(await primaryWriteHealthy())) {
+      const [url] = await fallback.client
+        .bucket(fallback.bucketName)
+        .file(objectName)
+        .getSignedUrl({ version: "v4", action: "write", expires: Date.now() + 900_000 });
+      return url;
+    }
+
     return signObjectURL({
       bucketName,
       objectName,
@@ -139,12 +306,12 @@ export class ObjectStorageService {
     const cleanKey = key.replace(/^\/+/, "");
     const fullPath = `${base}/${cleanKey}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
-    await objectStorageClient.bucket(bucketName).upload(localPath, {
-      destination: objectName,
-      metadata: {
-        contentType,
-        metadata: metadata ?? {},
-      },
+    // Backend-aware write: lands in the owner-project fallback bucket when
+    // the Replit-managed bucket rejects the write (platform 403).
+    const bytes = await fsReadFile(localPath);
+    await saveObjectWithFallback(bucketName, objectName, bytes, {
+      contentType,
+      metadata: { metadata: metadata ?? {} },
     });
     return `/objects/${cleanKey}`;
   }
@@ -168,12 +335,9 @@ export class ObjectStorageService {
         contentDisposition: `attachment; filename="${safeName}"`,
       });
     }
-    return signObjectURL({
-      bucketName: file.bucket.name,
-      objectName: file.name,
-      method: "GET",
-      ttlSec,
-    });
+    // Backend-aware signing: sidecar for the primary bucket, service-account
+    // V4 signing for objects living in the fallback bucket.
+    return signObjectURLAnyBackend(file, ttlSec);
   }
 
   async getObjectEntityFile(objectPath: string): Promise<File> {
@@ -193,10 +357,10 @@ export class ObjectStorageService {
     }
     const objectEntityPath = `${entityDir}${entityId}`;
     const { bucketName, objectName } = parseObjectPath(objectEntityPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const objectFile = bucket.file(objectName);
-    const [exists] = await objectFile.exists();
-    if (!exists) {
+    // Primary bucket first, then the owner-project fallback bucket — objects
+    // uploaded/vaulted during a primary-bucket outage live there.
+    const objectFile = await getObjectFileWithFallback(bucketName, objectName);
+    if (!objectFile) {
       throw new ObjectNotFoundError();
     }
     return objectFile;
@@ -215,12 +379,28 @@ export class ObjectStorageService {
       objectEntityDir = `${objectEntityDir}/`;
     }
 
-    if (!rawObjectPath.startsWith(objectEntityDir)) {
-      return rawObjectPath;
+    if (rawObjectPath.startsWith(objectEntityDir)) {
+      const entityId = rawObjectPath.slice(objectEntityDir.length);
+      return `/objects/${entityId}`;
     }
 
-    const entityId = rawObjectPath.slice(objectEntityDir.length);
-    return `/objects/${entityId}`;
+    // Fallback-bucket upload URLs: /<fallback-bucket>/<privateDirPath>/uploads/<id>.
+    // The objectName inside the fallback bucket mirrors the primary bucket's,
+    // so strip the fallback bucket + the primary private-dir path to recover
+    // the same /objects/<id> entity path.
+    const fallback = getFallbackStorage();
+    if (fallback && rawObjectPath.startsWith(`/${fallback.bucketName}/`)) {
+      const objectName = rawObjectPath.slice(fallback.bucketName.length + 2);
+      const { objectName: privateDirObjectPrefix } = parseObjectPath(
+        objectEntityDir.replace(/\/+$/, ""),
+      );
+      const prefix = `${privateDirObjectPrefix}/`;
+      if (objectName.startsWith(prefix)) {
+        return `/objects/${objectName.slice(prefix.length)}`;
+      }
+    }
+
+    return rawObjectPath;
   }
 
   async trySetObjectEntityAclPolicy(
@@ -265,7 +445,7 @@ export class ObjectStorageService {
     const searchPath = this.getPublicObjectSearchPaths()[0];
     const fullPath = `${searchPath}/${key}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
-    await objectStorageClient.bucket(bucketName).file(objectName).save(buffer, { contentType });
+    await saveObjectWithFallback(bucketName, objectName, buffer, { contentType });
   }
 
   /**
@@ -299,18 +479,21 @@ export class ObjectStorageService {
     const { bucketName, objectName } = parseObjectPath(fullPath);
     // Strip characters that would break the Content-Disposition header value.
     const safeName = downloadFilename.replace(/[^\w.\- ]+/g, "_");
-    await objectStorageClient
-      .bucket(bucketName)
-      .file(objectName)
-      .save(buffer, {
-        contentType,
-        metadata: {
-          contentDisposition: `attachment; filename="${safeName}"`,
-          // Spread any cert/integrity fields into GCS object custom metadata.
-          // These survive the object's lifetime independently of the DB record.
-          ...(certMetadata ?? {}),
-        },
-      });
+    const metadata = {
+      contentDisposition: `attachment; filename="${safeName}"`,
+      // Spread any cert/integrity fields into GCS object custom metadata.
+      // These survive the object's lifetime independently of the DB record.
+      ...(certMetadata ?? {}),
+    };
+    const backend = await saveObjectWithFallback(bucketName, objectName, buffer, {
+      contentType,
+      metadata,
+    });
+    if (backend === "fallback") {
+      const fallback = getFallbackStorage()!;
+      const file = fallback.client.bucket(fallback.bucketName).file(objectName);
+      return signObjectURLAnyBackend(file, ttlSec);
+    }
     return signObjectURL({ bucketName, objectName, method: "GET", ttlSec });
   }
 }

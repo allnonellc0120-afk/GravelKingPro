@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { StyleTagPills, appendStyleTag } from "@/components/style-tag-pills";
 import { authorshipScore as computeAuthorshipScore } from "@workspace/authorship";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -120,7 +122,19 @@ function getLastWord(text: string): string {
  * (/mastering?gkTrack=…) — no new player or screen here. The Mastering Tool
  * owns all playback, mastering, and download UI for the generated track.
  */
-function MlkGenerateCard({ lyrics, projectId, stylePrompt }: { lyrics: string; projectId: string | null; stylePrompt: string }) {
+function MlkGenerateCard({
+  lyrics,
+  projectId,
+  stylePrompt,
+  vocalMode,
+  onVocalModeChange,
+}: {
+  lyrics: string;
+  projectId: string | null;
+  stylePrompt: string;
+  vocalMode: "lyrics" | "random" | "instrumental";
+  onVocalModeChange: (mode: "lyrics" | "random" | "instrumental") => void;
+}) {
   const [, navigate] = useLocation();
   const { isPro, isDeveloper } = useAppState();
   const { toast } = useToast();
@@ -129,6 +143,9 @@ function MlkGenerateCard({ lyrics, projectId, stylePrompt }: { lyrics: string; p
   const hasAccess = isPro || isDeveloper;
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const lyricsOn = vocalMode !== "instrumental";
+  const needsLyrics = vocalMode === "lyrics";
 
   const handleGenerate = async () => {
     // Strict UI paywall: generation + kernel mastering is Pro-only.
@@ -147,10 +164,17 @@ function MlkGenerateCard({ lyrics, projectId, stylePrompt }: { lyrics: string; p
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ lyricId: projectId, text: lyrics, stylePrompt }),
+        body: JSON.stringify({ lyricId: projectId, text: needsLyrics ? lyrics : "", stylePrompt, vocalMode }),
       });
-      const data = (await res.json()) as { error?: string; trackId?: string; title?: string };
-      if (!res.ok || !data.trackId) throw new Error(data.error || `Generation failed (HTTP ${res.status})`);
+      const data = (await res.json()) as { error?: string; code?: string; trackId?: string; title?: string };
+      if (!res.ok || !data.trackId) {
+        const msg = data.error || `Generation failed (HTTP ${res.status})`;
+        // Upstream AI safety filter rejected the prompt — coach, don't scare.
+        if (res.status === 422 || data.code === "content_blocked") {
+          toast({ title: "Prompt flagged", description: msg, variant: "destructive" });
+        }
+        throw new Error(msg);
+      }
       // Force the user into the Mastering Tool pipeline with the generated track.
       navigate(`/mastering?gkTrack=${encodeURIComponent(data.trackId)}&gkTitle=${encodeURIComponent(data.title ?? "Generated Track")}`);
     } catch (err) {
@@ -161,22 +185,66 @@ function MlkGenerateCard({ lyrics, projectId, stylePrompt }: { lyrics: string; p
 
   return (
     <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-3">
+      {/* Vocal toggle: ON = sung vocals (own or model-written lyrics), OFF = instrumental */}
+      <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Mic className={`w-4 h-4 ${lyricsOn ? "text-emerald-400" : "text-muted-foreground"}`} />
+          <span className="text-xs font-semibold">Lyrics {lyricsOn ? "ON" : "OFF"}</span>
+        </div>
+        <Switch
+          checked={lyricsOn}
+          onCheckedChange={(on) => onVocalModeChange(on ? "lyrics" : "instrumental")}
+          aria-label="Lyrics on or off"
+        />
+      </div>
+      {lyricsOn && (
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Lyric source">
+          {([
+            { value: "lyrics", label: "My Lyrics" },
+            { value: "random", label: "Random Lyrics" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={vocalMode === opt.value}
+              onClick={() => onVocalModeChange(opt.value)}
+              className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                vocalMode === opt.value
+                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                  : "border-border/40 bg-background/40 text-muted-foreground hover:border-emerald-500/30"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
       <Button
         onClick={() => void handleGenerate()}
-        disabled={isGenerating || lyrics.trim().length < 5}
+        disabled={isGenerating || (needsLyrics && lyrics.trim().length < 5)}
         aria-disabled={!hasAccess}
         className={`w-full font-bold ${hasAccess
           ? "bg-emerald-500 hover:bg-emerald-600 text-black"
           : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed hover:bg-muted"}`}
       >
         {isGenerating
-          ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating + mastering (2–4 min)…</>
+          ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating your track (2–3 min)…</>
           : <><Music2 className="w-4 h-4 mr-2" />Generate with MLK v3.5{!hasAccess && " — Pro"}</>}
       </Button>
+      {isGenerating && (
+        <p className="text-[10px] font-medium text-sky-300/80 flex items-center justify-center gap-1">
+          <Sparkles className="w-3 h-3" /> AI Optimized for Production Sound
+        </p>
+      )}
       <p className="text-[11px] text-muted-foreground leading-relaxed text-center">
-        {hasAccess
-          ? "Your lyrics are hash-stamped, sung by AI in-house, mastered through the MLK v3.5 kernel, and IP-certified — then you're taken to the Mastering Tool to work with your track."
-          : "Upgrade to GravelKing Pro to generate and master AI tracks."}
+        {!hasAccess
+          ? "Upgrade to GravelKing Pro to generate and master AI tracks."
+          : vocalMode === "instrumental"
+            ? "A pure instrumental is generated from your style prompt and IP-certified, then dropped unmastered into the Mastering Tool — you choose when to master."
+            : vocalMode === "random"
+              ? "The AI writes and sings its own lyrics to match your style prompt and IP-certifies the track, then drops it unmastered into the Mastering Tool — you choose when to master."
+              : "Your lyrics are hash-stamped, sung by AI in-house, and IP-certified — then the unmastered track drops into the Mastering Tool, where mastering is your call."}
       </p>
       {error && (
         <p className="text-xs text-rose-400 flex items-start gap-1.5">
@@ -493,6 +561,9 @@ export default function SongwritingStudio() {
 
   // ── Style step ────────────────────────────────────────────────────────────
   const [styleInput, setStyleInput] = useState("");
+  // Lifted from MlkGenerateCard so the style-tag presets can tailor themselves
+  // to whether lyrics are ON or OFF.
+  const [genVocalMode, setGenVocalMode] = useState<"lyrics" | "random" | "instrumental">("lyrics");
   const [convertedStyle, setConvertedStyle] = useState("");
   const [isConvertingStyle, setIsConvertingStyle] = useState(false);
   const [styleCopied, setStyleCopied] = useState(false);
@@ -1268,6 +1339,11 @@ export default function SongwritingStudio() {
             onChange={(e) => setStyleInput(e.target.value)}
             maxLength={500}
           />
+          {/* Dynamic preset tags — tap to append, dice to re-roll (tailored to Lyrics ON/OFF) */}
+          <StyleTagPills
+            lyricsOn={genVocalMode !== "instrumental"}
+            onAppend={(tag) => setStyleInput((p) => appendStyleTag(p, tag).slice(0, 500))}
+          />
           <Button onClick={handleConvertStyle} disabled={isConvertingStyle || styleInput.trim().length < 3} variant="outline" className="w-full border-amber-500/40 text-amber-400 hover:bg-amber-500/10 font-semibold">
             {isConvertingStyle ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Converting…</> : <><Wand2 className="w-4 h-4 mr-2" />Convert to Style Tags</>}
           </Button>
@@ -1417,7 +1493,13 @@ export default function SongwritingStudio() {
                       <Clock className="w-3 h-3 inline mr-1" />Forensic revision history is being recorded.
                     </p>
                   )}
-                  <MlkGenerateCard lyrics={lyricsFromLines(lines)} projectId={projectId} stylePrompt={effectiveStyle} />
+                  <MlkGenerateCard
+                    lyrics={lyricsFromLines(lines)}
+                    projectId={projectId}
+                    stylePrompt={effectiveStyle}
+                    vocalMode={genVocalMode}
+                    onVocalModeChange={setGenVocalMode}
+                  />
                   {isEligible ? (
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">

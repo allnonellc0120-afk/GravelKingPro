@@ -571,3 +571,17 @@ uri = "file://artifacts/api-server/local_masters/mlk_v35_08026afe-e332-4fcb-9e32
 type = "audio"
 title = "MLK v3.5 Test Master — Dark Cinematic R&B"
 description = "Lyria 3 Pro vocals from your test lyrics, mastered through the real MLK v3.5 kernel (baseline preset) with the Dual-Anchor cert nominator embedded. 2:36, 44.1 kHz stereo WAV."
+
+[[outputs]]
+id = "5ajaEFE6fgde0VmYZHcds"
+uri = "file://attached_assets/promo/gkp-remix-launch-social.jpg"
+type = "image"
+title = "GravelKing Pro — Remix Launch Social Image"
+description = "16:9 promo image for LinkedIn/social — amber waveform, dark studio, brand aesthetic."
+
+[[outputs]]
+id = "Yk-2mEFUvGjuEebG5PJgF"
+uri = "file://attached_assets/promo/songwriting-studio-in-action.jpg"
+type = "image"
+title = "The Tool in Action — Songwriting Studio"
+description = "Real screenshot of the in-house studio UI, ready to attach to the post."

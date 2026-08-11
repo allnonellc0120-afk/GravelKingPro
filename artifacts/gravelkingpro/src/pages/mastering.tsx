@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
-import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
+import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown, Shuffle } from "lucide-react";
+import { RemixModal } from "@/components/remix-modal";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
@@ -36,10 +37,17 @@ const PRESETS = [
 type PresetId = (typeof PRESETS)[number]["id"];
 
 export default function Mastering() {
-  const { isPro } = useAppState();
+  const { isPro, isDeveloper } = useAppState();
   const { toast } = useToast();
   const emailGate = useEmailGate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Admin/developer accounts always bypass the Pro paywall (same rule as the
+  // Lyric Studio generate card).
+  const hasProAccess = isPro || isDeveloper;
+  // Set when the loaded input came from the user's vault (?gkTrack=…) — only
+  // those tracks can be remixed through the MLK v3.5 Remix Engine.
+  const [gkLoaded, setGkLoaded] = useState<{ id: string; title: string } | null>(null);
+  const [remixOpen, setRemixOpen] = useState(false);
 
   const [state, setState] = useState<State>("idle");
   const [progress, setProgress] = useState(0);
@@ -220,6 +228,7 @@ export default function Mastering() {
         setFileName(file.name);
         setBeforeUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
         setState("idle");
+        setGkLoaded({ id: gkTrack, title: safe });
         // Clean the query only after a successful preload so refresh retries.
         window.history.replaceState({}, "", window.location.pathname);
         toast({ title: "Generated track loaded", description: `“${safe}” is ready in the Mastering Tool.` });
@@ -296,6 +305,46 @@ export default function Mastering() {
             Apply a professional mastering chain with optional denoise. Runs locally with MLK v3 — no upload to third parties.
           </p>
         </div>
+
+        {/* MLK v3.5 Remix Engine — only for tracks loaded from the user's vault */}
+        {gkLoaded && (
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate">“{gkLoaded.title}”</p>
+              <p className="text-[11px] text-muted-foreground">
+                Generated with MLK v3.5 — spin a new variation that keeps its identity, with a child IP cert linked to the original.
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                if (!hasProAccess) {
+                  toast({
+                    title: "GravelKing Pro required",
+                    description: "Upgrade to GravelKing Pro to remix tracks with MLK v3.5.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setRemixOpen(true);
+              }}
+              aria-disabled={!hasProAccess}
+              className={`shrink-0 font-bold ${hasProAccess
+                ? "bg-emerald-500 hover:bg-emerald-600 text-black"
+                : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed hover:bg-muted"}`}
+            >
+              <Shuffle className="w-4 h-4 mr-2" />
+              Remix Track with MLK v3.5{!hasProAccess && " — Pro"}
+            </Button>
+          </div>
+        )}
+        {gkLoaded && (
+          <RemixModal
+            open={remixOpen}
+            onOpenChange={setRemixOpen}
+            parentTrackId={gkLoaded.id}
+            parentTitle={gkLoaded.title}
+          />
+        )}
 
         {/* File drop / file picked */}
         {!pendingFile && !busy && state !== "done" ? (
