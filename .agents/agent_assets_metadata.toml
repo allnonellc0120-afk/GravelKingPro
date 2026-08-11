@@ -597,5 +597,19 @@ description = "30-second 1920×1080 H.264/AAC promo video for YouTube and Facebo
 id = "wqqr0zn-KHh53yW2FvXfu"
 uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4"
 type = "video"
-title = "GravelKing Pro Lyrics Generator — 59s 4K Landscape Promo"
-description = "Verified 59.000-second 3840×2160 H.264/AAC master for YouTube and Facebook."
+title = "Lyrics Generator promo — 59s landscape (4K)"
+description = "3840×2160, H.264+AAC, exactly 59 seconds."
+
+[[outputs]]
+id = "lQ0VLh22k8Ekb__dMmnKj"
+uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4"
+type = "video"
+title = "Lyrics Generator promo — 59s vertical (4K)"
+description = "2160×3840, H.264+AAC, exactly 59 seconds."
+
+[[outputs]]
+id = "9L4b2LEcYndlME5VXalyT"
+uri = "file://screenshots/live-songwriting-generator.png"
+type = "image"
+title = "LIVE proof — song generator on gravelkingpro.it.com"
+description = "Real browser session on the published site: lyrics generated, then the Generate with MLK v3.5 card rendered below them (build v08/11/26 12:11 visible in footer)."

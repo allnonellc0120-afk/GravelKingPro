@@ -1476,17 +1476,6 @@ export default function SongwritingStudio() {
               </div>
             )}
 
-         {/* Song generator — always visible. Access is enforced by the card
-             itself so the tool never disappears when entitlement data is
-             delayed or a returning session is not yet hydrated. */}
-         <MlkGenerateCard
-           lyrics={lyricsFromLines(lines)}
-           projectId={projectId}
-           stylePrompt={effectiveStyle}
-           vocalMode={genVocalMode}
-           onVocalModeChange={setGenVocalMode}
-         />
-
          {/* Pro features */}
             <div className="space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pro Features</p>
@@ -1586,6 +1575,28 @@ export default function SongwritingStudio() {
             </div>
           </div>
         )}
+
+        {/* ── STEP 3: Song generator — ALWAYS on the page ──────────────────
+            Never hidden behind lyric output or entitlement state. Random
+            Lyrics and instrumental modes work with zero lyrics, and the card
+            itself enforces Pro access. */}
+        <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4">
+          <StepBadge n="3" label="Generate the Song — MLK v3.5" />
+          {!hasOutput && (
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Sing your own words by generating or importing lyrics above — or switch to
+              <span className="text-emerald-400 font-medium"> Random Lyrics</span> / turn
+              <span className="text-emerald-400 font-medium"> Lyrics OFF</span> for an instrumental and generate right now.
+            </p>
+          )}
+          <MlkGenerateCard
+            lyrics={lyricsFromLines(lines)}
+            projectId={projectId}
+            stylePrompt={effectiveStyle}
+            vocalMode={genVocalMode}
+            onVocalModeChange={setGenVocalMode}
+          />
+        </div>
       </div>
 
       {/* Variation picker overlay */}
