@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db, tracksTable, purchasedTracksTable, usersTable } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { resolveTier } from "../lib/entitlement";
-import { objectStorageClient, ObjectStorageService } from "../lib/objectStorage";
+import { ObjectStorageService, saveObjectWithFallback, getObjectFileWithFallback } from "../lib/objectStorage";
 import { sanitizeExt } from "../lib/audioGuards";
 import { getUncachableStripeClient } from "../stripeClient";
 import { storage } from "../storage";
@@ -69,11 +69,20 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function saveFileToBucket(buffer: Buffer, key: string, contentType: string): Promise<void> {
   const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
-  await objectStorageClient.bucket(bucketId).file(key).save(buffer, { contentType });
+  // Falls back to the owner-project bucket when the Replit-managed bucket
+  // rejects the write (platform-side 403 IAM breakage).
+  await saveObjectWithFallback(bucketId, key, buffer, { contentType });
 }
 
 /** Derive gk_session-based userId. Returns null if no session cookie present. */
 async function resolveSessionUser(req: Request): Promise<{ sessionId: string; userId: string } | null> {
+  // OIDC-signed-in users FIRST — they never carry a gk_session cookie, so
+  // without this check every vault/download route 401'd for logged-in users
+  // (same bug class as the subscription-status fix).
+  const authReq = req as Request & { isAuthenticated?: () => boolean; user?: { id?: string } };
+  if (authReq.isAuthenticated?.() && authReq.user?.id) {
+    return { sessionId: "", userId: authReq.user.id };
+  }
   const sessionId = (req.cookies as Record<string, string>)?.gk_session;
   if (!sessionId) return null;
   const user = await storage.getUserBySession(sessionId);
@@ -484,18 +493,35 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
   // when it exists; older tracks without one silently fall back to WAV.
   let audioKey = track.audioFullKey;
   let contentType = "audio/wav";
+  // Resolve against the primary bucket first, then the owner-project fallback
+  // bucket (tracks vaulted during a primary-bucket outage live there).
+  let file = null;
   if (req.query.format === "mp3") {
     const mp3Key = track.audioFullKey.replace(/\.[^./]+$/, ".mp3");
     if (mp3Key !== track.audioFullKey) {
-      const [mp3Exists] = await objectStorageClient.bucket(bucketId).file(mp3Key).exists()
-        .catch(() => [false] as [boolean]);
-      if (mp3Exists) {
+      const mp3File = await getObjectFileWithFallback(bucketId, mp3Key).catch(() => null);
+      if (mp3File) {
         audioKey = mp3Key;
         contentType = "audio/mpeg";
+        file = mp3File;
       }
     }
   }
-  const file = objectStorageClient.bucket(bucketId).file(audioKey);
+  if (!file) {
+    try {
+      file = await getObjectFileWithFallback(bucketId, audioKey);
+    } catch (err) {
+      // Storage incident (neither backend checkable) — report it as such,
+      // never as a misleading "not found".
+      req.log?.error?.({ err }, "track download: storage backends unavailable");
+      res.status(503).json({ error: "Storage backend unavailable — try again shortly" });
+      return;
+    }
+  }
+  if (!file) {
+    res.status(404).json({ error: "Track audio not found in storage" });
+    return;
+  }
 
   const safeTitle = track.title.replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "track";
   const ext = audioKey.split(".").pop() ?? "wav";

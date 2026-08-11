@@ -64,3 +64,5 @@
 - [Funnel + trial integrity](funnel-trial-integrity.md) — trials consumed on webhook only; checkout blocks dup subs + expires open sessions; Play fails closed; copy follows trialEligible
 - [presentAsset null result](present-asset-null.md) — presentAsset returning null usually means the file is missing on disk; verify with ffprobe/ls and re-export before re-presenting
 - [Lyria 3 on Vertex](lyria-vertex-interactions.md) — only the Interactions API (v1beta1, location global) serves Lyria 3; :predict 404s, lyria-002 can't sing lyrics
+- [Lyria prompt policy + zero-rejection shield](lyria-prompt-policy.md) — "remix of"/"keep exact style" wording trips content_blocked; Gemini pre-pass (fail-open) + rescue rewrite + 422 error shield; lyrics never rewritten
+- [Generation drops unmastered](generation-unmastered.md) — user directive 2026-08-11: generate/remix NEVER auto-master (kernelEngine "unmastered"); mastering is a separate paid step in the Mastering Tool; vault routes must accept OIDC users, not just gk_session
