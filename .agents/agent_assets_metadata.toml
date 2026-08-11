@@ -683,3 +683,59 @@ uri = "file://attached_assets/final_promos/gravelkingpro_promo_59s_9x16.mp4"
 type = "video"
 title = "GravelKing Pro Promo — Vertical 4K (59s)"
 description = "2160×3840, 30fps, voiceover + warm soundtrack, verified smooth playback"
+
+[[outputs]]
+id = "pPHF8OYo1JZRvCVfUFa5j"
+uri = "file://attached_assets/generated_audio/promo_v3/vo2.mp3"
+type = "audio"
+title = "promo_v3_vo2"
+description = "Text-to-speech audio: GravelKing Pro. Build it here."
+
+[[outputs]]
+id = "7BrWRIpzgQ9lDGgLi9CUO"
+uri = "file://attached_assets/generated_audio/promo_v3/vo1.mp3"
+type = "audio"
+title = "promo_v3_vo1"
+description = "Text-to-speech audio: You've got a song in your head. Let's get it out."
+
+[[outputs]]
+id = "NyZq70pXlJ8bKrbYhFrag"
+uri = "file://attached_assets/generated_audio/promo_v3/vo5.mp3"
+type = "audio"
+title = "promo_v3_vo5"
+description = "Text-to-speech audio: Master your track. One click."
+
+[[outputs]]
+id = "gkavMAeFmBIG2-kJX0nIW"
+uri = "file://attached_assets/generated_audio/promo_v3/vo3.mp3"
+type = "audio"
+title = "promo_v3_vo3"
+description = "Text-to-speech audio: Drop your lyrics. Get a full track. Your words. Your sound."
+
+[[outputs]]
+id = "n1zIBRX7oNLncT4oXpsTS"
+uri = "file://attached_assets/generated_audio/promo_v3/vo6.mp3"
+type = "audio"
+title = "promo_v3_vo6"
+description = "Text-to-speech audio: Certify it. Lock it down. It's yours."
+
+[[outputs]]
+id = "iEjWY08B6E7RTOXdfT1Pk"
+uri = "file://attached_assets/generated_audio/promo_v3/vo7.mp3"
+type = "audio"
+title = "promo_v3_vo7"
+description = "Text-to-speech audio: GravelKing Pro. Your track starts now."
+
+[[outputs]]
+id = "WnwdQaYnR7lmlg2IKcW7y"
+uri = "file://attached_assets/generated_audio/promo_v3/vo4.mp3"
+type = "audio"
+title = "promo_v3_vo4"
+description = "Text-to-speech audio: Step in the booth and record."
+
+[[outputs]]
+id = "2lng0PaLEACH3cwpPbhfX"
+uri = "file://attached_assets/generated_audio/promo_v3/soundtrack.mp3"
+type = "audio"
+title = "promo_v3_trap_soundtrack"
+description = "Generated music: Hard-hitting trap hip hop instrumental, 2020s production style, 808 bass drops, crisp snares, atmospheric pads, dark cinematic energy, modern music app promo vibe, builds in intensit…"
