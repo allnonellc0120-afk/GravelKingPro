@@ -367,12 +367,12 @@ export default function Home() {
             />
             <AppCard
               icon={<PenLine className="w-5 h-5 text-violet-400" />}
-              title="Songwriting Studio + IP Cert"
-              desc="Document your lyrics, co-writers, and creative timeline. Build an airtight authorship record for every track. Generate your IP certificate from the same screen."
-              badge="IP Rights"
+              title="Lyrics Generator"
+              desc="Generate lyrics from your story, mood, and style, then edit every line and preserve your authorship record with an IP certificate."
+              badge="Creative Tool"
               badgeColor="border-violet-500/40 text-violet-400"
               href="/songwriting"
-              cta="Certify your authorship"
+              cta="Open Lyrics Generator"
               accent="violet"
             />
           </div>

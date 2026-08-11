@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Export the GravelKing Pro promo to a downloadable 1920x1080 MP4 with mixed audio.
- * Usage: node scripts/export-mp4.mjs [output.mp4]
+ * Export the GravelKing Pro Lyrics Generator promo to MP4.
+ * Usage: node scripts/export-mp4.mjs [output.mp4] [vertical]
  */
 import { chromium } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
@@ -13,38 +13,17 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const dist = path.resolve(root, 'dist/public');
-const output = path.resolve(root, process.argv[2] || 'public/videos/gravelkingpro_pitch_228.mp4');
+const isVertical = process.argv[3] === 'vertical';
+const output = path.resolve(root, process.argv[2] || (isVertical
+  ? 'public/videos/gravelkingpro_lyrics_generator_30s_9x16.mp4'
+  : 'public/videos/gravelkingpro_lyrics_generator_30s_16x9.mp4'));
 const tmpDir = path.resolve(root, '.tmp-export');
 fs.mkdirSync(tmpDir, { recursive: true });
 
-const WIDTH = 1920;
-const HEIGHT = 1080;
+const WIDTH = isVertical ? 1080 : 1920;
+const HEIGHT = isVertical ? 1920 : 1080;
 const FPS = 30;
-const DURATION_MS = 228500; // matches SCENE_DURATIONS total
-
-const SCENE_STARTS_MS = {
-  intro: 0,
-  hook: 19500,
-  problem: 35500,
-  technology: 61000,
-  product: 86500,
-  market: 112000,
-  revenue: 137500,
-  moat: 175500,
-  ask: 201000,
-};
-
-const SCENE_VO = {
-  intro: 'audio/vo_intro.mp3',
-  hook: 'audio/vo_hook.mp3',
-  problem: 'audio/vo_problem.mp3',
-  technology: 'audio/vo_technology.mp3',
-  product: 'audio/vo_product.mp3',
-  market: 'audio/vo_market.mp3',
-  revenue: 'audio/vo_revenue.mp3',
-  moat: 'audio/vo_moat.mp3',
-  ask: 'audio/vo_ask.mp3',
-};
+const DURATION_MS = 30000; // matches SCENE_DURATIONS total
 
 const CANDIDATE_CHROMIUMS = [
   '/nix/store/hvv3n9pvjfq0x8wjw8f3igsyvlaz1ngr-playwright-browsers-chromium/chromium-1091/chrome-linux/chrome',
@@ -111,29 +90,9 @@ async function startStaticServer() {
 async function mixAudio() {
   const audioPath = path.join(tmpDir, 'audio.m4a');
   const soundtrack = path.join(root, 'public/audio/gravelking_pro_soundtrack.mp3');
-  const inputs = ['-i', soundtrack];
-  const labels = [];
-  const delays = [];
-
-  // Background loop: 0.1 volume as in the player.
-  labels.push('[0:a]aloop=loop=-1:size=119980375,atrim=0:228.5,asetpts=PTS-STARTPTS,volume=0.1[bg]');
-  delays.push('[bg]');
-
-  let inputIdx = 1;
-  for (const [key, startMs] of Object.entries(SCENE_STARTS_MS)) {
-    const file = path.join(root, 'public', SCENE_VO[key]);
-    inputs.push('-i', file);
-    labels.push(`[${inputIdx}:a]adelay=${startMs}|${startMs},asetpts=PTS-STARTPTS[${key}]`);
-    delays.push(`[${key}]`);
-    inputIdx++;
-  }
-
-  const totalInputs = inputIdx; // 1 bg + 9 vo
-  const filter = `${labels.join(';')};${delays.join('')}amix=inputs=${totalInputs}:normalize=0:duration=longest`;
-
   execFileSync('ffmpeg', [
-    '-y', ...inputs,
-    '-filter_complex', filter,
+    '-y', '-stream_loop', '-1', '-i', soundtrack, '-t', '30',
+    '-af', 'volume=0.18,afade=t=in:st=0:d=0.5,afade=t=out:st=28.5:d=1.5',
     '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
     audioPath,
   ], { stdio: 'inherit' });
@@ -153,7 +112,8 @@ async function recordVideo() {
     recordVideo: { dir: tmpDir, size: { width: WIDTH, height: HEIGHT } },
   });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:5000/gravelkingpro-promo/?export=1', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  const formatQuery = isVertical ? '&format=vertical' : '';
+  await page.goto(`http://127.0.0.1:5000/gravelkingpro-promo/?export=1${formatQuery}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   // Wait for the first frame to render.
   await page.waitForTimeout(1000);

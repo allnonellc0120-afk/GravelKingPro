@@ -1,71 +1,28 @@
-import { motion } from 'framer-motion';
-import { CharacterVideo } from './CharacterVideo';
+import { motion } from "framer-motion";
+
+const base = import.meta.env.BASE_URL;
 
 export function Scene2() {
   return (
-    <motion.div
-      className="absolute inset-0"
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
-      transition={{ duration: 0.8 }}
-    >
-      <CharacterVideo
-        dialogue="Heh heh... they stole your song, dumbass."
-        subDialogue="Receipts don't stop audio theft."
-        audioSrc="audio/scene2.mp3"
-      />
-
-      {/* Top headline */}
-      <div className="absolute top-[8vh] left-0 right-0 z-20 text-center px-[5vw]">
-        <motion.h2
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.8 }}
-          className="text-[4vw] font-bold uppercase tracking-tight text-white leading-tight drop-shadow-[0_0_15px_rgba(245,166,35,0.8)]"
-        >
-          Metadata stripped? <br />
-          <span className="text-[#F5A623]">Chain broken.</span>
-        </motion.h2>
+    <motion.section className="absolute inset-0 overflow-hidden" initial={{ opacity: 0, x: "4%" }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: "-3%" }} transition={{ duration: .6 }}>
+      <video className="absolute inset-0 h-full w-full object-cover" src={`${base}videos/songwriter-editing.mp4`} autoPlay muted loop playsInline />
+      <div className="absolute inset-0 bg-[#21150f]/68" />
+      <div className="absolute inset-y-0 left-0 w-[45%] bg-gradient-to-r from-[#21150f]/90 to-transparent" />
+      <div className="absolute left-[8vw] top-[25vh] z-10">
+        <motion.p initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .35 }} className="mb-[1vh] text-[1vw] font-semibold uppercase tracking-[.22em] text-[#f0b34d]">Your story → a first draft</motion.p>
+        <motion.h2 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .2, duration: .55 }} className="text-[4.5vw] font-bold leading-[.93] tracking-[-.055em]" style={{ fontFamily: "var(--font-heading)" }}>Give it<br /><span className="text-[#f0b34d]">something real.</span></motion.h2>
+        <motion.div initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: .65, duration: .45 }} className="mt-[3vh] flex items-center gap-[.9vw]">
+          <span className="grid h-[2.4vw] w-[2.4vw] place-items-center rounded-full bg-[#f0b34d] text-[1.1vw] font-bold text-[#21150f]">✦</span>
+          <span className="text-[1.2vw] text-[#f7e9d3]">Lyrics Generator</span>
+        </motion.div>
       </div>
-
-      {/* Chain break graphic overlay */}
-      <motion.div
-        className="absolute top-[30%] left-1/2 -translate-x-1/2 z-10"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.5 }}
-      >
-        <svg viewBox="0 0 200 100" className="w-[20vw] drop-shadow-[0_0_15px_rgba(0,255,229,0.5)]">
-          <motion.path
-            d="M 60,30 L 40,30 C 20,30 20,70 40,70 L 60,70"
-            stroke="#00FFE5"
-            strokeWidth="10"
-            fill="none"
-            strokeLinecap="round"
-            animate={{ x: [0, -10], opacity: [1, 0.5] }}
-            transition={{ delay: 2, duration: 0.5, ease: "easeIn" }}
-          />
-          <motion.path
-            d="M 140,30 L 160,30 C 180,30 180,70 160,70 L 140,70"
-            stroke="#00FFE5"
-            strokeWidth="10"
-            fill="none"
-            strokeLinecap="round"
-            animate={{ x: [0, 10], opacity: [1, 0.5] }}
-            transition={{ delay: 2, duration: 0.5, ease: "easeIn" }}
-          />
-          <motion.path
-            d="M 50,50 L 150,50"
-            stroke="#F5A623"
-            strokeWidth="12"
-            strokeLinecap="round"
-            initial={{ pathLength: 1, opacity: 1 }}
-            animate={{ opacity: 0, pathLength: 0, scale: 1.5 }}
-            transition={{ delay: 1.8, duration: 0.4 }}
-          />
-        </svg>
-      </motion.div>
-    </motion.div>
+      <div className="absolute bottom-[9vh] left-[48vw] z-10 w-[39vw] rounded-[1vw] border border-[#f1bd6a]/35 bg-[#241914]/82 p-[1.5vw] shadow-2xl backdrop-blur-md">
+        <div className="mb-[1.4vh] flex items-center justify-between border-b border-[#f1bd6a]/20 pb-[1vh]">
+          <span className="text-[.78vw] uppercase tracking-[.16em] text-[#f0b34d]">GKP / Lyrics Generator</span><span className="h-[.55vw] w-[.55vw] rounded-full bg-[#76b36a]" />
+        </div>
+        <p className="text-[1.18vw] leading-[1.25] text-[#f8ebd5]">Concrete plot, narrative details,<br /><span className="text-[#f0b34d]">or specific metaphors.</span></p>
+        <div className="mt-[1.4vh] flex gap-[.6vw] text-[.72vw] text-[#f3d5ac]/70"><span className="rounded-full border border-[#f0b34d]/45 px-[.7vw] py-[.35vh]">Gritty Soul</span><span className="rounded-full border border-[#f0b34d]/45 px-[.7vw] py-[.35vh]">Rapid-Fire Verses</span></div>
+      </div>
+    </motion.section>
   );
 }
