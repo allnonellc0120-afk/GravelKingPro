@@ -179,56 +179,17 @@ async function generateLyriaAudio(
 }
 
 /**
- * Run the REAL Morris Law Kernel v3.5 on a normalized WAV file.
- * Identical invocation to routes/master.ts: Cloud Run primary, local Python
- * worker fallback (same kernel code). Throws if neither can run.
+ * Run the REAL Morris Law Kernel v3.5 on a normalized WAV file via the local
+ * Python worker subprocess — the ONLY DSP path. No remote / Cloud Run branch.
+ * Throws loudly if the kernel fails; no silent fallback.
  */
 async function runMlkKernel(
   kernelInputPath: string,
   outPath: string,
-): Promise<"cloud-run" | "local"> {
-  const remoteBase = process.env.MLK_KERNEL_URL?.replace(/\/$/, "");
+): Promise<"local"> {
   const d = KERNEL_DEFAULTS;
-
-  if (remoteBase) {
-    try {
-      const audioBytes = await readFile(kernelInputPath);
-      const form = new FormData();
-      form.append("audio", new Blob([audioBytes], { type: "audio/wav" }), "input.wav");
-      form.append("preset", KERNEL_PRESET.kernel);
-      form.append("intensity", String(d.intensity));
-      form.append("sidechain_filter", d.sidechainFilter);
-      form.append("sidechain_freq", String(d.sidechainFreq));
-      form.append("stereo_link", d.stereoLink ? "true" : "false");
-      form.append("adaptive_mode", d.adaptiveMode);
-      form.append("auto_threshold", d.autoThreshold ? "true" : "false");
-      form.append("auto_offset", String(d.autoOffset));
-      form.append("target_lufs", String(KERNEL_PRESET.lufs));
-      form.append("ceiling_db", String(KERNEL_PRESET.ceiling));
-      const headers: Record<string, string> = {};
-      const apiKey = process.env.REMOTE_KERNEL_API_KEY;
-      if (apiKey) headers["x-api-key"] = apiKey;
-      const resp = await fetch(`${remoteBase}/master`, {
-        method: "POST",
-        headers,
-        body: form,
-        signal: AbortSignal.timeout(280_000),
-      });
-      if (!resp.ok) {
-        throw new Error(`remote kernel HTTP ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
-      }
-      await writeFile(outPath, Buffer.from(await resp.arrayBuffer()));
-      return "cloud-run";
-    } catch (remoteErr) {
-      logger.warn(
-        { err: String((remoteErr as Error)?.message ?? remoteErr).slice(0, 200) },
-        "mlkOrchestrator: remote kernel unavailable — falling back to local worker (same kernel code)",
-      );
-    }
-  }
-
-  // Local worker — the SAME Python MLK v3.5 kernel, resolved relative to the
-  // bundle exactly like routes/master.ts does.
+  // Resolved relative to the bundle (dist/index.mjs → ../python), never
+  // process.cwd() — the container cwd is /app, not the package dir.
   const pyWorker = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
   await execFileAsync("python3", [
     pyWorker,
