@@ -426,64 +426,22 @@ masterRouter.post(
       // Pre-kernel bytes for cert content-hash binding (read before cleanup).
       const preKernelBytes = await readFile(kernelInputPath);
 
-      // ── Morris Law Kernel v3.5 (Python + Numba) — primary and ONLY DSP ───
-      // Primary: the dedicated Cloud Run kernel service (MLK_KERNEL_URL).
-      // Fallback: the local worker subprocess — the SAME kernel code, never an
-      // ffmpeg approximation. If neither can run, the request fails loudly.
+      // ── Morris Law Kernel v3.5 (Python + Numba) — the ONLY DSP path ─────
+      // All DSP — EQ, saturation, adaptive sidechain compression, limiting,
+      // loudness staging — runs exclusively in the local Python MLK worker.
+      // There is no cloud / remote fallback by design. If the kernel fails,
+      // the request fails loudly with a 500.
       const kp = KERNEL_PRESET_MAP[presetName as MasterPreset];
       let pyStats: {
         numba?: boolean; scFreqUsed?: number;
         detectedRmsDb?: number; appliedThresholdDb?: number;
       } = {};
-      let kernelEngine: "cloud-run" | "local" = "local";
+      const kernelEngine = "local" as const;
 
-      const remoteBase = process.env.MLK_KERNEL_URL?.replace(/\/$/, "");
       const kernelStart = performance.now();
       let kernelMs: number | null = null;
       try {
-        if (remoteBase) {
-          try {
-            const audioBytes = await readFile(kernelInputPath);
-            const form = new FormData();
-            form.append("audio", new Blob([audioBytes], { type: "audio/wav" }), "input.wav");
-            form.append("preset", kp.kernel);
-            form.append("intensity", String(intensity));
-            form.append("sidechain_filter", sidechainFilter);
-            form.append("sidechain_freq", String(sidechainFreq));
-            form.append("stereo_link", stereoLink ? "true" : "false");
-            form.append("adaptive_mode", adaptiveMode);
-            form.append("auto_threshold", autoThreshold ? "true" : "false");
-            form.append("auto_offset", String(autoThresholdOffset));
-            form.append("target_lufs", String(kp.lufs));
-            form.append("ceiling_db", String(kp.ceiling));
-            const headers: Record<string, string> = {};
-            const apiKey = process.env.REMOTE_KERNEL_API_KEY;
-            if (apiKey) headers["x-api-key"] = apiKey;
-            const resp = await fetch(`${remoteBase}/master`, {
-              method: "POST", headers, body: form,
-              signal: AbortSignal.timeout(280_000),
-            });
-            if (!resp.ok) {
-              throw new Error(`remote kernel HTTP ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
-            }
-            await writeFile(outPath, Buffer.from(await resp.arrayBuffer()));
-            const num = (v: string | null) => { const n = parseFloat(v ?? ""); return isNaN(n) ? undefined : n; };
-            pyStats = {
-              numba: resp.headers.get("x-mlk-numba") === "true",
-              scFreqUsed: num(resp.headers.get("x-mlk-scfreqused")),
-              detectedRmsDb: num(resp.headers.get("x-mlk-detectedrmsdb")),
-              appliedThresholdDb: num(resp.headers.get("x-mlk-appliedthresholddb")),
-            };
-            kernelEngine = "cloud-run";
-          } catch (remoteErr: any) {
-            req.log.warn(
-              { err: String(remoteErr?.message ?? remoteErr).slice(0, 200) },
-              "remote kernel unavailable — falling back to local worker (same kernel code)",
-            );
-          }
-        }
-
-        if (kernelEngine === "local") {
+        {
           // Resolve relative to this bundle (dist/index.mjs → ../python), never
           // process.cwd() — the container's cwd is /app, not the package dir.
           const pyWorker = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
