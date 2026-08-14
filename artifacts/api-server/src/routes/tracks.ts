@@ -9,6 +9,7 @@ import { storage } from "../storage";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
+import { consumeExport, exportLimitPayload } from "../lib/exportQuota";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { writeFileSync, unlinkSync } from "node:fs";
@@ -519,6 +520,17 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
   if (!file) {
     res.status(404).json({ error: "Track audio not found in storage" });
     return;
+  }
+
+  // Rolling 30-day export quota — applies to paid tiers too (capped, not
+  // unlimited). Consumed only once the file is confirmed available.
+  const [dlUser] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId));
+  if (dlUser) {
+    const quota = await consumeExport(dlUser);
+    if (!quota.allowed) {
+      res.status(429).json(exportLimitPayload(quota));
+      return;
+    }
   }
 
   const safeTitle = track.title.replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "track";

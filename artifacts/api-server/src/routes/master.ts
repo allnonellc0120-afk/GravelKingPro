@@ -13,6 +13,8 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasUnlimitedMasters } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
+import { checkExportQuota, consumeExport, exportLimitPayload } from "../lib/exportQuota";
+import type { User } from "@workspace/db";
 import { embedLsbPayload, extractLsbPayload } from "../kernel-v3";
 import { readFile, writeFile } from "fs/promises";
 import { db, ipCertStubsTable } from "@workspace/db";
@@ -342,9 +344,25 @@ masterRouter.post(
     const rawStylePrompt = (asStr(req.body.stylePrompt) || "").trim().slice(0, 1000);
     const styleScore     = styleAuthorshipScore(rawStylePrompt);
 
-    // weekly+ tiers get unlimited full-length masters. Free users get one full
-    // download, then 30-second previews thereafter.
-    const unlimited = isPartnerRequest(req) || await hasUnlimitedMasters(req);
+    // weekly+ tiers get full-length masters, capped by the rolling 30-day
+    // export quota (paid is limited, not unlimited — owner directive
+    // 2026-08-14). Free users get one full download, then 30-sec previews.
+    const partnerReq = isPartnerRequest(req);
+    const paidTier = !partnerReq && await hasUnlimitedMasters(req);
+    const unlimited = partnerReq || paidTier;
+
+    // Check (don't consume) BEFORE the expensive kernel run; consume after
+    // a successful master, right where free downloads are counted.
+    let exportUser: User | null = null;
+    if (paidTier) {
+      exportUser = await getUsageUser(req, res);
+      const quota = checkExportQuota(exportUser);
+      if (!quota.allowed) {
+        res.status(429).json(exportLimitPayload(quota));
+        return;
+      }
+    }
+
     let isSample = false;
     let usageUserId: string | null = null;
     let usedTotalDownloads = 0;
@@ -501,6 +519,15 @@ masterRouter.post(
         }
         await incrementUsage(usageUserId, "freeMasterDownloads");
         await incrementUsage(usageUserId, "totalDownloads");
+      }
+
+      // Paid-tier export quota — consumed only after a successful master.
+      if (exportUser && !isSample) {
+        const quota = await consumeExport(exportUser);
+        if (!quota.allowed) {
+          res.status(429).json(exportLimitPayload(quota));
+          return;
+        }
       }
 
       // The mastered WAV on disk IS the kernel output — no second carve stage.

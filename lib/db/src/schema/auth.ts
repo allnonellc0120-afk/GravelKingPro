@@ -37,6 +37,9 @@ export const usersTable = pgTable("users", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   isDeveloper: boolean("is_developer").notNull().default(false),
   trialUsed: boolean("trial_used").notNull().default(false),
+  // Rolling 30-day WAV/MP3 export quota (applies to paid tiers too).
+  monthlyExports: integer("monthly_exports").notNull().default(0),
+  exportPeriodStart: timestamp("export_period_start", { withTimezone: true }),
 });
 
 export type UpsertUser = typeof usersTable.$inferInsert;

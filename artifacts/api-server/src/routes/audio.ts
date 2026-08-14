@@ -35,6 +35,7 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeAudioDuration, probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio, hasUnlimitedSplits, resolveTier } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS, type UsageField } from "../lib/usage";
+import { checkExportQuota, consumeExport, exportLimitPayload } from "../lib/exportQuota";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
@@ -264,6 +265,7 @@ audioRouter.get("/usage/status", async (req: Request, res: Response) => {
   const remaining = (field: UsageField): number =>
     unlimited ? -1 : Math.max(0, FREE_LIMITS[field] - (usageUser[field] ?? 0));
 
+  const exportQuota = checkExportQuota(usageUser);
   res.json({
     tier,
     limits: FREE_LIMITS,
@@ -271,6 +273,12 @@ audioRouter.get("/usage/status", async (req: Request, res: Response) => {
       voice_remove: remaining("freeVoiceRemovals"),
       stem_split: remaining("freeStemSplits"),
       master: remaining("freeMasterDownloads"),
+    },
+    exports: {
+      used: exportQuota.used,
+      limit: exportQuota.limit,
+      remaining: Math.max(0, exportQuota.limit - exportQuota.used),
+      resetsAt: exportQuota.resetsAt,
     },
   });
 });
@@ -417,6 +425,29 @@ audioRouter.post(
       }
     }
 
+    // ── Rolling 30-day export quota — WAV/MP3/stem-ZIP outputs count ─────────
+    // Applies to paid tiers too (capped, not unlimited — owner directive
+    // 2026-08-14). Checked here before expensive processing; consumed only
+    // after a successful run, right before the bytes stream.
+    const exportQuotaUser = await getUsageUser(req, res);
+    {
+      const quota = checkExportQuota(exportQuotaUser);
+      if (!quota.allowed) {
+        await unlink(filePath).catch(() => {});
+        res.status(429).json(exportLimitPayload(quota));
+        return;
+      }
+    }
+    /** Consume one export; on exhaustion sends the 429 and returns false. */
+    const consumeExportOrReject = async (): Promise<boolean> => {
+      const quota = await consumeExport(exportQuotaUser);
+      if (!quota.allowed) {
+        res.status(429).json(exportLimitPayload(quota));
+        return false;
+      }
+      return true;
+    };
+
     // ── Voice removal — neural for paid, DSP for free ────────────────────────
     if (mode === "voice_remove") {
       let fsJobId: string | undefined;
@@ -528,6 +559,8 @@ audioRouter.post(
           await incrementUsage(usageUserId, "totalDownloads");
           res.setHeader("X-GK-Free-Remaining", String(freeRemaining));
         }
+
+        if (!(await consumeExportOrReject())) return;
 
         // MP3 fallback for free users; WAV for paid users.
         const mp3Wanted = !await hasUnlimitedSplits(req);
@@ -695,6 +728,8 @@ audioRouter.post(
 
         await unlink(filePath).catch(() => {});
 
+        if (!(await consumeExportOrReject())) return;
+
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename="gravelking_stems.zip"`);
         res.setHeader("X-GK-Mode", "stem_split");
@@ -759,6 +794,8 @@ audioRouter.post(
           fileName: req.file.originalname,
         }).catch(() => {});
       }
+
+      if (!(await consumeExportOrReject())) return;
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_processed.wav"`);
