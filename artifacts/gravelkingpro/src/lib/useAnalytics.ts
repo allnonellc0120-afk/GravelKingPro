@@ -18,6 +18,8 @@ export function trackFunnelEvent(
     | "plan_selected"
     | "signin_required"
     | "checkout_returned"
+    | "checkout_abandoned"
+    | "trial_started"
     | "signup_completed"
     | "checkout_error",
   metadata?: Record<string, string>,

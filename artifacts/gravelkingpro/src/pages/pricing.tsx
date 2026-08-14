@@ -200,7 +200,9 @@ export default function Pricing() {
         setSuccessInfo({ planId: fallbackId, ...PLAN_SUCCESS[fallbackId] });
       });
     } else if (checkout === "cancelled") {
+      const planParam = params.get("plan") as PlanId | null;
       trackFunnelEvent("checkout_returned", { outcome: "cancelled" });
+      trackFunnelEvent("checkout_abandoned", { plan: planParam ?? "unknown" });
       toast({ title: "Checkout cancelled", description: "No charge was made.", variant: "destructive" });
       window.history.replaceState({}, "", "/pricing");
     }
@@ -315,7 +317,13 @@ export default function Pricing() {
         throw new Error(errMsg);
       }
       const { url } = await checkoutRes.json() as { url: string };
-      if (url) window.location.href = url;
+      if (url) {
+        // Fire trial_started before leaving the page so the beacon has time to send.
+        if (trialEligible && (planId === "weekly" || planId === "monthly")) {
+          trackFunnelEvent("trial_started", { plan: planId });
+        }
+        window.location.href = url;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";
       toast({ title: "Checkout error", description: message, variant: "destructive" });
