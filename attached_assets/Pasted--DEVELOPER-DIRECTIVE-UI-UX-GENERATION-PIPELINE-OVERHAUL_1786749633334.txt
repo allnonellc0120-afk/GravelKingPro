@@ -1,0 +1,43 @@
+**DEVELOPER DIRECTIVE: UI/UX & GENERATION PIPELINE OVERHAUL**
+
+**CRITICAL INSTRUCTION:** This update focuses heavily on UI layout, user flow, and frontend routing. Do not alter or break the core functionality of the existing generation tools, APIs, or mastering engines during implementation. 
+
+---
+
+### 1. Simple Mode UI
+*   **Style Box:** Single input area for Atmosphere, Beat Style, and Genre. Place clickable style suggestion tags directly beneath it.
+*   **Instrumental Toggle:** 
+    *   If ON: Disables auto-lyrics, generates pure instrumental based on style.
+    *   If OFF: Generates full song with auto-written lyrics.
+*   **Action Button:** Place the "Generate Song" button *immediately* under the style input box. Remove bottom-page scrolling requirement.
+*   **Flow:** No lyric preview or editing phases. Straight from click to generation.
+
+### 2. Advanced Mode UI
+*   **Core Requirements:** Style Box (required input) and Song Duration selector.
+*   **Instrumental Toggle:** If enabled, instantly hides all lyric inputs and routes to instrumental generation.
+*   **Lyrics Module:**
+    *   Text area for manual typing/pasting.
+    *   "Auto-Generate Lyrics" button (pulls context directly from the Style box).
+    *   "Rewrite / IP Mode" button: Triggers a side-by-side split view. Left pane shows generated lyrics; Right pane allows user to rewrite and track originality.
+    *   Users must be able to generate and edit lyrics independently without triggering the full song generation.
+*   **Action Button:** Place "Generate Song" directly below the lyrics module. 
+
+### 3. Copyright Pipeline Integration
+*   Implement an automated verification check against major commercial databases for *all* lyrics (typed, pasted, or rewritten).
+*   This check must execute and clear before allowing the final "Generate Song" processing or saving to the library.
+
+### 4. Backend Logic & Prompt Handling
+*   **Remove "Convert to Style Tags":** Disable the forced tag conversion step. Pass the raw user text straight to the generation engine to retain explicit details and prevent scope broadening.
+*   **Filter Tuning:** Adjust safety net parameters so raw style inputs are not constantly kicked back with false positives, while maintaining basic safety bounds.
+
+### 5. Library & Player Interface (Post-Generation)
+*   **Auto-Save:** All generated tracks route automatically to a User Library account page.
+*   **Player Layout (Suno/Udio style):** Clicking a track in the library opens a clean player with:
+    *   Auto-generated album cover (static/simple).
+    *   Standard playback controls.
+    *   Generated lyrics displayed clearly underneath the player.
+
+### 6. Mastering Console Refactor
+*   **Hide by Default:** Remove the large drag-and-drop mastering tools from the main auto-route page.
+*   **Access Point:** Add a prominent "Master" button to the individual track player page.
+*   **Expandable UI:** Clicking "Master" opens/enlarges the full suite of mastering tools specifically for that active track.
