@@ -6,6 +6,9 @@ import { unlink, readFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { sanitizeExt } from "../lib/audioGuards";
 import { streamBuffer } from "../lib/streamResponse";
+import { getUsageUser } from "../lib/usage";
+import { checkExportQuota, consumeExport, exportLimitPayload } from "../lib/exportQuota";
+import type { User } from "@workspace/db";
 
 const execFileAsync = promisify(execFile);
 
@@ -59,6 +62,19 @@ convertRouter.post(
     const rawFormat = ((req.body.format as string) ?? "mp3").toLowerCase() as OutputFormat;
     const format: OutputFormat = FORMAT_ARGS[rawFormat] ? rawFormat : "mp3";
 
+    // WAV/MP3 outputs count against the rolling 30-day export quota
+    // (paid tiers included — capped, not unlimited).
+    let exportUser: User | null = null;
+    if (format === "wav" || format === "mp3") {
+      exportUser = await getUsageUser(req, res);
+      const quota = checkExportQuota(exportUser);
+      if (!quota.allowed) {
+        await unlink(inputPath).catch(() => {});
+        res.status(429).json(exportLimitPayload(quota));
+        return;
+      }
+    }
+
     const outId = randomUUID();
     const outPath = `/tmp/gk_conv_out_${outId}.${format}`;
 
@@ -74,6 +90,15 @@ convertRouter.post(
 
       const buf = await readFile(outPath);
       const baseName = req.file.originalname.replace(/\.[^.]+$/, "");
+
+      // Consume only after a successful conversion.
+      if (exportUser) {
+        const quota = await consumeExport(exportUser);
+        if (!quota.allowed) {
+          res.status(429).json(exportLimitPayload(quota));
+          return;
+        }
+      }
 
       res.setHeader("Content-Type", MIME[format]);
       res.setHeader("Content-Disposition", `attachment; filename="${baseName}.${format}"`);
