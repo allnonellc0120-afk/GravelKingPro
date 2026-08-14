@@ -29,6 +29,12 @@ export function Layout({
   const tierInfo = tier ? TIER_LABEL[tier] : null;
   const showUpgradeNudge = !tier || tier === "weekly";
 
+  // Nav sign-in carries the pricing destination explicitly so the Clerk widget
+  // honours it (redirect_url takes priority over the app-level fallback, and
+  // plan-specific redirects set by the pricing page keep working unchanged).
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const signInHref = `/sign-in?redirect_url=${encodeURIComponent(`${base}/pricing?plan=monthly`)}`;
+
   const links = [
     { href: "/mastering", label: "Mastering" },
     { href: "/vocal-booth", label: "Vocal Booth" },
@@ -142,7 +148,7 @@ export function Layout({
                 </div>
               </Link>
             ) : (
-              <Link href="/sign-in" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors">
+              <Link href={signInHref} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors">
                 <LogIn className="w-4 h-4" />
                 <span>Sign in</span>
               </Link>
@@ -211,7 +217,7 @@ export function Layout({
                 </Link>
               ) : (
                 <Link
-                  href="/sign-in"
+                  href={signInHref}
                   className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary/60 text-muted-foreground mt-1"
                   onClick={() => setMobileOpen(false)}
                 >
