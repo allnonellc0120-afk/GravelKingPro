@@ -47,6 +47,7 @@ import HelpPage from "@/pages/help";
 import AdminPublishChecklist from "@/pages/admin-publish-checklist";
 import PromotersPage from "@/pages/promoters";
 import AdminPromoters from "@/pages/admin-promoters";
+import AdminDecks from "@/pages/admin-decks";
 
 /**
  * Referral link capture: if the URL carries ?ref=CODE, report it to the server
@@ -133,17 +134,24 @@ const clerkAppearance = {
 };
 
 function SignInPage() {
+  // After sign-in, send the user to the pricing page with Studio pre-selected
+  // so they land on the offer rather than the homepage. The pricing page's
+  // auto-resume logic picks up ?plan=monthly and opens Stripe checkout
+  // automatically — plan-specific redirects set by handleCheckout take priority.
+  const afterUrl = `${basePath}/pricing?plan=monthly`;
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} fallbackRedirectUrl={afterUrl} signUpFallbackRedirectUrl={afterUrl} />
     </div>
   );
 }
 
 function SignUpPage() {
+  // Same intent: new users land on the pricing page, not the homepage.
+  const afterUrl = `${basePath}/pricing?plan=monthly`;
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} fallbackRedirectUrl={afterUrl} signInFallbackRedirectUrl={afterUrl} />
     </div>
   );
 }
@@ -214,6 +222,7 @@ function Router() {
       <Route path="/admin/publish-checklist" component={AdminPublishChecklist} />
       <Route path="/promoters" component={PromotersPage} />
       <Route path="/admin/promoters" component={AdminPromoters} />
+      <Route path="/admin/decks" component={AdminDecks} />
       <Route component={NotFound} />
     </Switch>
   );
