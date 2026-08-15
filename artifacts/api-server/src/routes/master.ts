@@ -235,7 +235,10 @@ const VALID_PRESETS = new Set(Object.keys(MASTER_PRESETS));
 // (certify=true) do the ingestion checks run and the IP cert get embedded.
 const maybeValidateIngestion = (req: Request, res: Response, next: NextFunction): void => {
   if ((req.body as Record<string, unknown> | undefined)?.certify === "true") {
-    void validateAssetIngestion({ requireAudio: true })(req, res, next);
+    void validateAssetIngestion({
+      requireAudio: true,
+      commercialFingerprint: true,
+    })(req, res, next);
     return;
   }
   next();

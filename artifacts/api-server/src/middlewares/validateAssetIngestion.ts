@@ -4,6 +4,10 @@ import { promisify } from "util";
 import { randomUUID } from "crypto";
 import { writeFile, unlink } from "fs/promises";
 import { logger } from "../lib/logger";
+import {
+  scanCommercialFingerprint,
+  type CommercialFingerprintMatch,
+} from "../lib/commercialFingerprint";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,6 +39,11 @@ export interface IngestionValidationResult {
     isrcIswcHits: string[];
     labelHits: string[];
     spectralUniqueness: number | null;
+    commercialFingerprint: {
+      provider: "acrcloud";
+      status: "not_run" | "no_match" | "match" | "unavailable";
+      matches: CommercialFingerprintMatch[];
+    };
   };
   authorAssertion: boolean;
 }
@@ -155,9 +164,26 @@ async function computeSpectralUniqueness(audioBuffer: Buffer, ext: string): Prom
  * or LSB steganographic watermarks. Checks metadata, spectral uniqueness, and
  * requires an explicit author ownership assertion.
  */
-export function validateAssetIngestion(options: { requireAudio?: boolean } = {}) {
+export function validateAssetIngestion(
+  options: { requireAudio?: boolean; commercialFingerprint?: boolean } = {},
+) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const file = req.file ?? (req.files && Array.isArray(req.files) ? req.files[0] : undefined);
+    const uploadedFiles: Express.Multer.File[] = req.file
+      ? [req.file]
+      : Array.isArray(req.files)
+        ? req.files
+        : req.files
+          ? Object.values(req.files).flat()
+          : [];
+    const audioFiles = uploadedFiles.filter(
+      (candidate) =>
+        candidate.mimetype?.startsWith("audio/") ||
+        candidate.fieldname === "audio" ||
+        candidate.fieldname === "audio_full" ||
+        candidate.fieldname === "audio_preview" ||
+        candidate.fieldname === "tracks",
+    );
+    const file = audioFiles[0];
     const body = (req.body as Record<string, unknown>) ?? {};
 
     const result: IngestionValidationResult = {
@@ -168,6 +194,11 @@ export function validateAssetIngestion(options: { requireAudio?: boolean } = {})
         isrcIswcHits: [],
         labelHits: [],
         spectralUniqueness: null,
+        commercialFingerprint: {
+          provider: "acrcloud",
+          status: "not_run",
+          matches: [],
+        },
       },
       authorAssertion: false,
     };
@@ -195,28 +226,86 @@ export function validateAssetIngestion(options: { requireAudio?: boolean } = {})
       result.reasons.push(`Commercial label metadata detected: ${meta.labelHits.join(", ")}`);
     }
 
-    // 3. Audio Fingerprint Check (lightweight spectral uniqueness)
-    if (file && options.requireAudio !== false) {
-      const audioBuffer = (file as Express.Multer.File & { buffer?: Buffer }).buffer;
-      if (Buffer.isBuffer(audioBuffer)) {
-        const ext = (file.originalname?.split(".").pop() ?? "wav").toLowerCase();
-        result.metadata.spectralUniqueness = await computeSpectralUniqueness(audioBuffer, ext);
-        if (result.metadata.spectralUniqueness !== null && result.metadata.spectralUniqueness < 0.1) {
-          result.reasons.push(`Audio spectral uniqueness too low (${result.metadata.spectralUniqueness}); possible silence, test tone, or copied signal`);
-        }
-      } else if (file.path) {
-        const { readFile } = await import("node:fs/promises");
+    // 3. Local signal screening followed by commercial catalog recognition.
+    // Every uploaded audio component is checked; a multi-track studio mix
+    // cannot hide an external match in a later file.
+    if (audioFiles.length && options.requireAudio !== false) {
+      const uniquenessScores: number[] = [];
+      for (const audioFile of audioFiles) {
+        const audioBuffer = (audioFile as Express.Multer.File & { buffer?: Buffer }).buffer;
+        let tempPath: string | null = null;
         try {
-          const buf = await readFile(file.path);
-          const ext = (file.originalname?.split(".").pop() ?? "wav").toLowerCase();
-          result.metadata.spectralUniqueness = await computeSpectralUniqueness(buf, ext);
-          if (result.metadata.spectralUniqueness !== null && result.metadata.spectralUniqueness < 0.1) {
-            result.reasons.push(`Audio spectral uniqueness too low (${result.metadata.spectralUniqueness}); possible silence, test tone, or copied signal`);
+          let scanPath = audioFile.path;
+          let buf = audioBuffer;
+          if (!Buffer.isBuffer(buf) && scanPath) {
+            const { readFile } = await import("node:fs/promises");
+            buf = await readFile(scanPath);
+          } else if (Buffer.isBuffer(buf) && !scanPath) {
+            tempPath = `/tmp/gk_ingest_${randomUUID()}.audio`;
+            await writeFile(tempPath, buf);
+            scanPath = tempPath;
+          }
+          if (!Buffer.isBuffer(buf) || !scanPath) continue;
+
+          const ext = (audioFile.originalname?.split(".").pop() ?? "wav").toLowerCase();
+          const uniqueness = await computeSpectralUniqueness(buf, ext);
+          if (uniqueness !== null) uniquenessScores.push(uniqueness);
+          if (uniqueness !== null && uniqueness < 0.1) {
+            result.reasons.push(
+              `Audio spectral uniqueness too low (${uniqueness}); possible silence, test tone, or copied signal`,
+            );
+          }
+
+          // Avoid provider cost when local validation has already rejected the
+          // asset, but never stamp a locally-valid external upload without the
+          // commercial recognition result.
+          if (result.reasons.length === 0 && options.commercialFingerprint === true) {
+            const commercial = await scanCommercialFingerprint(scanPath);
+            result.metadata.commercialFingerprint.status = commercial.status;
+            if (commercial.status === "unavailable") {
+              logger.warn(
+                { reason: commercial.reason, filename: audioFile.originalname },
+                "commercial fingerprint scan temporarily unavailable",
+              );
+              (req as Request & { ingestionValidation?: IngestionValidationResult }).ingestionValidation = result;
+              res.status(503).json({
+                success: false,
+                code: "SCAN_TEMPORARILY_UNAVAILABLE",
+                error: "Scan temporarily unavailable",
+                message: "Your audio was not stamped. Please try again later.",
+              });
+              return;
+            }
+            if (commercial.status === "match") {
+              result.metadata.commercialFingerprint.matches.push(...commercial.matches);
+              const identified = commercial.matches
+                .slice(0, 3)
+                .map((match) => {
+                  const artist = match.artists?.join(", ");
+                  return [match.title, artist].filter(Boolean).join(" — ");
+                })
+                .filter(Boolean);
+              result.reasons.push(
+                `Commercial fingerprint match detected${identified.length ? `: ${identified.join("; ")}` : ""}`,
+              );
+            }
           }
         } catch (err) {
-          logger.warn({ err }, "could not read uploaded file for spectral check");
+          logger.warn({ err, filename: audioFile.originalname }, "could not scan uploaded audio");
+          (req as Request & { ingestionValidation?: IngestionValidationResult }).ingestionValidation = result;
+          res.status(503).json({
+            success: false,
+            code: "SCAN_TEMPORARILY_UNAVAILABLE",
+            error: "Scan temporarily unavailable",
+            message: "Your audio was not stamped. Please try again later.",
+          });
+          return;
+        } finally {
+          if (tempPath) await unlink(tempPath).catch(() => {});
         }
       }
+      result.metadata.spectralUniqueness =
+        uniquenessScores.length > 0 ? Math.min(...uniquenessScores) : null;
     }
 
     result.passed = result.reasons.length === 0;

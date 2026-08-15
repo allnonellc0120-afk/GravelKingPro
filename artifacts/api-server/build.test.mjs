@@ -34,6 +34,7 @@ async function buildTest() {
       path.resolve(artifactDir, "src/__tests__/generation-pipeline.test.ts"),
       path.resolve(artifactDir, "src/__tests__/export-quota.test.ts"),
       path.resolve(artifactDir, "src/__tests__/lyric-owner-auth.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/commercial-fingerprint.test.ts"),
     ],
     platform: "node",
     bundle: true,
