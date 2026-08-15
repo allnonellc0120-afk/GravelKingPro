@@ -34,6 +34,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // The production SPA bundle is currently just over Workbox's 2 MiB
+        // default. Keep it precached so offline/PWA behavior remains intact.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // CRITICAL: never serve the SPA shell for server-side routes.
         // Without this, the service worker hijacks navigations to /api/*
         // (incl. the Clerk proxy at /api/__clerk) and renders the SPA 404 page.
