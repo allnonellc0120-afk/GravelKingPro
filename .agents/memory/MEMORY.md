@@ -71,4 +71,5 @@
 - [Referral/promoter program](referral-program.md) — attribution via httpOnly gk_ref cookie + DB, commission only on verified paid invoices; never trust client claims
 - [Live-site browser proof](live-site-browser-proof.md) — verify production interactively via a throwaway nix-shell browser; never add browsers to the deploy image
 - [Export quota pattern](export-quota.md) — 20 WAV/MP3 exports per rolling 30 days, paid tiers included; consume must be ONE atomic reset-or-increment UPDATE or window-boundary races blow the cap
+- [Package firewall blocked packages](package-firewall-block.md) — deploy installs 403 on some npm packages (all `tar` versions); fix by vendoring the tgz + pnpm file: override
 - [Lyric copyright screen](lyric-copyright-screen.md) — AI screening (never "database clearance") enforced server-side on generate/save/import; fail-open on Vertex outage; playback via /stream never burns export quota
