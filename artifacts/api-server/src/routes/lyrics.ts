@@ -11,6 +11,7 @@ import {
   lyricForensicLedgerTable,
   lyricTimelineBlocksTable,
   lyricImportsTable,
+  usersTable,
 } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID, createHmac, createHash } from "crypto";
@@ -227,12 +228,29 @@ async function requireStudio(req: Request, res: Response, next: NextFunction): P
 // anonymous caller who learned a project id could read or delete it).
 // Project creation sets the gk_session cookie when absent, so anonymous and
 // signed-in creators alike keep a matching credential for their own project.
-function isProjectOwner(req: Request, projectSessionId: string | null | undefined): boolean {
+//
+// LEGACY-ROW GUARD: the cookie path is only honoured when the stored
+// sessionId is NOT the id of an existing user row. Legacy projects whose
+// sessionId is a user principal id would otherwise be forgeable — user ids
+// are public/stable identifiers, not bearer secrets, so an attacker who
+// learned one could set gk_session=<userId> and own the project. For those
+// rows only a server-authenticated req.dbUser match grants access.
+async function isProjectOwner(req: Request, projectSessionId: string | null | undefined): Promise<boolean> {
   if (!projectSessionId) return false;
-  const cookie = (req.cookies as Record<string, string> | undefined)?.["gk_session"];
-  if (cookie && cookie === projectSessionId) return true;
   const dbUser = req.dbUser as { id?: string; sessionId?: string | null } | undefined;
   if (dbUser && (dbUser.sessionId === projectSessionId || dbUser.id === projectSessionId)) return true;
+  const cookie = (req.cookies as Record<string, string> | undefined)?.["gk_session"];
+  if (cookie && cookie === projectSessionId) {
+    const [principal] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.id, projectSessionId))
+      .limit(1);
+    // If the stored sessionId is actually a user id (legacy row), the cookie
+    // is a forgeable public identifier — deny; only the authenticated-user
+    // branch above may grant access to that project.
+    return !principal;
+  }
   return false;
 }
 
@@ -669,7 +687,7 @@ lyricsRouter.post("/lyrics/forensic-entry", async (req: Request, res: Response) 
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (!isProjectOwner(req, forensicProject.sessionId)) {
+  if (!await isProjectOwner(req, forensicProject.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -839,7 +857,7 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (!isProjectOwner(req, project.sessionId)) {
+  if (!await isProjectOwner(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -931,7 +949,7 @@ lyricsRouter.get("/lyrics/certificate/:projectId", async (req: Request, res: Res
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (!isProjectOwner(req, project.sessionId)) {
+  if (!await isProjectOwner(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -1044,7 +1062,7 @@ lyricsRouter.delete("/lyrics/project/:id", async (req: Request, res: Response) =
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (!isProjectOwner(req, project.sessionId)) {
+  if (!await isProjectOwner(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -1068,7 +1086,7 @@ lyricsRouter.get("/lyrics/project/:id", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (!isProjectOwner(req, project.sessionId)) {
+  if (!await isProjectOwner(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -1106,7 +1124,7 @@ lyricsRouter.post("/lyrics/timeline-blocks", async (req: Request, res: Response)
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (!isProjectOwner(req, blocksProject.sessionId)) {
+  if (!await isProjectOwner(req, blocksProject.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
