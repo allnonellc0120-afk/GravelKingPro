@@ -17,6 +17,7 @@ export function trackFunnelEvent(
     | "landing_cta_clicked"
     | "plan_selected"
     | "signin_required"
+    | "checkout_started"
     | "checkout_returned"
     | "checkout_abandoned"
     | "trial_started"
