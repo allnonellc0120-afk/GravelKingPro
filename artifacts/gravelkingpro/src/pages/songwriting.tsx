@@ -509,7 +509,13 @@ export default function SongwritingStudio() {
           durationS: mode === "advanced" ? durationS : undefined,
         }),
       });
-      const data = (await res.json()) as { error?: string; code?: string; trackId?: string; title?: string };
+      const data = (await res.json()) as {
+        error?: string;
+        code?: string;
+        trackId?: string;
+        title?: string;
+        certificationStatus?: "sealed" | "skipped_match" | "skipped_unavailable";
+      };
       if (!res.ok || !data.trackId) {
         const msg = data.error || `Generation failed (HTTP ${res.status})`;
         if (data.code === "lyrics_flagged") {
@@ -520,6 +526,17 @@ export default function SongwritingStudio() {
           toast({ title: "Prompt flagged", description: msg, variant: "destructive" });
         }
         throw new Error(msg);
+      }
+      if (data.certificationStatus === "skipped_unavailable") {
+        toast({
+          title: "Track generated — stamp skipped",
+          description: "The copyright scan is temporarily unavailable. Your track was still saved and is ready to use.",
+        });
+      } else if (data.certificationStatus === "skipped_match") {
+        toast({
+          title: "Track generated — stamp skipped",
+          description: "A commercial catalog match was detected. Your track was still saved without an IP stamp.",
+        });
       }
       // Track is auto-saved to the library — land the user on its player.
       navigate(`/library?track=${encodeURIComponent(data.trackId)}`);

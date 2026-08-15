@@ -239,7 +239,7 @@ router.post(
     { name: "audio_preview", maxCount: 1 },
     { name: "cover_art", maxCount: 1 },
   ]),
-  validateAssetIngestion({ requireAudio: true, commercialFingerprint: true }),
+  validateAssetIngestion({ requireAudio: true }),
   async (req: Request, res: Response) => {
     // Dev privileges: an admin-authenticated request (gk_admin cookie or
     // x-admin-key header, both derived from ADMIN_KEY) bypasses the paid-tier
