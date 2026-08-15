@@ -36,6 +36,7 @@ async function buildTest() {
       path.resolve(artifactDir, "src/__tests__/lyric-owner-auth.test.ts"),
       path.resolve(artifactDir, "src/__tests__/commercial-fingerprint.test.ts"),
       path.resolve(artifactDir, "src/__tests__/cert-unlock-webhook.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/cert-paywall.test.ts"),
     ],
     platform: "node",
     bundle: true,
