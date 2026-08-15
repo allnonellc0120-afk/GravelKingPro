@@ -746,3 +746,10 @@ uri = "file://exports/gravelking-live-backend-architecture.pdf"
 type = "pdf"
 title = "GravelKing Pro — Live Backend Architecture"
 description = "Four-page A3 landscape vector PDF mapping the code-audited mastering, lyrics, AI generation, ACRCloud classification, persistence, and certificate-stamping pipelines."
+
+[[outputs]]
+id = "Ibao7saZqWjwbhxrnmWJ1"
+uri = "file://.local/outputs/GravelKing-Pro---Studio-Proof-and-Release.pdf"
+type = "pdf"
+title = "GravelKing Pro — Studio, Proof & Release (PDF)"
+description = "The single 12-slide release, certificate-pipeline, F6S, B2B, and business-roadmap PDF."
