@@ -173,6 +173,12 @@ export default function SongwritingStudio() {
   const [verifyState, setVerifyState] = useState<VerifyState>("idle");
   const [verifyMsg, setVerifyMsg] = useState<string>("");
   const [matchedWork, setMatchedWork] = useState<string | undefined>(undefined);
+  /** The specific matching passage returned by the screening model (≤120 chars). */
+  const [flaggedEvidence, setFlaggedEvidence] = useState<string | undefined>(undefined);
+  /** Whether the AI rewrite suggestion box is expanded. */
+  const [showRewriteBox, setShowRewriteBox] = useState(false);
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [rewriteSuggestion, setRewriteSuggestion] = useState("");
   const verifiedTextRef = useRef<string>("");
 
   // ── Generation ────────────────────────────────────────────────────────────
@@ -215,6 +221,9 @@ export default function SongwritingStudio() {
       setVerifyState("idle");
       setVerifyMsg("");
       setMatchedWork(undefined);
+      setFlaggedEvidence(undefined);
+      setShowRewriteBox(false);
+      setRewriteSuggestion("");
     }
   }, [lyricsText, verifyState]);
 
@@ -270,14 +279,17 @@ export default function SongwritingStudio() {
         body: JSON.stringify({ text }),
       });
       const data = (await res.json()) as {
-        verdict?: string; reason?: string; matchedWork?: string; error?: string;
-        screeningUnavailable?: boolean;
+        verdict?: string; reason?: string; matchedWork?: string; evidence?: string;
+        error?: string; screeningUnavailable?: boolean;
       };
       if (!res.ok) throw new Error(data.error || "Verification failed");
       verifiedTextRef.current = text;
       if (data.verdict === "flagged") {
         setVerifyState("flagged");
         setMatchedWork(data.matchedWork);
+        setFlaggedEvidence(data.evidence || undefined);
+        setShowRewriteBox(false);
+        setRewriteSuggestion("");
         setVerifyMsg(data.reason || "These lyrics appear to reproduce a released song. Rewrite the matching passage in your own words.");
         return false;
       }
@@ -358,10 +370,13 @@ export default function SongwritingStudio() {
           }),
         });
         if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as { error?: string; code?: string; matchedWork?: string } | null;
+          const body = (await res.json().catch(() => null)) as { error?: string; code?: string; matchedWork?: string; evidence?: string } | null;
           if (body?.code === "lyrics_flagged") {
             setVerifyState("flagged");
             setMatchedWork(body.matchedWork);
+            setFlaggedEvidence(body.evidence || undefined);
+            setShowRewriteBox(false);
+            setRewriteSuggestion("");
             setVerifyMsg(body.error || "These lyrics appear to reproduce a released song. Rewrite the matching passage in your own words.");
             verifiedTextRef.current = text;
             toast({
@@ -373,7 +388,7 @@ export default function SongwritingStudio() {
           }
           throw new Error(body?.error || "Save failed");
         }
-        const data = (await res.json()) as { id: string; screeningUnavailable?: boolean };
+        const data = (await res.json()) as { id: string; screeningUnavailable?: boolean; evidence?: string };
         setProjectId(data.id);
         if (data.screeningUnavailable) {
           setVerifyState("unavailable");
@@ -395,6 +410,9 @@ export default function SongwritingStudio() {
           const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
           if (body?.code === "lyrics_flagged") {
             setVerifyState("flagged");
+            setFlaggedEvidence((body as { evidence?: string }).evidence || undefined);
+            setShowRewriteBox(false);
+            setRewriteSuggestion("");
             setVerifyMsg(body.error || "These lyrics appear to reproduce a released song. Rewrite the matching passage in your own words.");
             verifiedTextRef.current = text;
             toast({
@@ -572,8 +590,62 @@ export default function SongwritingStudio() {
   const resetAll = () => {
     setStyleRaw(""); setLyricsText(""); setAiDraft(""); setProjectId(null);
     setVerifyState("idle"); setVerifyMsg(""); setMatchedWork(undefined); setGenError(null);
+    setFlaggedEvidence(undefined); setShowRewriteBox(false); setRewriteSuggestion("");
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* non-critical */ }
   };
+
+  // ── Rewrite a flagged passage with AI ────────────────────────────────────
+  const handleRewritePassage = useCallback(async () => {
+    if (!flaggedEvidence) return;
+    setIsRewriting(true);
+    setShowRewriteBox(true);
+    setRewriteSuggestion("");
+    try {
+      const res = await fetch("/api/lyrics/rewrite-passage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          passage: flaggedEvidence,
+          matchedWork,
+          songContext: lyricsText.slice(0, 800),
+        }),
+      });
+      const data = (await res.json()) as { rewrite?: string; error?: string };
+      if (!res.ok || !data.rewrite) throw new Error(data.error || "Rewrite failed");
+      setRewriteSuggestion(data.rewrite);
+    } catch (err) {
+      toast({
+        title: "AI rewrite unavailable",
+        description: err instanceof Error ? err.message : "Please rewrite the passage manually.",
+        variant: "destructive",
+      });
+      setShowRewriteBox(false);
+    } finally {
+      setIsRewriting(false);
+    }
+  }, [flaggedEvidence, matchedWork, lyricsText, toast]);
+
+  // Apply the accepted rewrite suggestion — replace the flagged passage in the
+  // lyrics text, then immediately re-run verification so the user sees a new verdict.
+  const handleAcceptRewrite = useCallback(async () => {
+    if (!flaggedEvidence || !rewriteSuggestion.trim()) return;
+    // Replace the flagged passage with the accepted rewrite (case-sensitive first,
+    // then case-insensitive fallback so the match survives minor capitalization drift).
+    const updated = lyricsText.includes(flaggedEvidence)
+      ? lyricsText.replace(flaggedEvidence, rewriteSuggestion.trim())
+      : lyricsText.replace(
+          new RegExp(flaggedEvidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"),
+          rewriteSuggestion.trim(),
+        );
+    setLyricsText(updated);
+    setShowRewriteBox(false);
+    setRewriteSuggestion("");
+    // verifyState reset is handled by the lyricsText useEffect above, but we
+    // also need the updated text to be committed before runVerify reads it.
+    // Schedule verify after the state flush.
+    setTimeout(() => { void runVerify(); }, 0);
+  }, [flaggedEvidence, rewriteSuggestion, lyricsText, runVerify]);
 
   // ── The style box + suggestions (shared between both modes) ──────────────
   const styleBox = (
@@ -837,8 +909,85 @@ export default function SongwritingStudio() {
                         )}
                       </div>
                     </div>
-                    {verifyMsg && verifyState === "flagged" && (
-                      <p className="text-xs text-rose-400 leading-relaxed">{verifyMsg}</p>
+                    {verifyState === "flagged" && (
+                      <div className="space-y-3 pt-1">
+                        {/* Explanation text */}
+                        {verifyMsg && (
+                          <p className="text-xs text-rose-400 leading-relaxed">{verifyMsg}</p>
+                        )}
+
+                        {/* Highlighted matching passage */}
+                        {flaggedEvidence && (
+                          <div className="rounded-lg border border-rose-500/40 bg-rose-500/[0.06] px-3 py-2.5 space-y-1.5">
+                            <p className="text-[10px] font-semibold text-rose-400 uppercase tracking-wide">
+                              Matching passage identified by the screen
+                            </p>
+                            <blockquote className="text-xs font-mono text-rose-300 leading-relaxed border-l-2 border-rose-500/50 pl-2 italic whitespace-pre-wrap">
+                              {flaggedEvidence}
+                            </blockquote>
+                            <p className="text-[10px] text-rose-400/70">
+                              Replace this passage with your own original words to clear the flag.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* AI rewrite assist */}
+                        {flaggedEvidence && !showRewriteBox && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleRewritePassage()}
+                            disabled={isRewriting}
+                            className="text-xs border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
+                            data-testid="button-rewrite-passage"
+                          >
+                            {isRewriting
+                              ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Getting AI suggestion…</>
+                              : <><Wand2 className="w-3.5 h-3.5 mr-1.5" />Suggest an original rewrite</>}
+                          </Button>
+                        )}
+
+                        {/* Rewrite suggestion box */}
+                        {showRewriteBox && (
+                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-3 space-y-2.5">
+                            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide">
+                              AI suggested rewrite — edit freely, then accept
+                            </p>
+                            <Textarea
+                              value={rewriteSuggestion}
+                              onChange={(e) => setRewriteSuggestion(e.target.value)}
+                              className="min-h-[80px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50 font-mono text-xs"
+                              placeholder="AI rewrite will appear here…"
+                              maxLength={2000}
+                              data-testid="textarea-rewrite-suggestion"
+                            />
+                            <p className="text-[10px] text-muted-foreground/70">
+                              This replaces the flagged passage in your lyrics and re-runs verification automatically.
+                              You remain the author — this is a starting point, not a finished line.
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => void handleAcceptRewrite()}
+                                disabled={!rewriteSuggestion.trim()}
+                                className="text-xs bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+                                data-testid="button-accept-rewrite"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Use this rewrite
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { setShowRewriteBox(false); setRewriteSuggestion(""); }}
+                                className="text-xs text-muted-foreground"
+                                data-testid="button-dismiss-rewrite"
+                              >
+                                Dismiss
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                     {verifyMsg && verifyState === "unavailable" && (
                       <p className="text-xs text-amber-400 leading-relaxed">{verifyMsg}</p>
