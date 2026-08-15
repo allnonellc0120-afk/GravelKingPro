@@ -19,6 +19,7 @@ import { authorshipScore } from "@workspace/authorship";
 import { generateVertexText, isVertexConfigured } from "../geminiVertex";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
+import { verifyLyrics } from "../services/lyricGuard";
 
 const EMBED_SECRET = process.env["SESSION_SECRET"] ?? "gravelking-embed-secret";
 
@@ -337,6 +338,35 @@ STYLE_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
   }
 });
 
+// ─── POST /api/lyrics/verify ─────────────────────────────────────────────────
+// GravelKing Protocol copyright gate: AI screening of typed/pasted/rewritten
+// lyrics for recognizable commercial-song content (including phonetic
+// obfuscation). Must clear before generation or library save — both of those
+// routes re-run the same check server-side, so this endpoint is the UI's
+// preview of the verdict, not the enforcement point.
+lyricsRouter.post("/lyrics/verify", lyricsAiRateLimit, async (req: Request, res: Response) => {
+  const { text } = req.body as { text?: string };
+  const input = (text ?? "").toString();
+  if (input.replace(/\s/g, "").length < 5) {
+    res.status(400).json({ error: "Lyrics text is required (min 5 characters)." });
+    return;
+  }
+  try {
+    const result = await verifyLyrics(input);
+    res.json({
+      verdict: result.verdict,
+      ...(result.reason ? { reason: result.reason } : {}),
+      ...(result.matchedWork ? { matchedWork: result.matchedWork } : {}),
+      ...(result.screeningUnavailable ? { screeningUnavailable: true } : {}),
+      method: "ai_screening",
+    });
+  } catch (err) {
+    req.log.error({ err }, "Lyric verification failed");
+    void logToolError("Lyric Verify", "COPYRIGHT_SCREEN", err);
+    res.status(500).json({ error: "Verification failed. Please try again." });
+  }
+});
+
 // ─── POST /api/lyrics/expand ─────────────────────────────────────────────────
 lyricsRouter.post("/lyrics/expand", lyricsAiRateLimit, requireStudio, async (req: Request, res: Response) => {
   const { partialLyrics, genre, bpm, styleContext } = req.body as {
@@ -522,6 +552,19 @@ lyricsRouter.post("/lyrics/import", lyricsAiRateLimit, async (req: Request, res:
     return;
   }
 
+  // Possession stamps also pass the AI copyright screen — a stamp on someone
+  // else's released lyrics would be a false ownership record.
+  const importScreen = await verifyLyrics(normalized);
+  if (importScreen.verdict === "flagged") {
+    res.status(422).json({
+      error: importScreen.reason ||
+        "These lyrics appear to reproduce a released song and cannot be stamped as your original work.",
+      code: "lyrics_flagged",
+      ...(importScreen.matchedWork ? { matchedWork: importScreen.matchedWork } : {}),
+    });
+    return;
+  }
+
   const contentHash = createHash("sha256").update(normalized, "utf8").digest("hex");
 
   try {
@@ -634,11 +677,12 @@ lyricsRouter.post("/lyrics/forensic-entry", async (req: Request, res: Response) 
 // ─── POST /api/lyrics/project ────────────────────────────────────────────────
 lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
   const {
-    aiDraft, title, genre, bpm,
+    aiDraft, content, title, genre, bpm,
     mode, storyPrompt, key, vocalType, genreTags,
     linesState, stylePrompt, generationCount,
   } = req.body as {
     aiDraft?: string;
+    content?: string;
     title?: string;
     genre?: string;
     bpm?: number;
@@ -657,6 +701,30 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
     return;
   }
 
+  // The canonical saved lyric text: the user's current (possibly edited)
+  // content when provided, otherwise the AI draft itself.
+  const savedContent = (content ?? "").trim() || aiDraft;
+
+  // GravelKing Protocol gate: lyrics entering the library must clear the AI
+  // copyright screen. Enforced HERE (not just in the UI) — the /lyrics/verify
+  // endpoint is only a preview; the cache makes verify-then-save cheap.
+  // Both the stored draft AND the canonical content are screened (identical
+  // text is a single cached screening).
+  for (const text of savedContent === aiDraft ? [savedContent] : [savedContent, aiDraft]) {
+    const projectScreen = await verifyLyrics(text);
+    if (projectScreen.verdict === "flagged") {
+      res.status(422).json({
+        error: projectScreen.reason ||
+          "These lyrics appear to reproduce a released song and cannot be saved. Rewrite the matching passage in your own words.",
+        code: "lyrics_flagged",
+        ...(projectScreen.matchedWork ? { matchedWork: projectScreen.matchedWork } : {}),
+      });
+      return;
+    }
+  }
+
+  const initialScore = savedContent === aiDraft ? 0 : authorshipScore(aiDraft, savedContent);
+
   const id = randomUUID();
   const sessionId = (req.cookies as Record<string, string>)?.["gk_session"] ?? randomUUID();
 
@@ -671,16 +739,16 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
     vocalType: vocalType ?? null,
     genreTags: genreTags ?? null,
     aiDraft,
-    currentContent: aiDraft,
+    currentContent: savedContent,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     linesState: (linesState ?? null) as any,
     stylePrompt: stylePrompt ?? null,
     // Legacy column (historic name) — mirrors stylePrompt for old readers.
     sunoPrompt: stylePrompt ?? null,
     genre: genre ?? null,
-    authorshipScore: 0,
-    isCopyrightEligible: false,
-    isAiOnly: true,
+    authorshipScore: initialScore,
+    isCopyrightEligible: initialScore >= 25,
+    isAiOnly: savedContent === aiDraft,
     generationCount: generationCount ?? 1,
     isLocked: false,
     updatedAt: new Date(),
@@ -697,10 +765,10 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
       storyPrompt: storyPrompt ?? undefined,
       aiDraft,
       stylePrompt: stylePrompt ?? undefined,
-      authorshipScore: 0,
-      isCopyrightEligible: false,
-      is_certified: false,
-      lineCount: parseToLines(aiDraft).length,
+      authorshipScore: initialScore,
+      isCopyrightEligible: initialScore >= 25,
+      is_certified: initialScore >= 25,
+      lineCount: parseToLines(savedContent).length,
     },
     id,
   );
@@ -734,6 +802,20 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
   }
   if (ownershipMismatch(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
+    return;
+  }
+
+  // GravelKing Protocol gate: revisions are saves too. Without this, a client
+  // could create a clean project then revise commercial lyrics into it —
+  // screening only at creation would be a bypassable gate.
+  const revisionScreen = await verifyLyrics(content);
+  if (revisionScreen.verdict === "flagged") {
+    res.status(422).json({
+      error: revisionScreen.reason ||
+        "These lyrics appear to reproduce a released song and cannot be saved. Rewrite the matching passage in your own words.",
+      code: "lyrics_flagged",
+      ...(revisionScreen.matchedWork ? { matchedWork: revisionScreen.matchedWork } : {}),
+    });
     return;
   }
 

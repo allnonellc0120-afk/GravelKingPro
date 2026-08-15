@@ -15,6 +15,9 @@ export const tracksTable = pgTable("tracks", {
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   submittedByUserId: varchar("submitted_by_user_id", { length: 255 }),
+  // Generated-track lyrics (exact text the AI sang, when vocalMode === "lyrics").
+  // Displayed under the Library player. Null for uploads/instrumentals.
+  lyricsText: text("lyrics_text"),
   // Label admin controls
   adminOverride: boolean("admin_override").notNull().default(false),
   overrideExpiresAt: timestamp("override_expires_at", { withTimezone: true }),

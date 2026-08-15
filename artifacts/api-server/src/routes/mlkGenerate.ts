@@ -11,6 +11,7 @@ import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { getUsageUser } from "../lib/usage";
 import { isVertexConfigured } from "../geminiVertex";
 import { generateAndMasterTrack, remixTrack, type VocalMode } from "../services/mlkOrchestrator";
+import { verifyLyrics } from "../services/lyricGuard";
 
 const mlkGenerateRouter = Router();
 
@@ -42,6 +43,7 @@ mlkGenerateRouter.post(
       artistName?: string;
       stylePrompt?: string;
       vocalMode?: string;
+      durationS?: number;
     };
     const vocalMode: VocalMode =
       body.vocalMode === "instrumental" || body.vocalMode === "random"
@@ -55,12 +57,32 @@ mlkGenerateRouter.post(
       return;
     }
 
+    // GravelKing Protocol copyright gate — server-side enforcement point.
+    // User-supplied lyrics must clear the AI copyright screen before any
+    // generation runs. The UI's /lyrics/verify preview is advisory; this is
+    // the gate a crafted client cannot skip.
+    if (vocalMode === "lyrics") {
+      const screen = await verifyLyrics(text);
+      if (screen.verdict === "flagged") {
+        res.status(422).json({
+          error: screen.reason ?? "These lyrics appear to reproduce a commercially released song.",
+          code: "lyrics_flagged",
+          ...(screen.matchedWork ? { matchedWork: screen.matchedWork } : {}),
+        });
+        return;
+      }
+    }
+
     try {
       const result = await generateAndMasterTrack(body.lyricId ?? null, text, userId, {
         title: body.title,
         artistName: body.artistName,
         stylePrompt: body.stylePrompt,
         vocalMode,
+        targetDurationS:
+          typeof body.durationS === "number" && Number.isFinite(body.durationS)
+            ? body.durationS
+            : undefined,
       });
       res.json({ success: true, ...result });
     } catch (err) {

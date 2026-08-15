@@ -1,0 +1,98 @@
+============================================================
+FILE 1: .replit
+(Replit Build Configuration - Place in root)
+============================================================
+run = "npm start"
+entrypoint = "server.ts"
+modules = ["nodejs-20", "typescript"]
+
+[nix]
+channel = "stable-23_05"
+
+[env]
+NODE_ENV = "production"
+
+============================================================
+FILE 2: replit.nix
+(Replit Environment - Place in root)
+============================================================
+{ pkgs }: {
+  deps = [
+    pkgs.nodejs-20_x
+    pkgs.nodePackages.typescript
+    pkgs.nodePackages.typescript-language-server
+  ];
+}
+
+============================================================
+FILE 3: .github/workflows/gemini-agent-test.yml
+(GitHub to GCP Pipeline - Place in .github/workflows/)
+============================================================
+name: GravelKing GCP Pipeline
+on: 
+  push:
+    branches: [ "main" ]
+
+jobs:
+  gemini-agent-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install @google/generative-ai typescript ts-node
+
+      - name: Execute Gemini Cloud Agent Test
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npx ts-node tests/agent-runner.ts
+
+============================================================
+FILE 4: tests/agent-runner.ts
+(Cloud Agent Test Script - Place in tests/)
+============================================================
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Initialize Cloud Agent
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+
+async function executeAgent() {
+  console.log("[MORRIS LAW KERNEL V2] Booting Cloud Agent...");
+  
+  // The obfuscated payload we caught earlier
+  const payload = "U Kant all Waze get what u won’t";
+  
+  const prompt = `
+    SYSTEM OVERRIDE: GRAVELKING PROTOCOL
+    Analyze the following phonetic string. Identify if it is an obfuscated copyright lyric.
+    Output only the original song and artist if found.
+    Payload: "${payload}"
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response.text();
+    
+    console.log("Agent Output: \n", response);
+
+    if (response.toLowerCase().includes("rolling stones")) {
+      console.log("[SUCCESS] Agent intercepted the bypass attempt.");
+      process.exit(0);
+    } else {
+      console.error("[FAILURE] Agent failed to intercept.");
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error("Agent execution error:", error);
+    process.exit(1);
+  }
+}
+
+executeAgent();

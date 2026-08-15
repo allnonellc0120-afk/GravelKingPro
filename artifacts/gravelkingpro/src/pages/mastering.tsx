@@ -50,6 +50,9 @@ export default function Mastering() {
   // those tracks can be remixed through the MLK v3.5 Remix Engine.
   const [gkLoaded, setGkLoaded] = useState<{ id: string; title: string } | null>(null);
   const [remixOpen, setRemixOpen] = useState(false);
+  // Direct upload is preserved but collapsed — the primary entry is
+  // Library → "Master this track".
+  const [showUpload, setShowUpload] = useState(false);
 
   const [state, setState] = useState<State>("idle");
   const [progress, setProgress] = useState(0);
@@ -222,7 +225,9 @@ export default function Mastering() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/tracks/${encodeURIComponent(gkTrack)}/download`, { credentials: "include" });
+        // Stream route: full-quality authenticated audio that does NOT consume
+        // the export quota (loading a track into the tool is not an export).
+        const res = await fetch(`/api/tracks/${encodeURIComponent(gkTrack)}/stream`, { credentials: "include" });
         if (!res.ok) throw new Error(`Could not load your generated track (HTTP ${res.status}).`);
         const blob = await res.blob();
         if (cancelled) return;
@@ -351,29 +356,60 @@ export default function Mastering() {
           />
         )}
 
-        {/* File drop / file picked */}
+        {/* Entry state — the primary path is Library → "Master this track".
+            Direct upload stays fully available but collapsed behind a toggle. */}
         {!pendingFile && !busy && state !== "done" ? (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-            <Card
-              className="border-2 border-dashed border-sky-500/30 bg-sky-500/5 hover:border-sky-500/60 hover:bg-sky-500/10 transition-all cursor-pointer"
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <CardContent className="py-14 flex flex-col items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-sky-500/10 flex items-center justify-center">
-                  <Upload className="w-7 h-7 text-sky-400" />
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+            <Card className="border border-border/40 bg-card/40">
+              <CardContent className="py-10 flex flex-col items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center">
+                  <Wand2 className="w-7 h-7 text-amber-400" />
                 </div>
                 <div className="text-center">
-                  <p className="font-medium">Drop your track here</p>
-                  <p className="text-xs text-muted-foreground mt-1">MP3, WAV, FLAC · up to 30 MB on server</p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">Files over ~30 MB may fail — try shorter clips if needed</p>
+                  <p className="font-medium">Pick a track from your library to master</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Generated tracks arrive here unmastered — open one in My Library and hit “Master this track”.
+                  </p>
                 </div>
-                <Button variant="outline" className="border-sky-500/40 text-sky-400 hover:bg-sky-500/10" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
-                  Choose File
-                </Button>
+                <Link href="/library">
+                  <Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold" data-testid="button-open-library">
+                    Open My Library
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
+
+            {!showUpload ? (
+              <button
+                type="button"
+                onClick={() => setShowUpload(true)}
+                className="w-full text-center text-xs text-sky-400 hover:text-sky-300 py-2"
+                data-testid="button-show-upload"
+              >
+                …or upload an audio file directly
+              </button>
+            ) : (
+              <Card
+                className="border-2 border-dashed border-sky-500/30 bg-sky-500/5 hover:border-sky-500/60 hover:bg-sky-500/10 transition-all cursor-pointer"
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <CardContent className="py-14 flex flex-col items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-sky-500/10 flex items-center justify-center">
+                    <Upload className="w-7 h-7 text-sky-400" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-medium">Drop your track here</p>
+                    <p className="text-xs text-muted-foreground mt-1">MP3, WAV, FLAC · up to 30 MB on server</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">Files over ~30 MB may fail — try shorter clips if needed</p>
+                  </div>
+                  <Button variant="outline" className="border-sky-500/40 text-sky-400 hover:bg-sky-500/10" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                    Choose File
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
             <input ref={fileInputRef} type="file" accept=".mp3,.wav,.flac,.m4a,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.ogg,.aiff,.aac" className="hidden" onChange={(e) => handleFile(e.target.files)} />
           </motion.div>
         ) : null}
