@@ -76,7 +76,7 @@ studioRouter.post(
   studioConcurrency,
   requireStudio,
   upload.array("tracks", 6),
-  validateAssetIngestion({ requireAudio: true }),
+  validateAssetIngestion({ requireAudio: true, commercialFingerprint: true }),
   async (req: Request, res: Response) => {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) {

@@ -102,6 +102,19 @@ async function main(): Promise<void> {
   const sid = randomBytes(32).toString("hex");
 
   const appServer = http.createServer(app);
+  const fingerprintServer = http.createServer((req, res) => {
+    const authorized = req.headers["x-api-key"] === "studio-audio-test-key";
+    req.resume();
+    req.on("end", () => {
+      res.statusCode = authorized ? 200 : 401;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(
+        authorized
+          ? { status: "no_match", provider: "acrcloud", matches: [] }
+          : { status: "unavailable", code: "UNAUTHORIZED" },
+      ));
+    });
+  });
 
   try {
     // ── Seed a monthly (Studio) session via the OIDC bearer path ───────────────
@@ -121,9 +134,14 @@ async function main(): Promise<void> {
 
     // ── Start server ────────────────────────────────────────────────────────────
     await new Promise<void>((resolve) => appServer.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => fingerprintServer.listen(0, "127.0.0.1", resolve));
     const apiPort = (appServer.address() as AddressInfo).port;
+    const fingerprintPort = (fingerprintServer.address() as AddressInfo).port;
     const base = `http://127.0.0.1:${apiPort}`;
     const auth = { Authorization: `Bearer ${sid}` };
+    process.env["FINGERPRINT_SERVICE_URL"] = `http://127.0.0.1:${fingerprintPort}`;
+    process.env["FINGERPRINT_SERVICE_API_KEY"] = "studio-audio-test-key";
+    process.env["FINGERPRINT_CLOUD_RUN_IAM"] = "false";
 
     // Fixtures
     const stereoWav = await makeTrueStereoWav(2);
@@ -236,6 +254,10 @@ async function main(): Promise<void> {
     await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid)).catch(() => {});
     await db.delete(usersTable).where(eq(usersTable.id, userId)).catch(() => {});
     await new Promise<void>((resolve) => appServer.close(() => resolve()));
+    await new Promise<void>((resolve) => fingerprintServer.close(() => resolve()));
+    delete process.env["FINGERPRINT_SERVICE_URL"];
+    delete process.env["FINGERPRINT_SERVICE_API_KEY"];
+    delete process.env["FINGERPRINT_CLOUD_RUN_IAM"];
   }
 
   // ── Report ────────────────────────────────────────────────────────────────
