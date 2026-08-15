@@ -25,7 +25,8 @@ import type { AddressInfo } from "node:net";
 import { eq } from "drizzle-orm";
 
 import app from "../app";
-import { buildCoverArgs } from "../services/mlkOrchestrator";
+import { buildCoverArgs, extractInteractionLyrics } from "../services/mlkOrchestrator";
+import type { InteractionResponse } from "../services/mlkOrchestrator";
 import { primeLyricVerificationForTest, parseScreeningResponse } from "../services/lyricGuard";
 import { saveObjectWithFallback } from "../lib/objectStorage";
 import { consumeExport, EXPORT_LIMIT } from "../lib/exportQuota";
@@ -98,6 +99,70 @@ async function main(): Promise<void> {
   const lyrics = "[Verse 1]\nGravel in my voice, thunder in the pines\nOriginal test lyrics, nothing borrowed here";
 
   try {
+    // ── 0. extractInteractionLyrics unit tests ─────────────────────────────
+    // These are pure-function checks — no network, no DB.
+    console.log("\n[0] extractInteractionLyrics: step-type filtering");
+    {
+      // 0a. Input step text must NOT be captured (would store the style prompt).
+      const inputOnly: InteractionResponse = {
+        steps: [
+          { type: "user_input", content: [{ type: "text", text: "Write a song about the mountains." }] },
+        ],
+      };
+      check(
+        "input-only response → null (triggers transcription fallback)",
+        extractInteractionLyrics(inputOnly) === null,
+        `got ${JSON.stringify(extractInteractionLyrics(inputOnly))}`,
+      );
+
+      // 0b. When both an input step and a model_output step are present, only
+      // the model_output text must be captured.
+      const mixedSteps: InteractionResponse = {
+        steps: [
+          { type: "user_input", content: [{ type: "text", text: "Write a song about the mountains." }] },
+          { type: "model_output", content: [
+            { type: "audio", data: "AAAA", mime_type: "audio/mpeg" },
+            { type: "text", text: "Under the granite sky\nWhere eagles dare to fly" },
+          ]},
+        ],
+      };
+      const mixed = extractInteractionLyrics(mixedSteps);
+      check(
+        "mixed steps: only model_output text is captured",
+        mixed === "Under the granite sky\nWhere eagles dare to fly",
+        `got ${JSON.stringify(mixed)}`,
+      );
+      check(
+        "mixed steps: input step text is excluded",
+        !mixed?.includes("Write a song about the mountains"),
+        `got ${JSON.stringify(mixed)}`,
+      );
+
+      // 0c. Top-level outputs field (model-produced by definition) is accepted.
+      const outputsField: InteractionResponse = {
+        outputs: [
+          { type: "text", text: "Rolling down the gravel road\nAnother mile, another load" },
+          { type: "audio", data: "AAAA", mime_type: "audio/mpeg" },
+        ],
+      };
+      check(
+        "top-level outputs text block is captured",
+        extractInteractionLyrics(outputsField) === "Rolling down the gravel road\nAnother mile, another load",
+        `got ${JSON.stringify(extractInteractionLyrics(outputsField))}`,
+      );
+
+      // 0d. No text content at all → null (Gemini transcription fallback path).
+      const audioOnly: InteractionResponse = {
+        steps: [
+          { type: "model_output", content: [{ type: "audio", data: "AAAA", mime_type: "audio/mpeg" }] },
+        ],
+      };
+      check(
+        "audio-only model_output → null (triggers transcription fallback)",
+        extractInteractionLyrics(audioOnly) === null,
+      );
+    }
+
     // ── 1. Cover generation helper ─────────────────────────────────────────
     console.log("\n[1] buildCoverArgs renders a real 600×600 PNG");
     {

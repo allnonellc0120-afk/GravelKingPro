@@ -36,6 +36,7 @@ import { backupCertStub } from "../lib/firestore";
 import { getGcpCredentials, getVertexAccessToken, VERTEX_LOCATION } from "../geminiVertex";
 import { logger } from "../lib/logger";
 import { sanitizeStylePrompt, rewriteBlockedPrompt } from "./promptSanitizer";
+import { transcribeWithGemini } from "../geminiTranscribe";
 
 const execFileAsync = promisify(execFile);
 const objectStorage = new ObjectStorageService();
@@ -117,18 +118,18 @@ export function hashLyrics(text: string): { normalized: string; hash: string } {
   };
 }
 
-interface InteractionContentBlock {
+export interface InteractionContentBlock {
   type?: string;
   data?: string;
   mime_type?: string;
   mimeType?: string;
   text?: string;
 }
-interface InteractionStep {
+export interface InteractionStep {
   type?: string;
   content?: InteractionContentBlock[];
 }
-interface InteractionResponse {
+export interface InteractionResponse {
   id?: string;
   name?: string;
   status?: string;
@@ -156,13 +157,44 @@ function extractInteractionAudio(body: InteractionResponse): { data: string; mim
 }
 
 /**
+ * Pull any sung-lyrics text out of a Lyria Interactions API response.
+ * The model may return a text block (lyrics it wrote) alongside the audio.
+ *
+ * Only accepts blocks from verified model-output steps (step.type ===
+ * "model_output") and the top-level `outputs` field — never input, user, or
+ * tool steps, which could contain the style prompt or tool call payloads.
+ * Returns null if no model-authored text content is present.
+ *
+ * Exported for unit-testing only — not part of the public module surface.
+ */
+export function extractInteractionLyrics(body: InteractionResponse): string | null {
+  const candidates: string[] = [];
+  for (const step of body.steps ?? []) {
+    // Skip every step that is not a verified model output.
+    if (step.type !== "model_output") continue;
+    for (const block of step.content ?? []) {
+      if (block.type === "text" && block.text?.trim()) {
+        candidates.push(block.text.trim());
+      }
+    }
+  }
+  // Top-level `outputs` is model-produced by definition.
+  for (const block of body.outputs ?? []) {
+    if (block.type === "text" && block.text?.trim()) {
+      candidates.push(block.text.trim());
+    }
+  }
+  return candidates.length > 0 ? candidates.join("\n\n") : null;
+}
+
+/**
  * Call Vertex AI Lyria 3 Pro via the Interactions API (the ONLY surface that
  * serves Lyria 3 on Vertex — :predict/:generateContent are not supported).
  * Lyria 3 requires location "global". Returns raw audio bytes (MP3).
  */
 async function generateLyriaAudio(
   input: string,
-): Promise<{ audio: Buffer; mimeType: string; model: string }> {
+): Promise<{ audio: Buffer; mimeType: string; model: string; responseLyrics?: string }> {
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
   const base = `https://aiplatform.googleapis.com/v1beta1/projects/${creds.project_id}/locations/global`;
@@ -216,7 +248,14 @@ async function generateLyriaAudio(
       `Vertex AI Lyria (${LYRIA_MODEL}) returned no audio content (status=${body.status ?? "?"}): ${bodyText.slice(0, 300)}`,
     );
   }
-  return { audio: Buffer.from(audio.data, "base64"), mimeType: audio.mime, model: LYRIA_MODEL };
+  const responseLyrics = extractInteractionLyrics(body);
+  return {
+    audio: Buffer.from(audio.data, "base64"),
+    mimeType: audio.mime,
+    model: LYRIA_MODEL,
+    /** Lyrics text returned by the model alongside the audio, if any. */
+    responseLyrics: responseLyrics ?? undefined,
+  };
 }
 
 /**
@@ -345,7 +384,7 @@ export async function generateAndMasterTrack(
       throw err;
     }
   }
-  const { audio, mimeType, model: lyriaModel } = lyriaResult;
+  const { audio, mimeType, model: lyriaModel, responseLyrics } = lyriaResult;
 
   const tmpTag = randomUUID();
   const rawExt = /mpeg|mp3/i.test(mimeType) ? "mp3" : "wav";
@@ -447,6 +486,30 @@ export async function generateAndMasterTrack(
       );
     }
 
+    // ── e) Capture AI-written lyrics for vocalMode "random" ────────────────
+    // Try the Lyria response text first (the model may include the lyrics it
+    // composed alongside the audio). Fall back to Gemini transcription of the
+    // generated audio. Both paths are fail-soft: a transcription error only
+    // means "No lyrics on file" — it never aborts the track save.
+    const AI_LYRICS_HEADER = "[AI-written lyrics]\n";
+    let aiLyricsText: string | null = null;
+    if (vocalMode === "random") {
+      if (responseLyrics) {
+        aiLyricsText = AI_LYRICS_HEADER + responseLyrics;
+        logger.info({ trackId: "pending" }, "mlkOrchestrator: captured AI lyrics from Lyria response");
+      } else {
+        try {
+          const { fullText } = await transcribeWithGemini(normalizedPath);
+          if (fullText.trim()) {
+            aiLyricsText = AI_LYRICS_HEADER + fullText.trim();
+            logger.info({ trackId: "pending" }, "mlkOrchestrator: captured AI lyrics via Gemini transcription");
+          }
+        } catch (transcribeErr) {
+          logger.warn({ err: transcribeErr }, "mlkOrchestrator: AI lyrics transcription failed (non-fatal)");
+        }
+      }
+    }
+
     // Cert stub + track + entitlement commit atomically: either the user gets
     // a fully valid, downloadable, certified track, or nothing is recorded.
     // For remixes, the parent track + parent cert ids are baked into the
@@ -477,8 +540,15 @@ export async function generateAndMasterTrack(
         status: "accepted",
         price: 0,
         submittedByUserId: userId,
-        // Exact lyrics the AI sang — displayed under the Library player.
-        lyricsText: vocalMode === "lyrics" && normalized ? normalized : null,
+        // Lyrics stored for both user-supplied (vocalMode "lyrics") and
+        // AI-written (vocalMode "random") tracks. AI-written lyrics carry the
+        // "[AI-written lyrics]" header so the player can label them correctly.
+        lyricsText:
+          vocalMode === "lyrics" && normalized
+            ? normalized
+            : vocalMode === "random" && aiLyricsText
+              ? aiLyricsText
+              : null,
       });
       await tx.insert(purchasedTracksTable).values({
         userId,
