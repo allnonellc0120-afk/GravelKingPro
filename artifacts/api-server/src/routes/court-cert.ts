@@ -8,6 +8,7 @@ import { storage } from "../storage";
 import { resolveTier } from "../lib/entitlement";
 import { checkCertUnlockQuota, consumeCertUnlock } from "../lib/certUnlocks";
 import { getUncachableStripeClient } from "../stripeClient";
+import { ensureCustomerOnCurrentAccount } from "../lib/stripeCustomers";
 
 const router = Router();
 
@@ -294,15 +295,8 @@ router.post("/court-cert/:certId/checkout", async (req: Request, res: Response) 
     }
 
     const stripe = await getUncachableStripeClient();
-    let customerId = user.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email ?? undefined,
-        metadata: { userId: user.id },
-      });
-      await storage.linkStripeCustomer(user.id, customer.id);
-      customerId = customer.id;
-    }
+    // Self-heals customer IDs minted on a previously connected Stripe account.
+    const customerId = await ensureCustomerOnCurrentAccount(stripe, user);
 
     const domain = process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost:80";
     const baseUrl = `https://${domain}`;

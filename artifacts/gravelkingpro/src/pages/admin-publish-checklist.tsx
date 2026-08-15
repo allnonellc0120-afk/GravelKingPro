@@ -100,9 +100,9 @@ const MANUAL_ITEMS = [
   {
     section: "Stripe live mode",
     items: [
-      "Stripe is in LIVE mode (not test mode) in the Replit integration dashboard",
-      "The managed webhook is active — check the Stripe dashboard → Developers → Webhooks",
-      "seed-products.ts was run against the live Stripe account (not test mode products)",
+      "Live Stripe account (GravelKing Productions) connected in the Stripe step of Replit's Publish flow — the dev workspace ALWAYS shows the sandbox; that is expected",
+      "After publishing: the managed webhook auto-creates at boot (self-healing) — confirm in Stripe dashboard → Workbench → Webhooks with Live mode selected",
+      "After publishing: /api/stripe/products on the live domain lists all 3 products with no warning — the catalog self-seeds at server boot",
       "The billing portal is enabled: Stripe dashboard → Settings → Billing Portal",
     ],
   },

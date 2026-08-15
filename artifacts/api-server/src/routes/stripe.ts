@@ -4,6 +4,7 @@ import { storage } from '../storage';
 import { db, usersTable, promotersTable, referralAttributionsTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
 import { getUncachableStripeClient } from '../stripeClient';
+import { ensureCustomerOnCurrentAccount } from '../lib/stripeCustomers';
 import { recordAnalyticsEvent } from '../analytics';
 import type Stripe from 'stripe';
 
@@ -65,21 +66,15 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
     }
 
     const dbUser = req.dbUser;
-    let customerId = dbUser.stripeCustomerId;
-    if (!customerId) {
-      const stripe = await getUncachableStripeClient();
-      const customer = await stripe.customers.create({
-        email: dbUser.email ?? undefined,
-        metadata: { userId: dbUser.id },
-      });
-      await storage.linkStripeCustomer(dbUser.id, customer.id);
-      customerId = customer.id;
-    }
+    const stripe = await getUncachableStripeClient();
+    // Self-heal customers minted on a previously connected Stripe account
+    // (e.g. the dev sandbox before the live account was attached at publish
+    // time) — their IDs don't exist on the current account and would fail
+    // checkout forever for exactly the oldest accounts.
+    const customerId = await ensureCustomerOnCurrentAccount(stripe, dbUser);
 
     const domain = process.env.REPLIT_DOMAINS?.split(',')[0] ?? 'localhost:80';
     const baseUrl = `https://${domain}`;
-
-    const stripe = await getUncachableStripeClient();
 
     // One subscription per account — creating a second one would double-bill.
     const existingSubs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 20 });
@@ -215,11 +210,20 @@ stripeRouter.post('/stripe/portal', async (req: Request, res: Response) => {
     // which an attacker-controlled page could set to their own domain.
     const appOrigin = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]?.trim() ?? "localhost"}`;
 
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: user.stripeCustomerId,
-      return_url: `${appOrigin}/account`,
-    });
-    res.json({ url: portalSession.url });
+    try {
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: user.stripeCustomerId,
+        return_url: `${appOrigin}/account`,
+      });
+      res.json({ url: portalSession.url });
+    } catch (portalErr: unknown) {
+      if ((portalErr as { code?: string })?.code === 'resource_missing') {
+        // Customer was minted on a previously connected Stripe account.
+        res.status(400).json({ error: 'No billing account found. Subscribe first.' });
+        return;
+      }
+      throw portalErr;
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: message });

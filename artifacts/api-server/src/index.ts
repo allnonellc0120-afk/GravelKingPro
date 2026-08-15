@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
+import { ensureStripeProducts } from "./lib/stripeProducts";
 import { submitSitemapToGSC } from "./lib/googleSearchConsole";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
@@ -85,6 +86,14 @@ async function initStripe() {
     logger.info({ url: webhookUrl }, "Setting up managed webhook...");
     await setupWebhook(webhookUrl);
 
+    // Self-seed the product catalog BEFORE the backfill so a freshly connected
+    // live account (publish-time Stripe step) mirrors complete products/prices.
+    try {
+      await ensureStripeProducts();
+    } catch (err: unknown) {
+      logger.error({ err }, "Stripe product self-seed failed");
+    }
+
     logger.info("Starting Stripe data backfill (runs in background)...");
     const stripeSync = await getStripeSync();
     stripeSync
@@ -93,7 +102,23 @@ async function initStripe() {
       // the real product/price/customer/subscription backfill.
       .syncBackfill({ object: "all" })
       .then(() => logger.info("Stripe data backfill complete"))
-      .catch((err: unknown) => logger.error({ err }, "Stripe backfill error"));
+      .catch((err: unknown) => {
+        // Known benign case: the local mirror still carries customer IDs
+        // minted on a previously connected Stripe account (dev sandbox before
+        // the live account was attached). Listing payment methods for those
+        // throws resource_missing. Checkout self-heals such customers via
+        // ensureCustomerOnCurrentAccount, so log this quietly instead of as
+        // an ERROR that buries real backfill failures.
+        const e = err as { code?: string; param?: string };
+        if (e?.code === "resource_missing" && e?.param === "customer") {
+          logger.warn(
+            { err },
+            "Stripe backfill skipped stale mirrored customer(s) from a previously connected account — checkout self-heals these"
+          );
+          return;
+        }
+        logger.error({ err }, "Stripe backfill error");
+      });
   } catch (err: unknown) {
     logger.error({ err }, "Failed to set up Stripe webhook/backfill");
   }
