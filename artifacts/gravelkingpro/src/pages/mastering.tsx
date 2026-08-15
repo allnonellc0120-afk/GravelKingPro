@@ -74,6 +74,10 @@ export default function Mastering() {
   const [autoThreshold, setAutoThreshold] = useState(true);
   const [autoThresholdOffset, setAutoThresholdOffset] = useState(-16.0);
   const [stylePrompt, setStylePrompt] = useState("");
+  // Global music industry identifiers — optional, only sent when certifying.
+  const [ipiNumber, setIpiNumber] = useState("");
+  const [iswc, setIswc] = useState("");
+  const [isrc, setIsrc] = useState("");
 
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
   const { quota, refresh: refreshQuota } = useExportQuota();
@@ -83,7 +87,8 @@ export default function Mastering() {
     style: string, certify: boolean, intensityVal: number,
     scFilter: "none" | "highpass" | "lowpass", scFreq: number,
     stereoLinkVal: boolean, adaptiveModeVal: "off" | "bass_aware",
-    autoThresholdVal: boolean, autoThresholdOffsetVal: number
+    autoThresholdVal: boolean, autoThresholdOffsetVal: number,
+    industryIds?: { ipi: string; iswc: string; isrc: string }
   ) => {
     setFileName(file.name);
     setResultUrl(null);
@@ -131,6 +136,10 @@ export default function Mastering() {
       fd.append("certify", "true");
       // Checking the certify box IS the ownership assertion.
       fd.append("author_assertion", "true");
+      // Global industry identifiers — bound to the cert record server-side.
+      if (industryIds?.ipi.trim())  fd.append("ipiNumber", industryIds.ipi.trim());
+      if (industryIds?.iswc.trim()) fd.append("iswc", industryIds.iswc.trim());
+      if (industryIds?.isrc.trim()) fd.append("isrc", industryIds.isrc.trim());
     }
 
     // 3-minute hard cap — keeps mobile browsers from hanging forever when the
@@ -258,7 +267,7 @@ export default function Mastering() {
   };
 
   const startMastering = () => {
-    if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn, intensity, sidechainFilter, sidechainFreq, stereoLink, adaptiveMode, autoThreshold, autoThresholdOffset);
+    if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn, intensity, sidechainFilter, sidechainFreq, stereoLink, adaptiveMode, autoThreshold, autoThresholdOffset, { ipi: ipiNumber, iswc, isrc });
   };
 
   const download = () => {
@@ -636,6 +645,47 @@ export default function Mastering() {
                 Certify this as my original work <span className="text-muted-foreground">(optional) — runs a copyright check and embeds an IP ownership certificate in the WAV. Leave off for karaoke, covers, or remixes.</span>
               </label>
             </div>
+
+            {/* ── Global Industry Identifiers — only relevant when certifying ── */}
+            {certifyOn && (
+              <div className="space-y-3 p-3 rounded-lg border border-sky-500/20 bg-sky-500/5">
+                <div>
+                  <p className="text-sm font-medium text-sky-300">Global Industry Identifiers <span className="text-muted-foreground font-normal">(optional)</span></p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Attach your IPI, ISWC, or ISRC to bind them to the track's cryptographic IP certificate.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    value={ipiNumber}
+                    onChange={(e) => setIpiNumber(e.target.value)}
+                    placeholder="IPI Number (Songwriter)"
+                    maxLength={64}
+                    data-testid="input-ipi-number"
+                    className="w-full text-xs bg-background/60 border border-sky-500/20 rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-sky-500/50"
+                  />
+                  <input
+                    type="text"
+                    value={iswc}
+                    onChange={(e) => setIswc(e.target.value)}
+                    placeholder="ISWC (Composition)"
+                    maxLength={32}
+                    data-testid="input-iswc"
+                    className="w-full text-xs bg-background/60 border border-sky-500/20 rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-sky-500/50"
+                  />
+                  <input
+                    type="text"
+                    value={isrc}
+                    onChange={(e) => setIsrc(e.target.value)}
+                    placeholder="ISRC (Recording)"
+                    maxLength={32}
+                    data-testid="input-isrc"
+                    className="w-full text-xs bg-background/60 border border-sky-500/20 rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-sky-500/50"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ── Human Authorship — Style Prompt ───────────────────────── */}
             <div className="space-y-2 p-3 rounded-lg border border-indigo-500/20 bg-indigo-500/5">

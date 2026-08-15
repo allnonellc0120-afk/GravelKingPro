@@ -16,7 +16,7 @@ interface LabelTrack {
   id: string;
   title: string;
   artistName: string;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "private";
   price: number;
   adminOverride: boolean;
   overrideExpiresAt: string | null;
@@ -117,6 +117,32 @@ function AdminLabelDashboard() {
       await load();
     } catch (e) {
       toast({ title: "Action failed", description: String(e), variant: "destructive" });
+    } finally {
+      setActing(null);
+    }
+  }
+
+  /** One-click removal from the label page — track stays in the owner's library. */
+  async function delist(id: string) {
+    await act(id, "delist");
+  }
+
+  /** Permanent delete: gone from label AND every library, audio wiped from storage. */
+  async function destroy(id: string, title: string) {
+    if (!window.confirm(`Permanently delete "${title}"? This wipes the audio and removes it from every library. Cannot be undone.`)) return;
+    setActing(id + "delete");
+    try {
+      const r = await fetch(`/api/admin/label/tracks/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (r.status === 401 || r.status === 403) { logout(); return; }
+      const data = await r.json() as { ok?: boolean; error?: string };
+      if (!r.ok) throw new Error(data.error ?? `Error ${r.status}`);
+      toast({ title: "Deleted", description: `"${title}" permanently removed.` });
+      await load();
+    } catch (e) {
+      toast({ title: "Delete failed", description: String(e), variant: "destructive" });
     } finally {
       setActing(null);
     }
@@ -277,6 +303,16 @@ function AdminLabelDashboard() {
                       {acting === t.id + "reject" ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
                       Reject
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-8"
+                      disabled={acting !== null}
+                      onClick={() => void destroy(t.id, t.title)}
+                    >
+                      {acting === t.id + "delete" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -334,10 +370,31 @@ function AdminLabelDashboard() {
                       variant="outline"
                       className="h-8 border-red-500/40 text-red-400 hover:bg-red-500/10"
                       disabled={acting !== null}
+                      onClick={() => void delist(t.id)}
+                      title="Instantly removes it from the public label page. Stays in the owner's personal library."
+                    >
+                      {acting === t.id + "delist" ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                      Remove from Label
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-red-500/40 text-red-400 hover:bg-red-500/10"
+                      disabled={acting !== null}
                       onClick={() => void act(t.id, "takedown")}
                     >
                       {acting === t.id + "takedown" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                       Take Down
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-8"
+                      disabled={acting !== null}
+                      onClick={() => void destroy(t.id, t.title)}
+                    >
+                      {acting === t.id + "delete" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      Delete
                     </Button>
                   </div>
                 </div>
@@ -398,6 +455,16 @@ function AdminLabelDashboard() {
                     >
                       {acting === t.id + "restore" ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
                       Restore
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-8"
+                      disabled={acting !== null}
+                      onClick={() => void destroy(t.id, t.title)}
+                    >
+                      {acting === t.id + "delete" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      Delete
                     </Button>
                   </div>
                 </div>

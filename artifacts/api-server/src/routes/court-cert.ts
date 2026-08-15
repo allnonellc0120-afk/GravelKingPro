@@ -32,6 +32,11 @@ router.get("/court-cert/:certId", async (req: Request, res: Response) => {
         denominator: stub.denominator,
         anchorA: 0,
         anchorB: 0,
+      },
+      {
+        ipiNumber: stub.ipiNumber ?? undefined,
+        iswc: stub.iswc ?? undefined,
+        isrc: stub.isrc ?? undefined,
       }
     );
 
@@ -73,6 +78,11 @@ router.get("/court-cert/:certId.pdf", async (req: Request, res: Response) => {
         denominator: stub.denominator,
         anchorA: 0,
         anchorB: 0,
+      },
+      {
+        ipiNumber: stub.ipiNumber ?? undefined,
+        iswc: stub.iswc ?? undefined,
+        isrc: stub.isrc ?? undefined,
       }
     );
     certificate.chainOfCustody.nominator = stub.denominator.slice(0, 32);

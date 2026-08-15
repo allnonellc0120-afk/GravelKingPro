@@ -138,6 +138,10 @@ export interface CertStubBackup {
   styleAuthorshipScore: number | null;
   certifiedAt:          string;   // ISO timestamp — legal creation record
   backupNote:           string;   // human-readable legal context
+  // Global music industry identifiers (optional, artist-supplied)
+  ipiNumber?:           string;   // IPI — songwriter/composer registry ID
+  iswc?:                string;   // ISWC — composition identifier
+  isrc?:                string;   // ISRC — recording identifier
 }
 
 /**

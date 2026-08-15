@@ -36,4 +36,17 @@ export const ipCertStubsTable = pgTable("ip_cert_stubs", {
 
   /** 0–100 human-authorship score derived from the style prompt specificity */
   styleAuthorshipScore: integer("style_authorship_score"),
+
+  // ── Global Music Industry Identifiers (optional, artist-supplied) ────────
+  // Binding these to the cryptographic cert ties the IDs to the
+  // server-authoritative ownership record in a tamper-evident way.
+
+  /** IPI (Interested Party Information) — songwriter/composer registry ID */
+  ipiNumber: text("ipi_number"),
+
+  /** ISWC (International Standard Work Code) — composition identifier */
+  iswc: text("iswc"),
+
+  /** ISRC (International Standard Recording Code) — recording identifier */
+  isrc: text("isrc"),
 });

@@ -106,7 +106,10 @@ router.get("/tracks", async (_req: Request, res: Response) => {
     const rows = await db
       .select(publicTrackCols)
       .from(tracksTable)
-      .where(eq(tracksTable.status, "accepted"))
+      .where(and(
+        eq(tracksTable.status, "accepted"),
+        eq(tracksTable.takenDown, false),
+      ))
       .orderBy(desc(tracksTable.createdAt));
     res.json({ tracks: rows });
   } catch (_err) {
@@ -124,6 +127,7 @@ router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
       .where(and(
         eq(tracksTable.artistName, artist),
         eq(tracksTable.status, "accepted"),
+        eq(tracksTable.takenDown, false),
       ))
       .orderBy(desc(tracksTable.createdAt));
     res.json({ tracks: rows });
@@ -477,7 +481,10 @@ router.get("/tracks/:id/stream", async (req: Request, res: Response) => {
 
   const trackId = req.params.id as string;
   const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, trackId));
-  if (!track || track.status !== "accepted") {
+  // No status gate here: playback is ownership-gated below (purchased_tracks).
+  // Private/generated tracks MUST stay playable in their owner's library even
+  // though they never appear on the public label page.
+  if (!track) {
     res.status(404).json({ error: "Track not found" });
     return;
   }
@@ -550,10 +557,9 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
     return;
   }
 
-  if (track.status !== "accepted") {
-    res.status(403).json({ error: "Track not yet available for download" });
-    return;
-  }
+  // No status gate: download rights come from the purchased_tracks row below.
+  // Private/generated tracks stay downloadable by their owner (export quota
+  // still applies); label status only controls the PUBLIC page + checkout.
 
   const [purchase] = await db
     .select()

@@ -28,6 +28,15 @@ export interface DualAnchorData {
   denominator: string;
 }
 
+export interface GlobalIndustryIds {
+  /** IPI (Interested Party Information) — songwriter/composer registry ID */
+  ipiNumber?: string;
+  /** ISWC (International Standard Work Code) — composition identifier */
+  iswc?: string;
+  /** ISRC (International Standard Recording Code) — recording identifier */
+  isrc?: string;
+}
+
 export interface ForensicCertificate {
   certificateId: string;
   generatedAt: string;
@@ -46,6 +55,8 @@ export interface ForensicCertificate {
     anchorA: number;
     anchorB: number;
   };
+  /** Global music industry identifiers bound to this cert (optional, artist-supplied) */
+  industryIds?: GlobalIndustryIds;
   legalDisclaimer: string;
   verificationUrl: string;
 }
@@ -63,7 +74,8 @@ function buildHandshake(certId: string, nominator: string, denominator: string):
 
 export function generateForensicCertificate(
   inputs: ForensicInputHashes,
-  anchorData: DualAnchorData
+  anchorData: DualAnchorData,
+  industryIds?: GlobalIndustryIds
 ): ForensicCertificate {
   const certificateId = randomUUID();
   const generatedAt = new Date().toISOString();
@@ -74,6 +86,9 @@ export function generateForensicCertificate(
   const contentHash = inputs.contentHash ?? null;
 
   const handshake = buildHandshake(anchorData.certId, anchorData.nominator, anchorData.denominator);
+
+  const hasIndustryIds =
+    !!(industryIds && (industryIds.ipiNumber || industryIds.iswc || industryIds.isrc));
 
   const certificate: ForensicCertificate = {
     certificateId,
@@ -93,6 +108,13 @@ export function generateForensicCertificate(
       anchorA: anchorData.anchorA,
       anchorB: anchorData.anchorB,
     },
+    ...(hasIndustryIds ? {
+      industryIds: {
+        ...(industryIds!.ipiNumber ? { ipiNumber: industryIds!.ipiNumber } : {}),
+        ...(industryIds!.iswc ? { iswc: industryIds!.iswc } : {}),
+        ...(industryIds!.isrc ? { isrc: industryIds!.isrc } : {}),
+      },
+    } : {}),
     legalDisclaimer:
       "This document serves as an immutable, timestamped cryptographic proof-of-existence and chain-of-custody log generated at signal-level export. " +
       "The dual-anchor HMAC handshake was generated exclusively by the GravelKing server and can be independently verified only by combining the track-embedded nominator with the server-retained denominator. " +
@@ -136,6 +158,14 @@ export function certificateToPdf(certificate: ForensicCertificate): Buffer {
     `Anchor A:    ${certificate.chainOfCustody.anchorA}`,
     `Anchor B:    ${certificate.chainOfCustody.anchorB}`,
     "",
+    ...(certificate.industryIds ? [
+      "GLOBAL INDUSTRY IDENTIFIERS",
+      "---------------------------",
+      `IPI Number (Songwriter):  ${certificate.industryIds.ipiNumber ?? "UNREGISTERED"}`,
+      `ISWC (Composition):       ${certificate.industryIds.iswc ?? "UNREGISTERED"}`,
+      `ISRC (Recording):         ${certificate.industryIds.isrc ?? "UNREGISTERED"}`,
+      "",
+    ] : []),
     "LEGAL FORENSICS DISCLAIMER",
     "---------------------------",
     certificate.legalDisclaimer,
