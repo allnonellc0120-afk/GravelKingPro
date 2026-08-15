@@ -249,14 +249,21 @@ function TrackPlayer({
           <div className="flex items-center gap-2 mb-3">
             <FileText className="w-4 h-4 text-amber-500" />
             <span className="text-sm font-semibold">Lyrics</span>
+            {track.lyricsText?.startsWith("[AI-written lyrics]") && (
+              <Badge variant="outline" className="text-[10px] border-violet-500/40 text-violet-400 ml-1">
+                AI-written
+              </Badge>
+            )}
           </div>
           {track.lyricsText ? (
             <pre className="text-sm font-mono text-foreground/85 whitespace-pre-wrap leading-relaxed max-h-[480px] overflow-y-auto" data-testid="text-player-lyrics">
-              {track.lyricsText}
+              {track.lyricsText.startsWith("[AI-written lyrics]\n")
+                ? track.lyricsText.slice("[AI-written lyrics]\n".length)
+                : track.lyricsText}
             </pre>
           ) : (
             <p className="text-sm text-muted-foreground italic">
-              No lyrics on file for this track — it's an instrumental, AI-sung, or an uploaded purchase.
+              No lyrics on file for this track — it's an instrumental or an uploaded purchase.
             </p>
           )}
         </div>
