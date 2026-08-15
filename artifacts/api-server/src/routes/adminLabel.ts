@@ -1,7 +1,8 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { db, tracksTable, usersTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, ne, desc } from "drizzle-orm";
+import { getObjectFileWithFallback } from "../lib/objectStorage";
 
 const router = Router();
 
@@ -30,6 +31,10 @@ async function fetchAllLabelTracks() {
     })
     .from(tracksTable)
     .leftJoin(usersTable, eq(tracksTable.submittedByUserId, usersTable.id))
+    // "private" tracks are personal-library-only (AI generations). They are
+    // not label business — listing them here would flood the queue with every
+    // user's generations. They surface only if the user submits them.
+    .where(ne(tracksTable.status, "private"))
     .orderBy(desc(tracksTable.createdAt));
 
   const now = new Date();
@@ -149,6 +154,54 @@ router.patch("/api/admin/label/tracks/:id/restore", async (req: Request, res: Re
       .update(tracksTable)
       .set({ status: "accepted", takenDown: false, updatedAt: new Date() })
       .where(eq(tracksTable.id, id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// PATCH /api/admin/label/tracks/:id/delist — one-click "Remove from Label".
+// Sets status to "private": the track vanishes from the public label page
+// instantly but STAYS in its owner's personal library (playable/downloadable).
+router.patch("/api/admin/label/tracks/:id/delist", async (req: Request, res: Response) => {
+  if (!await guard(req, res)) return;
+  try {
+    const id = String(req.params["id"]);
+    await db
+      .update(tracksTable)
+      .set({ status: "private", takenDown: false, adminOverride: false, updatedAt: new Date() })
+      .where(eq(tracksTable.id, id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// DELETE /api/admin/label/tracks/:id — permanent delete: removes the DB row
+// (purchased_tracks rows cascade, so it leaves every library too) and
+// best-effort deletes the audio/cover objects from storage.
+router.delete("/api/admin/label/tracks/:id", async (req: Request, res: Response) => {
+  if (!await guard(req, res)) return;
+  try {
+    const id = String(req.params["id"]);
+    const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, id));
+    if (!track) {
+      res.status(404).json({ error: "Track not found" });
+      return;
+    }
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
+    const keys = new Set<string>([track.audioFullKey, track.audioPreviewKey, track.coverArtKey]);
+    const mp3Sibling = track.audioFullKey.replace(/\.[^./]+$/, ".mp3");
+    if (mp3Sibling !== track.audioFullKey) keys.add(mp3Sibling);
+    // Best-effort storage cleanup — a missing object must never block the delete.
+    for (const key of keys) {
+      if (!key) continue;
+      try {
+        const file = await getObjectFileWithFallback(bucketId, key);
+        if (file) await file.delete();
+      } catch { /* object already gone or storage briefly unavailable */ }
+    }
+    await db.delete(tracksTable).where(eq(tracksTable.id, id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

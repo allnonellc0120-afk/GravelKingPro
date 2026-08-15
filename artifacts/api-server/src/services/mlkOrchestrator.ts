@@ -537,7 +537,11 @@ export async function generateAndMasterTrack(
         audioFullKey,
         audioPreviewKey,
         coverArtKey,
-        status: "accepted",
+        // PRIVATE: generated tracks land ONLY in the creator's personal
+        // library. The public label page lists "accepted" tracks exclusively —
+        // a track reaches it via submit → admin approval (or admin upload),
+        // never automatically from generation.
+        status: "private",
         price: 0,
         submittedByUserId: userId,
         // Lyrics stored for both user-supplied (vocalMode "lyrics") and

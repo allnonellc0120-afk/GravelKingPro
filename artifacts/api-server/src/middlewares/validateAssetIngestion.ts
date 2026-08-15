@@ -47,8 +47,12 @@ function normalizeMeta(value: unknown): string {
 function scanMetadata(body: Record<string, unknown>, file?: Express.Multer.File): { blacklistedHits: string[]; isrcIswcHits: string[]; labelHits: string[] } {
   const haystackParts: string[] = [];
 
-  // Include body fields
-  for (const v of Object.values(body)) {
+  // Include free-form body fields. Dedicated registry-ID fields are excluded:
+  // they are intentionally supplied for certificate binding and are not
+  // evidence that a title, prompt, or filename copied commercial metadata.
+  const registryIdFields = new Set(["ipiNumber", "iswc", "isrc"]);
+  for (const [key, v] of Object.entries(body)) {
+    if (registryIdFields.has(key)) continue;
     haystackParts.push(normalizeMeta(v));
   }
 
@@ -63,14 +67,15 @@ function scanMetadata(body: Record<string, unknown>, file?: Express.Multer.File)
     if (haystack.includes(term)) blacklistedHits.push(term);
   }
 
-  const isrcIswcHits: string[] = [];
-  let m: RegExpExecArray | null;
-  const re = new RegExp(ISRC_ISWC_RE.source, ISRC_ISWC_RE.flags);
-  while ((m = re.exec(haystack)) !== null) {
-    isrcIswcHits.push(m[0]);
-  }
+  // ISRC_ISWC_RE is intentionally non-global for one-off checks. Calling
+  // exec() repeatedly on a non-global regex never advances lastIndex and used
+  // to grow this array until the process OOM'd whenever a match existed.
+  const isrcIswcHits = haystack.match(
+    new RegExp(ISRC_ISWC_RE.source, `${ISRC_ISWC_RE.flags.replace(/g/g, "")}g`)
+  ) ?? [];
 
   const labelHits: string[] = [];
+  let m: RegExpExecArray | null;
   const labelRe = new RegExp(COMMERCIAL_LABEL_RE.source, "gi");
   while ((m = labelRe.exec(haystack)) !== null) {
     labelHits.push(m[0]);

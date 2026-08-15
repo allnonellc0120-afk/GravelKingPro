@@ -1,7 +1,11 @@
 import { pgEnum, pgTable, text, timestamp, varchar, real, uuid, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { usersTable } from "./auth";
 
-export const trackStatusEnum = pgEnum("track_status", ["pending", "accepted", "rejected"]);
+// "private" = personal-library-only (AI-generated tracks default here; never
+// shown on the public label page; owner can still play/download via library).
+// Label page shows ONLY "accepted" tracks — reached via submit → admin approve,
+// or admin direct upload.
+export const trackStatusEnum = pgEnum("track_status", ["pending", "accepted", "rejected", "private"]);
 
 export const tracksTable = pgTable("tracks", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -344,6 +344,12 @@ masterRouter.post(
     const rawStylePrompt = (asStr(req.body.stylePrompt) || "").trim().slice(0, 1000);
     const styleScore     = styleAuthorshipScore(rawStylePrompt);
 
+    // Global music industry identifiers (optional, artist-supplied).
+    // Bound to the cert record so they become part of the tamper-evident chain.
+    const ipiNumber = (asStr(req.body.ipiNumber) || "").trim().slice(0, 64) || null;
+    const iswc      = (asStr(req.body.iswc)      || "").trim().slice(0, 32) || null;
+    const isrc      = (asStr(req.body.isrc)      || "").trim().slice(0, 32) || null;
+
     // weekly+ tiers get full-length masters, capped by the rolling 30-day
     // export quota (paid is limited, not unlimited — owner directive
     // 2026-08-14). Free users get one full download, then 30-sec previews.
@@ -573,6 +579,9 @@ masterRouter.post(
           artist: artistHandle,
           stylePrompt:          rawStylePrompt || null,
           styleAuthorshipScore: styleScore.score,
+          ipiNumber,
+          iswc,
+          isrc,
         }).onConflictDoNothing();
 
         // Dual-backup to Firestore — independently subpoenable even if
@@ -585,6 +594,9 @@ masterRouter.post(
           artist:               artistHandle,
           stylePrompt:          rawStylePrompt || null,
           styleAuthorshipScore: styleScore.score,
+          ipiNumber:            ipiNumber ?? undefined,
+          iswc:                 iswc ?? undefined,
+          isrc:                 isrc ?? undefined,
           certifiedAt:          new Date().toISOString(),
         });
 
