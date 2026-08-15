@@ -37,6 +37,7 @@ import { getGcpCredentials, getVertexAccessToken, VERTEX_LOCATION } from "../gem
 import { logger } from "../lib/logger";
 import { sanitizeStylePrompt, rewriteBlockedPrompt } from "./promptSanitizer";
 import { transcribeWithGemini } from "../geminiTranscribe";
+import { scanCommercialFingerprint } from "../lib/commercialFingerprint";
 
 const execFileAsync = promisify(execFile);
 const objectStorage = new ObjectStorageService();
@@ -60,7 +61,8 @@ export type VocalMode = "lyrics" | "random" | "instrumental";
 
 export interface GenerateAndMasterResult {
   trackId: string;
-  certId: string;
+  certId: string | null;
+  certificationStatus: "sealed" | "skipped_match" | "skipped_unavailable";
   lyricHash: string;
   lyriaModel: string;
   kernelEngine: "cloud-run" | "local" | "unmastered";
@@ -411,32 +413,60 @@ export async function generateAndMasterTrack(
     // step there — never bundled into generation. (runMlkKernel remains in
     // use by the standalone mastering route.)
     const kernelEngine = "unmastered";
-    const masteredWav = preKernelBytes;
+    const masteredWav: Buffer<ArrayBufferLike> = preKernelBytes;
 
-    // ── d) Dual-Anchor HMAC certificate (identical scheme to master.ts) ─────
-    const secret = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
-    const certId = randomUUID();
+    // ── d) Commercial classification + optional dual-anchor certificate ─────
+    // ACRCloud is strictly an optional stamping dependency. Generation, vault
+    // storage, playback, and download all continue if the provider is offline,
+    // suspended, times out, or returns a match; in those cases finalWav remains
+    // unmodified and no certificate row is created.
+    const fingerprint = await scanCommercialFingerprint(normalizedPath);
+    const shouldStamp = fingerprint.status === "no_match";
+    const certificationStatus: GenerateAndMasterResult["certificationStatus"] =
+      shouldStamp
+        ? "sealed"
+        : fingerprint.status === "match"
+          ? "skipped_match"
+          : "skipped_unavailable";
+    if (!shouldStamp) {
+      logger.warn(
+        {
+          fingerprintStatus: fingerprint.status,
+          reason: fingerprint.status === "unavailable" ? fingerprint.reason : undefined,
+          vocalMode,
+        },
+        "mlkOrchestrator: generation completed without certificate stamp",
+      );
+    }
+
     const contentHash = createHash("sha256").update(preKernelBytes).digest("hex");
-    const fullHash = createHash("sha256")
-      .update(`${contentHash}|${artistHandle}|${certId}`)
-      .digest("hex");
-    const nominator = fullHash.slice(0, 32);
-    const denominator = fullHash.slice(32);
-    const handshake = createHmac("sha256", secret)
-      .update(`${certId}|${nominator}|${denominator}`)
-      .digest("hex");
-
-    const nominatorPayload = Buffer.from(
-      JSON.stringify({ v: 2, id: certId, n: nominator, a: artistHandle }),
-    );
-    const finalWav = embedLsbPayload(masteredWav, nominatorPayload);
+    let certId: string | null = null;
+    let denominator: string | null = null;
+    let handshake: string | null = null;
+    let finalWav: Buffer<ArrayBufferLike> = masteredWav;
+    if (shouldStamp) {
+      const secret = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
+      certId = randomUUID();
+      const fullHash = createHash("sha256")
+        .update(`${contentHash}|${artistHandle}|${certId}`)
+        .digest("hex");
+      const nominator = fullHash.slice(0, 32);
+      denominator = fullHash.slice(32);
+      handshake = createHmac("sha256", secret)
+        .update(`${certId}|${nominator}|${denominator}`)
+        .digest("hex");
+      const nominatorPayload = Buffer.from(
+        JSON.stringify({ v: 2, id: certId, n: nominator, a: artistHandle }),
+      );
+      finalWav = embedLsbPayload(masteredWav, nominatorPayload);
+    }
 
     // Dev-only: keep a local copy of the final master so it can be audited
     // even if the object-storage vault write fails. Never runs in production.
     if (process.env.NODE_ENV === "development") {
       const localDir = "local_masters";
       await mkdir(localDir, { recursive: true }).catch(() => {});
-      await writeFile(`${localDir}/mlk_v35_${certId}.wav`, finalWav).catch(() => {});
+      await writeFile(`${localDir}/mlk_v35_${certId ?? `unstamped_${tmpTag}`}.wav`, finalWav).catch(() => {});
     }
 
     // ── Vault: existing tracks + purchased_tracks tables → /api/library ────
@@ -519,17 +549,19 @@ export async function generateAndMasterTrack(
       : "";
     const stylePromptRecord = `${stylePrompt} [vocalMode:${vocalMode}${lyricHash ? ` lyricSha256:${lyricHash}` : ""}${lyricId ? ` lyricProject:${lyricId}` : ""}${remixMarkers}]`;
     await db.transaction(async (tx) => {
-      await tx.insert(ipCertStubsTable).values({
-        certId,
-        denominator,
-        handshake,
-        contentHash,
-        artist: artistHandle,
-        // Bind the lyric possession hash into the court record — evidence of
-        // the human-authored input that drove the generation.
-        stylePrompt: stylePromptRecord,
-        styleAuthorshipScore: null,
-      });
+      if (certId && denominator && handshake) {
+        await tx.insert(ipCertStubsTable).values({
+          certId,
+          denominator,
+          handshake,
+          contentHash,
+          artist: artistHandle,
+          // Bind the lyric possession hash into the court record — evidence of
+          // the human-authored input that drove the generation.
+          stylePrompt: stylePromptRecord,
+          styleAuthorshipScore: null,
+        });
+      }
       await tx.insert(tracksTable).values({
         id: trackId,
         title,
@@ -557,23 +589,34 @@ export async function generateAndMasterTrack(
       await tx.insert(purchasedTracksTable).values({
         userId,
         trackId,
-        stripeCheckoutSessionId: `mlk-gen-${certId}`,
+        stripeCheckoutSessionId: `mlk-gen-${certId ?? trackId}`,
       });
     });
 
     // Fire-and-forget court replica only AFTER the primary record committed.
-    backupCertStub({
-      certId,
-      denominator,
-      handshake,
-      contentHash,
-      artist: artistHandle,
-      stylePrompt: stylePromptRecord,
-      styleAuthorshipScore: null,
-      certifiedAt: new Date().toISOString(),
-    });
+    if (certId && denominator && handshake) {
+      backupCertStub({
+        certId,
+        denominator,
+        handshake,
+        contentHash,
+        artist: artistHandle,
+        stylePrompt: stylePromptRecord,
+        styleAuthorshipScore: null,
+        certifiedAt: new Date().toISOString(),
+      });
+    }
 
-    return { trackId, certId, lyricHash, lyriaModel, kernelEngine, durationS, title };
+    return {
+      trackId,
+      certId,
+      certificationStatus,
+      lyricHash,
+      lyriaModel,
+      kernelEngine,
+      durationS,
+      title,
+    };
   } finally {
     await Promise.all(
       [rawPath, outPath, previewPath, mp3Path, coverPath, normalizedPath]

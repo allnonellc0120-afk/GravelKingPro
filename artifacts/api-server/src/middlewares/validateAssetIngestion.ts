@@ -165,7 +165,11 @@ async function computeSpectralUniqueness(audioBuffer: Buffer, ext: string): Prom
  * requires an explicit author ownership assertion.
  */
 export function validateAssetIngestion(
-  options: { requireAudio?: boolean; commercialFingerprint?: boolean } = {},
+  options: {
+    requireAudio?: boolean;
+    commercialFingerprint?: boolean;
+    allowUncertifiedFallback?: boolean;
+  } = {},
 ) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const uploadedFiles: Express.Multer.File[] = req.file
@@ -268,6 +272,12 @@ export function validateAssetIngestion(
                 "commercial fingerprint scan temporarily unavailable",
               );
               (req as Request & { ingestionValidation?: IngestionValidationResult }).ingestionValidation = result;
+              if (options.allowUncertifiedFallback === true) {
+                // Provider availability controls only whether a stamp can be
+                // emitted. The underlying audio tool must still run.
+                next();
+                return;
+              }
               res.status(503).json({
                 success: false,
                 code: "SCAN_TEMPORARILY_UNAVAILABLE",
@@ -293,6 +303,11 @@ export function validateAssetIngestion(
         } catch (err) {
           logger.warn({ err, filename: audioFile.originalname }, "could not scan uploaded audio");
           (req as Request & { ingestionValidation?: IngestionValidationResult }).ingestionValidation = result;
+          result.metadata.commercialFingerprint.status = "unavailable";
+          if (options.allowUncertifiedFallback === true) {
+            next();
+            return;
+          }
           res.status(503).json({
             success: false,
             code: "SCAN_TEMPORARILY_UNAVAILABLE",
@@ -314,6 +329,14 @@ export function validateAssetIngestion(
     (req as Request & { ingestionValidation?: IngestionValidationResult }).ingestionValidation = result;
 
     if (!result.passed) {
+      if (
+        options.allowUncertifiedFallback === true &&
+        result.metadata.commercialFingerprint.status === "match"
+      ) {
+        // A catalog match suppresses the stamp, not the mastering operation.
+        next();
+        return;
+      }
       logger.warn({ result }, "ingestion validation blocked asset");
       res.status(422).json({
         success: false,

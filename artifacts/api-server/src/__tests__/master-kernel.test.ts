@@ -220,6 +220,33 @@ async function main(): Promise<void> {
       const res = await fetch(`${base}/api/kernel/master`, { method: "POST", headers: auth, body: fd });
       check("no audio file: HTTP 400", res.status === 400, `got ${res.status}`);
     }
+
+    // ── 3. ACRCloud outage suppresses only the stamp, never mastering ────────
+    console.log("\n[5] certify=true with fingerprint service unavailable");
+    {
+      delete process.env.FINGERPRINT_SERVICE_URL;
+      delete process.env.FINGERPRINT_SERVICE_API_KEY;
+      const res = await fetch(`${base}/api/kernel/master`, {
+        method: "POST",
+        headers: auth,
+        body: buildForm({
+          preset: "baseline",
+          certify: "true",
+          author_assertion: "true",
+          artist: "Availability Test",
+          stylePrompt: "Original two-tone test composition",
+        }, stereoWav),
+      });
+      check("ACR unavailable: mastering still HTTP 200", res.status === 200, `got ${res.status}`);
+      check(
+        "ACR unavailable: response explicitly says stamp skipped",
+        res.headers.get("x-gk-certification") === "skipped-acr-unavailable",
+        String(res.headers.get("x-gk-certification")),
+      );
+      check("ACR unavailable: no cert hash emitted", res.headers.get("x-gk-cert-hash") === null);
+      const buf = Buffer.from(await res.arrayBuffer());
+      await assertDecodableWav("ACR unavailable fallback", buf);
+    }
   } finally {
     await new Promise<void>((resolve) => appServer.close(() => resolve()));
   }

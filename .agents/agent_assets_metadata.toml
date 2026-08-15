@@ -739,3 +739,10 @@ uri = "file://attached_assets/generated_audio/promo_v3/soundtrack.mp3"
 type = "audio"
 title = "promo_v3_trap_soundtrack"
 description = "Generated music: Hard-hitting trap hip hop instrumental, 2020s production style, 808 bass drops, crisp snares, atmospheric pads, dark cinematic energy, modern music app promo vibe, builds in intensit…"
+
+[[outputs]]
+id = "A6_68PF0vaDE1ugkua2l8"
+uri = "file://exports/gravelking-live-backend-architecture.pdf"
+type = "pdf"
+title = "GravelKing Pro — Live Backend Architecture"
+description = "Four-page A3 landscape vector PDF mapping the code-audited mastering, lyrics, AI generation, ACRCloud classification, persistence, and certificate-stamping pipelines."
