@@ -28,6 +28,7 @@ import app from "../app";
 import { buildCoverArgs } from "../services/mlkOrchestrator";
 import { primeLyricVerificationForTest, parseScreeningResponse } from "../services/lyricGuard";
 import { saveObjectWithFallback } from "../lib/objectStorage";
+import { consumeExport, EXPORT_LIMIT } from "../lib/exportQuota";
 import {
   db,
   usersTable,
@@ -555,6 +556,26 @@ async function main(): Promise<void> {
         before!.monthlyExports === after!.monthlyExports,
         `${before!.monthlyExports} → ${after!.monthlyExports}`,
       );
+
+      // Concurrent consumers must be serialized by the atomic UPDATE; no
+      // simultaneous download burst may exceed the shared rolling cap.
+      await db.update(usersTable).set({
+        monthlyExports: 0,
+        exportPeriodStart: new Date(),
+      }).where(eq(usersTable.id, owner.userId));
+      const [quotaUser] = await db.select().from(usersTable).where(eq(usersTable.id, owner.userId));
+      const results = await Promise.all(
+        Array.from({ length: EXPORT_LIMIT + 8 }, () => consumeExport(quotaUser)),
+      );
+      const allowed = results.filter((result) => result.allowed);
+      const denied = results.filter((result) => !result.allowed);
+      const [quotaAfter] = await db
+        .select({ monthlyExports: usersTable.monthlyExports })
+        .from(usersTable)
+        .where(eq(usersTable.id, owner.userId));
+      check("simultaneous exports allow exactly 20", allowed.length === EXPORT_LIMIT, `${allowed.length} allowed`);
+      check("simultaneous exports deny the overflow", denied.length === 8, `${denied.length} denied`);
+      check("database counter never exceeds 20", quotaAfter?.monthlyExports === EXPORT_LIMIT, String(quotaAfter?.monthlyExports));
     }
   } finally {
     // ── Cleanup (FK-safe order) ───────────────────────────────────────────────
