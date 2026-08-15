@@ -1,14 +1,13 @@
 [
-  {"id":"0e3774dd-8b9c-43d9-8845-2bb73c8ec011","position":1,"filepath":"src/pages/slides/Cover.tsx","title":"GravelKing Pro — Studio, Proof & Release","description":"Combined release, F6S, B2B, and certificate-pipeline briefing.","speakerNotes":""},
-  {"id":"c78cbd48-3f1f-42d4-886f-07f84cbe0d12","position":2,"filepath":"src/pages/slides/ReleaseCommand.tsx","title":"Release command center","description":"Verified code readiness and open production proofs.","speakerNotes":""},
-  {"id":"6e507bb0-3c15-4b77-8ca3-ea88cd7c0d13","position":3,"filepath":"src/pages/slides/Changed.tsx","title":"What changed — and what did not","description":"Studio and Vocal Booth certificate boundary.","speakerNotes":""},
-  {"id":"6454b355-fd61-4423-a775-7c425a8e0d14","position":4,"filepath":"src/pages/slides/ArtifactStatus.tsx","title":"What is live, stopped, and quarantined","description":"Artifact and workflow disposition.","speakerNotes":""},
-  {"id":"340195fc-22c7-4ed2-9396-aa57f46c0d15","position":5,"filepath":"src/pages/slides/CreatorPipeline.tsx","title":"The creator pipeline","description":"Eight-stage creator workflow with Studio span.","speakerNotes":""},
-  {"id":"279d512d-cbe9-4c43-b4a6-a222b3da0d16","position":6,"filepath":"src/pages/slides/CertCreation.tsx","title":"How a certificate is created","description":"Certificate creation and signal-stamp flow.","speakerNotes":""},
-  {"id":"49812f1c-7e18-460e-af0c-9244468e0d17","position":7,"filepath":"src/pages/slides/CertStripe.tsx","title":"How certificate access and Stripe work","description":"Owner-only unlock and payment path.","speakerNotes":""},
-  {"id":"631a17cf-df8c-4bb1-8620-c31c348e0d18","position":8,"filepath":"src/pages/slides/SearchVerify.tsx","title":"How search and verification work","description":"Catalog screening versus public provenance verification.","speakerNotes":""},
-  {"id":"add90ea0-9db3-41a8-b0fb-d9be94990d19","position":9,"filepath":"src/pages/slides/F6S.tsx","title":"F6S company pitch","description":"Company pitch with disciplined claims.","speakerNotes":""},
-  {"id":"a8d9cd35-aecb-4fe1-8e6b-75f2c4ee0d20","position":10,"filepath":"src/pages/slides/B2B.tsx","title":"B2B partner pitch","description":"Enterprise use cases and integration path.","speakerNotes":""},
-  {"id":"d83abc2e-c914-45e7-8e61-c08ae6fc0d21","position":11,"filepath":"src/pages/slides/BusinessConcept.tsx","title":"Business concept and revenue engine","description":"Business model and north-star metrics.","speakerNotes":""},
-  {"id":"d5643849-6956-4484-b5e2-a5c986870d22","position":12,"filepath":"src/pages/slides/RepublishGate.tsx","title":"Republish gate and next move","description":"Final checklist and release decision.","speakerNotes":""}
+  {"id":"0e3774dd-8b9c-43d9-8845-2bb73c8ec011","position":1,"filepath":"src/pages/slides/Cover.tsx","title":"GravelKing Productions — F6S Investor Deck","description":"Every track certified, every AI credited, every claim checked.","speakerNotes":""},
+  {"id":"1a2b3c4d-1111-4a2b-9c3d-0e1f2a3b4c01","position":2,"filepath":"src/pages/slides/Problem.tsx","title":"The problem","description":"AI flooded music with tracks nobody can attribute.","speakerNotes":""},
+  {"id":"1a2b3c4d-2222-4a2b-9c3d-0e1f2a3b4c02","position":3,"filepath":"src/pages/slides/Solution.tsx","title":"The solution","description":"One platform: create, master, certify, verify.","speakerNotes":""},
+  {"id":"1a2b3c4d-3333-4a2b-9c3d-0e1f2a3b4c03","position":4,"filepath":"src/pages/slides/Provenance.tsx","title":"Provenance — human part, AI part, clean-hands check","description":"The core product update: attribution and screening on every certificate.","speakerNotes":""},
+  {"id":"1a2b3c4d-4444-4a2b-9c3d-0e1f2a3b4c04","position":5,"filepath":"src/pages/slides/Moat.tsx","title":"The moat","description":"Four layers competitors have to rebuild from scratch.","speakerNotes":""},
+  {"id":"1a2b3c4d-5555-4a2b-9c3d-0e1f2a3b4c05","position":6,"filepath":"src/pages/slides/BusinessModel.tsx","title":"Business model","description":"Subscription, per-certificate, and B2B licensing.","speakerNotes":""},
+  {"id":"1a2b3c4d-6666-4a2b-9c3d-0e1f2a3b4c06","position":7,"filepath":"src/pages/slides/Path30.tsx","title":"30-day sprint","description":"First 10 paying subscribers, organic only.","speakerNotes":""},
+  {"id":"1a2b3c4d-7777-4a2b-9c3d-0e1f2a3b4c07","position":8,"filepath":"src/pages/slides/Path90.tsx","title":"90-day runway","description":"50 subscribers and the first two license deals.","speakerNotes":""},
+  {"id":"1a2b3c4d-8888-4a2b-9c3d-0e1f2a3b4c08","position":9,"filepath":"src/pages/slides/Path365.tsx","title":"Year-one milestone","description":"100 subscribers, five licenses, $10K MRR run rate.","speakerNotes":""},
+  {"id":"1a2b3c4d-9999-4a2b-9c3d-0e1f2a3b4c09","position":10,"filepath":"src/pages/slides/Valuation.tsx","title":"Valuation of GravelKing Productions","description":"Asset-based view with founder-estimated ranges.","speakerNotes":""},
+  {"id":"1a2b3c4d-aaaa-4a2b-9c3d-0e1f2a3b4c10","position":11,"filepath":"src/pages/slides/Ask.tsx","title":"The ask","description":"$250K seed — use of funds and milestones.","speakerNotes":""}
 ]
