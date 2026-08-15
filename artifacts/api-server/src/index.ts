@@ -126,6 +126,14 @@ async function migrateAppSchema() {
         ADD COLUMN IF NOT EXISTS regen_instruction  text
     `);
 
+    // Generated tracks now persist the sung lyrics for the library player
+    // (owner-only exposure). Additive + idempotent so databases created
+    // before this column upgrade safely on startup.
+    await db.execute(sql`
+      ALTER TABLE tracks
+        ADD COLUMN IF NOT EXISTS lyrics_text text
+    `);
+
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS lyric_timeline_blocks (
         id             text        PRIMARY KEY,

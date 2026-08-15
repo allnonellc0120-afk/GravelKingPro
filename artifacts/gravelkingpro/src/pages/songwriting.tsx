@@ -1,17 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import {
-  Sparkles, Music2, Edit3, Lock, Copy, ExternalLink,
-  CheckCircle2, AlertTriangle, Loader2, RotateCcw,
-  FileText, Clock, Wand2, Check, RefreshCw, Plus, Trash2,
-  ChevronRight, Mic, X, Share2, Shield, ShieldCheck, Fingerprint, ArrowRight,
+  Sparkles, Music2, Lock, CheckCircle2, AlertTriangle, Loader2,
+  FileText, Mic, Shield, ShieldCheck, ShieldAlert, Fingerprint,
+  ArrowRight, Clock3, Wand2, RotateCcw,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +19,9 @@ import { authorshipScore as computeAuthorshipScore } from "@workspace/authorship
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type VocalMode = "lyrics" | "random" | "instrumental";
+type VerifyState = "idle" | "checking" | "clear" | "flagged";
+
 type LineState = {
   id: string;
   type: "section" | "lyric" | "empty";
@@ -28,265 +29,40 @@ type LineState = {
   aiOriginal: string;
   isHumanEdited: boolean;
   sectionContext: string;
-  timestampMs?: number;
-};
-
-type TimelineBlock = {
-  id: string;
-  timestampMs: number;
-  label: string;
-  sectionType: string;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GENRES = [
-  "Hip-Hop", "R&B", "Pop", "Trap", "Soul", "Gospel",
-  "Country", "Rock", "Afrobeats", "Reggae", "Lo-Fi", "EDM",
-];
-
-// Sub-genre suggestions for the free-text Genre / Sub-genre input (simple mode).
-const GENRE_SUGGESTIONS = [
-  ...GENRES,
-  "Hip-Hop/Boom Bap", "Hip-Hop/Drill", "Country/Americana",
-  "Pop-Punk", "Metalcore", "Outlaw Grunge", "Neo-Soul", "Trap/Rage",
-];
-
-const EMOTION_SUGGESTIONS = [
-  "Gritty", "Melancholic", "Hostile", "Nostalgic",
-  "Defiant", "Triumphant", "Heartbroken", "Menacing", "Hopeful",
-];
-
-const DELIVERY_SUGGESTIONS = [
-  "Raw/Rasp", "Rapid-fire Cadence", "Melodic", "Conversational",
-  "Half-sung/Half-rapped", "Whispered intensity", "Belted power",
-];
-
-const STRUCTURE_OPTIONS = [
-  "Verse-Chorus-Verse", "Include Bridge", "Complex/Internal Rhymes", "Raw/Freeform",
+const DURATIONS = [
+  { s: 60, label: "1:00" },
+  { s: 90, label: "1:30" },
+  { s: 120, label: "2:00" },
+  { s: 150, label: "2:30" },
+  { s: 180, label: "3:00" },
+  { s: 240, label: "4:00" },
 ] as const;
 
-/** Pull a usable numeric BPM out of a free-text rhythm description
- *  ("90 BPM - Heavy Bounce" → 90). Undefined when no number is present,
- *  so we never send NaN→null to the API. */
-function bpmNumberFrom(value: string): number | undefined {
-  const m = value.match(/\d{2,3}/);
-  return m ? parseInt(m[0], 10) : undefined;
-}
-
-const SECTION_TYPES = ["intro", "verse", "pre-chorus", "chorus", "bridge", "outro"];
-
-const KEYS = [
-  "C Major", "C Minor", "D Major", "D Minor", "E Major", "E Minor",
-  "F Major", "F Minor", "G Major", "G Minor", "A Major", "A Minor",
-  "B Major", "B Minor", "C# Minor", "F# Minor", "Bb Major", "Eb Major",
-];
-
-const VOCAL_TYPES = [
-  "Male tenor", "Male baritone", "Male bass",
-  "Female soprano", "Female mezzo-soprano", "Female alto",
-  "Rapper (male)", "Rapper (female)", "R&B vocalist",
-];
+const DRAFT_KEY = "gk:songwriting:v2";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function msToTimestamp(ms: number) {
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return `${m}:${String(s).padStart(2, "0")}`;
+function textToLines(aiDraft: string, current: string): LineState[] {
+  const draftLines = aiDraft.split("\n");
+  return current.split("\n").map((text, i) => {
+    const orig = draftLines[i] ?? "";
+    const isSection = /^\s*\[.+\]\s*$/.test(text);
+    return {
+      id: `l${i}`,
+      type: text.trim() === "" ? "empty" : isSection ? "section" : "lyric",
+      text,
+      aiOriginal: orig,
+      isHumanEdited: text !== orig,
+      sectionContext: "verse",
+    } as LineState;
+  });
 }
 
-function timestampToMs(ts: string): number {
-  const parts = ts.split(":").map(Number);
-  if (parts.length === 2) return (parts[0]! * 60 + parts[1]!) * 1000;
-  return 0;
-}
-
-function lyricsFromLines(lines: LineState[]): string {
-  return lines.map((l) => (l.type === "section" ? l.text : l.type === "empty" ? "" : l.text)).join("\n");
-}
-
-function getLastWord(text: string): string {
-  const words = text.trim().split(/\s+/);
-  return words[words.length - 1]?.replace(/[^\w]/g, "") ?? "";
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-/**
- * Self-contained "Generate with MLK v3.5" button (Task #73).
- * Sends the lyrics to POST /api/mlk/v35/generate-master, which generates the
- * song with Vertex AI Lyria, masters it through the real MLK v3.5 kernel,
- * issues a Dual-Anchor IP cert, and saves the track to the user's vault.
- * On success it redirects straight into the EXISTING Mastering Tool
- * (/mastering?gkTrack=…) — no new player or screen here. The Mastering Tool
- * owns all playback, mastering, and download UI for the generated track.
- */
-function MlkGenerateCard({
-  lyrics,
-  projectId,
-  stylePrompt,
-  vocalMode,
-  onVocalModeChange,
-}: {
-  lyrics: string;
-  projectId: string | null;
-  stylePrompt: string;
-  vocalMode: "lyrics" | "random" | "instrumental";
-  onVocalModeChange: (mode: "lyrics" | "random" | "instrumental") => void;
-}) {
-  const [, navigate] = useLocation();
-  const { isPro, isDeveloper } = useAppState();
-  const { toast } = useToast();
-  // Admin/developer accounts (email-allowlisted on the server, surfaced as
-  // isDeveloper) ALWAYS bypass the Pro paywall regardless of Stripe status.
-  const hasAccess = isPro || isDeveloper;
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const lyricsOn = vocalMode !== "instrumental";
-  const needsLyrics = vocalMode === "lyrics";
-
-  const handleGenerate = async () => {
-    // Strict UI paywall: generation + kernel mastering is Pro-only.
-    if (!hasAccess) {
-      toast({
-        title: "GravelKing Pro required",
-        description: "Upgrade to GravelKing Pro to generate and master AI tracks.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/mlk/v35/generate-master", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ lyricId: projectId, text: needsLyrics ? lyrics : "", stylePrompt, vocalMode }),
-      });
-      const data = (await res.json()) as { error?: string; code?: string; trackId?: string; title?: string };
-      if (!res.ok || !data.trackId) {
-        const msg = data.error || `Generation failed (HTTP ${res.status})`;
-        // Upstream AI safety filter rejected the prompt — coach, don't scare.
-        if (res.status === 422 || data.code === "content_blocked") {
-          toast({ title: "Prompt flagged", description: msg, variant: "destructive" });
-        }
-        throw new Error(msg);
-      }
-      // Force the user into the Mastering Tool pipeline with the generated track.
-      navigate(`/mastering?gkTrack=${encodeURIComponent(data.trackId)}&gkTitle=${encodeURIComponent(data.title ?? "Generated Track")}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Generation failed.");
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-3">
-      {/* Vocal toggle: ON = sung vocals (own or model-written lyrics), OFF = instrumental */}
-      <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <Mic className={`w-4 h-4 ${lyricsOn ? "text-emerald-400" : "text-muted-foreground"}`} />
-          <span className="text-xs font-semibold">Lyrics {lyricsOn ? "ON" : "OFF"}</span>
-        </div>
-        <Switch
-          checked={lyricsOn}
-          onCheckedChange={(on) => onVocalModeChange(on ? "lyrics" : "instrumental")}
-          aria-label="Lyrics on or off"
-        />
-      </div>
-      {lyricsOn && (
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Lyric source">
-          {([
-            { value: "lyrics", label: "My Lyrics" },
-            { value: "random", label: "Random Lyrics" },
-          ] as const).map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={vocalMode === opt.value}
-              onClick={() => onVocalModeChange(opt.value)}
-              className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
-                vocalMode === opt.value
-                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                  : "border-border/40 bg-background/40 text-muted-foreground hover:border-emerald-500/30"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-      <Button
-        onClick={() => void handleGenerate()}
-        disabled={isGenerating || (needsLyrics && lyrics.trim().length < 5)}
-        aria-disabled={!hasAccess}
-        className={`w-full font-bold ${hasAccess
-          ? "bg-emerald-500 hover:bg-emerald-600 text-black"
-          : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed hover:bg-muted"}`}
-      >
-        {isGenerating
-          ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating your track (2–3 min)…</>
-          : <><Music2 className="w-4 h-4 mr-2" />Generate with MLK v3.5{!hasAccess && " — Pro"}</>}
-      </Button>
-      {isGenerating && (
-        <p className="text-[10px] font-medium text-sky-300/80 flex items-center justify-center gap-1">
-          <Sparkles className="w-3 h-3" /> AI Optimized for Production Sound
-        </p>
-      )}
-      <p className="text-[11px] text-muted-foreground leading-relaxed text-center">
-        {!hasAccess
-          ? "Upgrade to GravelKing Pro to generate and master AI tracks."
-          : vocalMode === "instrumental"
-            ? "A pure instrumental is generated from your style prompt and IP-certified, then dropped unmastered into the Mastering Tool — you choose when to master."
-            : vocalMode === "random"
-              ? "The AI writes and sings its own lyrics to match your style prompt and IP-certifies the track, then drops it unmastered into the Mastering Tool — you choose when to master."
-              : "Your lyrics are hash-stamped, sung by AI in-house, and IP-certified — then the unmastered track drops into the Mastering Tool, where mastering is your call."}
-      </p>
-      {error && (
-        <p className="text-xs text-rose-400 flex items-start gap-1.5">
-          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function AuthorshipMeter({ score }: { score: number }) {
-  const eligible = score >= 25;
-  const isFullHuman = score === 100;
-  const color = eligible ? "bg-emerald-500" : score >= 12 ? "bg-amber-500" : "bg-rose-500";
-
-  return (
-    <div className="rounded-xl border border-border/40 bg-card/60 p-4 space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-semibold flex items-center gap-2">
-          {eligible ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Edit3 className="w-4 h-4 text-amber-500" />}
-          Copyright Eligibility Goal
-        </span>
-        <span className={`font-bold ${eligible ? "text-emerald-400" : "text-muted-foreground"}`}>{score}%</span>
-      </div>
-      <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${Math.max(2, score)}%` }} />
-      </div>
-      <p className={`text-xs font-semibold ${eligible ? "text-emerald-400" : "text-rose-400"}`}>
-        {isFullHuman
-          ? "Human Ownership Locked — 100% original."
-          : eligible
-            ? "Copyright Registered Goal Achieved! Human Ownership Locked."
-            : `AI Draft Status (Public Domain Only) — ${Math.max(0, 25 - score)}% more edits needed.`}
-      </p>
-      {eligible && (
-        <p className="text-[10px] text-muted-foreground/60 border-t border-border/30 pt-2">
-          Instrumental tracking locked to AI/Public Domain. Lyrics protected.
-        </p>
-      )}
-    </div>
-  );
-}
+// ─── Shared sub-components ────────────────────────────────────────────────────
 
 function ProGate({ feature }: { feature: string }) {
   return (
@@ -298,240 +74,60 @@ function ProGate({ feature }: { feature: string }) {
   );
 }
 
-function StepBadge({ n, label }: { n: string; label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center shrink-0">{n}</span>
-      <span className="text-sm font-semibold">{label}</span>
-    </div>
-  );
-}
-
-// ── Timeline canvas (Advanced mode) ───────────────────────────────────────────
-
-function TimelineCanvas({ blocks, onChange }: { blocks: TimelineBlock[]; onChange: (b: TimelineBlock[]) => void }) {
-  const addBlock = () => {
-    const lastMs = blocks.length > 0 ? (blocks[blocks.length - 1]?.timestampMs ?? 0) + 30000 : 0;
-    onChange([...blocks, { id: crypto.randomUUID(), timestampMs: lastMs, label: "", sectionType: "verse" }]);
-  };
-  const updateBlock = (id: string, patch: Partial<TimelineBlock>) => {
-    onChange(blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-  };
-  const removeBlock = (id: string) => onChange(blocks.filter((b) => b.id !== id));
-
-  return (
-    <div className="space-y-2">
-      {blocks.map((block) => (
-        <div key={block.id} className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/40 px-3 py-2">
-          <Mic className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <Input
-            value={msToTimestamp(block.timestampMs)}
-            onChange={(e) => updateBlock(block.id, { timestampMs: timestampToMs(e.target.value) })}
-            className="w-16 text-xs bg-transparent border-0 p-0 font-mono focus-visible:ring-0 text-amber-400"
-            placeholder="0:00"
-          />
-          <select
-            value={block.sectionType}
-            onChange={(e) => updateBlock(block.id, { sectionType: e.target.value })}
-            className="text-xs bg-transparent border border-border/40 rounded px-2 py-1 focus:outline-none text-muted-foreground"
-          >
-            {SECTION_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <Input
-            value={block.label}
-            onChange={(e) => updateBlock(block.id, { label: e.target.value })}
-            placeholder="e.g. Violin Intro, Heavy Metal Verse"
-            className="flex-1 text-xs bg-transparent border-0 p-0 focus-visible:ring-0"
-          />
-          <button onClick={() => removeBlock(block.id)} className="text-muted-foreground hover:text-rose-400 transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ))}
-      <Button variant="ghost" size="sm" onClick={addBlock} className="w-full border border-dashed border-border/40 text-muted-foreground hover:text-amber-400 hover:border-amber-500/40">
-        <Plus className="w-3.5 h-3.5 mr-1.5" />Add Timeline Block
-      </Button>
-    </div>
-  );
-}
-
-// ── Variation picker overlay ───────────────────────────────────────────────────
-
-function VariationPicker({
-  variations, instruction, onPick, onClose,
-}: {
-  variations: string[];
-  instruction: string;
-  onPick: (v: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-border/40 bg-card shadow-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="font-semibold text-sm flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-500" />3 Variations
-          </p>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-        </div>
-        {instruction && (
-          <p className="text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-lg">"{instruction}"</p>
-        )}
-        <div className="space-y-2">
-          {variations.map((v, i) => (
-            <button
-              key={i}
-              onClick={() => onPick(v)}
-              className="w-full text-left rounded-xl border border-border/40 bg-background/60 px-4 py-3 text-sm hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors group"
-            >
-              <span className="text-[10px] text-amber-500/60 font-bold uppercase tracking-wide block mb-1">Option {i + 1}</span>
-              <span className="text-foreground/90">{v}</span>
-              <ChevronRight className="w-3.5 h-3.5 text-amber-500 float-right mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Rhyming tray ──────────────────────────────────────────────────────────────
-
-function RhymingTray({
-  rhymes, word, isLoading, onInsert,
-}: {
-  rhymes: string[]; word: string; isLoading: boolean; onInsert: (w: string) => void;
-}) {
-  if (!word && !isLoading) return null;
-  return (
-    <div className="sticky bottom-0 bg-card/95 backdrop-blur-md border-t border-border/40 px-4 py-2 z-40">
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-        <span className="text-[10px] text-muted-foreground/60 shrink-0">Rhymes with <strong className="text-amber-500/70">{word}</strong>:</span>
-        {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500/60 shrink-0" />}
-        {rhymes.map((r) => (
-          <button
-            key={r}
-            onClick={() => onInsert(r)}
-            className="shrink-0 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-medium hover:bg-amber-500/25 transition-colors"
-          >
-            {r}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Single lyric line row ──────────────────────────────────────────────────────
-
-function LyricLineRow({
-  line, isPro, isEditing, editText, remixMode, remixInstruction,
-  isRemixing, onStartEdit, onEditChange, onSaveEdit, onCancelEdit,
-  onStartRemix, onRemixInstructionChange, onTriggerRemix,
-  onFocus, onInsertRhyme, rhymeInsertTarget,
-}: {
-  line: LineState;
-  isPro: boolean;
-  isEditing: boolean;
-  editText: string;
-  remixMode: boolean;
-  remixInstruction: string;
-  isRemixing: boolean;
-  onStartEdit: () => void;
-  onEditChange: (v: string) => void;
-  onSaveEdit: () => void;
-  onCancelEdit: () => void;
-  onStartRemix: () => void;
-  onRemixInstructionChange: (v: string) => void;
-  onTriggerRemix: () => void;
-  onFocus: (lastWord: string) => void;
-  onInsertRhyme: (word: string) => void;
-  rhymeInsertTarget: string | null;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) inputRef.current.focus();
-  }, [isEditing]);
-
-  if (line.type === "section") {
+/**
+ * Copyright verification chip — honest language: this is an AI screening for
+ * recognizable commercial lyrics (incl. phonetic disguises), not a commercial
+ * copyright-database lookup.
+ */
+function VerifyBadge({ state, matchedWork }: { state: VerifyState; matchedWork?: string }) {
+  if (state === "idle") {
     return (
-      <p className="text-xs font-bold text-amber-500 uppercase tracking-widest pt-4 pb-1 select-none">
-        {line.text}
-      </p>
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Shield className="w-3.5 h-3.5" /> Not verified yet
+      </span>
     );
   }
-  if (line.type === "empty") return <div className="h-2" />;
-
+  if (state === "checking") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-sky-300">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" /> AI copyright screen running…
+      </span>
+    );
+  }
+  if (state === "clear") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+        <ShieldCheck className="w-3.5 h-3.5" /> Cleared by AI screening
+      </span>
+    );
+  }
   return (
-    <div className={`group relative rounded-lg transition-colors ${isEditing || remixMode ? "bg-amber-500/5 border border-amber-500/20" : "hover:bg-white/3"}`}>
-      {isEditing ? (
-        <div className="px-3 py-2 space-y-2">
-          <input
-            ref={inputRef}
-            value={editText}
-            onChange={(e) => onEditChange(e.target.value)}
-            onFocus={() => {
-              const prev = getLastWord(line.text);
-              onFocus(prev);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); onSaveEdit(); }
-              if (e.key === "Escape") onCancelEdit();
-            }}
-            className="w-full bg-transparent text-sm text-foreground font-mono focus:outline-none"
-          />
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={onSaveEdit} className="h-6 px-2 text-xs bg-amber-500 hover:bg-amber-600 text-black">Save</Button>
-            <Button size="sm" variant="ghost" onClick={onCancelEdit} className="h-6 px-2 text-xs">Cancel</Button>
-          </div>
-        </div>
-      ) : remixMode ? (
-        <div className="px-3 py-2 space-y-2">
-          <p className="text-sm text-muted-foreground/60 italic font-mono">{line.text}</p>
-          <p className="text-xs text-amber-500/70 font-semibold">What should this line be about?</p>
-          <Input
-            autoFocus
-            value={remixInstruction}
-            onChange={(e) => onRemixInstructionChange(e.target.value)}
-            placeholder='e.g. "Make this about brown hats" or leave blank to just remix'
-            className="text-xs h-8 bg-background/60"
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onTriggerRemix(); } if (e.key === "Escape") onCancelEdit(); }}
-          />
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={onTriggerRemix} disabled={isRemixing} className="h-6 px-2 text-xs bg-amber-500 hover:bg-amber-600 text-black">
-              {isRemixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />Get 3 Variations</>}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={onCancelEdit} className="h-6 px-2 text-xs">Cancel</Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 px-3 py-2">
-          {/* Tapping the line text directly enters edit mode. */}
-          <p
-            className={`flex-1 text-sm font-mono leading-relaxed select-text ${
-              line.isHumanEdited ? "text-emerald-300/90" : "text-foreground/85"
-            } ${isPro ? "cursor-text hover:text-foreground" : ""}`}
-            onClick={isPro ? onStartEdit : undefined}
-            title={isPro ? "Tap to edit this line" : undefined}
-          >
-            {line.text}
-          </p>
-          {isPro ? (
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={onStartRemix}
-                className="p-1.5 rounded hover:bg-amber-500/20 text-muted-foreground/40 hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100"
-                title="AI remix this line — get 3 variations"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <Lock className="w-3 h-3 text-border/40 opacity-0 group-hover:opacity-100 shrink-0" />
-          )}
-        </div>
-      )}
+    <span className="inline-flex items-center gap-1.5 text-[11px] text-rose-400 font-semibold">
+      <ShieldAlert className="w-3.5 h-3.5" /> Flagged{matchedWork ? `: ${matchedWork}` : ""}
+    </span>
+  );
+}
+
+function AuthorshipMeter({ score }: { score: number }) {
+  const eligible = score >= 25;
+  const color = eligible ? "bg-emerald-500" : score >= 12 ? "bg-amber-500" : "bg-rose-500";
+  return (
+    <div className="rounded-xl border border-border/40 bg-card/60 p-4 space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-semibold flex items-center gap-2">
+          {eligible ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <FileText className="w-4 h-4 text-amber-500" />}
+          Human Authorship
+        </span>
+        <span className={`font-bold ${eligible ? "text-emerald-400" : "text-muted-foreground"}`}>{score}%</span>
+      </div>
+      <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${Math.max(2, score)}%` }} />
+      </div>
+      <p className={`text-xs font-semibold ${eligible ? "text-emerald-400" : "text-rose-400"}`}>
+        {eligible
+          ? "Copyright eligibility goal achieved — human ownership locked."
+          : `AI draft status — rewrite ${Math.max(0, 25 - score)}% more in your own words to reach the 25% goal.`}
+      </p>
     </div>
   );
 }
@@ -539,515 +135,314 @@ function LyricLineRow({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SongwritingStudio() {
-  const { isPro } = useAppState();
+  const { isPro, isDeveloper } = useAppState();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const hasAccess = isPro || isDeveloper;
 
-  // ── Mode & input ──────────────────────────────────────────────────────────
-  const [lyricsMode, setLyricsMode] = useState<"simple" | "advanced">("simple");
-  const [story, setStory] = useState("");
-  const [genre, setGenre] = useState("Hip-Hop");
-  const [bpm, setBpm] = useState("");
-  const [emotion, setEmotion] = useState("");
-  const [vocalDelivery, setVocalDelivery] = useState("");
-  const [structureOptions, setStructureOptions] = useState<string[]>([]);
-  // Advanced mode
-  const [advKey, setAdvKey] = useState("C Minor");
-  const [advVocalType, setAdvVocalType] = useState("Male tenor");
-  const [timelineBlocks, setTimelineBlocks] = useState<TimelineBlock[]>([
-    { id: crypto.randomUUID(), timestampMs: 0, label: "Intro", sectionType: "intro" },
-    { id: crypto.randomUUID(), timestampMs: 30000, label: "Verse 1", sectionType: "verse" },
-    { id: crypto.randomUUID(), timestampMs: 75000, label: "Chorus", sectionType: "chorus" },
-  ]);
+  // ── Mode (deep-linkable via ?mode=advanced) ──────────────────────────────
+  const [mode, setMode] = useState<"simple" | "advanced">(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("mode") === "advanced" ? "advanced" : "simple";
+    } catch {
+      return "simple";
+    }
+  });
 
-  // ── Style step ────────────────────────────────────────────────────────────
-  const [styleInput, setStyleInput] = useState("");
-  // Lifted from MlkGenerateCard so the style-tag presets can tailor themselves
-  // to whether lyrics are ON or OFF.
-  const [genVocalMode, setGenVocalMode] = useState<"lyrics" | "random" | "instrumental">("lyrics");
-  const [convertedStyle, setConvertedStyle] = useState("");
-  const [isConvertingStyle, setIsConvertingStyle] = useState(false);
-  const [styleCopied, setStyleCopied] = useState(false);
+  // ── Shared: the RAW style prompt (atmosphere + beat style + genre in one box).
+  // Sent to the server EXACTLY as typed — no client-side tag conversion.
+  const [styleRaw, setStyleRaw] = useState("");
+  const [instrumental, setInstrumental] = useState(false);
+  const [durationS, setDurationS] = useState<number>(120);
 
-  // ── Output state ──────────────────────────────────────────────────────────
-  const [aiDraft, setAiDraft] = useState("");
-  const [lines, setLines] = useState<LineState[]>([]);
-  const [stylePrompt, setStylePrompt] = useState("");
+  // ── Advanced: lyrics module ───────────────────────────────────────────────
+  const [lyricsText, setLyricsText] = useState("");
+  const [aiDraft, setAiDraft] = useState(""); // last AI-generated draft (read-only pane)
+  const [isWritingLyrics, setIsWritingLyrics] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // ── Verification gate ─────────────────────────────────────────────────────
+  const [verifyState, setVerifyState] = useState<VerifyState>("idle");
+  const [verifyMsg, setVerifyMsg] = useState<string>("");
+  const [matchedWork, setMatchedWork] = useState<string | undefined>(undefined);
+  const verifiedTextRef = useRef<string>("");
+
+  // ── Generation ────────────────────────────────────────────────────────────
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationCount, setGenerationCount] = useState(0);
+  const [genError, setGenError] = useState<string | null>(null);
 
-  // ── Import custom (self-authored) lyrics ───────────────────────────────────
+  // ── Import / possession stamp ─────────────────────────────────────────────
+  const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [importCertified, setImportCertified] = useState(false);
   const [isStamping, setIsStamping] = useState(false);
   const [lastStampAt, setLastStampAt] = useState<string | null>(null);
 
-  // ── Authorship ────────────────────────────────────────────────────────────
-  const [authorshipScore, setAuthorshipScore] = useState(0);
+  const authorship = useMemo(
+    () => (aiDraft && lyricsText ? computeAuthorshipScore(aiDraft, lyricsText) : lyricsText.trim() ? 100 : 0),
+    [aiDraft, lyricsText],
+  );
 
-  // ── Line editing state (only one active at a time) ───────────────────────
-  const [editingLineId, setEditingLineId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
+  // Whether this run will sing the user's own lyrics.
+  const usesOwnLyrics = mode === "advanced" && !instrumental && lyricsText.trim().length >= 5;
+  const effectiveVocalMode: VocalMode = instrumental
+    ? "instrumental"
+    : usesOwnLyrics
+      ? "lyrics"
+      : "random";
 
-  // ── Surgical remix state ──────────────────────────────────────────────────
-  const [remixLineId, setRemixLineId] = useState<string | null>(null);
-  const [remixInstruction, setRemixInstruction] = useState("");
-  const [remixVariations, setRemixVariations] = useState<string[]>([]);
-  const [isRemixing, setIsRemixing] = useState(false);
+  // Verification is only demanded when the user's own lyrics will be sung/saved.
+  const needsVerification = usesOwnLyrics;
+  const isVerifiedCurrent = verifyState === "clear" && verifiedTextRef.current === lyricsText.trim();
 
-  // ── Rhyming tray ──────────────────────────────────────────────────────────
-  const [rhymeWord, setRhymeWord] = useState("");
-  const [rhymes, setRhymes] = useState<string[]>([]);
-  const [isLoadingRhymes, setIsLoadingRhymes] = useState(false);
-  const rhymeTarget = useRef<string | null>(null);
-
-  // ── Saving ────────────────────────────────────────────────────────────────
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // ── IP Embed ───────────────────────────────────────────────────────────────
-  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
-  const [embedToken, setEmbedToken] = useState<string | null>(null);
-  const [embedCopied, setEmbedCopied] = useState(false);
-  const [showEmbed, setShowEmbed] = useState(false);
-
-  // ── Authorship score recompute whenever lines change ─────────────────────
+  // Any lyric edit invalidates a previous verdict.
   useEffect(() => {
-    if (!aiDraft || lines.length === 0) return;
-    const currentText = lyricsFromLines(lines);
-    setAuthorshipScore(computeAuthorshipScore(aiDraft, currentText));
-  }, [lines, aiDraft]);
+    if (verifyState !== "idle" && verifiedTextRef.current !== lyricsText.trim()) {
+      setVerifyState("idle");
+      setVerifyMsg("");
+      setMatchedWork(undefined);
+    }
+  }, [lyricsText, verifyState]);
 
-  // ── Draft persistence key ─────────────────────────────────────────────────
-  const DRAFT_KEY = "gk:songwriting:draft";
-
-  // ── Restore draft on mount ────────────────────────────────────────────────
-  const draftRestoredRef = useRef(false);
+  // ── Draft restore / persist ───────────────────────────────────────────────
+  const restoredRef = useRef(false);
   useEffect(() => {
-    if (draftRestoredRef.current) return;
-    draftRestoredRef.current = true;
+    if (restoredRef.current) return;
+    restoredRef.current = true;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const d = JSON.parse(raw) as {
-        lyricsMode?: "simple" | "advanced";
-        story?: string; genre?: string; bpm?: string;
-        emotion?: string; vocalDelivery?: string; structureOptions?: string[];
-        advKey?: string; advVocalType?: string;
-        timelineBlocks?: TimelineBlock[];
-        styleInput?: string; convertedStyle?: string; stylePrompt?: string;
-        aiDraft?: string; lines?: LineState[];
-        projectId?: string | null; generationCount?: number;
-        savedAt?: string;
+        mode?: "simple" | "advanced"; styleRaw?: string; instrumental?: boolean;
+        durationS?: number; lyricsText?: string; aiDraft?: string; projectId?: string | null;
       };
-      if (!d.aiDraft || !d.lines?.length) return;
-      if (d.lyricsMode) setLyricsMode(d.lyricsMode);
-      if (d.story !== undefined) setStory(d.story);
-      if (d.genre) setGenre(d.genre);
-      if (d.bpm !== undefined) setBpm(d.bpm);
-      if (d.emotion !== undefined) setEmotion(d.emotion);
-      if (d.vocalDelivery !== undefined) setVocalDelivery(d.vocalDelivery);
-      if (d.structureOptions?.length) setStructureOptions(d.structureOptions);
-      if (d.advKey) setAdvKey(d.advKey);
-      if (d.advVocalType) setAdvVocalType(d.advVocalType);
-      if (d.timelineBlocks?.length) setTimelineBlocks(d.timelineBlocks);
-      if (d.styleInput !== undefined) setStyleInput(d.styleInput);
-      if (d.convertedStyle !== undefined) setConvertedStyle(d.convertedStyle);
-      if (d.stylePrompt !== undefined) setStylePrompt(d.stylePrompt);
-      setAiDraft(d.aiDraft);
-      setLines(d.lines);
+      // An explicit ?mode= in the URL wins over the remembered draft mode.
+      const urlMode = new URLSearchParams(window.location.search).get("mode");
+      if (d.mode && urlMode !== "advanced" && urlMode !== "simple") setMode(d.mode);
+      if (d.styleRaw) setStyleRaw(d.styleRaw);
+      if (typeof d.instrumental === "boolean") setInstrumental(d.instrumental);
+      if (d.durationS) setDurationS(d.durationS);
+      if (d.lyricsText) setLyricsText(d.lyricsText);
+      if (d.aiDraft) setAiDraft(d.aiDraft);
       if (d.projectId) setProjectId(d.projectId);
-      if (d.generationCount !== undefined) setGenerationCount(d.generationCount);
-      const when = d.savedAt
-        ? new Date(d.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        : "earlier";
-      toast({ title: "Draft restored", description: `Your last session from ${when} was recovered.` });
-    } catch {
-      // Non-critical — malformed or absent draft
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    } catch { /* non-critical */ }
+  }, []);
 
-  // ── Auto-save draft to localStorage whenever content changes ─────────────
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!aiDraft) return; // nothing worth saving yet
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          lyricsMode, story, genre, bpm,
-          emotion, vocalDelivery, structureOptions,
-          advKey, advVocalType, timelineBlocks,
-          styleInput, convertedStyle, stylePrompt,
-          aiDraft, lines,
-          projectId, generationCount,
-          savedAt: new Date().toISOString(),
+          mode, styleRaw, instrumental, durationS, lyricsText, aiDraft, projectId,
         }));
-      } catch {
-        // Storage full or unavailable — silent
-      }
+      } catch { /* storage full — silent */ }
     }, 800);
-    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
-  }, [aiDraft, lines, story, genre, bpm, emotion, vocalDelivery, structureOptions,
-      lyricsMode, advKey, advVocalType,
-      timelineBlocks, styleInput, convertedStyle, stylePrompt,
-      projectId, generationCount]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [mode, styleRaw, instrumental, durationS, lyricsText, aiDraft, projectId]);
 
-  // ── Voice Splitter prefill — load lyrics sent from the split page ──────────
-  useEffect(() => {
+  // ── Verify lyrics (AI copyright screen) ───────────────────────────────────
+  const runVerify = useCallback(async (): Promise<boolean> => {
+    const text = lyricsText.trim();
+    if (text.length < 5) return false;
+    setVerifyState("checking");
+    setVerifyMsg("");
+    setMatchedWork(undefined);
     try {
-      const raw = localStorage.getItem("gk:prefill:split_lyrics");
-      if (!raw) return;
-      localStorage.removeItem("gk:prefill:split_lyrics");
-      const { text, filename } = JSON.parse(raw) as { text: string; filename: string };
-      if (!text?.trim()) return;
-      const rawLines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
-      const newLines: LineState[] = rawLines.map((l: string) => ({
-        id: crypto.randomUUID(),
-        type: "lyric" as const,
-        text: l,
-        aiOriginal: l,
-        isHumanEdited: false,
-        sectionContext: "verse",
-      }));
-      setAiDraft(text);
-      setLines(newLines);
-      toast({
-        title: "Lyrics loaded from Voice Splitter",
-        description: `From: ${filename} — edit lines to build your authorship score`,
+      const res = await fetch("/api/lyrics/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text }),
       });
-    } catch {
-      // Non-critical
+      const data = (await res.json()) as {
+        verdict?: string; reason?: string; matchedWork?: string; error?: string;
+      };
+      if (!res.ok) throw new Error(data.error || "Verification failed");
+      verifiedTextRef.current = text;
+      if (data.verdict === "flagged") {
+        setVerifyState("flagged");
+        setMatchedWork(data.matchedWork);
+        setVerifyMsg(data.reason || "These lyrics appear to reproduce a released song. Rewrite the matching passage in your own words.");
+        return false;
+      }
+      setVerifyState("clear");
+      return true;
+    } catch (err) {
+      setVerifyState("idle");
+      toast({
+        title: "Verification unavailable",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+      return false;
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lyricsText, toast]);
 
-  // ── Generate ──────────────────────────────────────────────────────────────
-  const handleGenerate = useCallback(async () => {
-    if (generationCount >= 2 && !isPro) {
-      toast({ title: "Generation limit reached", description: "Upgrade to Pro for unlimited generations.", variant: "destructive" });
+  // ── Auto-generate lyrics (advanced, independent of song generation) ──────
+  const handleWriteLyrics = useCallback(async () => {
+    if (styleRaw.trim().length < 5) {
+      toast({ title: "Describe your style first", description: "The style box drives the lyric writer.", variant: "destructive" });
       return;
     }
-    if (lyricsMode === "simple" && !story.trim()) {
-      toast({ title: "Describe your song first", variant: "destructive" });
-      return;
-    }
-    if (lyricsMode === "advanced" && timelineBlocks.filter((b) => b.label.trim()).length === 0) {
-      toast({ title: "Add at least one labeled timeline block", variant: "destructive" });
-      return;
-    }
-
-    setIsGenerating(true);
-    setLines([]); setAiDraft(""); setAuthorshipScore(0); setProjectId(null);
-    setEditingLineId(null); setRemixLineId(null);
-
+    setIsWritingLyrics(true);
     try {
-      const body =
-        lyricsMode === "simple"
-          ? {
-              mode: "simple", story: story.trim(), genre,
-              bpm: bpmNumberFrom(bpm),
-              rhythmStyle: bpm.trim() || undefined,
-              emotion: emotion.trim() || undefined,
-              vocalDelivery: vocalDelivery.trim() || undefined,
-              structureOptions: structureOptions.length ? structureOptions : undefined,
-            }
-          : {
-              mode: "advanced",
-              genre, bpm: bpmNumberFrom(bpm),
-              rhythmStyle: bpm.trim() || undefined,
-              key: advKey, vocalType: advVocalType, genreTags: genre,
-              timelineBlocks: timelineBlocks.filter((b) => b.label.trim()).map((b, i) => ({
-                timestampMs: b.timestampMs, label: b.label, sectionType: b.sectionType, sortOrder: i,
-              })),
-            };
-
       const res = await fetch("/api/lyrics/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        credentials: "include",
+        body: JSON.stringify({ mode: "simple", story: styleRaw.trim(), genre: styleRaw.trim().slice(0, 60) }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const data = await res.json() as { lyrics: string; stylePrompt: string; lines: LineState[] };
-
+      const data = (await res.json()) as { lyrics: string };
       setAiDraft(data.lyrics);
-      setLines(data.lines);
-      setStylePrompt(data.stylePrompt);
-      setGenerationCount((c) => c + 1);
+      setLyricsText(data.lyrics);
+      setProjectId(null);
+      toast({ title: "Lyrics drafted", description: "Rewrite lines in your own words on the right to build your IP claim." });
     } catch {
-      toast({ title: "Generation failed", description: "Please try again.", variant: "destructive" });
+      toast({ title: "Lyric generation failed", description: "Please try again.", variant: "destructive" });
     } finally {
-      setIsGenerating(false);
+      setIsWritingLyrics(false);
     }
-  }, [lyricsMode, story, genre, bpm, emotion, vocalDelivery, structureOptions, advKey, advVocalType, timelineBlocks, generationCount, isPro, toast]);
+  }, [styleRaw, toast]);
 
-  // ── Fetch rhymes ──────────────────────────────────────────────────────────
-  const fetchRhymes = useCallback(async (word: string) => {
-    if (!word || word.length < 2) { setRhymes([]); setRhymeWord(""); return; }
-    rhymeTarget.current = word;
-    setRhymeWord(word); setIsLoadingRhymes(true);
-    try {
-      const res = await fetch("/api/lyrics/rhymes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word, genre }),
-      });
-      if (res.ok && rhymeTarget.current === word) {
-        const data = await res.json() as { rhymes: string[] };
-        setRhymes(data.rhymes);
-      }
-    } catch { /* silent */ } finally {
-      setIsLoadingRhymes(false);
-    }
-  }, [genre]);
-
-  // ── Line editing ──────────────────────────────────────────────────────────
-  const startEdit = useCallback((line: LineState) => {
-    setRemixLineId(null); setRemixInstruction("");
-    setEditingLineId(line.id); setEditText(line.text);
-  }, []);
-
-  const saveEdit = useCallback((lineId: string, newText: string) => {
-    if (!newText.trim()) { setEditingLineId(null); return; }
-    setLines((prev) => {
-      const oldLine = prev.find((l) => l.id === lineId);
-      if (!oldLine || oldLine.text === newText) { setEditingLineId(null); return prev; }
-      const updated = prev.map((l) =>
-        l.id === lineId ? { ...l, text: newText, isHumanEdited: true } : l
-      );
-      // Log forensic entry (fire-and-forget)
-      if (projectId) {
-        const currentText = lyricsFromLines(updated);
-        const scoreBefore = authorshipScore;
-        const scoreAfter = computeAuthorshipScore(aiDraft, currentText);
-        fetch("/api/lyrics/forensic-entry", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId, editType: "manual_edit",
-            lineIndex: prev.findIndex((l) => l.id === lineId),
-            originalText: oldLine.text, newText,
-            levenshteinDelta: Math.abs(newText.length - oldLine.text.length),
-            authorshipScoreBefore: scoreBefore, authorshipScoreAfter: scoreAfter,
-          }),
-        }).catch(() => {});
-      }
-      return updated;
-    });
-    setEditingLineId(null); setRhymes([]); setRhymeWord("");
-  }, [projectId, aiDraft, authorshipScore]);
-
-  // ── Surgical remix ────────────────────────────────────────────────────────
-  const startRemix = useCallback((line: LineState) => {
-    setEditingLineId(null);
-    setRemixLineId(line.id); setRemixInstruction("");
-  }, []);
-
-  const triggerRemix = useCallback(async (lineId: string) => {
-    const lineIndex = lines.findIndex((l) => l.id === lineId);
-    const line = lines[lineIndex];
-    if (!line) return;
-
-    const lyricLines = lines.filter((l) => l.type === "lyric");
-    const lyricIdx = lyricLines.findIndex((l) => l.id === lineId);
-    const prevLine = lyricLines[lyricIdx - 1]?.text;
-    const nextLine = lyricLines[lyricIdx + 1]?.text;
-
-    setIsRemixing(true);
-    try {
-      const res = await fetch("/api/lyrics/regenerate-line", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          line: line.text, instruction: remixInstruction || undefined,
-          sectionLabel: line.sectionContext, genre,
-          songConcept: story || `${genre} song`,
-          prevLine, nextLine,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json() as { variations: string[] };
-      setRemixVariations(data.variations);
-    } catch {
-      toast({ title: "Remix failed", description: "Please try again.", variant: "destructive" });
-      setRemixLineId(null);
-    } finally {
-      setIsRemixing(false);
-    }
-  }, [lines, remixInstruction, genre, story, toast]);
-
-  const pickVariation = useCallback((lineId: string, variation: string) => {
-    const lineIndex = lines.findIndex((l) => l.id === lineId);
-    const oldLine = lines[lineIndex];
-    if (!oldLine) return;
-
-    setLines((prev) => prev.map((l) =>
-      l.id === lineId ? { ...l, text: variation, isHumanEdited: true } : l
-    ));
-
-    // Log forensic entry
-    if (projectId) {
-      const updated = lines.map((l) => l.id === lineId ? { ...l, text: variation } : l);
-      const currentText = lyricsFromLines(updated);
-      const scoreAfter = computeAuthorshipScore(aiDraft, currentText);
-      fetch("/api/lyrics/forensic-entry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId, editType: "ai_line_regen",
-          lineIndex, originalText: oldLine.text, newText: variation,
-          regenInstruction: remixInstruction,
-          levenshteinDelta: Math.abs(variation.length - oldLine.text.length),
-          authorshipScoreBefore: authorshipScore, authorshipScoreAfter: scoreAfter,
-        }),
-      }).catch(() => {});
-    }
-
-    setRemixLineId(null); setRemixVariations([]); setRemixInstruction("");
-    toast({ title: "Line updated", description: "Your authorship meter has been updated." });
-  }, [lines, projectId, aiDraft, authorshipScore, remixInstruction, toast]);
-
-  // ── Style convert ─────────────────────────────────────────────────────────
-  const handleConvertStyle = useCallback(async () => {
-    if (!styleInput.trim()) return;
-    setIsConvertingStyle(true);
-    try {
-      const res = await fetch("/api/lyrics/convert-style", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ styleDescription: styleInput.trim() }),
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json() as { styleTags: string };
-      setConvertedStyle(data.styleTags);
-    } catch {
-      toast({ title: "Style conversion failed", variant: "destructive" });
-    } finally {
-      setIsConvertingStyle(false);
-    }
-  }, [styleInput, toast]);
-
-  // ── Save project ──────────────────────────────────────────────────────────
+  // ── Save lyrics project (gated on verification) ───────────────────────────
   const handleSaveProject = useCallback(async () => {
-    if (!aiDraft) return;
+    const text = lyricsText.trim();
+    if (!text) return;
+    // Verification gate for library saves — run it now if not current.
+    if (!isVerifiedCurrent) {
+      const ok = await runVerify();
+      if (!ok) return;
+    }
     setIsSaving(true);
     try {
-      const id = projectId ?? randomUUID_client();
+      const lines = textToLines(aiDraft || text, text);
       if (!projectId) {
         const res = await fetch("/api/lyrics/project", {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
-            aiDraft, title: story.slice(0, 40) || "Untitled", genre,
-            bpm: bpmNumberFrom(bpm),
-            mode: lyricsMode,
-            storyPrompt: story || undefined,
-            key: lyricsMode === "advanced" ? advKey : undefined,
-            vocalType: lyricsMode === "advanced" ? advVocalType : undefined,
-            stylePrompt: convertedStyle || stylePrompt,
-            linesState: lines, generationCount,
+            aiDraft: aiDraft || text,
+            content: text,
+            title: text.split("\n").find((l) => l.trim() && !/^\s*\[/.test(l))?.slice(0, 40) || "Untitled",
+            genre: styleRaw.slice(0, 40) || "Song",
+            mode: "simple",
+            storyPrompt: styleRaw || undefined,
+            stylePrompt: styleRaw,
+            linesState: lines,
+            generationCount: aiDraft ? 1 : 0,
           }),
         });
         if (!res.ok) throw new Error();
-        const data = await res.json() as { id: string };
+        const data = (await res.json()) as { id: string };
         setProjectId(data.id);
       } else {
-        await fetch("/api/lyrics/revise", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId, content: lyricsFromLines(lines),
-            linesState: lines, editType: "manual_edit",
-          }),
+        const res = await fetch("/api/lyrics/revise", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ projectId, content: text, linesState: lines, editType: "manual_edit" }),
         });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+          if (body?.code === "lyrics_flagged") {
+            setVerifyState("flagged");
+            setVerifyMsg(body.error || "These lyrics appear to reproduce a released song. Rewrite the matching passage in your own words.");
+            verifiedTextRef.current = text;
+            toast({
+              title: "Lyrics flagged by the AI copyright screen",
+              description: body.error || "Rewrite the matching passage in your own words, then save again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw new Error(body?.error || "Save failed");
+        }
       }
-      toast({ title: "Project saved", description: "Forensic revision history logged." });
+      toast({ title: "Lyrics saved", description: "Verified and saved to your library with the forensic revision ledger." });
     } catch {
       toast({ title: "Save failed", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
-  }, [aiDraft, projectId, story, genre, bpm, lyricsMode, advKey, advVocalType, convertedStyle, stylePrompt, lines, generationCount, toast]);
+  }, [lyricsText, aiDraft, projectId, styleRaw, isVerifiedCurrent, runVerify, toast]);
 
-  const handleReset = () => {
-    setAiDraft(""); setLines([]); setStylePrompt(""); setAuthorshipScore(0);
-    setEditingLineId(null); setRemixLineId(null); setProjectId(null);
-    setRhymes([]); setRhymeWord("");
-    try { localStorage.removeItem(DRAFT_KEY); } catch { /* non-critical */ }
-  };
-
-  const downloadCertificate = async () => {
-    if (!projectId) {
-      toast({ title: "Save your project first", description: "Save and edit to 25% authorship before certifying.", variant: "destructive" });
+  // ── Generate the song ─────────────────────────────────────────────────────
+  const handleGenerateSong = useCallback(async () => {
+    if (!hasAccess) {
+      toast({
+        title: "GravelKing Pro required",
+        description: "Upgrade to GravelKing Pro to generate AI tracks.",
+        variant: "destructive",
+      });
       return;
     }
-    type CertResponse = { title: string; genre: string | null; authorshipScore: number; certifiedAt: string; embedToken: string; embedUrl: string };
-    let cert: CertResponse;
+    if (styleRaw.trim().length < 5) {
+      toast({ title: "Describe your style first", description: "Atmosphere, beat style, genre — one box, your words.", variant: "destructive" });
+      return;
+    }
+
+    // Verification gate: own lyrics must clear the AI copyright screen first.
+    if (needsVerification && !isVerifiedCurrent) {
+      const ok = await runVerify();
+      if (!ok) return;
+    }
+
+    setIsGenerating(true);
+    setGenError(null);
     try {
-      const r = await fetch(`/api/lyrics/certificate/${projectId}`, { credentials: "include" });
-      if (!r.ok) {
-        const d = (await r.json().catch(() => ({}))) as { error?: string };
-        toast({ title: "Certificate unavailable", description: d.error || "Could not verify eligibility.", variant: "destructive" });
-        return;
+      const res = await fetch("/api/mlk/v35/generate-master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          lyricId: projectId,
+          text: effectiveVocalMode === "lyrics" ? lyricsText : "",
+          stylePrompt: styleRaw.trim(), // RAW user prompt — server handles Lyria-side sanitizing
+          vocalMode: effectiveVocalMode,
+          durationS: mode === "advanced" ? durationS : undefined,
+        }),
+      });
+      const data = (await res.json()) as { error?: string; code?: string; trackId?: string; title?: string };
+      if (!res.ok || !data.trackId) {
+        const msg = data.error || `Generation failed (HTTP ${res.status})`;
+        if (data.code === "lyrics_flagged") {
+          setVerifyState("flagged");
+          setVerifyMsg(msg);
+        }
+        if (res.status === 422 || data.code === "content_blocked") {
+          toast({ title: "Prompt flagged", description: msg, variant: "destructive" });
+        }
+        throw new Error(msg);
       }
-      cert = (await r.json()) as CertResponse;
-    } catch {
-      toast({ title: "Error", description: "Could not reach the certification service.", variant: "destructive" });
-      return;
+      // Track is auto-saved to the library — land the user on its player.
+      navigate(`/library?track=${encodeURIComponent(data.trackId)}`);
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Generation failed.");
+      setIsGenerating(false);
     }
+  }, [hasAccess, styleRaw, needsVerification, isVerifiedCurrent, runVerify, projectId,
+      effectiveVocalMode, lyricsText, mode, durationS, navigate, toast]);
 
-    setEmbedUrl(cert.embedUrl);
-    setEmbedToken(cert.embedToken);
-    setShowEmbed(true);
-
-    const songTitle = (cert.title || `${cert.genre ?? genre} Work`).slice(0, 80);
-    const date = new Date(cert.certifiedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    const fingerprint = `GKP-${cert.embedToken.slice(0, 8).toUpperCase()}-${cert.embedToken.slice(8, 16).toUpperCase()}`;
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>IP Certificate</title>
-<style>
-  @page { size: letter landscape; margin: 0; }
-  body { font-family: Georgia, "Times New Roman", serif; margin: 0; background: #0f0f0f; color: #1a1a1a; }
-  .cert { max-width: 960px; margin: 32px auto; background: #fffdf6; border: 10px double #c9a227; padding: 56px 64px; text-align: center; position: relative; }
-  .seal { font-size: 12px; font-weight: bold; letter-spacing: 4px; text-transform: uppercase; color: #c9a227; }
-  h1 { font-size: 32px; margin: 18px 0 6px; color: #161616; }
-  .badge { display: inline-block; margin: 14px 0; padding: 8px 20px; border: 2px solid #2a7a2a; border-radius: 999px; color: #2a7a2a; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; }
-  .title { font-size: 26px; font-style: italic; margin: 28px 0 6px; }
-  .row { font-size: 14px; color: #444; margin: 6px 0; }
-  .score { font-size: 20px; font-weight: bold; color: #2a7a2a; margin: 22px 0; }
-  .legal { font-size: 12px; color: #555; max-width: 640px; margin: 20px auto 0; line-height: 1.5; }
-  .footer { margin-top: 36px; border-top: 2px solid #c9a227; padding-top: 16px; font-size: 10px; color: #888; }
-  .fp { background: #f5f0e8; border: 1px solid #d4b96e; border-radius: 4px; padding: 6px 12px; display: inline-block; margin-top: 10px; font-family: monospace; font-size: 12px; letter-spacing: 2px; color: #8a6914; }
-  @media print { body { background: #fff; } .cert { margin: 0 auto; } }
-</style></head>
-<body><div class="cert">
-  <div class="seal">Gravel King Productions · Engine 2 IP Pipeline</div>
-  <h1>Certificate of Human–AI Collaborative Authorship</h1>
-  <div class="badge">Certified Human-AI Collaborative Work</div>
-  <div class="title">&ldquo;${songTitle.replace(/</g, "&lt;")}&rdquo;</div>
-  <div class="row">Genre: ${cert.genre ?? genre}</div>
-  <div class="row">Date Certified: ${date}</div>
-  <div class="score">Human Authorship Score: ${cert.authorshipScore}%</div>
-  <div class="legal">This document certifies that the named work contains sufficient human creative
-  expression — through manual line-by-line editing and reconfiguration of AI-generated elements —
-  to support a claim of human authorship under current U.S. Copyright Office guidance. The complete
-  forensic edit ledger is retained on file.</div>
-  <div class="footer">Verified by forensic authorship ledger<br><div class="fp">${fingerprint}</div></div>
-</div>
-<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
-</body></html>`;
-    const w = window.open("", "_blank", "width=1000,height=760");
-    if (!w) {
-      toast({ title: "Pop-up blocked", description: "Allow pop-ups to open the printable certificate.", variant: "destructive" });
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
-  };
-
-  const hasOutput = lines.length > 0;
-  const isEligible = authorshipScore >= 25;
-  const effectiveStyle = convertedStyle || styleInput || stylePrompt;
-  const generationLimitReached = generationCount >= 2 && !isPro;
-
+  // ── Import stamp ──────────────────────────────────────────────────────────
   const handleStampImport = useCallback(async () => {
     if (importText.trim().length < 5 || !importCertified) return;
     setIsStamping(true);
     try {
+      // Imports also pass the copyright screen before entering the library.
+      const vRes = await fetch("/api/lyrics/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: importText }),
+      });
+      const v = (await vRes.json().catch(() => ({}))) as { verdict?: string; reason?: string };
+      if (vRes.ok && v.verdict === "flagged") {
+        throw new Error(v.reason || "These lyrics appear to reproduce a released song.");
+      }
       const res = await fetch("/api/lyrics/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1058,15 +453,12 @@ export default function SongwritingStudio() {
           certificationText: "I certify these lyrics are my original human work and were NOT produced by an AI.",
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as { error?: string; import?: { stampedAt?: string } };
       if (!res.ok) throw new Error(data.error || "Failed to stamp lyrics");
       setImportText("");
       setImportCertified(false);
       setLastStampAt(data.import?.stampedAt ?? new Date().toISOString());
-      toast({
-        title: "Lyrics stamped ✓",
-        description: "SHA-256 possession stamp saved to My Protected Lyrics.",
-      });
+      toast({ title: "Lyrics stamped ✓", description: "SHA-256 possession stamp saved to My Protected Lyrics." });
     } catch (err) {
       toast({
         title: "Stamp failed",
@@ -1078,9 +470,83 @@ export default function SongwritingStudio() {
     }
   }, [importText, importCertified, toast]);
 
+  const resetAll = () => {
+    setStyleRaw(""); setLyricsText(""); setAiDraft(""); setProjectId(null);
+    setVerifyState("idle"); setVerifyMsg(""); setMatchedWork(undefined); setGenError(null);
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* non-critical */ }
+  };
+
+  // ── The style box + suggestions (shared between both modes) ──────────────
+  const styleBox = (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <label className="text-xs text-muted-foreground font-medium">
+          Style — atmosphere, beat style, genre <span className="text-amber-500">*</span>
+        </label>
+        <Textarea
+          placeholder={"Describe the whole vibe in your own words — it goes to the engine exactly as written.\n\nExamples:\n• dark trap, rainy midnight streets, heavy 808s, whispered hook\n• sunny reggaeton beach party, brass stabs, festival energy\n• slow-burn southern gospel soul, warm organ, handclaps"}
+          className="min-h-[110px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50"
+          value={styleRaw}
+          onChange={(e) => setStyleRaw(e.target.value)}
+          maxLength={500}
+          data-testid="input-style-raw"
+        />
+      </div>
+      {/* Inline suggestions — tap to append. Raw text only, never converted. */}
+      <StyleTagPills
+        lyricsOn={!instrumental}
+        onAppend={(tag) => setStyleRaw((p) => appendStyleTag(p, tag).slice(0, 500))}
+      />
+      <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Mic className={`w-4 h-4 ${instrumental ? "text-muted-foreground" : "text-emerald-400"}`} />
+          <span className="text-xs font-semibold">{instrumental ? "Instrumental — no vocals" : "Vocals ON"}</span>
+        </div>
+        <Switch
+          checked={instrumental}
+          onCheckedChange={setInstrumental}
+          aria-label="Instrumental mode"
+          data-testid="switch-instrumental"
+        />
+      </div>
+    </div>
+  );
+
+  const generateButton = (
+    <div className="space-y-2">
+      <Button
+        onClick={() => void handleGenerateSong()}
+        disabled={isGenerating || styleRaw.trim().length < 5 || (needsVerification && verifyState === "flagged")}
+        aria-disabled={!hasAccess}
+        className={`w-full font-bold py-3 ${hasAccess
+          ? "bg-emerald-500 hover:bg-emerald-600 text-black"
+          : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed hover:bg-muted"}`}
+        data-testid="button-generate-song"
+      >
+        {isGenerating
+          ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating your track (2–3 min)…</>
+          : <><Music2 className="w-4 h-4 mr-2" />Generate Song{!hasAccess && " — Pro"}</>}
+      </Button>
+      <p className="text-[11px] text-muted-foreground leading-relaxed text-center">
+        {!hasAccess
+          ? "Upgrade to GravelKing Pro to generate AI tracks."
+          : instrumental
+            ? "A pure instrumental from your style prompt — IP-certified, saved unmastered to your library."
+            : effectiveVocalMode === "random"
+              ? "The AI writes and sings its own lyrics to match your style — IP-certified, saved unmastered to your library."
+              : "Your verified lyrics are hash-stamped and sung exactly as written — IP-certified, saved unmastered to your library."}
+      </p>
+      {genError && (
+        <p className="text-xs text-rose-400 flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{genError}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
 
         {/* Header */}
         <div className="text-center space-y-3">
@@ -1089,530 +555,270 @@ export default function SongwritingStudio() {
             <span className="text-xs font-bold tracking-widest uppercase text-amber-500">Songwriting Studio</span>
             <ToolHelp
               title="Songwriting Studio"
-              summary="AI co-writes a full song from your idea. Free gives you the draft; Pro lets you edit line-by-line and certify your authorship."
+              summary="Describe a style, get a full AI song saved straight to your library. Advanced mode adds your own lyrics with copyright verification and IP tracking."
               steps={[
-                "Enter a theme, mood or lyric seed and pick a genre.",
-                "Generate — Gemini writes the complete song.",
-                "Pro: edit line-by-line, certify your human–AI authorship, and generate + master it in-house with MLK v3.5.",
+                "Simple: describe the vibe, hit Generate — done.",
+                "Advanced: add or auto-write lyrics, rewrite them in your own words, verify, then generate.",
+                "Every track lands unmastered in My Library — master it there when you're ready.",
               ]}
-              note="Free drafts carry no IP rights — only Pro edits establish certified authorship."
+              note="Own-lyric songs pass an AI copyright screen (recognizable-lyrics detection) before generation."
             />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Write it. Generate it. Master it. All in-house.</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Describe it. Generate it. It's in your library.</h1>
           <p className="text-muted-foreground text-sm max-w-lg mx-auto">
-            Gemini writes the full song. Pro users edit line-by-line and lock in their IP. Free users get the AI draft — no IP rights.
+            One style box drives the whole song. Advanced mode adds your own verified lyrics and IP certification.
           </p>
         </div>
 
-        {/* ── STEP 1: Lyrics ── */}
-        <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4">
-          <StepBadge n="1" label="Your Lyrics" />
+        {/* Mode toggle */}
+        <div className="flex rounded-lg border border-border/40 bg-background/40 p-0.5 gap-0.5 max-w-md mx-auto">
+          {(["simple", "advanced"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`flex-1 text-sm py-2 rounded-md font-medium transition-colors ${mode === m ? "bg-amber-500/20 text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+              data-testid={`button-mode-${m}`}
+            >
+              {m === "simple" ? "💡 Simple" : "🎛️ Advanced"}
+            </button>
+          ))}
+        </div>
 
-          {/* Mode toggle */}
-          <div className="flex rounded-lg border border-border/40 bg-background/40 p-0.5 gap-0.5">
-            {(["simple", "advanced"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setLyricsMode(m)}
-                className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors ${lyricsMode === m ? "bg-amber-500/20 text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {m === "simple" ? "💡 Simple" : "🎛️ Advanced Timeline"}
-              </button>
-            ))}
+        {/* ══ SIMPLE MODE — style box + generate, nothing else ══ */}
+        {mode === "simple" && (
+          <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4 max-w-2xl mx-auto">
+            {styleBox}
+            {generateButton}
           </div>
+        )}
 
-          {/* Simple mode */}
-          {lyricsMode === "simple" && (
-            <div className="space-y-4">
+        {/* ══ ADVANCED MODE ══ */}
+        {mode === "advanced" && (
+          <div className="space-y-6">
+
+            {/* Style + duration */}
+            <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4">
+              {styleBox}
               <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground font-medium">Storyline / Core Theme</label>
-                <Textarea
-                  placeholder="Concrete plot, narrative details, or specific metaphors. The more real, the better the lyrics."
-                  className="min-h-[110px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50"
-                  value={story}
-                  onChange={(e) => setStory(e.target.value)}
-                  maxLength={1000}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">Genre / Sub-genre</label>
-                  <Input
-                    list="gk-genre-suggestions"
-                    placeholder="e.g. Hip-Hop/Boom Bap, Country/Americana"
-                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
-                    value={genre}
-                    onChange={(e) => setGenre(e.target.value)}
-                    maxLength={60}
-                  />
-                  <datalist id="gk-genre-suggestions">
-                    {GENRE_SUGGESTIONS.map((g) => <option key={g} value={g} />)}
-                  </datalist>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">BPM / Rhythm Style <span className="font-normal">(optional)</span></label>
-                  <Input
-                    placeholder="e.g. 90 BPM - Heavy Bounce"
-                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
-                    value={bpm}
-                    onChange={(e) => setBpm(e.target.value)}
-                    maxLength={60}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">Primary Emotion / Mood <span className="font-normal">(optional)</span></label>
-                  <Input
-                    list="gk-emotion-suggestions"
-                    placeholder="e.g. Gritty, Melancholic, Hostile"
-                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
-                    value={emotion}
-                    onChange={(e) => setEmotion(e.target.value)}
-                    maxLength={60}
-                  />
-                  <datalist id="gk-emotion-suggestions">
-                    {EMOTION_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
-                  </datalist>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">Vocal Delivery Style <span className="font-normal">(optional)</span></label>
-                  <Input
-                    list="gk-delivery-suggestions"
-                    placeholder="e.g. Raw/Rasp, Rapid-fire Cadence"
-                    className="bg-background/60 border-border/50 focus:border-amber-500/50"
-                    value={vocalDelivery}
-                    onChange={(e) => setVocalDelivery(e.target.value)}
-                    maxLength={60}
-                  />
-                  <datalist id="gk-delivery-suggestions">
-                    {DELIVERY_SUGGESTIONS.map((d) => <option key={d} value={d} />)}
-                  </datalist>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground font-medium">Structural Options</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {STRUCTURE_OPTIONS.map((opt) => (
-                    <label key={opt} className="flex items-center gap-2 rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm cursor-pointer hover:border-amber-500/40 transition-colors">
-                      <input
-                        type="checkbox"
-                        className="accent-amber-500"
-                        checked={structureOptions.includes(opt)}
-                        onChange={(e) =>
-                          setStructureOptions((prev) =>
-                            e.target.checked ? [...prev, opt] : prev.filter((o) => o !== opt),
-                          )
-                        }
-                      />
-                      <span>{opt}</span>
-                    </label>
+                <label className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                  <Clock3 className="w-3.5 h-3.5" /> Target length
+                </label>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {DURATIONS.map((d) => (
+                    <button
+                      key={d.s}
+                      type="button"
+                      onClick={() => setDurationS(d.s)}
+                      className={`py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        durationS === d.s
+                          ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
+                          : "border-border/40 bg-background/40 text-muted-foreground hover:border-amber-500/30"
+                      }`}
+                      data-testid={`button-duration-${d.s}`}
+                    >
+                      {d.label}
+                    </button>
                   ))}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Advanced mode */}
-          {lyricsMode === "advanced" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">Genre</label>
-                  <select className="w-full rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm focus:outline-none" value={genre} onChange={(e) => setGenre(e.target.value)}>
-                    {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
-                  </select>
+            {/* Lyrics module — hidden entirely in instrumental mode */}
+            {!instrumental && (
+              <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-amber-500" />
+                    <h2 className="text-sm font-bold">Lyrics</h2>
+                    {aiDraft && <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400/80">AI draft loaded</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleWriteLyrics()}
+                      disabled={isWritingLyrics || styleRaw.trim().length < 5}
+                      className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs"
+                      data-testid="button-write-lyrics"
+                    >
+                      {isWritingLyrics
+                        ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Writing…</>
+                        : <><Wand2 className="w-3.5 h-3.5 mr-1.5" />Auto-write lyrics</>}
+                    </Button>
+                    {(lyricsText || aiDraft) && (
+                      <Button size="sm" variant="ghost" onClick={resetAll} className="text-xs text-muted-foreground">
+                        <RotateCcw className="w-3 h-3 mr-1" />Clear
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">BPM / Rhythm Style</label>
-                  <Input placeholder="e.g. 90 BPM - Heavy Bounce" className="bg-background/60 border-border/50" value={bpm} onChange={(e) => setBpm(e.target.value)} maxLength={60} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">Key</label>
-                  <select className="w-full rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm focus:outline-none" value={advKey} onChange={(e) => setAdvKey(e.target.value)}>
-                    {KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium">Vocal Type</label>
-                  <select className="w-full rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm focus:outline-none" value={advVocalType} onChange={(e) => setAdvVocalType(e.target.value)}>
-                    {VOCAL_TYPES.map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground font-medium">Song Timeline</label>
-                <TimelineCanvas blocks={timelineBlocks} onChange={setTimelineBlocks} />
-              </div>
-            </div>
-          )}
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Type your own lyrics, or auto-write a draft and rewrite it in your own words.
+                  Leave empty and the AI sings its own lyrics.
+                </p>
 
-          {/* Generation paywall warning */}
-          {generationLimitReached && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-              <Lock className="w-4 h-4 text-amber-500 shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-400">Free generation limit reached</p>
-                <p className="text-xs text-amber-400/70">2 free generations used. Upgrade to Pro for unlimited.</p>
-              </div>
-              <a href="/pricing" className="text-xs font-bold text-amber-400 hover:text-amber-300 whitespace-nowrap">Upgrade →</a>
-            </div>
-          )}
-
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating || generationLimitReached || (lyricsMode === "simple" && story.trim().length < 5)}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold py-3"
-          >
-            {isGenerating
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Writing lyrics…</>
-              : <><Sparkles className="w-4 h-4 mr-2" />{hasOutput ? "Regenerate Full Song" : "Generate Lyrics"}</>}
-          </Button>
-
-          {!isPro && (
-            <p className="text-[10px] text-center text-muted-foreground/50">
-              {2 - generationCount} free generation{2 - generationCount !== 1 ? "s" : ""} remaining
-            </p>
-          )}
-        </div>
-
-        {/* ── Import your own lyrics (IP possession stamp) ── */}
-        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-amber-500" />
-            <h2 className="text-sm font-bold tracking-wide uppercase text-amber-500">Import Your Own Lyrics</h2>
-          </div>
-          <p className="text-xs text-muted-foreground -mt-1">
-            Already wrote lyrics yourself? Stamp them to lock in a cryptographic, timestamped
-            record of your authorship — kept separate from AI drafts.
-          </p>
-          <Textarea
-            placeholder="Paste the lyrics you wrote yourself…"
-            className="min-h-[140px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50 font-mono text-sm"
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-            maxLength={20000}
-            data-testid="input-import-lyrics"
-          />
-          <label className="flex items-start gap-2.5 cursor-pointer select-none">
-            <Checkbox
-              checked={importCertified}
-              onCheckedChange={(v) => setImportCertified(v === true)}
-              className="mt-0.5 border-amber-500/50 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
-              data-testid="checkbox-certify-author"
-            />
-            <span className="text-xs text-muted-foreground leading-relaxed">
-              I certify these lyrics are my original human work and were <span className="font-bold text-amber-400">NOT produced by an AI</span>.
-            </span>
-          </label>
-          <Button
-            onClick={handleStampImport}
-            disabled={isStamping || importText.trim().length < 5 || !importCertified}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold py-3 disabled:opacity-50"
-            data-testid="button-stamp-import"
-          >
-            {isStamping
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Stamping…</>
-              : <><Fingerprint className="w-4 h-4 mr-2" />Stamp My Lyrics</>}
-          </Button>
-          {lastStampAt && (
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="text-xs text-emerald-400 font-medium">
-                Stamped {new Date(lastStampAt).toLocaleString()}
-              </span>
-            </div>
-          )}
-          <Link
-            href="/protected-lyrics"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
-          >
-            View My Protected Lyrics <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        {/* ── STEP 2: Style ── */}
-        <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4">
-          <StepBadge n="2" label="Your Style" />
-          <Textarea
-            placeholder={"Describe the vibe, mood, genre — or reference an artist or song.\n\nExamples:\n• dark trap, rainy midnight, heavy 808s\n• sounds like Future meets James Blake\n• Kendrick Lamar storytelling, cinematic, orchestral trap"}
-            className="min-h-[100px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50"
-            value={styleInput}
-            onChange={(e) => setStyleInput(e.target.value)}
-            maxLength={500}
-          />
-          {/* Dynamic preset tags — tap to append, dice to re-roll (tailored to Lyrics ON/OFF) */}
-          <StyleTagPills
-            lyricsOn={genVocalMode !== "instrumental"}
-            onAppend={(tag) => setStyleInput((p) => appendStyleTag(p, tag).slice(0, 500))}
-          />
-          <Button onClick={handleConvertStyle} disabled={isConvertingStyle || styleInput.trim().length < 3} variant="outline" className="w-full border-amber-500/40 text-amber-400 hover:bg-amber-500/10 font-semibold">
-            {isConvertingStyle ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Converting…</> : <><Wand2 className="w-4 h-4 mr-2" />Convert to Style Tags</>}
-          </Button>
-          {convertedStyle && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground">Style tags (editable):</p>
-                <button onClick={async () => { await navigator.clipboard.writeText(convertedStyle); setStyleCopied(true); setTimeout(() => setStyleCopied(false), 1800); }} className="p-1 rounded hover:bg-border/20">
-                  {styleCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
-                </button>
-              </div>
-              <Input value={convertedStyle} onChange={(e) => setConvertedStyle(e.target.value)} className="bg-background/60 border-amber-500/30 text-sm font-mono" />
-            </div>
-          )}
-        </div>
-
-        {/* ── OUTPUT: Line-by-line editor ── */}
-        {hasOutput && (
-          <div className="space-y-5">
-
-            {/* Status banner */}
-            {isEligible ? (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-emerald-400">Copyright Registered Goal Achieved! Human Ownership Locked.</p>
-                  <p className="text-xs text-emerald-400/70">Your edits qualify these lyrics for copyright documentation.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
-                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-rose-400">AI Draft Status (Public Domain Only)</p>
-                  <p className="text-xs text-rose-400/70">
-                    {isPro ? "Edit lines below until your Authorship Meter hits 25% to lock in your IP." : "Upgrade to Pro to edit lines and claim authorship rights."}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Lyric editor card */}
-            <div className="rounded-2xl border border-border/40 bg-card/60 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-card/40">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold">{genre} Lyrics</span>
-                  <Badge variant="outline" className={`text-xs ${isEligible ? "border-emerald-500/40 text-emerald-400" : "border-rose-500/40 text-rose-400"}`}>
-                    {isEligible ? "Stamped" : "AI Draft"}
-                  </Badge>
-                  {isPro && <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-400/70">Pro Editor</Badge>}
-                </div>
-                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleReset}>
-                  <RotateCcw className="w-3 h-3 mr-1" />New
-                </Button>
-              </div>
-
-              {/* Pro editor hint */}
-              {isPro && !isEligible && (
-                <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/15 flex items-center gap-2">
-                  <Edit3 className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
-                  <p className="text-[11px] text-amber-500/70">
-                    Tap any line to edit it directly. Hover for <strong>↻</strong> to get 3 AI variations with your instruction.
-                    <span className="text-emerald-400/70 ml-1">Green = human edited.</span>
-                  </p>
-                </div>
-              )}
-
-              {!isPro && (
-                <div className="px-4 py-2 bg-muted/20 border-b border-border/30 flex items-center gap-2">
-                  <Lock className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
-                  <p className="text-[11px] text-muted-foreground">
-                    Free users: AI draft only — no IP rights. <a href="/pricing" className="text-amber-500 font-medium hover:underline">Upgrade to Pro</a> to edit line-by-line and lock your authorship.
-                  </p>
-                </div>
-              )}
-
-              <div className="p-4 space-y-0.5">
-                {lines.map((line) => (
-                  <LyricLineRow
-                    key={line.id}
-                    line={line}
-                    isPro={isPro}
-                    isEditing={editingLineId === line.id}
-                    editText={editText}
-                    remixMode={remixLineId === line.id}
-                    remixInstruction={remixInstruction}
-                    isRemixing={isRemixing}
-                    onStartEdit={() => startEdit(line)}
-                    onEditChange={(v) => setEditText(v)}
-                    onSaveEdit={() => saveEdit(line.id, editText)}
-                    onCancelEdit={() => { setEditingLineId(null); setRemixLineId(null); setRhymes([]); setRhymeWord(""); }}
-                    onStartRemix={() => startRemix(line)}
-                    onRemixInstructionChange={(v) => setRemixInstruction(v)}
-                    onTriggerRemix={() => void triggerRemix(line.id)}
-                    onFocus={(word) => { if (isPro) void fetchRhymes(word); }}
-                    onInsertRhyme={(word) => {
-                      const words = editText.split(" ");
-                      words[words.length - 1] = word;
-                      setEditText(words.join(" "));
-                    }}
-                    rhymeInsertTarget={editingLineId}
+                {/* Rewrite / IP split view: AI draft (read-only) beside your editable text */}
+                {aiDraft ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">AI draft (reference)</label>
+                      <pre className="min-h-[260px] max-h-[420px] overflow-y-auto rounded-lg border border-border/40 bg-background/40 p-3 text-xs font-mono text-muted-foreground/80 whitespace-pre-wrap">{aiDraft}</pre>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-amber-400 uppercase tracking-wide">Your version (editable)</label>
+                      <Textarea
+                        value={lyricsText}
+                        onChange={(e) => setLyricsText(e.target.value)}
+                        className="min-h-[260px] max-h-[420px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50 font-mono text-xs"
+                        maxLength={20000}
+                        data-testid="input-lyrics-editable"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <Textarea
+                    placeholder={"Type or paste your lyrics here…\n\n[Verse 1]\n…\n\n[Chorus]\n…"}
+                    value={lyricsText}
+                    onChange={(e) => setLyricsText(e.target.value)}
+                    className="min-h-[200px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50 font-mono text-sm"
+                    maxLength={20000}
+                    data-testid="input-lyrics-manual"
                   />
-                ))}
+                )}
+
+                {/* Authorship meter (only meaningful against an AI draft) */}
+                {aiDraft && lyricsText && <AuthorshipMeter score={authorship} />}
+
+                {/* Verification row */}
+                {lyricsText.trim().length >= 5 && (
+                  <div className="rounded-xl border border-border/40 bg-background/40 px-4 py-3 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <VerifyBadge state={isVerifiedCurrent ? "clear" : verifyState} matchedWork={matchedWork} />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void runVerify()}
+                          disabled={verifyState === "checking"}
+                          className="text-xs border-sky-500/40 text-sky-300 hover:bg-sky-500/10"
+                          data-testid="button-verify-lyrics"
+                        >
+                          {verifyState === "checking"
+                            ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Checking…</>
+                            : <><Shield className="w-3.5 h-3.5 mr-1.5" />Verify lyrics</>}
+                        </Button>
+                        {hasAccess ? (
+                          <Button
+                            size="sm"
+                            onClick={() => void handleSaveProject()}
+                            disabled={isSaving || verifyState === "flagged"}
+                            className="text-xs bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+                            data-testid="button-save-lyrics"
+                          >
+                            {isSaving
+                              ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving…</>
+                              : projectId ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Saved — log revision</> : "Save to library"}
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">Pro saves lyrics + forensic ledger</span>
+                        )}
+                      </div>
+                    </div>
+                    {verifyMsg && verifyState === "flagged" && (
+                      <p className="text-xs text-rose-400 leading-relaxed">{verifyMsg}</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                      Verification is an AI screening for recognizable commercial lyrics — including phonetically
+                      disguised ones — plus your author assertion. It is not a legal clearance service.
+                    </p>
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* Song generation — always below the lyrics module */}
+            <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-sm font-bold">Generate the Song</h2>
+              </div>
+              {generateButton}
             </div>
 
-            {/* Authorship meter */}
-            <AuthorshipMeter score={authorshipScore} />
-
-            {/* Rhyming tray (sticky bottom when editing) */}
-            {isPro && editingLineId && (
-              <RhymingTray
-                rhymes={rhymes}
-                word={rhymeWord}
-                isLoading={isLoadingRhymes}
-                onInsert={(word) => {
-                  const words = editText.split(" ");
-                  words[words.length - 1] = word;
-                  setEditText(words.join(" "));
-                }}
-              />
-            )}
-
-            {/* Style display — feeds the in-house MLK v3.5 generator */}
-            {effectiveStyle && (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-1">
-                <p className="text-xs font-semibold text-amber-500/70 uppercase tracking-wide">Style prompt</p>
-                <p className="text-sm text-foreground/80 font-mono">{effectiveStyle}</p>
-              </div>
-            )}
-
-         {/* Pro features */}
-            <div className="space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pro Features</p>
-              {isPro ? (
-                <div className="space-y-2">
-                  <Button onClick={() => void handleSaveProject()} disabled={isSaving} className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold">
-                    {isSaving
-                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-                      : projectId
-                        ? <><CheckCircle2 className="w-4 h-4 mr-2" />Saved — Log Revision</>
-                        : <><FileText className="w-4 h-4 mr-2" />Save Project + Log Revision</>}
+            {/* Import / possession stamp (collapsible, unchanged flow) */}
+            <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-6 space-y-4">
+              <button
+                type="button"
+                className="flex items-center gap-2 w-full text-left"
+                onClick={() => setShowImport((s) => !s)}
+                data-testid="button-toggle-import"
+              >
+                <ShieldCheck className="w-5 h-5 text-amber-500" />
+                <h2 className="text-sm font-bold tracking-wide uppercase text-amber-500">Stamp Self-Written Lyrics</h2>
+                <span className="ml-auto text-xs text-muted-foreground">{showImport ? "Hide" : "Show"}</span>
+              </button>
+              {showImport && (
+                <>
+                  <p className="text-xs text-muted-foreground -mt-1">
+                    Wrote lyrics 100% yourself? Stamp them for a cryptographic, timestamped possession
+                    record — kept separate from AI drafts. Stamps also pass the copyright screen.
+                  </p>
+                  <Textarea
+                    placeholder="Paste the lyrics you wrote yourself…"
+                    className="min-h-[140px] resize-none bg-background/60 border-border/50 focus:border-amber-500/50 font-mono text-sm"
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    maxLength={20000}
+                    data-testid="input-import-lyrics"
+                  />
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <Checkbox
+                      checked={importCertified}
+                      onCheckedChange={(v) => setImportCertified(v === true)}
+                      className="mt-0.5 border-amber-500/50 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                      data-testid="checkbox-certify-author"
+                    />
+                    <span className="text-xs text-muted-foreground leading-relaxed">
+                      I certify these lyrics are my original human work and were <span className="font-bold text-amber-400">NOT produced by an AI</span>.
+                    </span>
+                  </label>
+                  <Button
+                    onClick={() => void handleStampImport()}
+                    disabled={isStamping || importText.trim().length < 5 || !importCertified}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold py-3 disabled:opacity-50"
+                    data-testid="button-stamp-import"
+                  >
+                    {isStamping
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Stamping…</>
+                      : <><Fingerprint className="w-4 h-4 mr-2" />Stamp My Lyrics</>}
                   </Button>
-                  {projectId && (
-                    <p className="text-xs text-center text-muted-foreground">
-                      <Clock className="w-3 h-3 inline mr-1" />Forensic revision history is being recorded.
-                    </p>
-                  )}
-                  {isEligible ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button onClick={() => void downloadCertificate()} variant="outline" className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold text-xs">
-                          <FileText className="w-3.5 h-3.5 mr-1.5" />Print Certificate
-                        </Button>
-                        <Button onClick={() => void downloadCertificate()} variant="outline" className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 font-semibold text-xs">
-                          <Share2 className="w-3.5 h-3.5 mr-1.5" />Get Embed Code
-                        </Button>
-                      </div>
-                      {/* Embed code panel — shown after cert fetch */}
-                      {showEmbed && embedUrl && embedToken && (
-                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Share2 className="w-4 h-4 text-amber-400" />
-                            <span className="text-sm font-semibold text-amber-400">Your IP Embed Code</span>
-                            <button onClick={() => setShowEmbed(false)} className="ml-auto text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
-                          </div>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            Paste this <code className="bg-muted/60 px-1 py-0.5 rounded text-amber-400">&lt;iframe&gt;</code> anywhere — your website, SoundCloud bio, press kit, or social profile. Anyone who clicks it sees your certified authorship proof.
-                          </p>
-                          {/* Fingerprint */}
-                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/60 border border-border/40">
-                            <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="text-xs text-muted-foreground">Fingerprint:</span>
-                            <span className="text-xs font-mono text-emerald-400 tracking-wider">
-                              GKP-{embedToken.slice(0, 8).toUpperCase()}-{embedToken.slice(8, 16).toUpperCase()}
-                            </span>
-                          </div>
-                          {/* The iframe code */}
-                          <div className="relative">
-                            <pre className="rounded-lg bg-background/80 border border-border/50 p-3 text-xs font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">{`<iframe\n  src="${window.location.origin}${embedUrl}"\n  width="600"\n  height="400"\n  frameborder="0"\n  title="IP Certificate"\n  style="border-radius:8px;border:1px solid #c9a227;max-width:100%"\n></iframe>`}</pre>
-                            <button
-                              onClick={async () => {
-                                const code = `<iframe\n  src="${window.location.origin}${embedUrl}"\n  width="600"\n  height="400"\n  frameborder="0"\n  title="IP Certificate"\n  style="border-radius:8px;border:1px solid #c9a227;max-width:100%"\n></iframe>`;
-                                await navigator.clipboard.writeText(code);
-                                setEmbedCopied(true);
-                                setTimeout(() => setEmbedCopied(false), 2000);
-                              }}
-                              className="absolute top-2 right-2 p-1.5 rounded bg-muted/60 hover:bg-muted border border-border/40 transition-colors"
-                              title="Copy embed code"
-                            >
-                              {embedCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
-                            </button>
-                          </div>
-                          {/* Direct link */}
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={embedUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-3 h-3" />View certificate page directly
-                            </a>
-                            <span className="text-xs text-muted-foreground">— share this URL directly too</span>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground/60 border-t border-border/30 pt-2">
-                            The embed code is tied to this project's authorship score. If you edit further and recertify, generate a new code.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border/30 text-xs text-muted-foreground">
-                      <Lock className="w-3.5 h-3.5 text-amber-500/70 shrink-0" />
-                      <span>Reach 25% authorship to unlock your shareable IP embed code + printable certificate.</span>
+                  {lastStampAt && (
+                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="text-xs text-emerald-400 font-medium">
+                        Stamped {new Date(lastStampAt).toLocaleString()}
+                      </span>
                     </div>
                   )}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <ProGate feature="Line-by-line surgical editor + AI variations" />
-                  <ProGate feature="Rhyming tray — live suggestions while editing" />
-                  <ProGate feature="Save Project + Forensic Authorship Ledger" />
-                  <ProGate feature=".lrc Timed Lyric Export" />
-                  <ProGate feature="Form PA Copyright PDF with Authorship Log" />
-                </div>
+                  <Link
+                    href="/protected-lyrics"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
+                  >
+                    View My Protected Lyrics <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </>
               )}
             </div>
+
+            {!isPro && (
+              <div className="space-y-2 max-w-2xl mx-auto">
+                <ProGate feature="Song generation + IP certification with MLK v3.5" />
+                <ProGate feature="Save lyrics + forensic authorship ledger" />
+              </div>
+            )}
           </div>
         )}
-
-        {/* ── STEP 3: Song generator — ALWAYS on the page ──────────────────
-            Never hidden behind lyric output or entitlement state. Random
-            Lyrics and instrumental modes work with zero lyrics, and the card
-            itself enforces Pro access. */}
-        <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4">
-          <StepBadge n="3" label="Generate the Song — MLK v3.5" />
-          {!hasOutput && (
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Sing your own words by generating or importing lyrics above — or switch to
-              <span className="text-emerald-400 font-medium"> Random Lyrics</span> / turn
-              <span className="text-emerald-400 font-medium"> Lyrics OFF</span> for an instrumental and generate right now.
-            </p>
-          )}
-          <MlkGenerateCard
-            lyrics={lyricsFromLines(lines)}
-            projectId={projectId}
-            stylePrompt={effectiveStyle}
-            vocalMode={genVocalMode}
-            onVocalModeChange={setGenVocalMode}
-          />
-        </div>
       </div>
-
-      {/* Variation picker overlay */}
-      {remixVariations.length > 0 && remixLineId && (
-        <VariationPicker
-          variations={remixVariations}
-          instruction={remixInstruction}
-          onPick={(v) => pickVariation(remixLineId, v)}
-          onClose={() => { setRemixVariations([]); setRemixLineId(null); }}
-        />
-      )}
     </Layout>
   );
-}
-
-// Client-side UUID (no import needed — crypto is available in modern browsers)
-function randomUUID_client(): string {
-  return crypto.randomUUID();
 }

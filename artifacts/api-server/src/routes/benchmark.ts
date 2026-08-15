@@ -179,6 +179,10 @@ router.post(
       const s = summarize(results.map((r) => r.processingMs));
       const realtimeMultiplier = s.median > 0 ? (durationS * 1000) / s.median : null;
 
+      // Remove temp fixtures BEFORE responding — callers (and tests) may check
+      // /tmp as soon as the response lands; the finally block is only a backstop.
+      await Promise.all(cleanup.map((p) => unlink(p).catch(() => {})));
+
       res.json({
         success: true,
         measuredAt: new Date().toISOString(),
@@ -264,6 +268,9 @@ router.post(
       const uploadMs = num("x-gk-timing-upload-ms");
       const kernelMs = num("x-gk-timing-kernel-ms");
       const serverMs = num("x-gk-timing-server-ms");
+
+      // Remove temp fixtures BEFORE responding — see kernel benchmark above.
+      await Promise.all(cleanup.map((p) => unlink(p).catch(() => {})));
 
       res.json({
         success: true,

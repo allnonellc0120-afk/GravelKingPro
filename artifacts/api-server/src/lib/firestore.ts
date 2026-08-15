@@ -97,8 +97,11 @@ export function saveSongDraft(
 
   const now = new Date().toISOString();
   const doc: SongDraftData = { ...data, draftId, createdAt: now, updatedAt: now };
+  // Firestore rejects documents containing `undefined` values outright — strip
+  // absent optional fields (genre, storyPrompt, …) instead of erroring the save.
+  const clean = Object.fromEntries(Object.entries(doc).filter(([, v]) => v !== undefined));
   // merge so re-saving an existing project id never clobbers fields set by revise.
-  db.collection("song_drafts").doc(draftId).set(doc, { merge: true }).catch(() => {});
+  db.collection("song_drafts").doc(draftId).set(clean, { merge: true }).catch(() => {});
   return draftId;
 }
 

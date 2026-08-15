@@ -1,21 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { downloadBlob } from "@/lib/download";
 import { ExportQuotaBadge } from "@/components/export-quota-badge";
 import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
-import { Library, Download, Music, ArrowLeft, Loader2, FileText, Mic, CheckCircle2, Clock } from "lucide-react";
-import { Link, useSearch } from "wouter";
+import {
+  Library, Download, Music, ArrowLeft, Loader2, FileText, Mic,
+  CheckCircle2, Clock, Play, Pause, Wand2, ChevronLeft, ChevronRight,
+} from "lucide-react";
+import { Link, useSearch, useLocation } from "wouter";
 
 interface Track {
   id: string;
   title: string;
   artistName: string;
-  audioFullKey: string;
   coverArtKey: string;
+  audioPreviewKey: string;
   price: number;
+  lyricsText?: string | null;
+  createdAt?: string;
 }
 
 interface SongDraft {
@@ -51,6 +57,214 @@ function formatDate(iso: string): string {
   }
 }
 
+function fmtTime(s: number): string {
+  if (!Number.isFinite(s)) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+/**
+ * Selected-track player: cover, transport, seek bar, lyrics, downloads, and
+ * a per-track Master action. Playback streams from /api/tracks/:id/stream —
+ * the authenticated full-quality route that does NOT consume the export quota.
+ */
+function TrackPlayer({
+  track, onBack, onPrev, onNext, hasPrev, hasNext,
+  quota, downloading, onDownload,
+}: {
+  track: Track;
+  onBack: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+  quota: ReturnType<typeof useExportQuota>["quota"];
+  downloading: string | null;
+  onDownload: (trackId: string, format: "wav" | "mp3") => void;
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [audioError, setAudioError] = useState<string | null>(null);
+
+  // Reset playback state when the selected track changes.
+  useEffect(() => {
+    setPlaying(false);
+    setTime(0);
+    setDuration(0);
+    setAudioError(null);
+  }, [track.id]);
+
+  const togglePlay = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) {
+      el.pause();
+    } else {
+      // iOS: play must launch inside the gesture.
+      void el.play().catch(() => {
+        setAudioError("Playback failed — the track may still be uploading. Try again shortly.");
+      });
+    }
+  };
+
+  const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const el = audioRef.current;
+    if (!el) return;
+    const t = Number(e.target.value);
+    el.currentTime = t;
+    setTime(t);
+  };
+
+  return (
+    <div className="space-y-5" data-testid="track-player">
+      {/* Navigation row */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" onClick={onBack} data-testid="button-player-back">
+          <ArrowLeft className="w-4 h-4" /> All tracks
+        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" disabled={!hasPrev} onClick={onPrev} data-testid="button-player-prev">
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" disabled={!hasNext} onClick={onNext} data-testid="button-player-next">
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+        {/* Cover + transport */}
+        <div className="space-y-4">
+          <div className="relative aspect-square rounded-2xl overflow-hidden border border-border/40 bg-secondary/20">
+            <img
+              src={`/api/storage/public-objects/${track.coverArtKey}`}
+              alt={track.title}
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+            <button
+              onClick={togglePlay}
+              className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity"
+              aria-label={playing ? "Pause" : "Play"}
+              data-testid="button-player-cover-toggle"
+            >
+              {playing
+                ? <Pause className="w-14 h-14 text-white drop-shadow-lg" />
+                : <Play className="w-14 h-14 text-white drop-shadow-lg" />}
+            </button>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-bold truncate" data-testid="text-player-title">{track.title}</h2>
+            <p className="text-sm text-muted-foreground truncate">{track.artistName}</p>
+          </div>
+
+          {/* Transport */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                onClick={togglePlay}
+                className="bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-full w-10 h-10 p-0"
+                data-testid="button-player-play"
+              >
+                {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+              </Button>
+              <input
+                type="range"
+                min={0}
+                max={duration || 0}
+                step={0.1}
+                value={time}
+                onChange={seek}
+                className="flex-1 accent-amber-500"
+                aria-label="Seek"
+              />
+            </div>
+            <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
+              <span>{fmtTime(time)}</span>
+              <span>{fmtTime(duration)}</span>
+            </div>
+            {audioError && <p className="text-xs text-rose-400">{audioError}</p>}
+          </div>
+
+          <audio
+            ref={audioRef}
+            src={`/api/tracks/${track.id}/stream`}
+            preload="metadata"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onTimeUpdate={(e) => setTime((e.target as HTMLAudioElement).currentTime)}
+            onLoadedMetadata={(e) => setDuration((e.target as HTMLAudioElement).duration)}
+            onError={() => setAudioError("Could not load audio for this track.")}
+          />
+
+          {/* Actions */}
+          <div className="space-y-2">
+            <Link href={`/mastering?gkTrack=${encodeURIComponent(track.id)}&gkTitle=${encodeURIComponent(track.title)}`}>
+              <Button className="w-full bg-sky-500 hover:bg-sky-600 text-black font-bold" data-testid="button-player-master">
+                <Wand2 className="w-4 h-4 mr-2" /> Master this track
+              </Button>
+            </Link>
+            {quota && quota.remaining <= 0 ? (
+              <p className="text-[11px] text-rose-400 text-center leading-tight">
+                Export limit reached — resets {formatResetDate(quota.resetsAt)}
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={downloading === `${track.id}:wav`}
+                  onClick={() => onDownload(track.id, "wav")}
+                  data-testid="button-player-download-wav"
+                >
+                  {downloading === `${track.id}:wav` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  WAV
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={downloading === `${track.id}:mp3`}
+                  onClick={() => onDownload(track.id, "mp3")}
+                  data-testid="button-player-download-mp3"
+                >
+                  {downloading === `${track.id}:mp3` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  MP3
+                </Button>
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground/60 text-center">
+              Playback is free — downloads count toward your rolling 30-day export quota.
+            </p>
+          </div>
+        </div>
+
+        {/* Lyrics pane */}
+        <div className="rounded-2xl border border-border/40 bg-card/40 p-5 min-h-[300px]">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText className="w-4 h-4 text-amber-500" />
+            <span className="text-sm font-semibold">Lyrics</span>
+          </div>
+          {track.lyricsText ? (
+            <pre className="text-sm font-mono text-foreground/85 whitespace-pre-wrap leading-relaxed max-h-[480px] overflow-y-auto" data-testid="text-player-lyrics">
+              {track.lyricsText}
+            </pre>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">
+              No lyrics on file for this track — it's an instrumental, AI-sung, or an uploaded purchase.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LibraryPage() {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("tracks");
@@ -61,17 +275,22 @@ export default function LibraryPage() {
   const [studioLoading, setStudioLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const search = useSearch();
+  const [, navigate] = useLocation();
   const { quota, refresh: refreshQuota } = useExportQuota();
 
-  const loadLibrary = async () => {
+  const loadLibrary = async (): Promise<Track[]> => {
     setLoading(true);
     try {
       const r = await fetch("/api/library", { credentials: "include" });
       const d = (await r.json()) as { tracks?: Track[] };
-      setTracks(d.tracks || []);
+      const list = d.tracks || [];
+      setTracks(list);
+      return list;
     } catch {
       setTracks([]);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -95,6 +314,15 @@ export default function LibraryPage() {
   useEffect(() => {
     const params = new URLSearchParams(search);
     const cs = params.get("cs");
+    // ?track=<id> — deep link straight into the player (e.g. right after
+    // generation in the Songwriting Studio).
+    const wantTrack = params.get("track");
+    const finish = async () => {
+      const list = await loadLibrary();
+      if (wantTrack && list.some((t) => t.id === wantTrack)) {
+        setSelectedId(wantTrack);
+      }
+    };
     if (cs) {
       setConfirming(true);
       fetch("/api/tracks/confirm-purchase", {
@@ -109,12 +337,13 @@ export default function LibraryPage() {
         .catch(() => {})
         .finally(() => {
           setConfirming(false);
-          loadLibrary();
+          void finish();
         });
     } else {
-      loadLibrary();
+      void finish();
     }
     loadStudio();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const download = async (trackId: string, format: "wav" | "mp3" = "wav") => {
@@ -137,6 +366,15 @@ export default function LibraryPage() {
     } finally {
       setDownloading(null);
     }
+  };
+
+  const selectedIdx = tracks.findIndex((t) => t.id === selectedId);
+  const selected = selectedIdx >= 0 ? tracks[selectedIdx] : null;
+
+  const selectTrack = (id: string | null) => {
+    setSelectedId(id);
+    // Keep the URL shareable/back-navigable without a full reload.
+    navigate(id ? `/library?track=${encodeURIComponent(id)}` : "/library", { replace: true });
   };
 
   const TabButton = ({ id, label, icon, count }: { id: Tab; label: string; icon: React.ReactNode; count: number }) => (
@@ -168,15 +406,32 @@ export default function LibraryPage() {
           <ExportQuotaBadge quota={quota} className="ml-auto" />
         </div>
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-border/40 pb-3">
-          <TabButton id="tracks" label="Purchased Tracks" icon={<Music className="w-4 h-4" />} count={tracks.length} />
-          <TabButton id="songs" label="Lyrics & Songs" icon={<FileText className="w-4 h-4" />} count={songs.length} />
-          <TabButton id="stems" label="Audio Stems" icon={<Mic className="w-4 h-4" />} count={jobs.length} />
-        </div>
+        {/* Tabs (hidden while the player is open — the player has its own back nav) */}
+        {!selected && (
+          <div className="flex flex-wrap gap-2 border-b border-border/40 pb-3">
+            <TabButton id="tracks" label="My Tracks" icon={<Music className="w-4 h-4" />} count={tracks.length} />
+            <TabButton id="songs" label="Lyrics & Songs" icon={<FileText className="w-4 h-4" />} count={songs.length} />
+            <TabButton id="stems" label="Audio Stems" icon={<Mic className="w-4 h-4" />} count={jobs.length} />
+          </div>
+        )}
 
-        {/* ── Purchased Tracks ── */}
-        {tab === "tracks" && (
+        {/* ── Player (selected track) ── */}
+        {selected && (
+          <TrackPlayer
+            track={selected}
+            onBack={() => selectTrack(null)}
+            onPrev={() => { if (selectedIdx > 0) selectTrack(tracks[selectedIdx - 1]!.id); }}
+            onNext={() => { if (selectedIdx < tracks.length - 1) selectTrack(tracks[selectedIdx + 1]!.id); }}
+            hasPrev={selectedIdx > 0}
+            hasNext={selectedIdx >= 0 && selectedIdx < tracks.length - 1}
+            quota={quota}
+            downloading={downloading}
+            onDownload={download}
+          />
+        )}
+
+        {/* ── Track grid ── */}
+        {!selected && tab === "tracks" && (
           <>
             {(loading || confirming) && (
               <div className="flex items-center justify-center py-16">
@@ -189,43 +444,41 @@ export default function LibraryPage() {
               <div className="text-center py-16">
                 <Music className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                 <h3 className="text-lg font-medium">No tracks yet</h3>
-                <p className="text-sm text-muted-foreground mt-1">Tracks you purchase will appear here.</p>
-                <Link href="/label">
-                  <Button className="mt-4" variant="outline">Browse Label</Button>
-                </Link>
+                <p className="text-sm text-muted-foreground mt-1">Generate a song in the Songwriting Studio or purchase from the Label.</p>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <Link href="/songwriting">
+                    <Button variant="outline">Songwriting Studio</Button>
+                  </Link>
+                  <Link href="/label">
+                    <Button variant="outline">Browse Label</Button>
+                  </Link>
+                </div>
               </div>
             )}
 
             {!loading && !confirming && tracks.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tracks.map((t) => (
-                  <Card key={t.id} className="border-border/40 bg-card/40 overflow-hidden">
+                  <Card
+                    key={t.id}
+                    className="border-border/40 bg-card/40 overflow-hidden cursor-pointer hover:border-amber-500/40 transition-colors group"
+                    onClick={() => selectTrack(t.id)}
+                    data-testid={`card-track-${t.id}`}
+                  >
                     <div className="relative aspect-square bg-secondary/20 overflow-hidden">
                       <img src={`/api/storage/public-objects/${t.coverArtKey}`} alt={t.title} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play className="w-10 h-10 text-white drop-shadow-lg" />
+                      </div>
                     </div>
                     <CardContent className="pt-4 pb-3">
                       <div className="font-semibold text-sm truncate">{t.title}</div>
                       <div className="text-xs text-muted-foreground truncate">{t.artistName}</div>
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-xs text-muted-foreground">Purchased</span>
-                        {quota && quota.remaining <= 0 ? (
-                          <span className="text-[11px] text-rose-400 text-right leading-tight">
-                            Export limit reached
-                            <br />
-                            resets {formatResetDate(quota.resetsAt)}
-                          </span>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:wav`} onClick={() => download(t.id, "wav")}>
-                              {downloading === `${t.id}:wav` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                              WAV
-                            </Button>
-                            <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:mp3`} onClick={() => download(t.id, "mp3")}>
-                              {downloading === `${t.id}:mp3` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                              MP3
-                            </Button>
-                          </div>
-                        )}
+                      <div className="flex items-center justify-between mt-2">
+                        {t.lyricsText
+                          ? <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">Lyrics</Badge>
+                          : <span />}
+                        <span className="text-[11px] text-amber-400 font-medium">Open player →</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -236,7 +489,7 @@ export default function LibraryPage() {
         )}
 
         {/* ── Lyrics & Songs ── */}
-        {tab === "songs" && (
+        {!selected && tab === "songs" && (
           <>
             {studioLoading && (
               <div className="flex items-center justify-center py-16">
@@ -247,7 +500,7 @@ export default function LibraryPage() {
               <div className="text-center py-16">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                 <h3 className="text-lg font-medium">No saved lyrics yet</h3>
-                <p className="text-sm text-muted-foreground mt-1">Songs you generate in the Songwriting Studio appear here.</p>
+                <p className="text-sm text-muted-foreground mt-1">Songs you save in the Songwriting Studio appear here.</p>
                 <Link href="/songwriting">
                   <Button className="mt-4" variant="outline">Open Songwriting Studio</Button>
                 </Link>
@@ -285,7 +538,7 @@ export default function LibraryPage() {
         )}
 
         {/* ── Audio Stems ── */}
-        {tab === "stems" && (
+        {!selected && tab === "stems" && (
           <>
             {studioLoading && (
               <div className="flex items-center justify-center py-16">

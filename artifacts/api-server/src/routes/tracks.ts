@@ -61,6 +61,16 @@ const publicTrackCols = {
   updatedAt: tracksTable.updatedAt,
 };
 
+/**
+ * Library-only columns: everything public PLUS the generated lyrics text.
+ * Lyrics are only returned to the track's owner via /api/library — never on
+ * the unauthenticated /tracks listings.
+ */
+const libraryTrackCols = {
+  ...publicTrackCols,
+  lyricsText: tracksTable.lyricsText,
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 150 * 1024 * 1024 },
@@ -203,7 +213,7 @@ router.get("/library", async (req: Request, res: Response) => {
     }
 
     const tracks = await db
-      .select(publicTrackCols)
+      .select(libraryTrackCols)
       .from(tracksTable)
       .where(inArray(tracksTable.id, trackIds));
 
@@ -450,6 +460,79 @@ router.post("/tracks/confirm-purchase", async (req: Request, res: Response) => {
   } catch (_err) {
     res.status(500).json({ error: "Could not confirm purchase" });
   }
+});
+
+/**
+ * GET /api/tracks/:id/stream — in-app playback for owned tracks.
+ * Same ownership gate as /download but does NOT consume the rolling export
+ * quota (playback is not an export) and serves inline (no attachment header).
+ * Prefers the MP3 sibling to keep playback bandwidth sane; falls back to WAV.
+ */
+router.get("/tracks/:id/stream", async (req: Request, res: Response) => {
+  const session = await resolveSessionUser(req);
+  if (!session) {
+    res.status(401).json({ error: "Sign in to play this track" });
+    return;
+  }
+
+  const trackId = req.params.id as string;
+  const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, trackId));
+  if (!track || track.status !== "accepted") {
+    res.status(404).json({ error: "Track not found" });
+    return;
+  }
+
+  const [purchase] = await db
+    .select()
+    .from(purchasedTracksTable)
+    .where(and(
+      eq(purchasedTracksTable.userId, session.userId),
+      eq(purchasedTracksTable.trackId, trackId),
+    ));
+  if (!purchase) {
+    res.status(403).json({ error: "This track is not in your library" });
+    return;
+  }
+
+  const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
+  let audioKey = track.audioFullKey;
+  let contentType = "audio/wav";
+  let file = null;
+  const mp3Key = track.audioFullKey.replace(/\.[^./]+$/, ".mp3");
+  if (mp3Key !== track.audioFullKey) {
+    const mp3File = await getObjectFileWithFallback(bucketId, mp3Key).catch(() => null);
+    if (mp3File) {
+      audioKey = mp3Key;
+      contentType = "audio/mpeg";
+      file = mp3File;
+    }
+  }
+  if (!file) {
+    try {
+      file = await getObjectFileWithFallback(bucketId, audioKey);
+    } catch (err) {
+      req.log?.error?.({ err }, "track stream: storage backends unavailable");
+      res.status(503).json({ error: "Storage backend unavailable — try again shortly" });
+      return;
+    }
+  }
+  if (!file) {
+    res.status(404).json({ error: "Track audio not found in storage" });
+    return;
+  }
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+
+  file.createReadStream()
+    .on("error", (err) => {
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Playback failed" });
+      } else {
+        res.destroy(err);
+      }
+    })
+    .pipe(res);
 });
 
 /** GET /api/tracks/:id/download — stream purchased track directly to the user's device */

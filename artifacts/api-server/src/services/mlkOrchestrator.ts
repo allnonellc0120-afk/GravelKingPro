@@ -67,6 +67,47 @@ export interface GenerateAndMasterResult {
   title: string;
 }
 
+/**
+ * Auto-generated album cover (simple/static): a two-tone diagonal gradient
+ * deterministically seeded from the track id, with the title drawn on top.
+ * Plain ffmpeg plumbing — no AI cost, never produces a blank cover.
+ */
+export function buildCoverArgs(trackId: string, title: string, outPath: string): string[] {
+  // Seed two hues from the uuid so every track gets a distinct-but-stable look.
+  const seed = parseInt(trackId.replace(/-/g, "").slice(0, 8), 16) || 0x1f2937;
+  const hue0 = seed % 360;
+  const hue1 = (hue0 + 140) % 360;
+  const hsl = (h: number, s: number, l: number): string => {
+    // Minimal HSL→RGB for ffmpeg hex colors.
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      const c = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+      return Math.round(255 * c).toString(16).padStart(2, "0");
+    };
+    return `0x${f(0)}${f(8)}${f(4)}`;
+  };
+  const c0 = hsl(hue0, 0.55, 0.22);
+  const c1 = hsl(hue1, 0.6, 0.42);
+  // drawtext: escape ffmpeg filter special chars, keep it short.
+  const safeTitle = title
+    .slice(0, 42)
+    .replace(/\\/g, "")
+    .replace(/[':,\[\]=;#%]/g, " ")
+    .trim() || "GravelKing Track";
+  const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+  return [
+    "-y",
+    "-f", "lavfi",
+    "-i", `gradients=s=600x600:c0=${c0}:c1=${c1}:x0=0:y0=0:x1=600:y1=600,format=rgb24`,
+    "-vf",
+    `drawtext=fontfile=${font}:text='${safeTitle}':fontcolor=white@0.92:fontsize=40:x=(w-text_w)/2:y=h-120,` +
+      `drawtext=fontfile=${font}:text='GRAVELKING PRO':fontcolor=white@0.45:fontsize=18:x=(w-text_w)/2:y=h-64`,
+    "-frames:v", "1",
+    outPath,
+  ];
+}
+
 /** Same normalization + SHA-256 as the existing lyric possession stamp. */
 export function hashLyrics(text: string): { normalized: string; hash: string } {
   const normalized = text.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
@@ -223,6 +264,8 @@ export async function generateAndMasterTrack(
     artistName?: string;
     stylePrompt?: string;
     vocalMode?: VocalMode;
+    /** Requested song length in seconds (advisory — appended to the Lyria brief). */
+    targetDurationS?: number;
     /** When set, this run is a remix — the child cert records the parent linkage. */
     remixOf?: { parentTrackId: string; parentCertId: string | null };
   } = {},
@@ -255,12 +298,18 @@ export async function generateAndMasterTrack(
   // direction). User lyrics are NEVER rewritten (hash integrity).
   const { prompt: lyriaStylePrompt, optimized: promptOptimized } =
     await sanitizeStylePrompt(stylePrompt);
+  // Advisory duration brief — Lyria has no hard duration knob on the
+  // Interactions API, so the target length rides in the creative brief.
+  const durationLine =
+    opts.targetDurationS && opts.targetDurationS >= 30 && opts.targetDurationS <= 480
+      ? `\nTarget song length: about ${Math.round(opts.targetDurationS)} seconds.`
+      : "";
   const buildLyriaInput = (style: string) =>
     vocalMode === "instrumental"
-      ? `${style}\n\nInstrumental only — no vocals, no singing, no spoken words, no humming.`
+      ? `${style}${durationLine}\n\nInstrumental only — no vocals, no singing, no spoken words, no humming.`
       : vocalMode === "random"
-        ? `${style}\n\nWrite and sing your own original lyrics that fit this style.`
-        : `${style}\n\nSing these exact lyrics, word for word:\n${normalized}`;
+        ? `${style}${durationLine}\n\nWrite and sing your own original lyrics that fit this style.`
+        : `${style}${durationLine}\n\nSing these exact lyrics, word for word:\n${normalized}`;
   if (promptOptimized) {
     logger.info({ vocalMode }, "mlkOrchestrator: style prompt was AI-optimized before Lyria");
   }
@@ -368,9 +417,9 @@ export async function generateAndMasterTrack(
     await execFileAsync("ffmpeg", [
       "-y", "-i", normalizedPath, "-b:a", "320k", mp3Path,
     ], { timeout: 120_000 });
-    await execFileAsync("ffmpeg", [
-      "-y", "-f", "lavfi", "-i", "color=c=0x18181b:s=600x600", "-frames:v", "1", coverPath,
-    ], { timeout: 30_000 });
+    // Auto-generated album cover: deterministic two-tone gradient seeded from
+    // the track id + the title drawn on top — simple, static, never blank.
+    await execFileAsync("ffmpeg", buildCoverArgs(trackId, title, coverPath), { timeout: 30_000 });
 
     // Object writes FIRST — if any fails, no cert or track row was committed,
     // so there is no orphaned legal record or inaccessible vault entry.
@@ -428,6 +477,8 @@ export async function generateAndMasterTrack(
         status: "accepted",
         price: 0,
         submittedByUserId: userId,
+        // Exact lyrics the AI sang — displayed under the Library player.
+        lyricsText: vocalMode === "lyrics" && normalized ? normalized : null,
       });
       await tx.insert(purchasedTracksTable).values({
         userId,
