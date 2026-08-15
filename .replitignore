@@ -1,5 +1,32 @@
 # The format of this file is identical to `.dockerignore`.
 # It is used to reduce the size of deployed images to make the process of publishing faster.
+# NOTE: excluded paths are absent in the deploy builder too — never exclude
+# anything imported at build time (e.g. attached_assets/IMG_1956/IMG_1957 pngs
+# used by gravelkingpro-promo scenes) or needed at runtime (.pythonlibs).
 
 # No need to store the pnpm store twice.
 .local
+.cache
+.config/npm
+.git
+
+# Heavy media never referenced by any build or runtime code
+attached_assets/final_promos
+attached_assets/generated_videos
+attached_assets/generated
+attached_assets/*.aab
+attached_assets/*.mp4
+attached_assets/*.mov
+attached_assets/*.webm
+attached_assets/*.wav
+attached_assets/*.zip
+
+# Dev-only project folders
+android-twa
+screenshots
+MorrisLawKernel
+deliverables
+business-package
+exports
+seeds
+vendor/tmp
