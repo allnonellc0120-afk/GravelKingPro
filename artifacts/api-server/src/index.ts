@@ -176,6 +176,25 @@ async function migrateAppSchema() {
       )
     `);
 
+    // Certificate paywall — docs stay private until unlocked (additive + idempotent).
+    await db.execute(sql`
+      ALTER TABLE ip_cert_stubs
+        ADD COLUMN IF NOT EXISTS ipi_number        text,
+        ADD COLUMN IF NOT EXISTS iswc              text,
+        ADD COLUMN IF NOT EXISTS isrc              text,
+        ADD COLUMN IF NOT EXISTS owner_user_id     text,
+        ADD COLUMN IF NOT EXISTS category          text,
+        ADD COLUMN IF NOT EXISTS provenance        text,
+        ADD COLUMN IF NOT EXISTS unlocked_at       timestamptz,
+        ADD COLUMN IF NOT EXISTS unlock_source     text,
+        ADD COLUMN IF NOT EXISTS stripe_session_id text
+    `);
+    await db.execute(sql`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS cert_unlocks             integer NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS cert_unlock_period_start timestamptz
+    `);
+
     logger.info("App schema migration complete");
   } catch (err: unknown) {
     logger.error({ err }, "App schema migration failed — continuing anyway");

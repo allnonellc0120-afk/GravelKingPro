@@ -560,6 +560,12 @@ export async function generateAndMasterTrack(
           // the human-authored input that drove the generation.
           stylePrompt: stylePromptRecord,
           styleAuthorshipScore: null,
+          // Certificate paywall metadata: generated in-house, owned by the
+          // generating account. The document stays locked until unlocked
+          // (purchase or included allowance) — enforced in court-cert.ts.
+          ownerUserId: userId,
+          category: vocalMode === "instrumental" ? "instrumental" : "full_track",
+          provenance: "internal",
         });
       }
       await tx.insert(tracksTable).values({

@@ -312,18 +312,6 @@ export default function Mastering() {
 
       const rem = resp.headers.get("X-GK-Free-Remaining");
       if (rem !== null) setRemaining(parseInt(rem));
-      const certificationStatus = resp.headers.get("X-GK-Certification");
-      if (certify && certificationStatus === "skipped-acr-unavailable") {
-        toast({
-          title: "Master complete — stamp skipped",
-          description: "The copyright scan is temporarily unavailable. Your master still completed and was not stamped.",
-        });
-      } else if (certify && certificationStatus === "skipped-acr-match") {
-        toast({
-          title: "Master complete — stamp skipped",
-          description: "A commercial catalog match was detected. Your master still completed and was not stamped.",
-        });
-      }
       // Real HTTPS download URL — large blob: URLs stall when saving on mobile.
       setDownloadHref(resp.headers.get("X-GK-Download-Url"));
       // Certificate id (only present when this master was certified).

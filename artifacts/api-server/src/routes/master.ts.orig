@@ -238,7 +238,6 @@ const maybeValidateIngestion = (req: Request, res: Response, next: NextFunction)
     void validateAssetIngestion({
       requireAudio: true,
       commercialFingerprint: true,
-      allowUncertifiedFallback: true,
     })(req, res, next);
     return;
   }
@@ -340,17 +339,7 @@ masterRouter.post(
 
     // certify=true → copyright/ownership validation (runs in middleware) plus
     // an embedded IP cert. Default false → master any track, no watermark.
-    const certifyRequested = asStr(req.body.certify) === "true";
-    const fingerprintStatus =
-      req.ingestionValidation?.metadata.commercialFingerprint.status ?? "not_run";
-    // ACRCloud controls only the stamp. Mastering always continues when the
-    // provider is down, suspended, times out, or returns a catalog match.
-    const certify = certifyRequested && fingerprintStatus === "no_match";
-    const certificationStatus =
-      !certifyRequested ? "not-requested"
-      : certify ? "sealed"
-      : fingerprintStatus === "match" ? "skipped-acr-match"
-      : "skipped-acr-unavailable";
+    const certify      = asStr(req.body.certify) === "true";
     // Artist handle attached to every cert
     const artistHandle = (asStr(req.body.artist) || "Unknown Artist")
       .trim().slice(0, 64).replace(/[^\w\s@._-]/g, "");
@@ -680,7 +669,6 @@ masterRouter.post(
         if (appliedThresholdDb !== null) res.setHeader("X-GK-AppliedThresholdDb", appliedThresholdDb.toFixed(1));
         if (autoThresholdFallback)       res.setHeader("X-GK-AutoThresholdFallback", "true");
         res.setHeader("X-GK-Parity",            parity);
-        res.setHeader("X-GK-Certification",     certificationStatus);
         // Measured timing decomposition (ms): multipart upload+parse, kernel
         // processing, and total server time up to response start.
         const reqStart = (res.locals as { requestStartMs?: number }).requestStartMs;

@@ -49,4 +49,28 @@ export const ipCertStubsTable = pgTable("ip_cert_stubs", {
 
   /** ISRC (International Standard Recording Code) — recording identifier */
   isrc: text("isrc"),
+
+  // ── Certificate paywall (task: docs stay private until unlocked) ────────
+
+  /** Owning user (users.id) — the ONLY account allowed to view/unlock docs.
+   *  NULL = legacy stub with no recorded owner → fail closed (no access). */
+  ownerUserId: text("owner_user_id"),
+
+  /** What was certified: 'lyrics' | 'instrumental' | 'full_track' | 'vocal_performance' */
+  category: text("category"),
+
+  /** Where the audio came from: 'internal' (generated in-app) |
+   *  'external_upload' (user upload, ACRCloud-gated) | 'vocal_recording' (in-app booth) */
+  provenance: text("provenance"),
+
+  /** When the certificate DOCUMENT was unlocked (NULL = still locked).
+   *  Stamping is free; the JSON/PDF document is the paid artifact. */
+  unlockedAt: timestamp("unlocked_at", { withTimezone: true }),
+
+  /** How it was unlocked: 'purchase' ($1.99 one-time) | 'included' (subscriber allowance) | 'admin' */
+  unlockSource: text("unlock_source"),
+
+  /** Stripe Checkout session that paid for this unlock — idempotency anchor
+   *  for duplicate webhook deliveries. */
+  stripeSessionId: text("stripe_session_id"),
 });
