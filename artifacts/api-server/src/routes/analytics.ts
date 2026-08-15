@@ -86,6 +86,7 @@ const FUNNEL_EVENTS = new Set([
   "landing_cta_clicked",
   "plan_selected",
   "signin_required",
+  "checkout_started",
   "signup_completed",
   "checkout_returned",
   "checkout_error",
