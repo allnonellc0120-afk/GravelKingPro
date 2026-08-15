@@ -36,6 +36,12 @@ export interface LyricVerification {
   reason?: string;
   /** "Song — Artist" when the screen recognized a specific work. */
   matchedWork?: string;
+  /**
+   * The specific matching passage returned by the screening model (≤120 chars).
+   * Present only when verdict is "flagged". Used by the UI to highlight the
+   * problematic text inside the editor.
+   */
+  evidence?: string;
   /** True when the screening service itself failed and the gate failed open. */
   screeningUnavailable?: boolean;
 }
@@ -134,9 +140,11 @@ export function parseScreeningResponse(raw: string): LyricVerification {
     }
 
     const matchedWork = `${song} — ${artist}`;
+    const evidenceStr = typeof p["evidence"] === "string" ? p["evidence"].trim() : undefined;
     return {
       verdict: "flagged",
       matchedWork,
+      evidence: evidenceStr || undefined,
       reason:
         `These lyrics appear to reproduce "${matchedWork}". ` +
         "Rewrite the matching passage in your own words, then verify again.",

@@ -388,6 +388,7 @@ lyricsRouter.post("/lyrics/verify", lyricsAiRateLimit, async (req: Request, res:
       verdict: result.verdict,
       ...(result.reason ? { reason: result.reason } : {}),
       ...(result.matchedWork ? { matchedWork: result.matchedWork } : {}),
+      ...(result.evidence ? { evidence: result.evidence } : {}),
       ...(result.screeningUnavailable ? { screeningUnavailable: true } : {}),
       method: "ai_screening",
     });
@@ -395,6 +396,66 @@ lyricsRouter.post("/lyrics/verify", lyricsAiRateLimit, async (req: Request, res:
     req.log.error({ err }, "Lyric verification failed");
     void logToolError("Lyric Verify", "COPYRIGHT_SCREEN", err);
     res.status(500).json({ error: "Verification failed. Please try again." });
+  }
+});
+
+// ─── POST /api/lyrics/rewrite-passage ────────────────────────────────────────
+// AI-assisted rewrite of a single flagged passage. The user can accept or
+// further edit the suggestion before re-verifying. No authorship score impact
+// here — the user must still rewrite in their own words; this is a starting
+// point, not a replacement.
+lyricsRouter.post("/lyrics/rewrite-passage", lyricsAiRateLimit, async (req: Request, res: Response) => {
+  const { passage, matchedWork, songContext } = req.body as {
+    passage?: string;
+    matchedWork?: string;
+    songContext?: string;
+  };
+  const input = (passage ?? "").toString().trim();
+  if (input.length < 3) {
+    res.status(400).json({ error: "passage is required (min 3 characters)." });
+    return;
+  }
+  if (!isVertexConfigured()) {
+    res.status(503).json({ error: "AI rewrite service is temporarily unavailable. Please rewrite this passage manually." });
+    return;
+  }
+
+  const contextHint = matchedWork
+    ? `The flagged passage is recognized as a portion of "${matchedWork}".`
+    : "The flagged passage resembles a commercially released song.";
+  const songHint = songContext ? `The surrounding song context is:\n${songContext.slice(0, 600)}\n\n` : "";
+
+  const prompt = `You are a professional lyricist helping a songwriter fix a copyright issue.
+
+${contextHint} Rewrite the following passage in a completely original way so it is clearly distinct from the source material. The rewrite must:
+- Express the same core emotional idea or theme
+- Match the approximate line count and syllable cadence
+- Use fresh, vivid, concrete imagery (no AI clichés)
+- Contain ZERO words or phrases from the original flagged passage
+- Sound natural when sung
+
+${songHint}Flagged passage to rewrite:
+"""
+${input.slice(0, 500)}
+"""
+
+Output ONLY the rewritten passage — no introductory text, no commentary, no quotation marks around the output.`;
+
+  try {
+    const rewrite = (await generateVertexText(prompt, {
+      temperature: 0.8,
+      maxOutputTokens: 512,
+      thinkingConfig: { thinkingBudget: 0 },
+    })).trim();
+    if (!rewrite) {
+      res.status(503).json({ error: "AI rewrite returned an empty response. Please rewrite this passage manually." });
+      return;
+    }
+    res.json({ rewrite });
+  } catch (err) {
+    req.log.error({ err }, "Lyric rewrite-passage failed");
+    void logToolError("Lyric Rewrite", "AI_GENERATION", err);
+    res.status(500).json({ error: "Rewrite failed. Please rewrite this passage manually." });
   }
 });
 
