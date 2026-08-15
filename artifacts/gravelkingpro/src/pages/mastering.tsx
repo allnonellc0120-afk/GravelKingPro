@@ -16,6 +16,8 @@ import { useAppState } from "@/lib/context";
 import { downloadUrl } from "@/lib/download";
 import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
 import { EmailGate, useEmailGate } from "@/components/email-gate";
+import { ExportQuotaBadge } from "@/components/export-quota-badge";
+import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
 import { Link } from "wouter";
 
 type State = "idle" | "compressing" | "processing" | "done" | "error";
@@ -71,6 +73,7 @@ export default function Mastering() {
   const [stylePrompt, setStylePrompt] = useState("");
 
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
+  const { quota, refresh: refreshQuota } = useExportQuota();
 
   const processFile = useCallback(async (
     file: File, selectedPreset: PresetId, denoise: boolean,
@@ -180,6 +183,7 @@ export default function Mastering() {
       setResultUrl(URL.createObjectURL(blob));
       setState("done");
       setProgress(100);
+      void refreshQuota();
     } catch (err: any) {
       clearInterval(crawlId);
       setState("error");
@@ -290,6 +294,7 @@ export default function Mastering() {
                 1 free download
               </Badge>
             )}
+            <ExportQuotaBadge quota={quota} />
             <ToolHelp
               title="Mastering"
               summary="Runs a professional mastering chain — EQ, compression and loudness, with optional denoise — to polish a finished mix."
@@ -661,12 +666,20 @@ export default function Mastering() {
               )}
             </div>
 
-            <Button
-              onClick={startMastering}
-              className="w-full bg-sky-600 hover:bg-sky-700 font-semibold"
-            >
-              <Wand2 className="w-4 h-4 mr-2" /> Master with {selectedPreset.label}
-            </Button>
+            {/* At 0 exports left the server would 429 the mastering run itself, so the
+                start action explains the reset date instead of failing on click. */}
+            {quota && quota.remaining <= 0 ? (
+              <Button disabled variant="outline" className="w-full border-rose-500/30 text-rose-400 font-semibold" data-testid="button-export-limit">
+                Export limit reached — resets {formatResetDate(quota.resetsAt)}
+              </Button>
+            ) : (
+              <Button
+                onClick={startMastering}
+                className="w-full bg-sky-600 hover:bg-sky-700 font-semibold"
+              >
+                <Wand2 className="w-4 h-4 mr-2" /> Master with {selectedPreset.label}
+              </Button>
+            )}
 
             {!isPro && (
               <p className="text-xs text-center text-muted-foreground">
@@ -733,6 +746,9 @@ export default function Mastering() {
                 <audio src={resultUrl} controls className="w-full h-10" />
 
                 <div className="flex gap-3">
+                  {/* This result already consumed its export credit server-side when
+                      the master ran — saving it must stay possible even if the quota
+                      just hit 0, so the download is never gated here. */}
                   <Button onClick={download} className="flex-1 bg-sky-600 hover:bg-sky-700">
                     <Download className="w-4 h-4 mr-2" /> Download WAV
                   </Button>
