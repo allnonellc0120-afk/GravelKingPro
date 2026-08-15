@@ -40,6 +40,9 @@ export const usersTable = pgTable("users", {
   // Rolling 30-day WAV/MP3 export quota (applies to paid tiers too).
   monthlyExports: integer("monthly_exports").notNull().default(0),
   exportPeriodStart: timestamp("export_period_start", { withTimezone: true }),
+  // Rolling 30-day included certificate-unlock allowance (monthly/Studio+ only).
+  certUnlocks: integer("cert_unlocks").notNull().default(0),
+  certUnlockPeriodStart: timestamp("cert_unlock_period_start", { withTimezone: true }),
 });
 
 export type UpsertUser = typeof usersTable.$inferInsert;

@@ -7,6 +7,7 @@ import {
   promotersTable,
   referralAttributionsTable,
   commissionsTable,
+  ipCertStubsTable,
 } from '@workspace/db';
 import { eq, sql } from 'drizzle-orm';
 import type { Request } from 'express';
@@ -106,6 +107,32 @@ export class WebhookHandlers {
 
             // Track purchases are fully handled here.
             // Do NOT forward to stripe-replit-sync (which mirrors subscription data).
+            return;
+          }
+
+          // ── Per-certificate $1.99 unlock ─────────────────────────────────
+          // Idempotent: the conditional UPDATE only fires while unlocked_at is
+          // NULL, so duplicate webhook deliveries are no-ops. Owner-scoped so a
+          // paid session can never unlock someone else's certificate.
+          if (
+            meta.kind === 'cert_unlock' &&
+            meta.cert_id &&
+            meta.user_id &&
+            (session.payment_status === 'paid' || session.status === 'complete')
+          ) {
+            await db
+              .update(ipCertStubsTable)
+              .set({
+                unlockedAt: sql`NOW()`,
+                unlockSource: 'purchase',
+                stripeSessionId: session.id,
+              })
+              .where(
+                sql`${ipCertStubsTable.certId} = ${meta.cert_id}
+                  AND ${ipCertStubsTable.ownerUserId} = ${meta.user_id}
+                  AND ${ipCertStubsTable.unlockedAt} IS NULL`,
+              );
+            // Cert unlocks are fully handled here — nothing for stripe-replit-sync.
             return;
           }
         }
