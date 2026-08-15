@@ -674,15 +674,15 @@ description = "Text-to-speech audio: GravelKing Pro. Your song starts today."
 id = "TbnhXvhgy6JFIJZJMRRYt"
 uri = "file://attached_assets/final_promos/gravelkingpro_promo_59s_16x9.mp4"
 type = "video"
-title = "GravelKing Pro Promo — Landscape 4K (59s)"
-description = "3840×2160, 30fps, voiceover + warm soundtrack, verified smooth playback"
+title = "GravelKing Pro Promo — 59s (16:9)"
+description = "Final promo master, landscape — for YouTube/web."
 
 [[outputs]]
 id = "WCjCBW6waaa1RSl6uiNBv"
 uri = "file://attached_assets/final_promos/gravelkingpro_promo_59s_9x16.mp4"
 type = "video"
-title = "GravelKing Pro Promo — Vertical 4K (59s)"
-description = "2160×3840, 30fps, voiceover + warm soundtrack, verified smooth playback"
+title = "GravelKing Pro Promo — 59s (9:16)"
+description = "Final promo master, vertical — for TikTok/Reels/Shorts."
 
 [[outputs]]
 id = "pPHF8OYo1JZRvCVfUFa5j"
