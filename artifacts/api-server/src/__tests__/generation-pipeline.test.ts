@@ -26,7 +26,7 @@ import { eq } from "drizzle-orm";
 
 import app from "../app";
 import { buildCoverArgs } from "../services/mlkOrchestrator";
-import { primeLyricVerificationForTest } from "../services/lyricGuard";
+import { primeLyricVerificationForTest, parseScreeningResponse } from "../services/lyricGuard";
 import { saveObjectWithFallback } from "../lib/objectStorage";
 import {
   db,
@@ -36,6 +36,7 @@ import {
   purchasedTracksTable,
   lyricProjectsTable,
   lyricRevisionsTable,
+  lyricImportsTable,
 } from "@workspace/db";
 
 const execFileAsync = promisify(execFile);
@@ -294,6 +295,234 @@ async function main(): Promise<void> {
         .from(lyricProjectsTable)
         .where(eq(lyricProjectsTable.id, gateProjectId));
       check("clean revise persisted", afterCleanRevise?.currentContent === cleanDraft);
+
+      // 6d-bis. Nonconforming screening-model responses must NEVER be treated
+      // as a clearance — every malformed/partial shape maps to fail-open with
+      // screeningUnavailable, and only the two exact contract shapes parse.
+      check(
+        "parse: valid clear → clear, screened",
+        (() => { const r = parseScreeningResponse('{"verdict":"clear"}'); return r.verdict === "clear" && !r.screeningUnavailable; })(),
+      );
+      check(
+        "parse: valid flagged → flagged with matchedWork",
+        (() => { const r = parseScreeningResponse('{"verdict":"flagged","song":"Song A","artist":"Artist B"}'); return r.verdict === "flagged" && r.matchedWork === "Song A — Artist B"; })(),
+      );
+      check(
+        "parse: valid flagged with evidence → flagged",
+        (() => { const r = parseScreeningResponse('{"verdict":"flagged","song":"Song A","artist":"Artist B","evidence":"the hook"}'); return r.verdict === "flagged" && r.matchedWork === "Song A — Artist B"; })(),
+      );
+      check(
+        "parse: fenced valid clear → clear",
+        (() => { const r = parseScreeningResponse('```json\n{"verdict":"clear"}\n```'); return r.verdict === "clear" && !r.screeningUnavailable; })(),
+      );
+      const nonconforming: Array<[string, string]> = [
+        ["unparseable prose", "I think these lyrics are fine."],
+        ["empty string", ""],
+        ["JSON non-object", '"clear"'],
+        ["JSON array", '[{"verdict":"clear"}]'],
+        ["missing verdict", '{"song":"X"}'],
+        ["unknown verdict", '{"verdict":"ok"}'],
+        ["verdict wrong type", '{"verdict":true}'],
+        ["clear with extra key", '{"verdict":"clear","unexpected":"value"}'],
+        ["flagged without song/artist", '{"verdict":"flagged"}'],
+        ["flagged song-only", '{"verdict":"flagged","song":"Title"}'],
+        ["flagged artist-only", '{"verdict":"flagged","artist":"Artist"}'],
+        ["flagged with empty song/artist", '{"verdict":"flagged","song":"","artist":"  "}'],
+        ["flagged song wrong type", '{"verdict":"flagged","song":42,"artist":"Artist"}'],
+        ["flagged with unexpected key", '{"verdict":"flagged","song":"S","artist":"A","confidence":0.9}'],
+        ["flagged evidence wrong type", '{"verdict":"flagged","song":"S","artist":"A","evidence":123}'],
+        ["flagged evidence empty", '{"verdict":"flagged","song":"S","artist":"A","evidence":"  "}'],
+      ];
+      for (const [label, raw] of nonconforming) {
+        const r = parseScreeningResponse(raw);
+        check(
+          `parse: ${label} → unavailable, never a clearance`,
+          r.verdict === "clear" && r.screeningUnavailable === true,
+          JSON.stringify(r),
+        );
+      }
+
+      // 6e. Screening outage (fail-open policy): save proceeds but the response
+      // carries screeningUnavailable so the client never claims "cleared".
+      const unscreenedText = "[Verse 1]\nOutage lane, no signal home\nThese unscreened words are mine alone";
+      primeLyricVerificationForTest(unscreenedText, { verdict: "clear", screeningUnavailable: true });
+      const outageCreate = await fetch(`${base}/api/lyrics/project`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({ aiDraft: unscreenedText, title: "Outage Test" }),
+      });
+      check("outage create → HTTP 200 (fail-open)", outageCreate.status === 200, `got ${outageCreate.status}`);
+      const outageBody = (await outageCreate.json()) as { id: string; screeningUnavailable?: boolean };
+      check("outage create response carries screeningUnavailable:true", outageBody.screeningUnavailable === true, JSON.stringify(outageBody));
+
+      // 6e-bis. Import/possession-stamp during a screening outage: the stamp
+      // is saved (fail-open) but the response MUST carry screeningUnavailable
+      // so the client labels it honestly instead of a silent "stamped ✓".
+      const unscreenedImportText = "[Verse 1]\nStamp me through the outage window\nMy own words, unscreened but mine";
+      primeLyricVerificationForTest(unscreenedImportText, { verdict: "clear", screeningUnavailable: true });
+      const outageImport = await fetch(`${base}/api/lyrics/import`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          text: unscreenedImportText,
+          certifiedHumanAuthor: true,
+          certificationText: "I certify these lyrics are my original human work and were NOT produced by an AI.",
+        }),
+      });
+      check("outage import → HTTP 200 (fail-open)", outageImport.status === 200, `got ${outageImport.status}`);
+      const outageImportBody = (await outageImport.json()) as {
+        import?: { id?: string; stampedAt?: string };
+        screeningUnavailable?: boolean;
+      };
+      check(
+        "outage import response carries screeningUnavailable:true",
+        outageImportBody.screeningUnavailable === true,
+        JSON.stringify(outageImportBody),
+      );
+      check("outage import still returns the stamp record", Boolean(outageImportBody.import?.id), JSON.stringify(outageImportBody.import ?? {}));
+      if (outageImportBody.import?.id) {
+        await db.delete(lyricImportsTable).where(eq(lyricImportsTable.id, outageImportBody.import.id)).catch(() => {});
+      }
+
+      // Contrast: a SCREENED import must NOT carry the flag.
+      const screenedImportText = "[Verse 1]\nScreened and stamped in the same breath\nEvery word my own, verified";
+      primeLyricVerificationForTest(screenedImportText, { verdict: "clear" });
+      const screenedImport = await fetch(`${base}/api/lyrics/import`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({ text: screenedImportText, certifiedHumanAuthor: true }),
+      });
+      check("screened import → HTTP 200", screenedImport.status === 200, `got ${screenedImport.status}`);
+      const screenedImportBody = (await screenedImport.json()) as {
+        import?: { id?: string };
+        screeningUnavailable?: boolean;
+      };
+      check(
+        "screened import response has NO screeningUnavailable flag",
+        screenedImportBody.screeningUnavailable === undefined,
+        JSON.stringify(screenedImportBody),
+      );
+      if (screenedImportBody.import?.id) {
+        await db.delete(lyricImportsTable).where(eq(lyricImportsTable.id, screenedImportBody.import.id)).catch(() => {});
+      }
+
+      // 6f. Owner can DELETE the (unscreened) project; strangers cannot —
+      // and neither can a caller with NO credential at all (the IDOR case).
+      const strangerDelete = await fetch(`${base}/api/lyrics/project/${outageBody.id}`, {
+        method: "DELETE",
+        headers: { Cookie: `gk_session=stranger-${randomUUID()}` },
+      });
+      check("stranger delete → HTTP 403", strangerDelete.status === 403, `got ${strangerDelete.status}`);
+
+      const anonDelete = await fetch(`${base}/api/lyrics/project/${outageBody.id}`, {
+        method: "DELETE",
+      });
+      check("anonymous (no-cookie) delete → HTTP 403", anonDelete.status === 403, `got ${anonDelete.status}`);
+      const anonSurvived = await db
+        .select({ id: lyricProjectsTable.id })
+        .from(lyricProjectsTable)
+        .where(eq(lyricProjectsTable.id, outageBody.id));
+      check("project survives anonymous delete attempt", anonSurvived.length === 1, `${anonSurvived.length} rows`);
+
+      const anonRead = await fetch(`${base}/api/lyrics/project/${outageBody.id}`);
+      check("anonymous (no-cookie) project read → HTTP 403", anonRead.status === 403, `got ${anonRead.status}`);
+
+      const anonRevise = await fetch(`${base}/api/lyrics/revise`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: outageBody.id, content: cleanDraft, editType: "manual_edit" }),
+      });
+      check("anonymous (no-cookie) revise → HTTP 403", anonRevise.status === 403, `got ${anonRevise.status}`);
+
+      const ownerDelete = await fetch(`${base}/api/lyrics/project/${outageBody.id}`, {
+        method: "DELETE",
+        headers: { Cookie: gkCookie },
+      });
+      check("owner delete → HTTP 200", ownerDelete.status === 200, `got ${ownerDelete.status}`);
+      const deletedRows = await db
+        .select({ id: lyricProjectsTable.id })
+        .from(lyricProjectsTable)
+        .where(eq(lyricProjectsTable.id, outageBody.id));
+      check("project row removed after delete", deletedRows.length === 0, `${deletedRows.length} rows`);
+      const deleteMissing = await fetch(`${base}/api/lyrics/project/${outageBody.id}`, {
+        method: "DELETE",
+        headers: { Cookie: gkCookie },
+      });
+      check("re-delete of missing project → HTTP 404", deleteMissing.status === 404, `got ${deleteMissing.status}`);
+
+      // 6f-bis. User ids are NOT bearer credentials: a project created by a
+      // SIGNED-IN user (Bearer sid, no gk_session cookie) must store a random
+      // owner token — never the user id — so an attacker who learns the
+      // owner's public user id and sets gk_session to it gets 403 everywhere.
+      const signedInText = "[Verse 1]\nSigned in, token fresh and random\nNo public id unlocks this door";
+      primeLyricVerificationForTest(signedInText, { verdict: "clear" });
+      const signedInCreate = await fetch(`${base}/api/lyrics/project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${owner.sid}` },
+        body: JSON.stringify({ aiDraft: signedInText, title: "Spoof Test" }),
+      });
+      check("signed-in (cookie-less) create → HTTP 200", signedInCreate.status === 200, `got ${signedInCreate.status}`);
+      const { id: spoofProjectId } = (await signedInCreate.json()) as { id: string };
+      const issuedCookie = signedInCreate.headers.get("set-cookie") ?? "";
+      check("create issues a gk_session cookie to the signed-in creator", issuedCookie.includes("gk_session="), issuedCookie.slice(0, 80));
+      const issuedToken = /gk_session=([^;]+)/.exec(issuedCookie)?.[1] ?? "";
+      check("issued owner token is NOT the user id", issuedToken !== "" && issuedToken !== owner.userId, issuedToken.slice(0, 40));
+      const [spoofRow] = await db
+        .select({ sessionId: lyricProjectsTable.sessionId })
+        .from(lyricProjectsTable)
+        .where(eq(lyricProjectsTable.id, spoofProjectId));
+      check("stored owner sessionId is NOT the user id", spoofRow?.sessionId !== owner.userId, String(spoofRow?.sessionId).slice(0, 40));
+
+      const spoofHeaders = { Cookie: `gk_session=${owner.userId}` };
+      const spoofRead = await fetch(`${base}/api/lyrics/project/${spoofProjectId}`, { headers: spoofHeaders });
+      check("spoofed user-id cookie read → HTTP 403", spoofRead.status === 403, `got ${spoofRead.status}`);
+      const spoofRevise = await fetch(`${base}/api/lyrics/revise`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...spoofHeaders },
+        body: JSON.stringify({ projectId: spoofProjectId, content: cleanDraft, editType: "manual_edit" }),
+      });
+      check("spoofed user-id cookie revise → HTTP 403", spoofRevise.status === 403, `got ${spoofRevise.status}`);
+      const spoofDelete = await fetch(`${base}/api/lyrics/project/${spoofProjectId}`, {
+        method: "DELETE",
+        headers: spoofHeaders,
+      });
+      check("spoofed user-id cookie delete → HTTP 403", spoofDelete.status === 403, `got ${spoofDelete.status}`);
+
+      // The real issued token DOES work; the authenticated creator can delete.
+      const issuedTokenDelete = await fetch(`${base}/api/lyrics/project/${spoofProjectId}`, {
+        method: "DELETE",
+        headers: { Cookie: `gk_session=${issuedToken}` },
+      });
+      check("creator's issued token delete → HTTP 200", issuedTokenDelete.status === 200, `got ${issuedTokenDelete.status}`);
+      await db.delete(lyricProjectsTable).where(eq(lyricProjectsTable.id, spoofProjectId)).catch(() => {});
+
+      // 6g. Delete cascades: revisions vanish with the project (FK onDelete cascade).
+      const cascadeCreate = await fetch(`${base}/api/lyrics/project`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({ aiDraft: cleanDraft, content: editedClean, title: "Cascade Test" }),
+      });
+      const { id: cascadeId } = (await cascadeCreate.json()) as { id: string };
+      await fetch(`${base}/api/lyrics/revise`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({ projectId: cascadeId, content: cleanDraft, editType: "manual_edit" }),
+      });
+      const preCascade = await db
+        .select({ id: lyricRevisionsTable.id })
+        .from(lyricRevisionsTable)
+        .where(eq(lyricRevisionsTable.projectId, cascadeId));
+      check("cascade fixture has a revision row", preCascade.length === 1, `${preCascade.length} rows`);
+      const cascadeDelete = await fetch(`${base}/api/lyrics/project/${cascadeId}`, {
+        method: "DELETE",
+        headers: { Cookie: gkCookie },
+      });
+      check("cascade delete → HTTP 200", cascadeDelete.status === 200, `got ${cascadeDelete.status}`);
+      const postCascade = await db
+        .select({ id: lyricRevisionsTable.id })
+        .from(lyricRevisionsTable)
+        .where(eq(lyricRevisionsTable.projectId, cascadeId));
+      check("revision rows cascade-deleted with the project", postCascade.length === 0, `${postCascade.length} rows`);
 
       // Cleanup gate-test rows (revisions first — FK).
       await db.delete(lyricRevisionsTable).where(eq(lyricRevisionsTable.projectId, gateProjectId)).catch(() => {});

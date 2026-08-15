@@ -9,7 +9,7 @@ import { useAppState } from "@/lib/context";
 import {
   Sparkles, Music2, Lock, CheckCircle2, AlertTriangle, Loader2,
   FileText, Mic, Shield, ShieldCheck, ShieldAlert, Fingerprint,
-  ArrowRight, Clock3, Wand2, RotateCcw,
+  ArrowRight, Clock3, Wand2, RotateCcw, Trash2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,7 +20,7 @@ import { authorshipScore as computeAuthorshipScore } from "@workspace/authorship
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type VocalMode = "lyrics" | "random" | "instrumental";
-type VerifyState = "idle" | "checking" | "clear" | "flagged";
+type VerifyState = "idle" | "checking" | "clear" | "flagged" | "unavailable";
 
 type LineState = {
   id: string;
@@ -101,6 +101,13 @@ function VerifyBadge({ state, matchedWork }: { state: VerifyState; matchedWork?:
       </span>
     );
   }
+  if (state === "unavailable") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-amber-400 font-medium">
+        <ShieldAlert className="w-3.5 h-3.5" /> Screening service unavailable — not verified
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] text-rose-400 font-semibold">
       <ShieldAlert className="w-3.5 h-3.5" /> Flagged{matchedWork ? `: ${matchedWork}` : ""}
@@ -178,6 +185,9 @@ export default function SongwritingStudio() {
   const [importCertified, setImportCertified] = useState(false);
   const [isStamping, setIsStamping] = useState(false);
   const [lastStampAt, setLastStampAt] = useState<string | null>(null);
+  // True when the last stamp was saved during a copyright-screen outage —
+  // the stamp exists but must never be presented as screened/cleared.
+  const [lastStampUnscreened, setLastStampUnscreened] = useState(false);
 
   const authorship = useMemo(
     () => (aiDraft && lyricsText ? computeAuthorshipScore(aiDraft, lyricsText) : lyricsText.trim() ? 100 : 0),
@@ -194,7 +204,10 @@ export default function SongwritingStudio() {
 
   // Verification is only demanded when the user's own lyrics will be sung/saved.
   const needsVerification = usesOwnLyrics;
-  const isVerifiedCurrent = verifyState === "clear" && verifiedTextRef.current === lyricsText.trim();
+  // "unavailable" counts as a completed screen attempt (fail-open policy):
+  // saving/generating may proceed, but the UI never claims the lyrics cleared.
+  const isVerifiedCurrent = (verifyState === "clear" || verifyState === "unavailable")
+    && verifiedTextRef.current === lyricsText.trim();
 
   // Any lyric edit invalidates a previous verdict.
   useEffect(() => {
@@ -258,6 +271,7 @@ export default function SongwritingStudio() {
       });
       const data = (await res.json()) as {
         verdict?: string; reason?: string; matchedWork?: string; error?: string;
+        screeningUnavailable?: boolean;
       };
       if (!res.ok) throw new Error(data.error || "Verification failed");
       verifiedTextRef.current = text;
@@ -266,6 +280,13 @@ export default function SongwritingStudio() {
         setMatchedWork(data.matchedWork);
         setVerifyMsg(data.reason || "These lyrics appear to reproduce a released song. Rewrite the matching passage in your own words.");
         return false;
+      }
+      if (data.screeningUnavailable) {
+        // Fail-open policy: the outage never blocks songwriting, but we must
+        // NOT claim the lyrics were cleared — mark them honestly as unscreened.
+        setVerifyState("unavailable");
+        setVerifyMsg("The AI copyright screen is temporarily unavailable. You can still save and generate, but these lyrics have NOT been screened. You can delete the project at any time.");
+        return true;
       }
       setVerifyState("clear");
       return true;
@@ -336,9 +357,33 @@ export default function SongwritingStudio() {
             generationCount: aiDraft ? 1 : 0,
           }),
         });
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { id: string };
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string; code?: string; matchedWork?: string } | null;
+          if (body?.code === "lyrics_flagged") {
+            setVerifyState("flagged");
+            setMatchedWork(body.matchedWork);
+            setVerifyMsg(body.error || "These lyrics appear to reproduce a released song. Rewrite the matching passage in your own words.");
+            verifiedTextRef.current = text;
+            toast({
+              title: "Lyrics flagged by the AI copyright screen",
+              description: body.error || "Rewrite the matching passage in your own words, then save again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw new Error(body?.error || "Save failed");
+        }
+        const data = (await res.json()) as { id: string; screeningUnavailable?: boolean };
         setProjectId(data.id);
+        if (data.screeningUnavailable) {
+          setVerifyState("unavailable");
+          verifiedTextRef.current = text;
+          toast({
+            title: "Saved — but NOT screened",
+            description: "The AI copyright screen is temporarily unavailable, so these lyrics were saved unscreened. You can delete the project at any time.",
+          });
+          return;
+        }
       } else {
         const res = await fetch("/api/lyrics/revise", {
           method: "POST",
@@ -361,6 +406,16 @@ export default function SongwritingStudio() {
           }
           throw new Error(body?.error || "Save failed");
         }
+        const revData = (await res.json().catch(() => ({}))) as { screeningUnavailable?: boolean };
+        if (revData.screeningUnavailable) {
+          setVerifyState("unavailable");
+          verifiedTextRef.current = text;
+          toast({
+            title: "Revision saved — but NOT screened",
+            description: "The AI copyright screen is temporarily unavailable, so this revision was saved unscreened. You can delete the project at any time.",
+          });
+          return;
+        }
       }
       toast({ title: "Lyrics saved", description: "Verified and saved to your library with the forensic revision ledger." });
     } catch {
@@ -369,6 +424,36 @@ export default function SongwritingStudio() {
       setIsSaving(false);
     }
   }, [lyricsText, aiDraft, projectId, styleRaw, isVerifiedCurrent, runVerify, toast]);
+
+  // ── Delete saved project (owner-scoped) ───────────────────────────────────
+  const [isDeleting, setIsDeleting] = useState(false);
+  const handleDeleteProject = useCallback(async () => {
+    if (!projectId) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/lyrics/project/${encodeURIComponent(projectId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || "Delete failed");
+      }
+      setProjectId(null);
+      setVerifyState("idle");
+      setVerifyMsg("");
+      setMatchedWork(undefined);
+      toast({ title: "Project deleted", description: "The lyrics project and its revision ledger were removed from your library." });
+    } catch (err) {
+      toast({
+        title: "Delete failed",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [projectId, toast]);
 
   // ── Generate the song ─────────────────────────────────────────────────────
   const handleGenerateSong = useCallback(async () => {
@@ -453,12 +538,26 @@ export default function SongwritingStudio() {
           certificationText: "I certify these lyrics are my original human work and were NOT produced by an AI.",
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; import?: { stampedAt?: string } };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        import?: { stampedAt?: string };
+        screeningUnavailable?: boolean;
+      };
       if (!res.ok) throw new Error(data.error || "Failed to stamp lyrics");
       setImportText("");
       setImportCertified(false);
       setLastStampAt(data.import?.stampedAt ?? new Date().toISOString());
-      toast({ title: "Lyrics stamped ✓", description: "SHA-256 possession stamp saved to My Protected Lyrics." });
+      setLastStampUnscreened(data.screeningUnavailable === true);
+      if (data.screeningUnavailable) {
+        // Honest labeling: the stamp exists, but the copyright screen did NOT run.
+        toast({
+          title: "Stamped — copyright screen unavailable",
+          description:
+            "Your possession stamp was saved, but the AI copyright screen could not run. These lyrics have NOT been screened.",
+        });
+      } else {
+        toast({ title: "Lyrics stamped ✓", description: "SHA-256 possession stamp saved to My Protected Lyrics." });
+      }
     } catch (err) {
       toast({
         title: "Stamp failed",
@@ -693,7 +792,7 @@ export default function SongwritingStudio() {
                 {lyricsText.trim().length >= 5 && (
                   <div className="rounded-xl border border-border/40 bg-background/40 px-4 py-3 space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <VerifyBadge state={isVerifiedCurrent ? "clear" : verifyState} matchedWork={matchedWork} />
+                      <VerifyBadge state={verifyState} matchedWork={matchedWork} />
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
@@ -722,10 +821,27 @@ export default function SongwritingStudio() {
                         ) : (
                           <span className="text-[10px] text-muted-foreground">Pro saves lyrics + forensic ledger</span>
                         )}
+                        {projectId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void handleDeleteProject()}
+                            disabled={isDeleting}
+                            className="text-xs text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10"
+                            data-testid="button-delete-project"
+                          >
+                            {isDeleting
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <><Trash2 className="w-3.5 h-3.5 mr-1" />Delete</>}
+                          </Button>
+                        )}
                       </div>
                     </div>
                     {verifyMsg && verifyState === "flagged" && (
                       <p className="text-xs text-rose-400 leading-relaxed">{verifyMsg}</p>
+                    )}
+                    {verifyMsg && verifyState === "unavailable" && (
+                      <p className="text-xs text-amber-400 leading-relaxed">{verifyMsg}</p>
                     )}
                     <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
                       Verification is an AI screening for recognizable commercial lyrics — including phonetically
@@ -793,12 +909,22 @@ export default function SongwritingStudio() {
                       : <><Fingerprint className="w-4 h-4 mr-2" />Stamp My Lyrics</>}
                   </Button>
                   {lastStampAt && (
-                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span className="text-xs text-emerald-400 font-medium">
-                        Stamped {new Date(lastStampAt).toLocaleString()}
-                      </span>
-                    </div>
+                    lastStampUnscreened ? (
+                      <div className="flex items-start gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/25" data-testid="banner-stamp-unscreened">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <span className="text-xs text-amber-400 font-medium leading-relaxed">
+                          Stamped {new Date(lastStampAt).toLocaleString()} — copyright screen unavailable.
+                          These lyrics were NOT screened.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="text-xs text-emerald-400 font-medium">
+                          Stamped {new Date(lastStampAt).toLocaleString()}
+                        </span>
+                      </div>
+                    )
                   )}
                   <Link
                     href="/protected-lyrics"

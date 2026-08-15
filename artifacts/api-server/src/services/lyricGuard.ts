@@ -52,6 +52,8 @@ OUTPUT: Respond with EXACTLY one line of minified JSON, nothing else:
 {"verdict":"clear"} 
 or
 {"verdict":"flagged","song":"<title>","artist":"<artist>","evidence":"<the matching passage, max 120 chars>"}
+(A single \`\`\`json code fence around that one JSON object is tolerated as a
+transport wrapper; any other surrounding text invalidates the response.)
 
 LYRICS TO SCREEN:
 `;
@@ -76,6 +78,73 @@ export function primeLyricVerificationForTest(text: string, result: LyricVerific
     throw new Error("primeLyricVerificationForTest is not available in production");
   }
   cache.set(cacheKey(text.replace(/\r\n/g, "\n").trim()), result);
+}
+
+/**
+ * SCHEMA-STRICT parse of the screening model's response. Exactly two shapes
+ * are valid — matching the OUTPUT contract in GUARD_INSTRUCTIONS:
+ *   {"verdict":"clear"}                                      (no other keys)
+ *   {"verdict":"flagged","song":"…","artist":"…"}            (both nonempty;
+ *     plus an OPTIONAL nonempty string "evidence"; no other keys)
+ * Per the contract, the single JSON object MAY arrive wrapped in one ```json
+ * code fence (an explicitly tolerated transport wrapper — some model builds
+ * fence all structured output, and treating that as an outage would fake
+ * unavailability on every response). The fence is stripped BEFORE parsing;
+ * the payload inside is still held to the exact schema.
+ * ANYTHING else — unparseable JSON, non-object/array, unknown/extra keys,
+ * missing or unknown verdict, wrong field types, empty song/artist, prose
+ * around the JSON — is treated as a screening failure (fail-open +
+ * screeningUnavailable), NEVER as a valid screen result. Exported for tests.
+ */
+export function parseScreeningResponse(raw: string): LyricVerification {
+  // Contract-permitted transport wrapper: a single optional ```json fence.
+  const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+
+  const unavailable: LyricVerification = { verdict: "clear", screeningUnavailable: true };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return unavailable;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return unavailable;
+  }
+
+  const keys = Object.keys(parsed as Record<string, unknown>);
+  const p = parsed as Record<string, unknown>;
+
+  if (p["verdict"] === "clear") {
+    // Exact shape: the ONLY key allowed is "verdict".
+    if (keys.length !== 1) return unavailable;
+    return { verdict: "clear" };
+  }
+
+  if (p["verdict"] === "flagged") {
+    // Exact shape: verdict + song + artist, plus optional evidence. No other keys.
+    const allowed = new Set(["verdict", "song", "artist", "evidence"]);
+    if (keys.some((k) => !allowed.has(k))) return unavailable;
+
+    const song = typeof p["song"] === "string" ? p["song"].trim() : "";
+    const artist = typeof p["artist"] === "string" ? p["artist"].trim() : "";
+    if (!song || !artist) return unavailable;
+    if ("evidence" in p && (typeof p["evidence"] !== "string" || !p["evidence"].trim())) {
+      return unavailable;
+    }
+
+    const matchedWork = `${song} — ${artist}`;
+    return {
+      verdict: "flagged",
+      matchedWork,
+      reason:
+        `These lyrics appear to reproduce "${matchedWork}". ` +
+        "Rewrite the matching passage in your own words, then verify again.",
+    };
+  }
+
+  // Unknown or missing verdict.
+  return unavailable;
 }
 
 /**
@@ -105,31 +174,24 @@ export async function verifyLyrics(text: string): Promise<LyricVerification> {
       })
     ).trim();
 
-    // The model sometimes wraps JSON in a code fence — strip it.
-    const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(jsonText) as {
-      verdict?: string;
-      song?: string;
-      artist?: string;
-      evidence?: string;
-    };
+    const result = parseScreeningResponse(raw);
 
-    let result: LyricVerification;
-    if (parsed.verdict === "flagged" && (parsed.song || parsed.artist)) {
-      const matchedWork = [parsed.song, parsed.artist].filter(Boolean).join(" — ");
-      result = {
-        verdict: "flagged",
-        matchedWork,
-        reason:
-          `These lyrics appear to reproduce "${matchedWork}". ` +
-          "Rewrite the matching passage in your own words, then verify again.",
-      };
+    if (result.verdict === "flagged") {
       logger.warn(
-        { matchedWork, evidence: parsed.evidence?.slice(0, 120) },
+        { matchedWork: result.matchedWork },
         "lyricGuard: copyright screen FLAGGED submitted lyrics",
       );
-    } else {
-      result = { verdict: "clear" };
+    }
+
+    // A nonconforming/partial model response is an infrastructure failure, not
+    // a clearance — surface it as unavailable and NEVER cache it, so the next
+    // attempt gets a fresh screening.
+    if (result.screeningUnavailable) {
+      logger.error(
+        { raw: raw.slice(0, 200) },
+        "lyricGuard: nonconforming screening response — gate failing open as UNAVAILABLE",
+      );
+      return result;
     }
 
     if (cache.size >= CACHE_MAX) {

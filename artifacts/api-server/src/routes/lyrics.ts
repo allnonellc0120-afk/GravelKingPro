@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
-import { saveSongDraft, updateSongDraft, queryLibraryBySession } from "../lib/firestore";
+import { saveSongDraft, updateSongDraft, deleteSongDraft, queryLibraryBySession } from "../lib/firestore";
 import { hasStudio } from "../lib/entitlement";
 import { getUsageUser } from "../lib/usage";
 import { rateLimit } from "../lib/rateLimiter";
@@ -211,16 +211,29 @@ async function requireStudio(req: Request, res: Response, next: NextFunction): P
   res.status(403).json({ error: "A Pro (Studio) subscription is required for this feature." });
 }
 
-// Best-effort project ownership for the by-id lyric routes. Blocks only when the
-// caller presents a DIFFERENT gk_session than the one that owns the project, so a
-// logged-in user cannot read/tamper with another session's IP work just by
-// knowing the id. Callers with NO gk_session (e.g. OIDC users, who never receive
-// that cookie) pass through so we never lock someone out of their own project.
-// Residual gap: a caller sending no cookie at all is not blocked — fully closing
-// the IDOR needs an owner userId column + anon session token (tracked follow-up).
-function ownershipMismatch(req: Request, projectSessionId: string | null | undefined): boolean {
-  const caller = (req.cookies as Record<string, string> | undefined)?.["gk_session"];
-  return Boolean(caller) && Boolean(projectSessionId) && caller !== projectSessionId;
+// STRICT owner check for the by-id lyric routes. The caller must present a
+// credential that MATCHES the project's stored owner session:
+//   - the gk_session cookie equal to the project's sessionId (the stored
+//     sessionId is always a server-generated high-entropy random token —
+//     project creation NEVER stores a user id there, because user ids are
+//     public/stable identifiers, not bearer secrets: a client-supplied
+//     cookie equal to a known user id must never grant access), or
+//   - a server-AUTHENTICATED user (req.dbUser resolves only through a valid
+//     Clerk session or a server-side session row — it cannot be spoofed by a
+//     crafted cookie) whose sessionId or id equals the project's sessionId
+//     (covers legacy rows keyed to a user principal before random tokens).
+// A caller with NO credential is ALWAYS denied — a missing cookie must never
+// grant access to private or destructive routes (that would be an IDOR: any
+// anonymous caller who learned a project id could read or delete it).
+// Project creation sets the gk_session cookie when absent, so anonymous and
+// signed-in creators alike keep a matching credential for their own project.
+function isProjectOwner(req: Request, projectSessionId: string | null | undefined): boolean {
+  if (!projectSessionId) return false;
+  const cookie = (req.cookies as Record<string, string> | undefined)?.["gk_session"];
+  if (cookie && cookie === projectSessionId) return true;
+  const dbUser = req.dbUser as { id?: string; sessionId?: string | null } | undefined;
+  if (dbUser && (dbUser.sessionId === projectSessionId || dbUser.id === projectSessionId)) return true;
+  return false;
 }
 
 // ─── POST /api/lyrics/generate ───────────────────────────────────────────────
@@ -564,6 +577,7 @@ lyricsRouter.post("/lyrics/import", lyricsAiRateLimit, async (req: Request, res:
     });
     return;
   }
+  const importScreeningUnavailable = importScreen.screeningUnavailable === true;
 
   const contentHash = createHash("sha256").update(normalized, "utf8").digest("hex");
 
@@ -589,7 +603,10 @@ lyricsRouter.post("/lyrics/import", lyricsAiRateLimit, async (req: Request, res:
       .returning();
 
     recordActivity(sessionId, "Lyric Import");
-    res.json({ import: serializeImport(row!) });
+    res.json({
+      import: serializeImport(row!),
+      ...(importScreeningUnavailable ? { screeningUnavailable: true } : {}),
+    });
   } catch (err) {
     req.log.error({ err }, "Lyric import stamp failed");
     void logToolError("Lyric Import", "IMPORT_STAMP", err);
@@ -652,7 +669,7 @@ lyricsRouter.post("/lyrics/forensic-entry", async (req: Request, res: Response) 
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (ownershipMismatch(req, forensicProject.sessionId)) {
+  if (!isProjectOwner(req, forensicProject.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -710,6 +727,7 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
   // endpoint is only a preview; the cache makes verify-then-save cheap.
   // Both the stored draft AND the canonical content are screened (identical
   // text is a single cached screening).
+  let screeningUnavailable = false;
   for (const text of savedContent === aiDraft ? [savedContent] : [savedContent, aiDraft]) {
     const projectScreen = await verifyLyrics(text);
     if (projectScreen.verdict === "flagged") {
@@ -721,12 +739,30 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
       });
       return;
     }
+    if (projectScreen.screeningUnavailable) screeningUnavailable = true;
   }
 
   const initialScore = savedContent === aiDraft ? 0 : authorshipScore(aiDraft, savedContent);
 
   const id = randomUUID();
-  const sessionId = (req.cookies as Record<string, string>)?.["gk_session"] ?? randomUUID();
+  // Owner principal: the existing gk_session cookie, else a FRESHLY GENERATED
+  // high-entropy token. NEVER a user id — user ids are public/stable
+  // identifiers (they appear in track metadata and certificate URLs), so
+  // accepting one as a bearer credential would let anyone who knows the
+  // owner's id spoof the cookie and read/revise/delete the project.
+  // When the caller had no cookie we SET one below — the strict owner check
+  // denies credential-less access, so the creator must leave with a
+  // credential that matches the stored owner.
+  const cookieSession = (req.cookies as Record<string, string>)?.["gk_session"];
+  const sessionId = cookieSession ?? randomUUID();
+  if (!cookieSession) {
+    res.cookie("gk_session", sessionId, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+  }
 
   await db.insert(lyricProjectsTable).values({
     id,
@@ -773,7 +809,10 @@ lyricsRouter.post("/lyrics/project", async (req: Request, res: Response) => {
     id,
   );
 
-  res.json({ id });
+  // Fail-open policy (user directive, reconfirmed 2026-08-14): a screening
+  // outage never blocks songwriting — but the save must be honestly labeled
+  // as unscreened so the client never claims "cleared".
+  res.json({ id, ...(screeningUnavailable ? { screeningUnavailable: true } : {}) });
 });
 
 // ─── POST /api/lyrics/revise ─────────────────────────────────────────────────
@@ -800,7 +839,7 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (ownershipMismatch(req, project.sessionId)) {
+  if (!isProjectOwner(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -818,6 +857,7 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
     });
     return;
   }
+  const reviseScreeningUnavailable = revisionScreen.screeningUnavailable === true;
 
   const score = authorshipScore(project.aiDraft, content);
   const eligible = score >= 25;
@@ -855,7 +895,11 @@ lyricsRouter.post("/lyrics/revise", async (req: Request, res: Response) => {
     });
   }
 
-  res.json({ authorshipScore: score, isCopyrightEligible: eligible });
+  res.json({
+    authorshipScore: score,
+    isCopyrightEligible: eligible,
+    ...(reviseScreeningUnavailable ? { screeningUnavailable: true } : {}),
+  });
 });
 
 // ─── GET /api/library/studio ─────────────────────────────────────────────────
@@ -887,7 +931,7 @@ lyricsRouter.get("/lyrics/certificate/:projectId", async (req: Request, res: Res
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (ownershipMismatch(req, project.sessionId)) {
+  if (!isProjectOwner(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -987,6 +1031,32 @@ lyricsRouter.get("/lyrics/embed/:projectId", async (req: Request, res: Response)
   res.send(html);
 });
 
+// ─── DELETE /api/lyrics/project/:id ──────────────────────────────────────────
+// Owner-scoped delete. Cascades via FK (revisions, forensic ledger, timeline
+// blocks all have onDelete:"cascade"). Firestore draft is also cleaned up.
+lyricsRouter.delete("/lyrics/project/:id", async (req: Request, res: Response) => {
+  const id = String(req.params["id"]);
+
+  const project = await db.query.lyricProjectsTable.findFirst({
+    where: eq(lyricProjectsTable.id, id),
+  });
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (!isProjectOwner(req, project.sessionId)) {
+    res.status(403).json({ error: "You do not have access to this project." });
+    return;
+  }
+
+  await db.delete(lyricProjectsTable).where(eq(lyricProjectsTable.id, id));
+
+  // Best-effort Firestore cleanup — fire-and-forget, never fails the response.
+  deleteSongDraft(id);
+
+  res.json({ ok: true });
+});
+
 // ─── GET /api/lyrics/project/:id ─────────────────────────────────────────────
 lyricsRouter.get("/lyrics/project/:id", async (req: Request, res: Response) => {
   const id = String(req.params["id"]);
@@ -998,7 +1068,7 @@ lyricsRouter.get("/lyrics/project/:id", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (ownershipMismatch(req, project.sessionId)) {
+  if (!isProjectOwner(req, project.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }
@@ -1036,7 +1106,7 @@ lyricsRouter.post("/lyrics/timeline-blocks", async (req: Request, res: Response)
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  if (ownershipMismatch(req, blocksProject.sessionId)) {
+  if (!isProjectOwner(req, blocksProject.sessionId)) {
     res.status(403).json({ error: "You do not have access to this project." });
     return;
   }

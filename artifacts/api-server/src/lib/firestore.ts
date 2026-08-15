@@ -169,6 +169,12 @@ export function backupCertStub(stub: Omit<CertStubBackup, "backupNote">): void {
     });
 }
 
+export function deleteSongDraft(draftId: string): void {
+  const db = getDb();
+  if (!db) return;
+  db.collection("song_drafts").doc(draftId).delete().catch(() => {});
+}
+
 export function updateSongDraft(
   draftId: string,
   update: Partial<Pick<SongDraftData, "authorshipScore" | "isCopyrightEligible" | "aiDraft" | "is_certified">>
