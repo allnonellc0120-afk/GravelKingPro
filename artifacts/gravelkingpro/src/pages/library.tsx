@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { downloadBlob } from "@/lib/download";
+import { ExportQuotaBadge } from "@/components/export-quota-badge";
+import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
 import { Library, Download, Music, ArrowLeft, Loader2, FileText, Mic, CheckCircle2, Clock } from "lucide-react";
 import { Link, useSearch } from "wouter";
 
@@ -60,6 +62,7 @@ export default function LibraryPage() {
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const search = useSearch();
+  const { quota, refresh: refreshQuota } = useExportQuota();
 
   const loadLibrary = async () => {
     setLoading(true);
@@ -128,6 +131,7 @@ export default function LibraryPage() {
       const nameMatch = disposition.match(/filename="([^"]+)"/);
       const filename = nameMatch?.[1] ?? "track.wav";
       downloadBlob(blob, filename);
+      void refreshQuota();
     } catch {
       toast({ title: "Error", description: "Could not start download.", variant: "destructive" });
     } finally {
@@ -158,9 +162,10 @@ export default function LibraryPage() {
             </Button>
           </Link>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Library className="w-6 h-6 text-amber-500" />
           <h1 className="text-2xl font-bold">My Library</h1>
+          <ExportQuotaBadge quota={quota} className="ml-auto" />
         </div>
 
         {/* Tabs */}
@@ -203,16 +208,24 @@ export default function LibraryPage() {
                       <div className="text-xs text-muted-foreground truncate">{t.artistName}</div>
                       <div className="flex items-center justify-between mt-3">
                         <span className="text-xs text-muted-foreground">Purchased</span>
-                        <div className="flex items-center gap-1.5">
-                          <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:wav`} onClick={() => download(t.id, "wav")}>
-                            {downloading === `${t.id}:wav` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                            WAV
-                          </Button>
-                          <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:mp3`} onClick={() => download(t.id, "mp3")}>
-                            {downloading === `${t.id}:mp3` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                            MP3
-                          </Button>
-                        </div>
+                        {quota && quota.remaining <= 0 ? (
+                          <span className="text-[11px] text-rose-400 text-right leading-tight">
+                            Export limit reached
+                            <br />
+                            resets {formatResetDate(quota.resetsAt)}
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:wav`} onClick={() => download(t.id, "wav")}>
+                              {downloading === `${t.id}:wav` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                              WAV
+                            </Button>
+                            <Button size="sm" variant="outline" className="gap-1" disabled={downloading === `${t.id}:mp3`} onClick={() => download(t.id, "mp3")}>
+                              {downloading === `${t.id}:mp3` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                              MP3
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

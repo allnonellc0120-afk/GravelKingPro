@@ -21,6 +21,8 @@ import { compressAudioFile } from "@/lib/audioCompressor";
 import { WaveformScrubber, type WaveformScrubberHandle } from "@/components/waveform-scrubber";
 import { StudioPluginRack, DEFAULT_PLUGIN_STATE, type PluginState } from "@/components/studio-plugin-rack";
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
+import { ExportQuotaBadge } from "@/components/export-quota-badge";
+import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
 
 type ProcessState = "idle" | "loading" | "ready" | "compressing" | "processing" | "done";
 type ProcessMode = "standard" | "voice_remove" | "stem_split" | "master";
@@ -96,6 +98,7 @@ export default function Studio() {
   // Server-driven free-use accounting. -1 = unlimited (paid). null = unknown.
   const [remaining, setRemaining] = useState<UsageRemaining | null>(null);
   const [paywall, setPaywall] = useState<PaywallInfo | null>(null);
+  const { quota: exportQuota, refresh: refreshExportQuota } = useExportQuota();
 
   const refreshUsage = useCallback(async () => {
     try {
@@ -411,6 +414,7 @@ export default function Studio() {
         setStats({ efficiency: "—", decayRate: "—", samples: "—", parity: "VALIDATED", mode: `${masterPreset} master` });
         setProgress(100);
         setState("done");
+        void refreshExportQuota();
         return;
       }
 
@@ -482,6 +486,7 @@ export default function Studio() {
 
         setProgress(100);
         setState("done");
+        void refreshExportQuota();
         if (freeRemainingHeader !== null) {
           setRemaining((r) => r ? { ...r, stem_split: Math.max(0, parseInt(freeRemainingHeader, 10)) } : r);
         }
@@ -518,6 +523,7 @@ export default function Studio() {
 
       setProgress(100);
       setState("done");
+      void refreshExportQuota();
       if (mode === "voice_remove" && freeRemainingHeader !== null) {
         setRemaining((r) => r ? { ...r, voice_remove: Math.max(0, parseInt(freeRemainingHeader, 10)) } : r);
       }
@@ -1134,13 +1140,28 @@ export default function Studio() {
                   </div>
                 )}
 
+                {/* Quota is always visible BEFORE processing — every Studio output
+                    (WAV, MP3, stems) counts against the rolling 30-day cap, and at
+                    0 the server would 429 the run, so the start action explains the
+                    reset date instead of failing on click. */}
+                <div className="flex justify-center">
+                  <ExportQuotaBadge quota={exportQuota} />
+                </div>
+                {exportQuota && exportQuota.remaining <= 0 && (
+                  <p className="text-xs text-rose-400 text-center" data-testid="text-export-limit">
+                    Export limit reached ({exportQuota.limit} per 30 days) — resets{" "}
+                    {formatResetDate(exportQuota.resetsAt)}
+                  </p>
+                )}
                 <Button
-                  className={`w-full font-semibold h-11 ${canProcess ? "bg-amber-500 hover:bg-amber-600 text-black" : "opacity-60 cursor-not-allowed"}`}
+                  className={`w-full font-semibold h-11 ${canProcess && !(exportQuota && exportQuota.remaining <= 0) ? "bg-amber-500 hover:bg-amber-600 text-black" : "opacity-60 cursor-not-allowed"}`}
                   onClick={handleProcess}
-                  disabled={state === "processing" || state === "compressing" || state === "loading" || !canProcess}
+                  disabled={state === "processing" || state === "compressing" || state === "loading" || !canProcess || Boolean(exportQuota && exportQuota.remaining <= 0)}
                   data-testid="button-process"
                 >
-                  {state === "compressing"
+                  {exportQuota && exportQuota.remaining <= 0
+                    ? <>Export limit reached — resets {formatResetDate(exportQuota.resetsAt)}</>
+                    : state === "compressing"
                     ? `Compressing... ${progress}%`
                     : state === "processing"
                     ? `Processing... ${progress}%`
@@ -1265,11 +1286,17 @@ export default function Studio() {
                           </div>
                         );
                       })}
+                    {/* Stem downloads: this split already consumed its export credit
+                        server-side when it ran, so saving stems stays possible even
+                        when the quota just hit 0 — new runs are gated at Process. */}
                     {hasSplits && (
                       <Button className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold" onClick={handleDownloadAllStems} data-testid="button-download-all-stems">
                         <Download className="w-4 h-4 mr-2" /> Download All Stems
                       </Button>
                     )}
+                    <div className="flex justify-end pt-1">
+                      <ExportQuotaBadge quota={exportQuota} />
+                    </div>
                   </motion.div>
                 )}
 
@@ -1387,7 +1414,12 @@ export default function Studio() {
                       )}
                     </div>
 
-                    {/* Download */}
+                    {/* Download — results shown here already consumed their export
+                        credit server-side when the run completed, so saving them
+                        stays possible even when the quota just hit 0. */}
+                    <div className="flex justify-end">
+                      <ExportQuotaBadge quota={exportQuota} />
+                    </div>
                     <div className="flex gap-2 pt-1">
                       <Button variant="outline" className="flex-1" onClick={() => handlePlayProcessed()} data-testid="button-play">
                         {isPlaying ? <><Square className="w-4 h-4 mr-2" />Stop</> : <><Play className="w-4 h-4 mr-2" />Preview</>}
