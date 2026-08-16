@@ -21,6 +21,7 @@ const LIFETIME_EMAILS = new Set([
   "allnonellc0120@gmail.com",
   "kymegky@gmail.com",
   "martypodany63@gmail.com",
+  "labordehope3@gmail.com",
 ]);
 
 /** Permanently banned emails — any authenticated user matching is forced to free tier. */
