@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, CheckCircle2, Clock, AlertCircle, Circle, Download } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, Clock, AlertCircle, Circle, Download, BellRing, Mail, MailX } from "lucide-react";
 import { AdminGate } from "@/components/admin-gate";
 import { AdminNav } from "@/components/admin-nav";
 
@@ -254,6 +254,22 @@ function TouchChip({
   );
 }
 
+// ── Types for alert panel ────────────────────────────────────────────────────
+
+interface OverdueEntry {
+  prospectName: string;
+  daysSinceT1: number;
+  overdueTouch: 2 | 3;
+  t1SentAt: string;
+}
+
+interface AlertCheckResult {
+  overdueCount: number;
+  emailSent: boolean;
+  skippedRecentSend: boolean;
+  overdue: OverdueEntry[];
+}
+
 // ── Main dashboard component ─────────────────────────────────────────────────
 
 function InvestorsDashboard() {
@@ -263,6 +279,46 @@ function InvestorsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null); // prospectId being edited
   const [editBuf, setEditBuf] = useState<Partial<ProspectRow>>({});
+
+  // Alert panel state
+  const [lastAlertSentAt, setLastAlertSentAt] = useState<string | null | undefined>(undefined);
+  const [alertChecking, setAlertChecking] = useState(false);
+  const [alertResult, setAlertResult] = useState<AlertCheckResult | null>(null);
+  const [alertError, setAlertError] = useState<string | null>(null);
+
+  const loadAlertStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/investors/alert-status", { credentials: "include" });
+      if (!res.ok) return;
+      const json = (await res.json()) as { lastAlertSentAt: string | null };
+      setLastAlertSentAt(json.lastAlertSentAt);
+    } catch {
+      setLastAlertSentAt(null);
+    }
+  }, []);
+
+  const runAlertCheck = useCallback(async (force = false) => {
+    setAlertChecking(true);
+    setAlertResult(null);
+    setAlertError(null);
+    try {
+      const url = force
+        ? "/api/admin/investors/check-overdue?force=1"
+        : "/api/admin/investors/check-overdue";
+      const res = await fetch(url, { method: "POST", credentials: "include" });
+      const json = (await res.json()) as AlertCheckResult & { ok?: boolean; error?: string };
+      if (!res.ok || json.error) {
+        setAlertError(json.error ?? `HTTP ${res.status}`);
+      } else {
+        setAlertResult(json);
+        if (json.emailSent) await loadAlertStatus();
+      }
+    } catch (e) {
+      setAlertError(e instanceof Error ? e.message : "Check failed");
+    } finally {
+      setAlertChecking(false);
+    }
+  }, [loadAlertStatus]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -281,7 +337,8 @@ function InvestorsDashboard() {
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    void loadAlertStatus();
+  }, [refresh, loadAlertStatus]);
 
   const markSent = useCallback(
     async (prospectId: string, touchNum: number) => {
@@ -518,6 +575,103 @@ function InvestorsDashboard() {
       )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {/* Overdue alert panel */}
+      <Card className="border-border/60">
+        <CardContent className="p-4 space-y-3">
+          {/* Panel header row */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <BellRing className="h-4 w-4 text-amber-400 shrink-0" />
+              <span className="font-semibold text-sm">Overdue Alert</span>
+              <span className="text-xs text-muted-foreground">
+                {lastAlertSentAt === undefined
+                  ? "Loading…"
+                  : lastAlertSentAt
+                  ? `Last email: ${new Date(lastAlertSentAt).toLocaleString()}`
+                  : "No alert email sent yet"}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={alertChecking}
+                onClick={() => void runAlertCheck(false)}
+                title="Check overdue and send email if needed (23-hour dedup applies)"
+              >
+                {alertChecking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <BellRing className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Check now
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={alertChecking}
+                onClick={() => void runAlertCheck(true)}
+                title="Force check — bypasses 23-hour dedup and sends email regardless"
+                className="text-amber-400 hover:text-amber-300"
+              >
+                Force send
+              </Button>
+            </div>
+          </div>
+
+          {/* Result */}
+          {alertError && (
+            <p className="text-xs text-destructive">{alertError}</p>
+          )}
+          {alertResult && (
+            <div className="space-y-2">
+              {/* Summary line */}
+              <div className="flex items-center gap-2 text-sm flex-wrap">
+                {alertResult.overdueCount === 0 ? (
+                  <span className="flex items-center gap-1 text-green-400">
+                    <CheckCircle2 className="h-4 w-4" /> No overdue touches — all good
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-amber-400">
+                    <AlertCircle className="h-4 w-4" />
+                    {alertResult.overdueCount} overdue touch{alertResult.overdueCount !== 1 ? "es" : ""}
+                  </span>
+                )}
+                {alertResult.emailSent && (
+                  <span className="flex items-center gap-1 text-blue-400 text-xs ml-2">
+                    <Mail className="h-3.5 w-3.5" /> Alert email sent
+                  </span>
+                )}
+                {alertResult.skippedRecentSend && (
+                  <span className="flex items-center gap-1 text-muted-foreground text-xs ml-2">
+                    <MailX className="h-3.5 w-3.5" /> Email skipped — sent within 23 h (use Force send to override)
+                  </span>
+                )}
+                {alertResult.overdueCount > 0 && !alertResult.emailSent && !alertResult.skippedRecentSend && (
+                  <span className="flex items-center gap-1 text-muted-foreground text-xs ml-2">
+                    <MailX className="h-3.5 w-3.5" /> Email not sent (Gmail unavailable)
+                  </span>
+                )}
+              </div>
+
+              {/* Overdue list */}
+              {alertResult.overdue.length > 0 && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-950/20 divide-y divide-amber-500/20">
+                  {alertResult.overdue.map((entry, i) => (
+                    <div key={i} className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="font-medium text-foreground">{entry.prospectName}</span>
+                      <span className="text-amber-400">
+                        Touch {entry.overdueTouch} overdue · T1 was {entry.daysSinceT1}d ago (sent {entry.t1SentAt})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Prospect list */}
       {prospects === null ? (

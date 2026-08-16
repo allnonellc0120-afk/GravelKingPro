@@ -322,6 +322,32 @@ investorsRouter.delete(
   },
 );
 
+// ── GET /admin/investors/alert-status ───────────────────────────────────────
+// Returns the last time an overdue alert email was sent (or null if never).
+investorsRouter.get(
+  "/admin/investors/alert-status",
+  async (req: Request, res: Response) => {
+    if (!(await guard(req, res))) return;
+    try {
+      // Ensure table exists before querying it.
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS investor_alert_log (
+          key          text        PRIMARY KEY,
+          sent_at      timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const rows = await db.execute(sql`
+        SELECT sent_at FROM investor_alert_log WHERE key = 'overdue'
+      `);
+      const sentAt = rows.rows[0]?.sent_at as string | Date | undefined;
+      res.json({ lastAlertSentAt: sentAt ? new Date(sentAt).toISOString() : null });
+    } catch (err) {
+      console.error("[investors] alert-status error", err);
+      res.status(500).json({ error: "Failed to load alert status" });
+    }
+  },
+);
+
 // ── POST /admin/investors/check-overdue ──────────────────────────────────────
 // Manually trigger the overdue-touch alert check (also runs automatically
 // every 24 hours via the scheduler started in index.ts).
