@@ -1,13 +1,13 @@
 [
-  {"id":"0e3774dd-8b9c-43d9-8845-2bb73c8ec011","position":1,"filepath":"src/pages/slides/Cover.tsx","title":"GravelKing Productions — F6S Investor Deck","description":"Every track certified, every AI credited, every claim checked.","speakerNotes":""},
+  {"id":"0e3774dd-8b9c-43d9-8845-2bb73c8ec011","position":1,"filepath":"src/pages/slides/Cover.tsx","title":"GravelKing Pro — Prove Who Made the Music","description":"Every track certified, every AI credited, every claim checked.","speakerNotes":""},
   {"id":"1a2b3c4d-1111-4a2b-9c3d-0e1f2a3b4c01","position":2,"filepath":"src/pages/slides/Problem.tsx","title":"The problem","description":"AI flooded music with tracks nobody can attribute.","speakerNotes":""},
   {"id":"1a2b3c4d-2222-4a2b-9c3d-0e1f2a3b4c02","position":3,"filepath":"src/pages/slides/Solution.tsx","title":"The solution","description":"One platform: create, master, certify, verify.","speakerNotes":""},
-  {"id":"1a2b3c4d-3333-4a2b-9c3d-0e1f2a3b4c03","position":4,"filepath":"src/pages/slides/Provenance.tsx","title":"Provenance — human part, AI part, clean-hands check","description":"The core product update: attribution and screening on every certificate.","speakerNotes":""},
-  {"id":"1a2b3c4d-4444-4a2b-9c3d-0e1f2a3b4c04","position":5,"filepath":"src/pages/slides/Moat.tsx","title":"The moat","description":"Four layers competitors have to rebuild from scratch.","speakerNotes":""},
-  {"id":"1a2b3c4d-5555-4a2b-9c3d-0e1f2a3b4c05","position":6,"filepath":"src/pages/slides/BusinessModel.tsx","title":"Business model","description":"Subscription, per-certificate, and B2B licensing.","speakerNotes":""},
-  {"id":"1a2b3c4d-6666-4a2b-9c3d-0e1f2a3b4c06","position":7,"filepath":"src/pages/slides/Path30.tsx","title":"30-day sprint","description":"First 10 paying subscribers, organic only.","speakerNotes":""},
-  {"id":"1a2b3c4d-7777-4a2b-9c3d-0e1f2a3b4c07","position":8,"filepath":"src/pages/slides/Path90.tsx","title":"90-day runway","description":"50 subscribers and the first two license deals.","speakerNotes":""},
-  {"id":"1a2b3c4d-8888-4a2b-9c3d-0e1f2a3b4c08","position":9,"filepath":"src/pages/slides/Path365.tsx","title":"Year-one milestone","description":"100 subscribers, five licenses, $10K MRR run rate.","speakerNotes":""},
-  {"id":"1a2b3c4d-9999-4a2b-9c3d-0e1f2a3b4c09","position":10,"filepath":"src/pages/slides/Valuation.tsx","title":"Valuation of GravelKing Productions","description":"Asset-based view with founder-estimated ranges.","speakerNotes":""},
-  {"id":"1a2b3c4d-aaaa-4a2b-9c3d-0e1f2a3b4c10","position":11,"filepath":"src/pages/slides/Ask.tsx","title":"The ask","description":"$250K seed — use of funds and milestones.","speakerNotes":""}
+  {"id":"1a2b3c4d-3333-4a2b-9c3d-0e1f2a3b4c03","position":4,"filepath":"src/pages/slides/Provenance.tsx","title":"Provenance — human part, AI part, catalog check","description":"Attribution and catalog screening built into every certificate.","speakerNotes":""},
+  {"id":"1a2b3c4d-4444-4a2b-9c3d-0e1f2a3b4c04","position":5,"filepath":"src/pages/slides/Moat.tsx","title":"Why it works","description":"One workflow for a cleaner, trustworthy release.","speakerNotes":""},
+  {"id":"1a2b3c4d-5555-4a2b-9c3d-0e1f2a3b4c05","position":6,"filepath":"src/pages/slides/BusinessModel.tsx","title":"Pricing","description":"Subscription, per-certificate document, and studio/label licensing.","speakerNotes":""},
+  {"id":"1a2b3c4d-6666-4a2b-9c3d-0e1f2a3b4c06","position":7,"filepath":"src/pages/slides/Path30.tsx","title":"Step 1 — Master","description":"Upload any format and get a release-ready master in minutes.","speakerNotes":""},
+  {"id":"1a2b3c4d-7777-4a2b-9c3d-0e1f2a3b4c07","position":8,"filepath":"src/pages/slides/Path90.tsx","title":"Step 2 — Create","description":"Write, record, and arrange in the browser — no install needed.","speakerNotes":""},
+  {"id":"1a2b3c4d-8888-4a2b-9c3d-0e1f2a3b4c08","position":9,"filepath":"src/pages/slides/Path365.tsx","title":"Step 3 — Certify and share","description":"A release record built to travel with your music.","speakerNotes":""},
+  {"id":"1a2b3c4d-9999-4a2b-9c3d-0e1f2a3b4c09","position":10,"filepath":"src/pages/slides/Valuation.tsx","title":"Why creators use it","description":"A clearer path from idea to release.","speakerNotes":""},
+  {"id":"1a2b3c4d-aaaa-4a2b-9c3d-0e1f2a3b4c10","position":11,"filepath":"src/pages/slides/Ask.tsx","title":"Get started","description":"Try GravelKing Pro at gravelkingpro.it.com","speakerNotes":""}
 ]

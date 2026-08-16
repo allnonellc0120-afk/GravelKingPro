@@ -753,3 +753,24 @@ uri = "file://.local/outputs/GravelKing-Pro---Studio-Proof-and-Release.pdf"
 type = "pdf"
 title = "GravelKing Pro — Studio, Proof & Release (PDF)"
 description = "The single 12-slide release, certificate-pipeline, F6S, B2B, and business-roadmap PDF."
+
+[[outputs]]
+id = "Xu7QhZn_9KVGwVlpo-Wve"
+uri = "file://.local/outputs/GravelKing-Pro---Public-Promo-Deck.pdf"
+type = "pdf"
+title = "GravelKing Pro — Public Promo Deck (PDF)"
+description = "Postable promotional deck — no fundraising, valuation, or private details. Safe to share publicly."
+
+[[outputs]]
+id = "YxeyslfVVzc9dIDOzC5kg"
+uri = "file://.local/outputs/GravelKingPro_Buyout_Valuation_Brief_PRIVATE.pdf"
+type = "pdf"
+title = "Buyout & Valuation Brief (PRIVATE — your eyes only)"
+description = "Asset-based valuation, asking prices by deal type (seed / buyout / licensing), negotiation floors and techniques. Do not share externally."
+
+[[outputs]]
+id = "kYPQXV-5GKANtNeCukM27"
+uri = "file://.local/outputs/GravelKingPro_Outreach_Playbook_Road_to_100_PRIVATE.pdf"
+type = "pdf"
+title = "Investor Outreach Playbook + 30-Day Road to 100 (PRIVATE — your eyes only)"
+description = "All 12 prospects with routes, per-target angles, ready-to-send DM copy, and the 30-day bootstrap plan to 100 subscribers/investors/license deals. Do not share externally."
