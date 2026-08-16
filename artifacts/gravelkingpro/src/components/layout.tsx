@@ -40,6 +40,7 @@ export function Layout({
     { href: "/vocal-booth", label: "Vocal Booth" },
     { href: "/studio", label: "DAW" },
     { href: "/songwriting", label: "Lyrics Generator", icon: Sparkles },
+    { href: "/convert", label: "Converter" },
     { href: "/label", label: "Label" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
