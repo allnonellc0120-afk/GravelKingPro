@@ -18,12 +18,13 @@
     "tsx": "catalog:"
   },
   "dependencies": {
-    "@workspace/db": "workspace:*",
     "@google-cloud/storage": "^7.21.0",
+    "@replit/connectors-sdk": "^0.4.1",
+    "@workspace/db": "workspace:*",
     "drizzle-orm": "catalog:",
-    "stripe": "^22.2.0",
-    "stripe-replit-sync": "^1.0.0",
+    "fontkit": "^2.0.2",
     "pdf-lib": "^1.17.1",
-    "fontkit": "^2.0.2"
+    "stripe": "^22.2.0",
+    "stripe-replit-sync": "^1.0.0"
   }
 }

@@ -1285,6 +1285,9 @@ importers:
       '@google-cloud/storage':
         specifier: ^7.21.0
         version: 7.21.0
+      '@replit/connectors-sdk':
+        specifier: ^0.4.1
+        version: 0.4.1
       '@workspace/db':
         specifier: workspace:*
         version: link:../lib/db
