@@ -230,6 +230,47 @@ async function migrateAppSchema() {
         ADD COLUMN IF NOT EXISTS cert_unlock_period_start timestamptz
     `);
 
+    // Investor outreach tracker (admin-only).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS investor_prospects (
+        id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+        sort_order  integer     NOT NULL DEFAULT 0,
+        name        text        NOT NULL,
+        route       text,
+        notes       text,
+        status      text        NOT NULL DEFAULT 'not_started',
+        created_at  timestamptz NOT NULL DEFAULT now(),
+        updated_at  timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    // sort_order is the seed identity — unique constraint lets onConflictDoNothing
+    // prevent duplicate prospect sets from concurrent first-load requests.
+    // Use a DO block because ADD CONSTRAINT IF NOT EXISTS is not standard SQL.
+    await db.execute(sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'investor_prospects_sort_order_uniq'
+        ) THEN
+          ALTER TABLE investor_prospects
+            ADD CONSTRAINT investor_prospects_sort_order_uniq UNIQUE (sort_order);
+        END IF;
+      END $$
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS investor_touches (
+        id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+        prospect_id  uuid        NOT NULL REFERENCES investor_prospects(id) ON DELETE CASCADE,
+        touch_number integer     NOT NULL,
+        sent_at      date,
+        response     text,
+        notes        text,
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (prospect_id, touch_number)
+      )
+    `);
+
     logger.info("App schema migration complete");
   } catch (err: unknown) {
     logger.error({ err }, "App schema migration failed — continuing anyway");

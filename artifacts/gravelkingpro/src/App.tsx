@@ -48,6 +48,7 @@ import AdminPublishChecklist from "@/pages/admin-publish-checklist";
 import PromotersPage from "@/pages/promoters";
 import AdminPromoters from "@/pages/admin-promoters";
 import AdminDecks from "@/pages/admin-decks";
+import AdminInvestors from "@/pages/admin-investors";
 
 /**
  * Referral link capture: if the URL carries ?ref=CODE, report it to the server
@@ -222,6 +223,7 @@ function Router() {
       <Route path="/admin/publish-checklist" component={AdminPublishChecklist} />
       <Route path="/promoters" component={PromotersPage} />
       <Route path="/admin/promoters" component={AdminPromoters} />
+      <Route path="/admin/investors" component={AdminInvestors} />
       <Route path="/admin/decks" component={AdminDecks} />
       <Route component={NotFound} />
     </Switch>

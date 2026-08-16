@@ -28,6 +28,7 @@ import weekendSpecialRouter from "./weekend-special";
 import emailCaptureRouter from "./email-capture";
 import benchmarkRouter from "./benchmark";
 import referralsRouter from "./referrals";
+import investorsRouter from "./investors";
 
 const router: IRouter = Router();
 
@@ -60,5 +61,6 @@ router.use(weekendSpecialRouter);
 router.use(emailCaptureRouter);
 router.use(benchmarkRouter);
 router.use(referralsRouter);
+router.use(investorsRouter);
 
 export default router;
