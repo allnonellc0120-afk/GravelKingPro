@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { db, investorProspectsTable, investorTouchesTable } from "@workspace/db";
 import { eq, asc, sql } from "drizzle-orm";
+import { runOverdueAlertCheck } from "../lib/investorAlerts";
 
 const investorsRouter = Router();
 
@@ -317,6 +318,31 @@ investorsRouter.delete(
     } catch (err) {
       console.error("[investors] DELETE touch error", err);
       res.status(500).json({ error: "Failed to delete touch" });
+    }
+  },
+);
+
+// ── POST /admin/investors/check-overdue ──────────────────────────────────────
+// Manually trigger the overdue-touch alert check (also runs automatically
+// every 24 hours via the scheduler started in index.ts).
+// Query param: ?force=1 bypasses the 23-hour dedup guard.
+investorsRouter.post(
+  "/admin/investors/check-overdue",
+  async (req: Request, res: Response) => {
+    if (!(await guard(req, res))) return;
+    try {
+      const force = req.query["force"] === "1";
+      const result = await runOverdueAlertCheck(force);
+      res.json({
+        ok: true,
+        overdueCount: result.overdue.length,
+        emailSent: result.emailSent,
+        skippedRecentSend: result.skippedRecentSend,
+        overdue: result.overdue,
+      });
+    } catch (err) {
+      console.error("[investors] check-overdue error", err);
+      res.status(500).json({ error: "Overdue check failed" });
     }
   },
 );

@@ -4,6 +4,7 @@ import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
 import { ensureStripeProducts } from "./lib/stripeProducts";
 import { submitSitemapToGSC } from "./lib/googleSearchConsole";
+import { scheduleOverdueAlerts } from "./lib/investorAlerts";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -365,6 +366,7 @@ await migrateAppSchema();
 await ensureDemoAccount();
 await initStripe();
 await submitSitemapOnStartup();
+scheduleOverdueAlerts();
 
 app.listen(port, (err) => {
   if (err) {
