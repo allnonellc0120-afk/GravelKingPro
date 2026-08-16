@@ -14,10 +14,11 @@ const LIFETIME_GRANTS: Record<string, { tier: string; isDeveloper: boolean }> = 
   "martypodany63@gmail.com": { tier: "node_auditor", isDeveloper: false },
   "marie.gilreath@gmail.com": { tier: "node_auditor", isDeveloper: false },
   "labordehope3@gmail.com": { tier: "node_auditor", isDeveloper: false },
+  "hopelaborde66@gmail.com": { tier: "node_auditor", isDeveloper: false },
 };
 
 /** Permanently banned emails — auth rejected immediately. */
-const BANNED_EMAILS = new Set(["hopelaborde66@gmail.com"]);
+const BANNED_EMAILS = new Set<string>();
 
 // ── Global Express type augmentation ─────────────────────────────────────────
 declare global {

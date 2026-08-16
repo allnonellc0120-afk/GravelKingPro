@@ -22,10 +22,11 @@ const LIFETIME_EMAILS = new Set([
   "kymegky@gmail.com",
   "martypodany63@gmail.com",
   "labordehope3@gmail.com",
+  "hopelaborde66@gmail.com",
 ]);
 
 /** Permanently banned emails — any authenticated user matching is forced to free tier. */
-const BANNED_EMAILS = new Set(["hopelaborde66@gmail.com"]);
+const BANNED_EMAILS = new Set<string>();
 
 const TIER_RANK: Record<Tier, number> = {
   free: 0,
