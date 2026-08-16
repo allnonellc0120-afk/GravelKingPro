@@ -566,6 +566,13 @@ export async function generateAndMasterTrack(
           ownerUserId: userId,
           category: vocalMode === "instrumental" ? "instrumental" : "full_track",
           provenance: "internal",
+          // Provenance attribution on the document itself: which AI model
+          // generated the audio, and the copyright screen it cleared. A stub
+          // only exists when the scan returned no_match (shouldStamp).
+          generationModel: lyriaModel,
+          fingerprintStatus: fingerprint.status,
+          fingerprintProvider: "acrcloud",
+          fingerprintScannedAt: new Date(),
         });
       }
       await tx.insert(tracksTable).values({
@@ -610,6 +617,10 @@ export async function generateAndMasterTrack(
         stylePrompt: stylePromptRecord,
         styleAuthorshipScore: null,
         certifiedAt: new Date().toISOString(),
+        generationModel: lyriaModel,
+        fingerprintStatus: fingerprint.status,
+        fingerprintProvider: "acrcloud",
+        fingerprintScannedAt: new Date().toISOString(),
       });
     }
 

@@ -142,6 +142,11 @@ export interface CertStubBackup {
   ipiNumber?:           string;   // IPI — songwriter/composer registry ID
   iswc?:                string;   // ISWC — composition identifier
   isrc?:                string;   // ISRC — recording identifier
+  // Provenance attribution (optional — absent on legacy backups)
+  generationModel?:     string | null; // AI model name; null/absent = human/external
+  fingerprintStatus?:   string;   // copyright screen: no_match | match | unavailable | not_run
+  fingerprintProvider?: string;   // e.g. 'acrcloud'
+  fingerprintScannedAt?: string;  // ISO timestamp of the scan
 }
 
 /**

@@ -59,6 +59,21 @@ export const ipCertStubsTable = pgTable("ip_cert_stubs", {
   /** What was certified: 'lyrics' | 'instrumental' | 'full_track' | 'vocal_performance' */
   category: text("category"),
 
+  /** Name of the generating AI model (e.g. 'lyria-3-pro-preview').
+   *  NULL = human performance / external upload (no AI generation). */
+  generationModel: text("generation_model"),
+
+  /** Commercial-catalog copyright screen result at certification time:
+   *  'no_match' | 'match' | 'unavailable' | 'not_run'. NULL = legacy stub
+   *  created before the result was persisted on the cert. */
+  fingerprintStatus: text("fingerprint_status"),
+
+  /** Copyright-screen provider (currently 'acrcloud'). */
+  fingerprintProvider: text("fingerprint_provider"),
+
+  /** When the copyright screen ran. NULL = legacy stub or scan not run. */
+  fingerprintScannedAt: timestamp("fingerprint_scanned_at", { withTimezone: true }),
+
   /** Where the audio came from: 'internal' (generated in-app) |
    *  'external_upload' (user upload, ACRCloud-gated) | 'vocal_recording' (in-app booth) */
   provenance: text("provenance"),
