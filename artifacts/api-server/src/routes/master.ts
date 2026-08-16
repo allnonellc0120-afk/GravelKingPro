@@ -625,6 +625,14 @@ masterRouter.post(
           ownerUserId: certOwnerId,
           category:    certCategory,
           provenance:  certProvenance,
+          // This route only certifies uploaded/recorded audio — never AI
+          // generation — so the model attribution is explicitly absent.
+          generationModel: null,
+          // certify=true implies the ACRCloud screen returned no_match
+          // (enforced above); persist that result onto the court record.
+          fingerprintStatus: fingerprintStatus,
+          fingerprintProvider: "acrcloud",
+          fingerprintScannedAt: new Date(),
         }).onConflictDoNothing();
 
         // Dual-backup to Firestore — independently subpoenable even if
@@ -641,6 +649,9 @@ masterRouter.post(
           iswc:                 iswc ?? undefined,
           isrc:                 isrc ?? undefined,
           certifiedAt:          new Date().toISOString(),
+          fingerprintStatus:    fingerprintStatus,
+          fingerprintProvider:  "acrcloud",
+          fingerprintScannedAt: new Date().toISOString(),
         });
 
         // Embed only the nominator into the track LSBs — no secrets in the file.

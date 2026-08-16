@@ -100,6 +100,20 @@ function buildCertificate(stub: StubRow) {
       ipiNumber: stub.ipiNumber ?? undefined,
       iswc: stub.iswc ?? undefined,
       isrc: stub.isrc ?? undefined,
+    },
+    {
+      // Legacy stubs (columns NULL) omit each field gracefully.
+      generationModel: stub.generationModel ?? undefined,
+      category: stub.category ?? undefined,
+      provenance: stub.provenance ?? undefined,
+      styleAuthorshipScore: stub.styleAuthorshipScore ?? undefined,
+      copyrightScreen: stub.fingerprintStatus
+        ? {
+            status: stub.fingerprintStatus,
+            provider: stub.fingerprintProvider ?? undefined,
+            scannedAt: stub.fingerprintScannedAt?.toISOString(),
+          }
+        : undefined,
     }
   );
   // Override the chain-of-custody values to match the real stub exactly.

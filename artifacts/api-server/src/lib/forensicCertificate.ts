@@ -37,6 +37,24 @@ export interface GlobalIndustryIds {
   isrc?: string;
 }
 
+export interface ProvenanceAttribution {
+  /** Name of the generating AI model (e.g. "lyria-3-pro-preview").
+   *  Omit for human performances / external uploads. */
+  generationModel?: string;
+  /** What was certified: 'lyrics' | 'instrumental' | 'full_track' | 'vocal_performance' */
+  category?: string;
+  /** How the audio reached the platform: 'internal' | 'external_upload' | 'vocal_recording' */
+  provenance?: string;
+  /** 0–100 human-authorship score derived from the style prompt */
+  styleAuthorshipScore?: number;
+  /** Commercial-catalog copyright screen result at certification time */
+  copyrightScreen?: {
+    status: string;          // 'no_match' | 'match' | 'unavailable' | 'not_run'
+    provider?: string;       // e.g. 'acrcloud'
+    scannedAt?: string;      // ISO timestamp
+  };
+}
+
 export interface ForensicCertificate {
   certificateId: string;
   generatedAt: string;
@@ -57,6 +75,9 @@ export interface ForensicCertificate {
   };
   /** Global music industry identifiers bound to this cert (optional, artist-supplied) */
   industryIds?: GlobalIndustryIds;
+  /** AI-model attribution, category/provenance, authorship score, and the
+   *  copyright-screen result (optional — omitted on legacy certs). */
+  attribution?: ProvenanceAttribution;
   legalDisclaimer: string;
   verificationUrl: string;
 }
@@ -75,7 +96,8 @@ function buildHandshake(certId: string, nominator: string, denominator: string):
 export function generateForensicCertificate(
   inputs: ForensicInputHashes,
   anchorData: DualAnchorData,
-  industryIds?: GlobalIndustryIds
+  industryIds?: GlobalIndustryIds,
+  attribution?: ProvenanceAttribution
 ): ForensicCertificate {
   const certificateId = randomUUID();
   const generatedAt = new Date().toISOString();
@@ -89,6 +111,15 @@ export function generateForensicCertificate(
 
   const hasIndustryIds =
     !!(industryIds && (industryIds.ipiNumber || industryIds.iswc || industryIds.isrc));
+
+  const hasAttribution = !!(
+    attribution &&
+    (attribution.generationModel ||
+      attribution.category ||
+      attribution.provenance ||
+      attribution.styleAuthorshipScore !== undefined ||
+      attribution.copyrightScreen)
+  );
 
   const certificate: ForensicCertificate = {
     certificateId,
@@ -113,6 +144,23 @@ export function generateForensicCertificate(
         ...(industryIds!.ipiNumber ? { ipiNumber: industryIds!.ipiNumber } : {}),
         ...(industryIds!.iswc ? { iswc: industryIds!.iswc } : {}),
         ...(industryIds!.isrc ? { isrc: industryIds!.isrc } : {}),
+      },
+    } : {}),
+    ...(hasAttribution ? {
+      attribution: {
+        ...(attribution!.generationModel ? { generationModel: attribution!.generationModel } : {}),
+        ...(attribution!.category ? { category: attribution!.category } : {}),
+        ...(attribution!.provenance ? { provenance: attribution!.provenance } : {}),
+        ...(attribution!.styleAuthorshipScore !== undefined
+          ? { styleAuthorshipScore: attribution!.styleAuthorshipScore }
+          : {}),
+        ...(attribution!.copyrightScreen ? {
+          copyrightScreen: {
+            status: attribution!.copyrightScreen.status,
+            ...(attribution!.copyrightScreen.provider ? { provider: attribution!.copyrightScreen.provider } : {}),
+            ...(attribution!.copyrightScreen.scannedAt ? { scannedAt: attribution!.copyrightScreen.scannedAt } : {}),
+          },
+        } : {}),
       },
     } : {}),
     legalDisclaimer:
@@ -164,6 +212,29 @@ export function certificateToPdf(certificate: ForensicCertificate): Buffer {
       `IPI Number (Songwriter):  ${certificate.industryIds.ipiNumber ?? "UNREGISTERED"}`,
       `ISWC (Composition):       ${certificate.industryIds.iswc ?? "UNREGISTERED"}`,
       `ISRC (Recording):         ${certificate.industryIds.isrc ?? "UNREGISTERED"}`,
+      "",
+    ] : []),
+    ...(certificate.attribution ? [
+      "PROVENANCE & ATTRIBUTION",
+      "------------------------",
+      `Generating AI Model: ${certificate.attribution.generationModel ?? "None — human performance / external upload"}`,
+      ...(certificate.attribution.category ? [`Certified Category:  ${certificate.attribution.category}`] : []),
+      ...(certificate.attribution.provenance ? [`Audio Provenance:    ${certificate.attribution.provenance}`] : []),
+      ...(certificate.attribution.styleAuthorshipScore !== undefined
+        ? [`Style Authorship Score (0-100): ${certificate.attribution.styleAuthorshipScore}`]
+        : []),
+      ...(certificate.attribution.copyrightScreen ? [
+        "",
+        "COMMERCIAL-CATALOG COPYRIGHT SCREEN",
+        "-----------------------------------",
+        `Result:   ${certificate.attribution.copyrightScreen.status === "no_match"
+          ? "NO MATCH — cleared against commercial catalog"
+          : certificate.attribution.copyrightScreen.status}`,
+        ...(certificate.attribution.copyrightScreen.provider
+          ? [`Provider: ${certificate.attribution.copyrightScreen.provider}`] : []),
+        ...(certificate.attribution.copyrightScreen.scannedAt
+          ? [`Scanned:  ${certificate.attribution.copyrightScreen.scannedAt}`] : []),
+      ] : []),
       "",
     ] : []),
     "LEGAL FORENSICS DISCLAIMER",

@@ -214,6 +214,16 @@ async function migrateAppSchema() {
         ADD COLUMN IF NOT EXISTS unlock_source     text,
         ADD COLUMN IF NOT EXISTS stripe_session_id text
     `);
+    // Provenance attribution on the certificate document — the generating AI
+    // model and the commercial-catalog copyright-screen result (additive +
+    // idempotent; NULL on legacy stubs → fields omitted from the document).
+    await db.execute(sql`
+      ALTER TABLE ip_cert_stubs
+        ADD COLUMN IF NOT EXISTS generation_model       text,
+        ADD COLUMN IF NOT EXISTS fingerprint_status     text,
+        ADD COLUMN IF NOT EXISTS fingerprint_provider   text,
+        ADD COLUMN IF NOT EXISTS fingerprint_scanned_at timestamptz
+    `);
     await db.execute(sql`
       ALTER TABLE users
         ADD COLUMN IF NOT EXISTS cert_unlocks             integer NOT NULL DEFAULT 0,
