@@ -313,7 +313,12 @@ export default function Mastering() {
       const rem = resp.headers.get("X-GK-Free-Remaining");
       if (rem !== null) setRemaining(parseInt(rem));
       const certificationStatus = resp.headers.get("X-GK-Certification");
-      if (certify && certificationStatus === "skipped-acr-unavailable") {
+      if (certify && certificationStatus === "sealed-local") {
+        toast({
+          title: "Master complete — local scan certificate sealed",
+          description: "A local audio-signature scan found no project-catalog match. Worldwide commercial catalog clearance was not checked.",
+        });
+      } else if (certify && certificationStatus === "skipped-acr-unavailable") {
         toast({
           title: "Master complete — stamp skipped",
           description: "The copyright scan is temporarily unavailable. Your master still completed and was not stamped.",
@@ -800,7 +805,7 @@ export default function Mastering() {
                 className="w-4 h-4 accent-sky-500 mt-0.5"
               />
               <label htmlFor="certify" className="text-sm cursor-pointer">
-                Certify this as my original work <span className="text-muted-foreground">(optional) — runs a copyright check and embeds an IP ownership certificate in the WAV. Leave off for karaoke, covers, or remixes.</span>
+                Certify this as my original work <span className="text-muted-foreground">(optional) — runs the available local audio-signature scan and embeds an IP ownership certificate in the WAV. The certificate clearly shows that worldwide commercial-catalog clearance was not checked. Leave off for karaoke, covers, or remixes.</span>
               </label>
             </div>
 

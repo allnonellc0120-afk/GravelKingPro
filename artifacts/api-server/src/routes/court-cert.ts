@@ -111,6 +111,9 @@ function buildCertificate(stub: StubRow) {
         ? {
             status: stub.fingerprintStatus,
             provider: stub.fingerprintProvider ?? undefined,
+            scope: stub.fingerprintStatus === "local_no_match"
+              ? "local_catalog"
+              : "global_commercial",
             scannedAt: stub.fingerprintScannedAt?.toISOString(),
           }
         : undefined,

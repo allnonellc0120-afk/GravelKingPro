@@ -49,8 +49,9 @@ export interface ProvenanceAttribution {
   styleAuthorshipScore?: number;
   /** Commercial-catalog copyright screen result at certification time */
   copyrightScreen?: {
-    status: string;          // 'no_match' | 'match' | 'unavailable' | 'not_run'
-    provider?: string;       // e.g. 'acrcloud'
+    status: string;          // 'no_match' | 'local_no_match' | 'match' | 'unavailable' | 'not_run'
+    provider?: string;       // e.g. 'acrcloud' or 'local-signature'
+    scope?: "global_commercial" | "local_catalog";
     scannedAt?: string;      // ISO timestamp
   };
 }
@@ -158,6 +159,7 @@ export function generateForensicCertificate(
           copyrightScreen: {
             status: attribution!.copyrightScreen.status,
             ...(attribution!.copyrightScreen.provider ? { provider: attribution!.copyrightScreen.provider } : {}),
+            ...(attribution!.copyrightScreen.scope ? { scope: attribution!.copyrightScreen.scope } : {}),
             ...(attribution!.copyrightScreen.scannedAt ? { scannedAt: attribution!.copyrightScreen.scannedAt } : {}),
           },
         } : {}),
@@ -225,11 +227,20 @@ export function certificateToPdf(certificate: ForensicCertificate): Buffer {
         : []),
       ...(certificate.attribution.copyrightScreen ? [
         "",
-        "COMMERCIAL-CATALOG COPYRIGHT SCREEN",
+        certificate.attribution.copyrightScreen.scope === "local_catalog"
+          ? "LOCAL AUDIO-SIGNATURE SCREEN"
+          : "COMMERCIAL-CATALOG COPYRIGHT SCREEN",
         "-----------------------------------",
-        `Result:   ${certificate.attribution.copyrightScreen.status === "no_match"
-          ? "NO MATCH — cleared against commercial catalog"
-          : certificate.attribution.copyrightScreen.status}`,
+        ...(certificate.attribution.copyrightScreen.scope === "local_catalog"
+          ? [
+              "Result:   LOCAL SCAN COMPLETE — no local signature match",
+              "Global:   NOT CHECKED — worldwide commercial catalog scan unavailable",
+            ]
+          : [
+              `Result:   ${certificate.attribution.copyrightScreen.status === "no_match"
+                ? "NO MATCH — cleared against commercial catalog"
+                : certificate.attribution.copyrightScreen.status}`,
+            ]),
         ...(certificate.attribution.copyrightScreen.provider
           ? [`Provider: ${certificate.attribution.copyrightScreen.provider}`] : []),
         ...(certificate.attribution.copyrightScreen.scannedAt

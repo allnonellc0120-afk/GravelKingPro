@@ -345,9 +345,12 @@ masterRouter.post(
       req.ingestionValidation?.metadata.commercialFingerprint.status ?? "not_run";
     // ACRCloud controls only the stamp. Mastering always continues when the
     // provider is down, suspended, times out, or returns a catalog match.
-    const certify = certifyRequested && fingerprintStatus === "no_match";
+    const certify =
+      certifyRequested &&
+      (fingerprintStatus === "no_match" || fingerprintStatus === "local_no_match");
     const certificationStatus =
       !certifyRequested ? "not-requested"
+      : fingerprintStatus === "local_no_match" ? "sealed-local"
       : certify ? "sealed"
       : fingerprintStatus === "match" ? "skipped-acr-match"
       : "skipped-acr-unavailable";
@@ -631,7 +634,8 @@ masterRouter.post(
           // certify=true implies the ACRCloud screen returned no_match
           // (enforced above); persist that result onto the court record.
           fingerprintStatus: fingerprintStatus,
-          fingerprintProvider: "acrcloud",
+          fingerprintProvider:
+            fingerprintStatus === "local_no_match" ? "local-signature" : "acrcloud",
           fingerprintScannedAt: new Date(),
         }).onConflictDoNothing();
 
@@ -650,7 +654,8 @@ masterRouter.post(
           isrc:                 isrc ?? undefined,
           certifiedAt:          new Date().toISOString(),
           fingerprintStatus:    fingerprintStatus,
-          fingerprintProvider:  "acrcloud",
+          fingerprintProvider:
+            fingerprintStatus === "local_no_match" ? "local-signature" : "acrcloud",
           fingerprintScannedAt: new Date().toISOString(),
         });
 
