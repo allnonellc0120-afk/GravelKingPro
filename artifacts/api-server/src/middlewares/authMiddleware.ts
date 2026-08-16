@@ -13,6 +13,7 @@ const LIFETIME_GRANTS: Record<string, { tier: string; isDeveloper: boolean }> = 
   "kymegky@gmail.com": { tier: "node_auditor", isDeveloper: false },
   "martypodany63@gmail.com": { tier: "node_auditor", isDeveloper: false },
   "marie.gilreath@gmail.com": { tier: "node_auditor", isDeveloper: false },
+  "labordehope3@gmail.com": { tier: "node_auditor", isDeveloper: false },
 };
 
 /** Permanently banned emails — auth rejected immediately. */
