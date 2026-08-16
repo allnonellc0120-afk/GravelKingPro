@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, CheckCircle2, Clock, AlertCircle, Circle } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, Clock, AlertCircle, Circle, Download } from "lucide-react";
 import { AdminGate } from "@/components/admin-gate";
 import { AdminNav } from "@/components/admin-nav";
 
@@ -372,6 +372,79 @@ function InvestorsDashboard() {
     [refresh],
   );
 
+  const downloadCSV = useCallback(() => {
+    if (!prospects) return;
+
+    /**
+     * RFC 4180-compliant CSV cell encoder with spreadsheet formula injection
+     * protection. Values that start with a formula trigger character (=, +, -,
+     * @, TAB, CR) — including after leading whitespace or control characters —
+     * are prefixed with a literal apostrophe so spreadsheet apps treat them as
+     * text. Then the cell is double-quote escaped per RFC 4180.
+     */
+    const escape = (val: string | null | undefined): string => {
+      // Normalise to string, strip control chars except \t (tab is a formula trigger too)
+      let s = (val ?? "").replace(/\r/g, "");
+
+      // Neutralise formula injection: if the value (after stripping leading
+      // whitespace/zero-width chars) begins with a spreadsheet formula trigger,
+      // prepend a literal apostrophe to force text interpretation.
+      const FORMULA_PREFIXES = /^[\s\u200B\u00A0]*[=+\-@\t]/;
+      if (FORMULA_PREFIXES.test(s)) {
+        s = "'" + s;
+      }
+
+      // RFC 4180: wrap in double-quotes if the value contains comma, double-
+      // quote, or newline; escape interior double-quotes by doubling them.
+      if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const header = [
+      "#",
+      "Name",
+      "Route",
+      "Status",
+      "T1 Sent Date",
+      "T1 Response",
+      "T2 Sent Date",
+      "T2 Response",
+      "T3 Sent Date",
+      "T3 Response",
+    ].join(",");
+
+    const rows = prospects.map((p) => {
+      const t1 = p.touches.find((t) => t.touchNumber === 1);
+      const t2 = p.touches.find((t) => t.touchNumber === 2);
+      const t3 = p.touches.find((t) => t.touchNumber === 3);
+      return [
+        p.sortOrder,
+        escape(p.name),
+        escape(p.route),
+        escape(STATUS_LABELS[p.status] ?? p.status),
+        escape(t1?.sentAt),
+        escape(t1?.response),
+        escape(t2?.sentAt),
+        escape(t2?.response),
+        escape(t3?.sentAt),
+        escape(t3?.response),
+      ].join(",");
+    });
+
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `investor-touches-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [prospects]);
+
   // Summary counts
   const summary = prospects
     ? {
@@ -405,9 +478,21 @@ function InvestorsDashboard() {
             30-day outreach tracker · T1 → T2 at day 5 · T3 at day 12 · then stop
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={downloadCSV}
+            disabled={!prospects || prospects.length === 0}
+            title="Download CSV"
+          >
+            <Download className="h-4 w-4 mr-1.5" />
+            CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {/* Summary bar */}
