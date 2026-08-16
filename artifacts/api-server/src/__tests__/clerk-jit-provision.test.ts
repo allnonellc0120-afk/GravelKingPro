@@ -16,7 +16,7 @@
  *   5. Concurrent first authenticated requests — exactly one row, both callers
  *      resolve to it.
  *   6. Lifetime grants refresh on the ADOPTED row id (not the bridge id).
- *   7. Banned emails resolve to null (no row leak).
+ *   7. Lifetime-granted emails refresh to the top tier.
  */
 import { randomUUID } from "node:crypto";
 import { db, usersTable } from "@workspace/db";
@@ -155,16 +155,20 @@ async function main() {
     check("still exactly one row", (await countByEmail(email)) === 1);
   }
 
-  // ── 7. Banned email never provisions ───────────────────────────────────────
-  console.log("\n[7] Banned email resolves to null");
+  // ── 7. Lifetime-granted email provisions at the top tier ───────────────────
+  console.log("\n[7] Lifetime-granted email receives permanent top-tier access");
   {
-    const user = await jitProvisionUser(`test-clerk-${run}-banned`, "hopelaborde66@gmail.com");
-    check("returns null", user === null);
+    const bridgeId = `test-clerk-${run}-lifetime`;
+    createdIds.push(bridgeId);
+    const user = await jitProvisionUser(bridgeId, "hopelaborde66@gmail.com");
+    check("provisions the account", user !== null);
+    check("receives node_auditor tier", user?.subscriptionTier === "node_auditor");
+    check("is marked pro", user?.isPro === true);
     const [row] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.id, `test-clerk-${run}-banned`));
-    check("no row created", row === undefined);
+      .where(sql`lower(${usersTable.email}) = 'hopelaborde66@gmail.com'`);
+    check("persisted row keeps node_auditor tier", row?.subscriptionTier === "node_auditor");
   }
 
   // ── Cleanup ─────────────────────────────────────────────────────────────────
