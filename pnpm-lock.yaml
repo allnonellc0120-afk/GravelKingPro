@@ -217,6 +217,12 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 5.2.0(vite@7.3.6(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
+      pdf-lib:
+        specifier: ^1.17.1
+        version: 1.17.1
+      playwright:
+        specifier: 1.61.1
+        version: 1.61.1
       prosemirror-commands:
         specifier: 1.7.1
         version: 1.7.1
