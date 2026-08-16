@@ -95,7 +95,11 @@ async function main(): Promise<void> {
 
     delete process.env["FINGERPRINT_SERVICE_URL"];
     const unconfigured = await scanCommercialFingerprint(fixture);
-    check(unconfigured.status === "unavailable", "missing Cloud Run configuration fails closed");
+    check(unconfigured.status === "local_no_match", "missing Cloud Run configuration uses local signature scan");
+    check(
+      unconfigured.status === "local_no_match" && unconfigured.scope === "local_catalog",
+      "local fallback is explicitly scoped to the local catalog",
+    );
   } finally {
     server.close();
     await unlink(fixture).catch(() => {});

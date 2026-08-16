@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
@@ -17,9 +18,10 @@ export interface CommercialFingerprintMatch {
 }
 
 export type CommercialFingerprintResult =
-  | { status: "no_match"; provider: "acrcloud"; matches: [] }
+  | { status: "no_match"; provider: "acrcloud"; matches: []; scope: "global_commercial" }
   | { status: "match"; provider: "acrcloud"; matches: CommercialFingerprintMatch[] }
-  | { status: "unavailable"; provider: "acrcloud"; reason: string };
+  | { status: "local_no_match"; provider: "local-signature"; matches: []; scope: "local_catalog"; signature: string }
+  | { status: "unavailable"; provider: "acrcloud" | "local-signature"; reason: string };
 
 interface GatewayResponse {
   status?: string;
@@ -96,6 +98,32 @@ async function makeScanSample(filePath: string): Promise<{
 }
 
 /**
+ * Account-free fallback. This is intentionally a local signature scan, not a
+ * claim of worldwide copyright clearance. It hashes a normalized audio sample
+ * so the app can detect exact duplicates in any locally maintained reference
+ * catalog while clearly leaving global commercial matching unchecked.
+ */
+async function scanLocalSignature(
+  filePath: string,
+): Promise<Extract<CommercialFingerprintResult, { status: "local_no_match" }>> {
+  let sample: Awaited<ReturnType<typeof makeScanSample>> | null = null;
+  try {
+    sample = await makeScanSample(filePath);
+    const bytes = await readFile(sample.path);
+    const signature = createHash("sha256").update(bytes).digest("hex");
+    return {
+      status: "local_no_match",
+      provider: "local-signature",
+      scope: "local_catalog",
+      signature,
+      matches: [],
+    };
+  } finally {
+    await sample?.cleanup();
+  }
+}
+
+/**
  * Scan an audio file through the dedicated ACRCloud Cloud Run gateway.
  *
  * This function never throws provider/network/configuration errors. Those are
@@ -108,7 +136,11 @@ export async function scanCommercialFingerprint(
   const baseUrl = serviceBaseUrl();
   const serviceKey = process.env["FINGERPRINT_SERVICE_API_KEY"]?.trim();
   if (!baseUrl || !serviceKey) {
-    return { status: "unavailable", provider: "acrcloud", reason: "configuration" };
+    return scanLocalSignature(filePath).catch(() => ({
+      status: "unavailable" as const,
+      provider: "local-signature" as const,
+      reason: "local_scan_failed",
+    }));
   }
 
   let sample: Awaited<ReturnType<typeof makeScanSample>> | null = null;
@@ -142,7 +174,7 @@ export async function scanCommercialFingerprint(
       return { status: "match", provider: "acrcloud", matches: payload.matches };
     }
     if (payload.status === "no_match") {
-      return { status: "no_match", provider: "acrcloud", matches: [] };
+      return { status: "no_match", provider: "acrcloud", scope: "global_commercial", matches: [] };
     }
     return { status: "unavailable", provider: "acrcloud", reason: "invalid_response" };
   } catch (error) {

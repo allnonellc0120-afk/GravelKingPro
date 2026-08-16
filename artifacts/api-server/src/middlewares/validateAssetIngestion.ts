@@ -40,9 +40,10 @@ export interface IngestionValidationResult {
     labelHits: string[];
     spectralUniqueness: number | null;
     commercialFingerprint: {
-      provider: "acrcloud";
-      status: "not_run" | "no_match" | "match" | "unavailable";
+      provider: "acrcloud" | "local-signature";
+      status: "not_run" | "no_match" | "local_no_match" | "match" | "unavailable";
       matches: CommercialFingerprintMatch[];
+      scope?: "global_commercial" | "local_catalog";
     };
   };
   authorAssertion: boolean;
@@ -266,6 +267,8 @@ export function validateAssetIngestion(
           if (result.reasons.length === 0 && options.commercialFingerprint === true) {
             const commercial = await scanCommercialFingerprint(scanPath);
             result.metadata.commercialFingerprint.status = commercial.status;
+            result.metadata.commercialFingerprint.provider = commercial.provider;
+            if ("scope" in commercial) result.metadata.commercialFingerprint.scope = commercial.scope;
             if (commercial.status === "unavailable") {
               logger.warn(
                 { reason: commercial.reason, filename: audioFile.originalname },
