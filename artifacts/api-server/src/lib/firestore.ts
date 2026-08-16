@@ -159,8 +159,13 @@ export function backupCertStub(stub: Omit<CertStubBackup, "backupNote">): void {
   const db = getDb();
   if (!db) return;
 
+  // Strip undefined optional fields before writing. Firestore rejects any
+  // "undefined" document value, and cert stubs legitimately omit identifiers
+  // (ipiNumber/iswc/isrc) when the artist didn't supply them.
   const doc: CertStubBackup = {
-    ...stub,
+    ...Object.fromEntries(
+      Object.entries(stub).filter(([, v]) => v !== undefined),
+    ),
     backupNote:
       "GravelKing IP Certificate — dual-stored for independent legal verification. " +
       "This record on Google Cloud Firestore serves as a tamper-evident, " +
