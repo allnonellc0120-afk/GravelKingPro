@@ -2,49 +2,49 @@ export default function Moat() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#07111f] font-body text-white">
       <div className="absolute inset-0 bg-gradient-to-br from-[#07111f] via-[#0a1828] to-[#07111f]" />
-      <div className="absolute left-[5vw] right-[5vw] top-[5vh] flex items-center justify-between text-[1.5vw] text-white/55">
-        <div className="flex items-center gap-[0.8vw] font-bold text-white/80"><span className="h-[1.4vw] w-[1.4vw] rounded-[0.25vw] bg-[#f59e0b]" />GRAVELKING</div>
-        <div>THE MOAT</div>
-      </div>
-      <div className="absolute left-[5vw] top-[14vh] w-[88vw]">
-        <h2 className="font-display text-[4.2vw] font-bold leading-[1.05] tracking-[-0.02em]" style={{ textWrap: 'balance' }}>Four layers competitors have to rebuild from scratch</h2>
-      </div>
-      <div className="absolute left-[5vw] top-[30vh] grid w-[90vw] grid-cols-2 gap-[1.8vw]">
-        <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.8vw]">
-          <div className="flex items-baseline gap-[1vw]">
-            <span className="font-display text-[2.6vw] font-bold text-[#f59e0b]">1</span>
-            <p className="text-[2.1vw] font-extrabold">Proprietary DSP</p>
-          </div>
-          <p className="mt-[1vh] text-[2vw] leading-[1.45] text-white/78" style={{ textWrap: 'pretty' }}>Morris Law Kernel v3.5 — years of multi-band mastering R&amp;D with no open-source equivalent, running every track that touches the platform.</p>
+      <div className="relative flex h-full w-full flex-col px-[5vw] py-[4vh]">
+        <div className="flex items-center justify-between text-[1.5vw] text-white/55">
+          <div className="flex items-center gap-[0.8vw] font-bold text-white/80"><span className="h-[1.4vw] w-[1.4vw] rounded-[0.25vw] bg-[#f59e0b]" />GRAVELKING</div>
+          <div>THE MOAT</div>
         </div>
-        <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.8vw]">
-          <div className="flex items-baseline gap-[1vw]">
-            <span className="font-display text-[2.6vw] font-bold text-[#f59e0b]">2</span>
-            <p className="text-[2.1vw] font-extrabold">Split-key certificate architecture</p>
+        <h2 className="mt-[3vh] font-display text-[3.6vw] font-bold leading-[1.05] tracking-[-0.02em]" style={{ textWrap: 'balance' }}>One workflow for a cleaner release</h2>
+        <div className="mt-[3.5vh] grid grid-cols-2 gap-[1.4vw]">
+          <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.4vw]">
+            <div className="flex items-baseline gap-[0.9vw]">
+              <span className="font-display text-[2.2vw] font-bold text-[#f59e0b]">1</span>
+              <p className="text-[1.9vw] font-extrabold">Professional mastering</p>
+            </div>
+            <p className="mt-[0.8vh] text-[1.7vw] leading-[1.4] text-white/78" style={{ textWrap: 'pretty' }}>Bring a balanced, release-ready sound to every track with a guided mastering workflow built for independent creators.</p>
           </div>
-          <p className="mt-[1vh] text-[2vw] leading-[1.45] text-white/78" style={{ textWrap: 'pretty' }}>Half the proof lives in the audio itself, half on the server — a certificate can't be forged by copying the file, and can't be verified without us.</p>
-        </div>
-        <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.8vw]">
-          <div className="flex items-baseline gap-[1vw]">
-            <span className="font-display text-[2.6vw] font-bold text-[#f59e0b]">3</span>
-            <p className="text-[2.1vw] font-extrabold">The provenance record</p>
+          <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.4vw]">
+            <div className="flex items-baseline gap-[0.9vw]">
+              <span className="font-display text-[2.2vw] font-bold text-[#f59e0b]">2</span>
+              <p className="text-[1.9vw] font-extrabold">Verifiable certificates</p>
+            </div>
+            <p className="mt-[0.8vh] text-[1.7vw] leading-[1.4] text-white/78" style={{ textWrap: 'pretty' }}>Create a durable record for your release, with a verification link you can share with collaborators, platforms, and partners.</p>
           </div>
-          <p className="mt-[1vh] text-[2vw] leading-[1.45] text-white/78" style={{ textWrap: 'pretty' }}>Human-vs-AI attribution plus commercial-catalog screening on every cert. Each certified track grows a registry no competitor can copy retroactively.</p>
-        </div>
-        <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.8vw]">
-          <div className="flex items-baseline gap-[1vw]">
-            <span className="font-display text-[2.6vw] font-bold text-[#f59e0b]">4</span>
-            <p className="text-[2.1vw] font-extrabold">Full-pipeline lock-in</p>
+          <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.4vw]">
+            <div className="flex items-baseline gap-[0.9vw]">
+              <span className="font-display text-[2.2vw] font-bold text-[#f59e0b]">3</span>
+              <p className="text-[1.9vw] font-extrabold">Human + AI attribution</p>
+            </div>
+            <p className="mt-[0.8vh] text-[1.7vw] leading-[1.4] text-white/78" style={{ textWrap: 'pretty' }}>Keep the human contribution visible and disclose when AI helped create the instrumental, lyrics, or full track.</p>
           </div>
-          <p className="mt-[1vh] text-[2vw] leading-[1.45] text-white/78" style={{ textWrap: 'pretty' }}>Write, record, master, certify in one place. Leaving means abandoning your certificates, your vault, and your provenance history.</p>
+          <div className="rounded-[0.8vw] border border-white/12 bg-white/5 p-[1.4vw]">
+            <div className="flex items-baseline gap-[0.9vw]">
+              <span className="font-display text-[2.2vw] font-bold text-[#f59e0b]">4</span>
+              <p className="text-[1.9vw] font-extrabold">Creator workflow</p>
+            </div>
+            <p className="mt-[0.8vh] text-[1.7vw] leading-[1.4] text-white/78" style={{ textWrap: 'pretty' }}>Write, record, master, and prepare a release in one place — from the first idea to the final shareable asset.</p>
+          </div>
         </div>
-      </div>
-      <div className="absolute left-[5vw] top-[74vh] w-[90vw] rounded-[0.8vw] border border-[#5eead4]/30 bg-[#5eead4]/8 p-[1.5vw]">
-        <p className="text-[2vw] leading-[1.4]" style={{ textWrap: 'pretty' }}><span className="font-extrabold text-[#5eead4]">Estimated moat value: $800K–$2.4M</span> — internal estimate based on replacement cost of the DSP and cert stack, switching cost, and the growing registry data asset.</p>
-      </div>
-      <div className="absolute bottom-[5vh] left-[5vw] right-[5vw] flex items-center justify-between border-t border-white/15 pt-[2vh] text-[1.5vw] text-white/55">
-        <div>Defensibility compounds with every certified track</div>
-        <div>05</div>
+        <div className="mt-[2.5vh] rounded-[0.8vw] border border-[#5eead4]/30 bg-[#5eead4]/8 p-[1.4vw]">
+          <p className="text-[1.8vw] leading-[1.4]" style={{ textWrap: 'pretty' }}><span className="font-extrabold text-[#5eead4]">The result:</span> a release workflow that makes creator intent, AI involvement, and final audio easier to understand.</p>
+        </div>
+        <div className="mt-auto flex items-center justify-between border-t border-white/15 pt-[1.6vh] text-[1.5vw] text-white/55">
+          <div>Make every release easier to trust</div>
+          <div>05</div>
+        </div>
       </div>
     </div>
   );
