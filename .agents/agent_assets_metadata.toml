@@ -774,3 +774,10 @@ uri = "file://.local/outputs/GravelKingPro_Outreach_Playbook_Road_to_100_PRIVATE
 type = "pdf"
 title = "Investor Outreach Playbook + 30-Day Road to 100 (PRIVATE — your eyes only)"
 description = "All 12 prospects with routes, per-target angles, ready-to-send DM copy, and the 30-day bootstrap plan to 100 subscribers/investors/license deals. Do not share externally."
+
+[[outputs]]
+id = "s5mdBLqg_4XGYPSXkb6Zt"
+uri = "file://.local/outputs/GravelKing-Productions---F6S-Investor-Deck.pdf"
+type = "pdf"
+title = "GravelKing Productions — F6S Investor Deck (PDF)"
+description = "11-slide investor deck, ready to attach to the F6S profile or send via email."
