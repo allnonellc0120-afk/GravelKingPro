@@ -24,6 +24,7 @@
 - [video-js scaffold tsconfig](video-js-scaffold-tsconfig.md) — new video artifacts miss the DOM lib override; tsc fails on window/document until you add lib: [esnext, dom, dom.iterable]
 - [Promo video conventions](promo-video-conventions.md) — promo "voice 0dB/instruments -2dB" is a Scene5 DAW visual, not an audio re-encode; scenes must track real product (no removed bloat)
 - [Prod DB schema migrates on Publish](deploy-prod-db-schema.md) — Publish diffs dev DB (not code) → prod; drizzle schema edits must be pushed to dev or inserts 500 in BOTH envs; re-publish for prod
+- [Startup DDL dropped on Publish](startup-ddl-publish-drop.md) — tables created by raw startup SQL must also live in the Drizzle schema or the publish diff DROPs them in prod; check explainSchemaDiff before republish
 - [stripe-replit-sync esbuild external](stripe-esbuild-external.md) — stripe + stripe-replit-sync must stay external in build.mjs or migrations silently skip (wrong __dirname)
 - [MLK benchmark honesty + dev gating](mlk-benchmark-honesty.md) — benchmark must show only real detected hardware (CPU-only, no GPU; mmap_locked from real mlockall); dev open-usage gate must be fail-closed (NODE_ENV === "development")
 - [Stripe webhook invoice.upcoming fix](stripe-webhook-invoice-upcoming.md) — invoice.upcoming events have null ID; catch err.code=23502+table=invoices+column=id in processWebhook and return early (don't rethrow) so Stripe gets 200 and stops retrying
