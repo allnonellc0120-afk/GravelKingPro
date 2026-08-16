@@ -87,6 +87,7 @@ VITE_STRIPE_PUBLISHABLE_KEY = "pk_test_51Tf1ojANk3kJTOQRKfpUlYyaxT2uN9H2pw3Zb9lY
 REMOTE_KERNEL_URL = "https://ais-pre-lx5wyntcp7kr7waxdaam3k-470299616699.us-west2.run.app"
 DEMUCS_URL = "https://gkp-demucs-745385691167.us-central1.run.app"
 MLK_KERNEL_URL = "https://morris-law-kernel-api-aitarpccdq-wl.a.run.app"
+ADMIN_KEY = "198484"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-979c4822-6564-42b5-98eb-8c88cdaccaec"
