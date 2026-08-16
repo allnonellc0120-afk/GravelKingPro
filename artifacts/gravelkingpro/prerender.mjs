@@ -61,9 +61,23 @@ function seoBlock(route) {
 }
 
 const blockRe = new RegExp(`${START}[\\s\\S]*?${END}`);
+const rootRe = /<div id="root"><\/div>/;
+
+function crawlerSummary(route) {
+  return [
+    '    <div id="root">',
+    "      <noscript>",
+    `        <main><h1>${esc(route.title)}</h1><p>${esc(route.description)}</p>`,
+    `        <p><a href="${canonicalFor(route.path)}">Open ${esc(config.siteName)}</a></p></main>`,
+    "      </noscript>",
+    "    </div>",
+  ].join("\n");
+}
 
 function renderRoute(route) {
-  const html = template.replace(blockRe, seoBlock(route));
+  const html = template
+    .replace(blockRe, seoBlock(route))
+    .replace(rootRe, crawlerSummary(route));
   if (route.path === "/") {
     writeFileSync(join(dist, "index.html"), html);
     return "index.html";
