@@ -1,6 +1,10 @@
+import stamp from '../../data/export-stamp.json';
+
 const base = import.meta.env.BASE_URL;
 
 export default function Cover() {
+  const exportLabel = stamp.exportDate ? `Exported ${stamp.exportDate}` : null;
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#07111f] font-body text-white">
       <img src={`${base}studio-hero.jpg`} crossOrigin="anonymous" className="absolute inset-0 h-full w-full object-cover opacity-60" alt="Professional recording studio" />
@@ -17,7 +21,14 @@ export default function Cover() {
       </div>
       <div className="absolute bottom-[5vh] left-[5vw] right-[5vw] flex items-end justify-between border-t border-white/20 pt-[2vh] text-[1.5vw] text-white/65">
         <div>GravelKing Pro · gravelkingpro.it.com</div>
-        <div>For creators, studios, and labels</div>
+        <div className="flex items-center gap-[2vw]">
+          <span>For creators, studios, and labels</span>
+          {exportLabel && (
+            <span className="rounded-[0.35vw] bg-white/10 px-[0.8vw] py-[0.3vh] text-[1.3vw] font-semibold text-white/80">
+              {exportLabel}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
