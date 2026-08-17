@@ -73,6 +73,7 @@
 - [Live-site browser proof](live-site-browser-proof.md) — verify production interactively via a throwaway nix-shell browser; never add browsers to the deploy image
 - [Export quota pattern](export-quota.md) — 20 WAV/MP3 exports per rolling 30 days, paid tiers included; consume must be ONE atomic reset-or-increment UPDATE or window-boundary races blow the cap
 - [API test suite flock + lyric-owner cookie rule](api-test-suite-flock.md) — test script must stay flock-wrapped (dist-test races); legacy lyric rows never grant access via gk_session cookie
+- [Stale lib/db dist declarations](db-dist-declarations.md) — api-server typecheck fails on "missing" schema fields until `tsc -b lib/db --force`; dist/ never rebuilds automatically
 - [Stripe idempotency races](stripe-idempotency-races.md) — stable keys need bounded retry for in-flight conflicts; customer relinking must remain CAS-protected
 - [Package firewall blocked packages](package-firewall-block.md) — deploy installs 403 on some npm packages (all `tar` versions); fix by vendoring the tgz + pnpm file: override
 - [Cert document paywall](cert-paywall.md) — stamping free, doc owner-only+unlock-gated; $1.99 or 20/30d Studio allowance; Express 5: register `/:id.pdf` route BEFORE `/:id` or it's dead

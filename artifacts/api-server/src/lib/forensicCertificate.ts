@@ -87,10 +87,34 @@ function sha256Hex(input: string | Buffer): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-function buildHandshake(certId: string, nominator: string, denominator: string): string {
+/**
+ * Deterministic HMAC segment sealing IPI/ISWC/ISRC into the handshake payload.
+ * Appended ONLY when at least one identifier is present — certs without IDs
+ * keep the original `certId|nominator|denominator` format so legacy handshakes
+ * remain verifiable. Shared by the stamping routes (master.ts) and the
+ * verifier (verify-signal.ts): any post-stamp mutation of the identifiers
+ * breaks the handshake and revokes the chain of custody.
+ */
+export function industryIdsHmacSegment(industryIds?: {
+  ipiNumber?: string | null;
+  iswc?: string | null;
+  isrc?: string | null;
+}): string {
+  const hasAnyId = !!(industryIds && (industryIds.ipiNumber || industryIds.iswc || industryIds.isrc));
+  return hasAnyId
+    ? `|ipi:${industryIds!.ipiNumber ?? ""}|iswc:${industryIds!.iswc ?? ""}|isrc:${industryIds!.isrc ?? ""}`
+    : "";
+}
+
+function buildHandshake(
+  certId: string,
+  nominator: string,
+  denominator: string,
+  industryIds?: GlobalIndustryIds,
+): string {
   const secret = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
   return createHmac("sha256", secret)
-    .update(`${certId}|${nominator}|${denominator}`)
+    .update(`${certId}|${nominator}|${denominator}${industryIdsHmacSegment(industryIds)}`)
     .digest("hex");
 }
 
@@ -108,7 +132,7 @@ export function generateForensicCertificate(
   const rawPcmAudioHash = inputs.rawPcmAudio ? sha256Hex(inputs.rawPcmAudio) : null;
   const contentHash = inputs.contentHash ?? null;
 
-  const handshake = buildHandshake(anchorData.certId, anchorData.nominator, anchorData.denominator);
+  const handshake = buildHandshake(anchorData.certId, anchorData.nominator, anchorData.denominator, industryIds);
 
   const hasIndustryIds =
     !!(industryIds && (industryIds.ipiNumber || industryIds.iswc || industryIds.isrc));
@@ -209,11 +233,12 @@ export function certificateToPdf(certificate: ForensicCertificate): Buffer {
     `Anchor B:    ${certificate.chainOfCustody.anchorB}`,
     "",
     ...(certificate.industryIds ? [
-      "GLOBAL INDUSTRY IDENTIFIERS",
-      "---------------------------",
-      `IPI Number (Songwriter):  ${certificate.industryIds.ipiNumber ?? "UNREGISTERED"}`,
-      `ISWC (Composition):       ${certificate.industryIds.iswc ?? "UNREGISTERED"}`,
-      `ISRC (Recording):         ${certificate.industryIds.isrc ?? "UNREGISTERED"}`,
+      "GLOBAL INDUSTRY IDENTIFIERS & RIGHTS RAILS",
+      "------------------------------------------",
+      `IPI / CAE (Songwriter):   ${certificate.industryIds.ipiNumber ?? "UNREGISTERED / NOT PROVIDED"}`,
+      `ISWC (Musical Work):      ${certificate.industryIds.iswc ?? "UNREGISTERED / PENDING"}`,
+      `ISRC (Sound Recording):   ${certificate.industryIds.isrc ?? "PENDING DISTRIBUTOR ASSIGNMENT"}`,
+      "Identifier Binding:       IMMUTABLE - Sealed to Dual-Anchor HMAC",
       "",
     ] : []),
     ...(certificate.attribution ? [
