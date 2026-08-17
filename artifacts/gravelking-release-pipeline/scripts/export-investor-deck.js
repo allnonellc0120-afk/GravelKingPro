@@ -25,7 +25,7 @@
  * Dependencies: playwright, pdf-lib (declared in devDependencies)
  */
 
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -52,6 +52,13 @@ if (!PORT) {
 
 // Ensure output directory exists
 mkdirSync(outputDir, { recursive: true });
+
+// --- Write export date stamp into the slide data --------------------------
+// Cover.tsx reads this file so the rendered PDF shows "Exported Month Year".
+const stampPath = resolve(__dirname, '..', 'src', 'data', 'export-stamp.json');
+const exportDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+writeFileSync(stampPath, JSON.stringify({ exportDate }, null, 2) + '\n', 'utf8');
+console.log(`\n  Export date stamp: ${exportDate}`);
 
 // --- Load playwright ------------------------------------------------------
 let chromium;

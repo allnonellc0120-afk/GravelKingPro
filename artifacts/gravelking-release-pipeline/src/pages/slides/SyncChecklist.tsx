@@ -39,6 +39,9 @@ export default function SyncChecklist() {
               <p className="mt-[0.5vh] text-[1.45vw] text-[#f59e0b]/80">
                 Output: <code className="font-mono text-[1.35vw]">.local/outputs/GravelKing-Productions-F6S-Investor-Deck.pdf</code>
               </p>
+              <p className="mt-[0.5vh] text-[1.45vw] text-white/55">
+                ✦ The cover footer will show an <span className="font-semibold text-white/80">"Exported [Month Year]"</span> stamp — confirm it matches today before uploading.
+              </p>
             </div>
           </div>
 
