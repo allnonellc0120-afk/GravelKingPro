@@ -10,7 +10,7 @@ import {
   ShieldCheck, Wand2, Music2, LayoutDashboard, PenLine,
   Play, Pause, Volume2, ChevronRight, ArrowRight, Crown,
   FileCode2, Disc3, Smartphone, CheckCircle2, Zap,
-  Mail,
+  ArrowLeftRight, Mail,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePlanPrices } from "@/lib/usePlanPrices";

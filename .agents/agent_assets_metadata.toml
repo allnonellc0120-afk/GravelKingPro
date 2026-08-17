@@ -781,3 +781,24 @@ uri = "file://.local/outputs/GravelKing-Productions---F6S-Investor-Deck.pdf"
 type = "pdf"
 title = "GravelKing Productions — F6S Investor Deck (PDF)"
 description = "11-slide investor deck for F6S upload and email distribution. All slides verified: correct fonts, images, slide order, and no blank pages."
+
+[[outputs]]
+id = "J7gga8t-CIVwXMUzfkJl9"
+uri = "file://.local/outputs/MLK-v3-5-Pitch-Deck.pdf"
+type = "pdf"
+title = "MLK v3.5 Pitch Deck (PDF)"
+description = "Morris Law Kernel v3.5 — the full pitch deck, 9 slides."
+
+[[outputs]]
+id = "zv4nSXhAzdt8f7aAL_fMP"
+uri = "file://.local/outputs/GravelKing-Studio-Proof-Release.pdf"
+type = "pdf"
+title = "GravelKing Pro — Studio, Proof & Release (PDF)"
+description = "GravelKing Pro full deck, 12 slides."
+
+[[outputs]]
+id = "lUJL4OcilmV1TF0dS7HLI"
+uri = "file://pitch-files/matt-adel-musical-ai-one-pager.html"
+type = "text"
+title = "GravelKing Pro — Musical AI Partnership One-Pager"
+description = "Simplified one-page pitch framed for an AI-music platform partnership conversation."
