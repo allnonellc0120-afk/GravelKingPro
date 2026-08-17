@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import {
   setAdminCookie,
   clearAdminCookie,
@@ -6,8 +7,10 @@ import {
   isDeveloperAuthenticated,
   requireAdmin,
 } from "../lib/adminAuth";
-import { db, usersTable, tracksTable, toolErrorsTable } from "@workspace/db";
+import { db, usersTable, tracksTable, toolErrorsTable, ipCertStubsTable, lyricImportsTable } from "@workspace/db";
 import { eq, inArray, desc } from "drizzle-orm";
+import { getObjectFileWithFallback } from "../lib/objectStorage";
+import { logger } from "../lib/logger";
 import { setMaintenanceMode, isMaintenanceModeOn } from "../middlewares/maintenanceMode";
 import { getActiveSessions } from "../lib/activityTracker";
 import { purgeTempAudioCache } from "../lib/cachePurge";
@@ -345,6 +348,190 @@ adminAuthRouter.post("/admin/bing-submit", async (req: Request, res: Response) =
       siteAdded: false,
       sitemapSubmitted: false,
     });
+  }
+});
+
+/**
+ * POST /api/admin/mint-cert
+ *
+ * Admin-only certificate minting from REAL stored assets — bypasses the
+ * public upload flow. Used to mint owner-linked certs for tracks/lyrics
+ * that already live in the database and object storage.
+ *
+ * Body: {
+ *   category: 'lyrics' | 'vocal_performance' | 'full_track' | 'instrumental',
+ *   ownerUserId: string,
+ *   artist: string,
+ *   trackId?: string,        // audio categories — hashes the stored full WAV
+ *   lyricImportId?: string,  // lyrics category — uses the stored content hash
+ *   provenance?: string,     // defaults: lyrics→human_authored, audio→vocal_recording
+ * }
+ *
+ * The cert follows the exact cryptographic scheme of master.ts:
+ *   fullHash    = SHA-256(contentHash | artist | certId)
+ *   nominator   = fullHash[:32]   (returned; NOT embedded — no re-export here)
+ *   denominator = fullHash[32:]   (stored server-side)
+ *   handshake   = HMAC-SHA256(SESSION_SECRET, certId|nominator|denominator)
+ * No industry IDs are sealed (none on file — fields stay null / unregistered).
+ * The stub is minted UNLOCKED (unlock_source 'admin') so the owner can view
+ * the document immediately without the paywall.
+ */
+adminAuthRouter.post("/admin/mint-cert", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+
+  const body = (req.body ?? {}) as {
+    category?: string;
+    ownerUserId?: string;
+    artist?: string;
+    trackId?: string;
+    lyricImportId?: string;
+    provenance?: string;
+  };
+
+  const category = body.category?.trim();
+  const ownerUserId = body.ownerUserId?.trim();
+  const artist = body.artist?.trim();
+
+  const VALID_CATEGORIES = ["lyrics", "vocal_performance", "full_track", "instrumental"];
+  if (!category || !VALID_CATEGORIES.includes(category)) {
+    res.status(400).json({ error: `category must be one of: ${VALID_CATEGORIES.join(", ")}` });
+    return;
+  }
+  if (!ownerUserId || !artist) {
+    res.status(400).json({ error: "ownerUserId and artist are required" });
+    return;
+  }
+
+  try {
+    // Owner must be a real user row — certs are owner-gated documents.
+    const [owner] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, ownerUserId));
+    if (!owner) {
+      res.status(404).json({ error: "ownerUserId does not match any user" });
+      return;
+    }
+
+    let contentHash: string;
+    let provenance: string;
+    let source: Record<string, unknown>;
+
+    if (category === "lyrics") {
+      // Lyrics cert — sealed to the stored lyric-import hash (the text the
+      // owner certified as their own human-original work at import time).
+      const importId = body.lyricImportId?.trim();
+      if (!importId) {
+        res.status(400).json({ error: "lyricImportId is required for a lyrics cert" });
+        return;
+      }
+      const [imp] = await db.select().from(lyricImportsTable).where(eq(lyricImportsTable.id, importId));
+      if (!imp) {
+        res.status(404).json({ error: "lyricImportId does not match any lyric import" });
+        return;
+      }
+      if (imp.userId !== ownerUserId) {
+        res.status(403).json({ error: "Lyric import does not belong to the specified owner" });
+        return;
+      }
+      if (!imp.certifiedHumanAuthor) {
+        res.status(422).json({ error: "Lyric import lacks the human-authorship certification" });
+        return;
+      }
+      // Integrity check — recompute the hash from the stored text and require
+      // it to match the hash recorded at import time. A real certificate must
+      // never be minted over a corrupted or altered ledger row.
+      const recomputed = createHash("sha256").update(imp.importedText, "utf8").digest("hex");
+      if (recomputed !== imp.contentHash) {
+        res.status(409).json({
+          error: "Stored lyric text no longer matches its recorded content hash — refusing to mint.",
+        });
+        return;
+      }
+      contentHash = imp.contentHash;
+      provenance = body.provenance?.trim() || "human_authored";
+      source = { lyricImportId: imp.id, charCount: imp.charCount, importedAt: imp.createdAt };
+    } else {
+      // Audio cert — hash the REAL stored full-quality recording.
+      const trackId = body.trackId?.trim();
+      if (!trackId) {
+        res.status(400).json({ error: "trackId is required for an audio cert" });
+        return;
+      }
+      const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, trackId));
+      if (!track) {
+        res.status(404).json({ error: "trackId does not match any track" });
+        return;
+      }
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
+      const file = await getObjectFileWithFallback(bucketId, track.audioFullKey);
+      if (!file) {
+        res.status(404).json({ error: `Track audio not found in storage (${track.audioFullKey})` });
+        return;
+      }
+      const [bytes] = await file.download();
+      contentHash = createHash("sha256").update(bytes).digest("hex");
+      provenance = body.provenance?.trim() || "vocal_recording";
+      source = { trackId: track.id, audioFullKey: track.audioFullKey, bytes: bytes.length };
+    }
+
+    // ── Cryptographic mint — identical scheme to master.ts ──────────────────
+    const secret = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
+    const certId = randomUUID();
+    const fullHash = createHash("sha256")
+      .update(`${contentHash}|${artist}|${certId}`)
+      .digest("hex");
+    const nominator = fullHash.slice(0, 32);
+    const denominator = fullHash.slice(32);
+    // No industry IDs on file — bare legacy HMAC format (verify-signal accepts it).
+    const handshake = createHmac("sha256", secret)
+      .update(`${certId}|${nominator}|${denominator}`)
+      .digest("hex");
+
+    await db.insert(ipCertStubsTable).values({
+      certId,
+      denominator,
+      handshake,
+      contentHash,
+      artist,
+      stylePrompt: null,
+      styleAuthorshipScore: null,
+      ipiNumber: null,
+      iswc: null,
+      isrc: null,
+      ownerUserId,
+      category,
+      provenance,
+      // Admin-minted from stored assets — never AI generation.
+      generationModel: null,
+      // Original material with no commercial-catalog claim; a full ACR scan
+      // is out of scope for admin minting (tracked separately).
+      fingerprintStatus: "local_no_match",
+      fingerprintProvider: "local-signature",
+      fingerprintScannedAt: new Date(),
+      // Minted unlocked — the owner sees the document without the paywall.
+      unlockedAt: new Date(),
+      unlockSource: "admin",
+    });
+
+    logger.info({ certId, category, ownerUserId, artist }, "admin-minted certificate");
+
+    res.json({
+      ok: true,
+      certId,
+      category,
+      provenance,
+      artist,
+      ownerUserId,
+      contentHash,
+      nominator,
+      unlocked: true,
+      source,
+      document: {
+        json: `/api/court-cert/${certId}`,
+        pdf: `/api/court-cert/${certId}.pdf`,
+      },
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, "admin mint-cert failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
   }
 });
 
