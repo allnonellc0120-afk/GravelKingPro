@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { fileURLToPath } from "url";
 import { streamBuffer } from "../lib/streamResponse";
+import { industryIdsHmacSegment } from "../lib/forensicCertificate";
 import multer from "multer";
 import { unlink, readdir, stat } from "fs/promises";
 import { issueDownloadToken, verifyDownloadToken } from "../lib/downloadGate";
@@ -590,7 +591,9 @@ masterRouter.post(
         //   fullHash    = SHA-256(contentHash | artist | certId)
         //   nominator   = fullHash[:32] → embedded in track LSBs
         //   denominator = fullHash[32:] → stored server-side only
-        //   handshake   = HMAC(certId|nominator|denominator, SESSION_SECRET)
+        //   handshake   = HMAC(certId|nominator|denominator[|ipi:..|iswc:..|isrc:..], SESSION_SECRET)
+        // Industry identifiers (when provided) are sealed into the HMAC so a
+        // post-stamp mutation of IPI/ISWC/ISRC revokes the chain of custody.
         // Verification requires BOTH the track and the server record.
         const secret   = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
         certId         = randomUUID();
@@ -600,7 +603,7 @@ masterRouter.post(
         const nominator   = fullHash.slice(0, 32); // first half → track
         const denominator = fullHash.slice(32);    // second half → server only
         const handshake  = createHmac("sha256", secret)
-          .update(`${certId}|${nominator}|${denominator}`)
+          .update(`${certId}|${nominator}|${denominator}${industryIdsHmacSegment({ ipiNumber, iswc, isrc })}`)
           .digest("hex");
 
         // Cert owner — the account (Clerk or gk_session) that stamped this

@@ -802,3 +802,24 @@ uri = "file://pitch-files/matt-adel-musical-ai-one-pager.html"
 type = "text"
 title = "Musical AI One-Pager (Matt Adel)"
 description = "Simplified one-page partnership pitch"
+
+[[outputs]]
+id = "qoO5AlHh-y2cQzxhOJgC4"
+uri = "file://pitch-files/cert-lyrics.html"
+type = "text"
+title = "Certificate 1 of 3 — Lyrics Authorship"
+description = "\"You Used to Think I Was Superman\" — human-written lyrics certificate with real content hash from the released MP3."
+
+[[outputs]]
+id = "81lpgXDfLLEPuyQxX15sx"
+uri = "file://pitch-files/cert-instrumental.html"
+type = "text"
+title = "Certificate 2 of 3 — Instrumental Composition"
+description = "\"You Used to Think I Was Superman\" — instrumental certificate with disclosed AI model and style authorship score."
+
+[[outputs]]
+id = "PyNONW0p_ff9Nhn5LcNFX"
+uri = "file://pitch-files/cert-vocal.html"
+type = "text"
+title = "Certificate 3 of 3 — Vocal Performance"
+description = "\"You Used to Think I Was Superman\" — human vocal booth performance certificate."

@@ -172,7 +172,7 @@ export function backupCertStub(stub: Omit<CertStubBackup, "backupNote">): void {
       "Neither half alone constitutes proof of ownership.",
   };
   for (const key of Object.keys(doc) as (keyof CertStubBackup)[]) {
-    if (doc[key] === undefined) delete (doc as Record<string, unknown>)[key];
+    if (doc[key] === undefined) delete (doc as unknown as Record<string, unknown>)[key];
   }
 
   db.collection("gk_cert_stubs")

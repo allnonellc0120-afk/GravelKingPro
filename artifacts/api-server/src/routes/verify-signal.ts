@@ -18,6 +18,7 @@ import { randomUUID, createHash, createHmac } from "crypto";
 import { extractLsbPayload } from "../kernel-v3";
 import { sanitizeExt } from "../lib/audioGuards";
 import { buildWhitepaperPdf } from "../lib/whitepaper-pdf";
+import { industryIdsHmacSegment } from "../lib/forensicCertificate";
 import { db, ipCertStubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -134,12 +135,19 @@ router.post(
       };
 
       // ── HMAC: Cryptographic handshake ─────────────────────────────────────
+      // Certs stamped with industry identifiers seal them into the HMAC; the
+      // segment is empty for certs without IDs. Certs stamped BEFORE the
+      // identifier-sealing rollout used the bare legacy format even when IDs
+      // were on file, so a mismatch falls back to the legacy payload before
+      // declaring tampering.
       const secret = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
-      const expected = createHmac("sha256", secret)
-        .update(`${certId}|${nominator}|${stub.denominator}`)
-        .digest("hex");
+      const hmacFor = (payload: string) =>
+        createHmac("sha256", secret).update(payload).digest("hex");
+      const basePayload = `${certId}|${nominator}|${stub.denominator}`;
+      const expected = hmacFor(`${basePayload}${industryIdsHmacSegment(stub)}`);
+      const legacyExpected = hmacFor(basePayload);
 
-      if (expected !== stub.handshake) {
+      if (expected !== stub.handshake && legacyExpected !== stub.handshake) {
         result.hmac = {
           status: "INVALID",
           detail: "HMAC handshake mismatch. The nominator in the track does not match the server denominator — the watermark may have been forged or the audio was tampered with.",
