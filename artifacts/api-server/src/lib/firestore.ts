@@ -163,9 +163,7 @@ export function backupCertStub(stub: Omit<CertStubBackup, "backupNote">): void {
   // "undefined" document value, and cert stubs legitimately omit identifiers
   // (ipiNumber/iswc/isrc) when the artist didn't supply them.
   const doc: CertStubBackup = {
-    ...Object.fromEntries(
-      Object.entries(stub).filter(([, v]) => v !== undefined),
-    ),
+    ...stub,
     backupNote:
       "GravelKing IP Certificate — dual-stored for independent legal verification. " +
       "This record on Google Cloud Firestore serves as a tamper-evident, " +
@@ -173,6 +171,9 @@ export function backupCertStub(stub: Omit<CertStubBackup, "backupNote">): void {
       "Verification requires this record plus the nominator embedded in the audio file. " +
       "Neither half alone constitutes proof of ownership.",
   };
+  for (const key of Object.keys(doc) as (keyof CertStubBackup)[]) {
+    if (doc[key] === undefined) delete (doc as Record<string, unknown>)[key];
+  }
 
   db.collection("gk_cert_stubs")
     .doc(stub.certId)

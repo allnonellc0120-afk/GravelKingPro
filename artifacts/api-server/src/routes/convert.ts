@@ -24,13 +24,39 @@ const convertRouter = Router();
 
 type OutputFormat = "mp3" | "wav" | "flac" | "m4a" | "ogg";
 
-const FORMAT_ARGS: Record<OutputFormat, string[]> = {
-  mp3:  ["-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100"],
-  wav:  ["-acodec", "pcm_s16le", "-ar", "44100"],
-  flac: ["-acodec", "flac", "-ar", "44100"],
-  m4a:  ["-acodec", "aac", "-b:a", "256k", "-ar", "44100"],
-  ogg:  ["-acodec", "libvorbis", "-q:a", "8", "-ar", "44100"],
+// Default codec + per-format args; bitrate/sample rate are overridden below
+// when the client supplies them.
+const DEFAULT_RATE = 44100;
+const VALID_RATES = [22050, 44100, 48000];
+const DEFAULT_BITRATE_K: Record<OutputFormat, number> = {
+  mp3: 320, wav: 1411, flac: 1411, m4a: 256, ogg: 192,
 };
+// Bitrate applies only to lossy formats (lossless WAV/FLAC are bitrate-free).
+const LOSSLESS: Record<OutputFormat, boolean> = {
+  mp3: false, wav: true, flac: true, m4a: false, ogg: false,
+};
+
+const FORMAT_CODEC: Record<OutputFormat, string[]> = {
+  mp3:  ["-acodec", "libmp3lame"],
+  wav:  ["-acodec", "pcm_s16le"],
+  flac: ["-acodec", "flac"],
+  m4a:  ["-acodec", "aac"],
+  ogg:  ["-acodec", "libvorbis"],
+};
+
+function buildFormatArgs(
+  format: OutputFormat,
+  samplerate: number,
+  bitrateK: number | null,
+): string[] {
+  const args = [...FORMAT_CODEC[format], "-ar", String(samplerate)];
+  if (bitrateK !== null && !LOSSLESS[format]) {
+    // OGG falls back to its own default in bitrate mode; q:a default omitted.
+    if (format === "ogg") args.push("-b:a", `${bitrateK}k`);
+    else args.push("-b:a", `${bitrateK}k`);
+  }
+  return args;
+}
 
 const MIME: Record<OutputFormat, string> = {
   mp3:  "audio/mpeg",
@@ -60,7 +86,17 @@ convertRouter.post(
 
     const inputPath = req.file.path;
     const rawFormat = ((req.body.format as string) ?? "mp3").toLowerCase() as OutputFormat;
-    const format: OutputFormat = FORMAT_ARGS[rawFormat] ? rawFormat : "mp3";
+    const format: OutputFormat = FORMAT_CODEC[rawFormat] ? rawFormat : "mp3";
+
+    // Sample rate (Hz) — whitelisted values, default 44100.
+    const rawRate = Number(String(req.body.samplerate ?? "").trim());
+    const samplerate = VALID_RATES.includes(rawRate) ? rawRate : DEFAULT_RATE;
+
+    // Bitrate (kbps) — numeric, clamped to a sane range, ignored for lossless.
+    const rawBitrate = Number(String(req.body.bitrateK ?? "").trim());
+    const bitrateK = Number.isFinite(rawBitrate) && rawBitrate > 0
+      ? Math.round(Math.min(320, Math.max(64, rawBitrate)))
+      : null;
 
     // WAV/MP3 outputs count against the rolling 30-day export quota
     // (paid tiers included — capped, not unlimited).
@@ -84,7 +120,7 @@ convertRouter.post(
         "-y",
         "-i", inputPath,
         "-vn",
-        ...FORMAT_ARGS[format],
+        ...buildFormatArgs(format, samplerate, bitrateK),
         outPath,
       ], { timeout: 180_000, maxBuffer: 200 * 1024 * 1024 });
 

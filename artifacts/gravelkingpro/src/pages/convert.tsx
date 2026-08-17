@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { Download, Upload, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -14,12 +15,20 @@ type State = "idle" | "uploading" | "converting" | "done" | "error";
 type Format = "mp3" | "wav" | "flac" | "m4a" | "ogg";
 
 const FORMATS: { value: Format; label: string; desc: string }[] = [
-  { value: "mp3",  label: "MP3",  desc: "Universal · 320k" },
+  { value: "mp3",  label: "MP3",  desc: "Universal · lossy" },
   { value: "wav",  label: "WAV",  desc: "Lossless · studio" },
   { value: "flac", label: "FLAC", desc: "Lossless · compressed" },
   { value: "m4a",  label: "M4A",  desc: "AAC · Apple/mobile" },
   { value: "ogg",  label: "OGG",  desc: "Open · web-friendly" },
 ];
+
+// Formats where a lossy kbps bitrate applies (WAV/FLAC are lossless → no bitrate).
+const BITRATE_FORMATS: Format[] = ["mp3", "m4a", "ogg"];
+const BITRATE_RANGE: Record<Format, [number, number]> = {
+  mp3: [64, 320], m4a: [64, 320], ogg: [64, 500], wav: [64, 320], flac: [64, 320],
+};
+const BITRATE_STEP = 64;
+const SAMPLERATES = [22050, 44100, 48000];
 
 const ACCEPTS = ".mp3,.wav,.flac,.m4a,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.ogg,.aiff,.aac";
 
@@ -31,9 +40,19 @@ export default function ConvertPage() {
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState("");
   const [format, setFormat] = useState<Format>("mp3");
+  const [bitrateK, setBitrateK] = useState(320);
+  const [samplerate, setSamplerate] = useState(44100);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultName, setResultName] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Jump to the format's default bitrate when switching formats.
+  const handleFormat = (f: Format) => {
+    setFormat(f);
+    if (BITRATE_FORMATS.includes(f)) {
+      setBitrateK(BITRATE_RANGE[f][1]);
+    }
+  };
 
   const convert = useCallback(async (file: File) => {
     setFileName(file.name);
@@ -45,6 +64,10 @@ export default function ConvertPage() {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("format", format);
+    fd.append("samplerate", String(samplerate));
+    if (BITRATE_FORMATS.includes(format)) {
+      fd.append("bitrateK", String(bitrateK));
+    }
 
     try {
       setState("converting");
@@ -79,7 +102,7 @@ export default function ConvertPage() {
       setErrorMsg(err.message ?? "Something went wrong.");
       toast({ title: "Conversion failed", description: err.message, variant: "destructive" });
     }
-  }, [format, toast]);
+  }, [format, samplerate, bitrateK, toast]);
 
   const handleFile = (files: FileList | null) => {
     if (!files?.length) return;
@@ -149,6 +172,60 @@ export default function ConvertPage() {
             </button>
           ))}
         </div>
+
+        {/* Bitrate + sample-rate settings */}
+        <Card className="border-border/30 bg-card/30">
+          <CardContent className="py-4 space-y-4">
+            {BITRATE_FORMATS.includes(format) && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Bitrate</span>
+                  <span className="font-mono font-semibold text-amber-400">{bitrateK} kbps</span>
+                </div>
+                <Slider
+                  disabled={busy}
+                  value={[bitrateK]}
+                  min={BITRATE_RANGE[format][0]}
+                  max={BITRATE_RANGE[format][1]}
+                  step={BITRATE_STEP}
+                  onValueChange={([v]) => setBitrateK(v)}
+                  className="[&_[role=slider]]:bg-amber-500 [&_[role=slider]]:border-amber-500"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Lower = smaller file, rougher sound · {FORMATS.find((x) => x.value === format)?.label} quality
+                </p>
+              </div>
+            )}
+            {!BITRATE_FORMATS.includes(format) && (
+              <p className="text-[11px] text-muted-foreground">
+                {FORMATS.find((x) => x.value === format)?.label} is lossless — bitrate doesn't apply.
+              </p>
+            )}
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Sample rate</div>
+              <div className="grid grid-cols-3 gap-2">
+                {SAMPLERATES.map((rate) => (
+                  <button
+                    key={rate}
+                    disabled={busy}
+                    onClick={() => setSamplerate(rate)}
+                    className={`p-2 rounded-lg border text-center transition-all ${
+                      samplerate === rate
+                        ? "border-amber-500 bg-amber-500/10 text-amber-400"
+                        : "border-border/30 bg-card/30 text-muted-foreground hover:border-border/60"
+                    }`}
+                  >
+                    <p className="font-mono font-semibold text-xs">{rate}</p>
+                    <p className="text-[10px]">Hz</p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                44.1 kHz is CD standard · 48 kHz for video · 22 kHz for maximum file savings.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Upload zone */}
         {state === "idle" && (
