@@ -786,19 +786,19 @@ description = "11-slide investor deck for F6S upload and email distribution. All
 id = "J7gga8t-CIVwXMUzfkJl9"
 uri = "file://.local/outputs/MLK-v3-5-Pitch-Deck.pdf"
 type = "pdf"
-title = "MLK v3.5 Pitch Deck (PDF)"
-description = "Morris Law Kernel v3.5 — the full pitch deck, 9 slides."
+title = "Morris Law Kernel v3.5 — Pitch Deck"
+description = "9-slide MLK v3.5 pitch deck (PDF)"
 
 [[outputs]]
 id = "zv4nSXhAzdt8f7aAL_fMP"
 uri = "file://.local/outputs/GravelKing-Studio-Proof-Release.pdf"
 type = "pdf"
-title = "GravelKing Pro — Studio, Proof & Release (PDF)"
-description = "GravelKing Pro full deck, 12 slides."
+title = "GravelKing Pro — Studio, Proof & Release"
+description = "12-slide GravelKing Pro deck (PDF)"
 
 [[outputs]]
 id = "lUJL4OcilmV1TF0dS7HLI"
 uri = "file://pitch-files/matt-adel-musical-ai-one-pager.html"
 type = "text"
-title = "GravelKing Pro — Musical AI Partnership One-Pager"
-description = "Simplified one-page pitch framed for an AI-music platform partnership conversation."
+title = "Musical AI One-Pager (Matt Adel)"
+description = "Simplified one-page partnership pitch"
