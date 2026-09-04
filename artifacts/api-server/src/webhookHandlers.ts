@@ -73,6 +73,45 @@ export class WebhookHandlers {
       }
 
       if (event) {
+        if (
+          event.type === 'customer.subscription.created' ||
+          event.type === 'customer.subscription.updated'
+        ) {
+          const subscription = event.data.object as Stripe.Subscription;
+          const customerId = typeof subscription.customer === 'string'
+            ? subscription.customer
+            : subscription.customer.id;
+          const userId = subscription.metadata?.userId;
+          const [user] = userId
+            ? await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, userId))
+            : await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.stripeCustomerId, customerId));
+          if (user) {
+            const plan = subscription.metadata?.plan || null;
+            const entitled = ['active', 'trialing', 'past_due', 'unpaid'].includes(subscription.status);
+            await db.update(usersTable).set({
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscription.id,
+              isPro: entitled,
+              subscriptionTier: entitled ? plan : null,
+              ...(subscription.status === 'trialing' ? { trialUsed: true } : {}),
+            }).where(eq(usersTable.id, user.id));
+          }
+        }
+        if (event.type === 'customer.subscription.deleted') {
+          const subscription = event.data.object as Stripe.Subscription;
+          await db.update(usersTable).set({
+            isPro: false,
+            subscriptionTier: null,
+            stripeSubscriptionId: null,
+          }).where(eq(usersTable.stripeSubscriptionId, subscription.id));
+        }
+        if (event.type === 'payment_intent.succeeded' || event.type === 'setup_intent.succeeded') {
+          const intent = event.data.object as Stripe.PaymentIntent | Stripe.SetupIntent;
+          const userId = intent.metadata?.userId;
+          if (userId) {
+            await db.update(usersTable).set({ isPro: true }).where(eq(usersTable.id, userId));
+          }
+        }
         if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           const userId = session.client_reference_id ?? session.metadata?.userId;

@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { storage } from '../storage';
 import { db, usersTable, promotersTable, referralAttributionsTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
-import { getUncachableStripeClient } from '../stripeClient';
+import { getStripePublishableKey, getUncachableStripeClient } from '../stripeClient';
 import { ensureCustomerOnCurrentAccount } from '../lib/stripeCustomers';
 import { recordAnalyticsEvent } from '../analytics';
 import type Stripe from 'stripe';
@@ -45,6 +45,85 @@ stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
     res.json(response);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// Public Stripe.js configuration — publishable keys are safe for browser use.
+stripeRouter.get('/stripe/config', async (_req: Request, res: Response) => {
+  try {
+    res.json({ publishableKey: await getStripePublishableKey() });
+  } catch (err: unknown) {
+    res.status(503).json({ error: err instanceof Error ? err.message : 'Stripe is unavailable.' });
+  }
+});
+
+// Create an in-app Payment Element subscription. Trialing subscriptions use
+// Stripe's pending SetupIntent because their first invoice is $0; paid
+// subscriptions return the initial invoice PaymentIntent client secret.
+stripeRouter.post('/payment-intent', async (req: Request, res: Response) => {
+  try {
+    if (!req.dbUser) {
+      res.status(401).json({ error: 'Sign in required to subscribe', authRequired: true });
+      return;
+    }
+    const { priceId, plan } = req.body as { priceId?: string; plan?: string };
+    if (!priceId) {
+      res.status(400).json({ error: 'priceId is required' });
+      return;
+    }
+
+    const dbUser = req.dbUser;
+    const stripe = await getUncachableStripeClient();
+    const customerId = await ensureCustomerOnCurrentAccount(stripe, dbUser);
+    const existingSubs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 20 });
+    const blocking = existingSubs.data.find((s) => ['active', 'trialing', 'past_due', 'unpaid'].includes(s.status));
+    if (blocking) {
+      res.status(409).json({ error: 'You already have an active subscription. Manage it from your Account page.' });
+      return;
+    }
+
+    const price = await stripe.prices.retrieve(priceId);
+    const interval = price.recurring?.interval;
+    const trialDays = dbUser.trialUsed ? 0 : interval === 'month' ? 7 : interval === 'week' ? 3 : 0;
+    const metadata = { userId: dbUser.id, plan: plan ?? '' };
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: priceId }],
+      payment_behavior: trialDays > 0 ? 'allow_incomplete' : 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      metadata,
+      ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
+      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+    });
+
+    const invoice = subscription.latest_invoice as Stripe.Invoice | null;
+    const paymentIntent = invoice && typeof invoice !== 'string'
+      ? ((invoice as unknown as { payment_intent?: Stripe.PaymentIntent | string | null }).payment_intent as Stripe.PaymentIntent | null)
+      : null;
+    const setupIntent = subscription.pending_setup_intent as Stripe.SetupIntent | null;
+    const clientSecret = paymentIntent?.client_secret ?? setupIntent?.client_secret;
+    if (!clientSecret) {
+      res.status(502).json({ error: 'Stripe did not return a payment authorization secret.' });
+      return;
+    }
+
+    void recordAnalyticsEvent({
+      type: 'checkout_started',
+      visitorId: (req.cookies as Record<string, string>)?.gk_vid ?? null,
+      sessionId: dbUser.sessionId ?? dbUser.id,
+      path: '/checkout',
+      metadata: { priceId, plan: plan ?? '', embedded: 'true' },
+    }).catch(() => {});
+
+    res.json({
+      clientSecret,
+      intentType: paymentIntent ? 'payment' : 'setup',
+      subscriptionId: subscription.id,
+      trialing: trialDays > 0,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unable to start payment.';
     res.status(500).json({ error: message });
   }
 });

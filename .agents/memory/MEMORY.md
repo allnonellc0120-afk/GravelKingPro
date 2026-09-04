@@ -29,6 +29,7 @@
 - [MLK benchmark honesty + dev gating](mlk-benchmark-honesty.md) — benchmark must show only real detected hardware (CPU-only, no GPU; mmap_locked from real mlockall); dev open-usage gate must be fail-closed (NODE_ENV === "development")
 - [Stripe webhook invoice.upcoming fix](stripe-webhook-invoice-upcoming.md) — invoice.upcoming events have null ID; catch err.code=23502+table=invoices+column=id in processWebhook and return early (don't rethrow) so Stripe gets 200 and stops retrying
 - [Stripe connector secret field rename](stripe-connector-secret-field.md) — connector now returns settings.secret (not secret_key); readers must accept both or the managed connection looks "unavailable"
+- [Stripe Payment Element config](stripe-payment-element-config.md) — discover the managed connector’s pk_test/pk_live field instead of assuming one property name
 - [Stripe publish blocker](stripe-publish-blocker.md) — raw STRIPE_SECRET_KEY still exists as a secret; deleteEnvVars cannot remove secrets, so remove it manually before republishing
 - [Subscription DB fallback to Stripe API](subscription-stripe-api-fallback.md) — storage.ts getUserSubscriptionStatus: if stripe.subscriptions mirror empty, dynamic-import stripeClient and list active/trialing subscriptions directly; prevents wrongly-free on webhook delay
 - [Lifetime/owner full access](lifetime-access.md) — owners unlocked via email allowlist in auth.ts upsertUser (self-applies on OIDC login, dev+prod after publish); entitlement keyed by returned row id, not the OIDC sub
