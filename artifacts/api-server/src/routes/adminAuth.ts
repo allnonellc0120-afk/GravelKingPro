@@ -9,7 +9,8 @@ import {
 } from "../lib/adminAuth";
 import { db, usersTable, tracksTable, toolErrorsTable, ipCertStubsTable, lyricImportsTable } from "@workspace/db";
 import { eq, inArray, desc } from "drizzle-orm";
-import { getObjectFileWithFallback } from "../lib/objectStorage";
+import { getObjectFileWithFallback, saveObjectWithFallback } from "../lib/objectStorage";
+import { embedLsbPayload } from "../kernel-v3";
 import { logger } from "../lib/logger";
 import { setMaintenanceMode, isMaintenanceModeOn } from "../middlewares/maintenanceMode";
 import { getActiveSessions } from "../lib/activityTracker";
@@ -369,7 +370,7 @@ adminAuthRouter.post("/admin/bing-submit", async (req: Request, res: Response) =
  *
  * The cert follows the exact cryptographic scheme of master.ts:
  *   fullHash    = SHA-256(contentHash | artist | certId)
- *   nominator   = fullHash[:32]   (returned; NOT embedded — no re-export here)
+ *   nominator   = fullHash[:32]   (embedded into a certified WAV export)
  *   denominator = fullHash[32:]   (stored server-side)
  *   handshake   = HMAC-SHA256(SESSION_SECRET, certId|nominator|denominator)
  * No industry IDs are sealed (none on file — fields stay null / unregistered).
@@ -413,6 +414,8 @@ adminAuthRouter.post("/admin/mint-cert", async (req: Request, res: Response) => 
     let contentHash: string;
     let provenance: string;
     let source: Record<string, unknown>;
+    let audioBytes: Buffer | null = null;
+    let carrierTrackId: string | null = null;
 
     if (category === "lyrics") {
       // Lyrics cert — sealed to the stored lyric-import hash (the text the
@@ -448,6 +451,29 @@ adminAuthRouter.post("/admin/mint-cert", async (req: Request, res: Response) => 
       contentHash = imp.contentHash;
       provenance = body.provenance?.trim() || "human_authored";
       source = { lyricImportId: imp.id, charCount: imp.charCount, importedAt: imp.createdAt };
+
+      // A lyrics certificate can optionally be carried by the matching song
+      // recording so the public signal verifier can validate its split key.
+      if (body.trackId?.trim()) {
+        const [track] = await db
+          .select()
+          .from(tracksTable)
+          .where(eq(tracksTable.id, body.trackId.trim()));
+        if (!track) {
+          res.status(404).json({ error: "trackId does not match any track" });
+          return;
+        }
+        const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
+        const file = await getObjectFileWithFallback(bucketId, track.audioFullKey);
+        if (!file) {
+          res.status(404).json({ error: `Track audio not found in storage (${track.audioFullKey})` });
+          return;
+        }
+        const [bytes] = await file.download();
+        audioBytes = bytes;
+        carrierTrackId = track.id;
+        source = { ...source, trackId: track.id, audioFullKey: track.audioFullKey, bytes: bytes.length };
+      }
     } else {
       // Audio cert — hash the REAL stored full-quality recording.
       const trackId = body.trackId?.trim();
@@ -467,6 +493,8 @@ adminAuthRouter.post("/admin/mint-cert", async (req: Request, res: Response) => 
         return;
       }
       const [bytes] = await file.download();
+      audioBytes = bytes;
+      carrierTrackId = track.id;
       contentHash = createHash("sha256").update(bytes).digest("hex");
       provenance = body.provenance?.trim() || "vocal_recording";
       source = { trackId: track.id, audioFullKey: track.audioFullKey, bytes: bytes.length };
@@ -484,6 +512,27 @@ adminAuthRouter.post("/admin/mint-cert", async (req: Request, res: Response) => 
     const handshake = createHmac("sha256", secret)
       .update(`${certId}|${nominator}|${denominator}`)
       .digest("hex");
+
+    let certifiedAudioKey: string | null = null;
+    if (audioBytes && carrierTrackId) {
+      const payload = Buffer.from(JSON.stringify({ v: 2, id: certId, n: nominator, a: artist }));
+      const certifiedBytes = embedLsbPayload(audioBytes, payload);
+      certifiedAudioKey = `private/certified-tracks/${carrierTrackId}/${certId}.wav`;
+      await saveObjectWithFallback(
+        process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "",
+        certifiedAudioKey,
+        certifiedBytes,
+        {
+          contentType: "audio/wav",
+          metadata: {
+            certId,
+            category,
+            sourceContentHash: contentHash,
+          },
+        },
+      );
+      source = { ...source, certifiedAudioKey, certifiedBytes: certifiedBytes.length };
+    }
 
     await db.insert(ipCertStubsTable).values({
       certId,
@@ -524,6 +573,7 @@ adminAuthRouter.post("/admin/mint-cert", async (req: Request, res: Response) => 
       nominator,
       unlocked: true,
       source,
+      certifiedAudioKey,
       document: {
         json: `/api/court-cert/${certId}`,
         pdf: `/api/court-cert/${certId}.pdf`,
