@@ -300,7 +300,7 @@ export default function Pricing() {
 
       const priceId = product.prices[0].id;
 
-      const checkoutRes = await fetch("/api/payment-intent", {
+      const checkoutRes = await fetch("/api/create-subscription-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck, X } from "lucide-react";
@@ -23,8 +23,16 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
     setError(null);
     try {
       const result = intentType === "setup"
-        ? await stripe.confirmSetup({ elements, redirect: "if_required" })
-        : await stripe.confirmPayment({ elements, redirect: "if_required" });
+        ? await stripe.confirmSetup({
+            elements,
+            confirmParams: { return_url: window.location.href },
+            redirect: "if_required",
+          })
+        : await stripe.confirmPayment({
+            elements,
+            confirmParams: { return_url: window.location.href },
+            redirect: "if_required",
+          });
       if (result.error) {
         setError(
           result.error.type === "card_error"
@@ -52,7 +60,19 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
           <X className="w-4 h-4" />
         </button>
       </div>
-      <PaymentElement options={{ layout: "tabs", wallets: { applePay: "auto", googlePay: "auto" } }} />
+       <ExpressCheckoutElement
+         options={{
+           buttonType: { applePay: "buy", googlePay: "buy" },
+           buttonTheme: { applePay: "black", googlePay: "black" },
+           layout: { maxColumns: 2, maxRows: 1 },
+         }}
+       />
+       <div className="my-4 flex items-center gap-3 text-[11px] text-muted-foreground">
+         <span className="h-px flex-1 bg-border/60" />
+         <span>or pay by card</span>
+         <span className="h-px flex-1 bg-border/60" />
+       </div>
+       <PaymentElement options={{ layout: "tabs" }} />
       {error && <p className="mt-3 text-sm text-red-400" role="alert">{error}</p>}
       <Button onClick={submit} disabled={!stripe || !elements || submitting} className="w-full mt-5 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold">
         {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirming securely…</> : intentType === "setup" ? "Save payment method securely" : "Confirm subscription"}
