@@ -2,9 +2,10 @@ import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Clock3, FileText, Mail, ShieldCheck, Trash2 } from "lucide-react";
+import { useAuth } from "@clerk/react";
 
-const deletionEmail = "kevm@gravelkingpro.it.com";
-const requestSubject = "GravelKing Pro data deletion request";
+const deletionEmail = "Allnonellc0120@gmail.com";
+const requestSubject = "Account Deletion Request";
 const requestBody = `Please delete my GravelKing Pro personal data.
 
 Email or account identifier:
@@ -26,6 +27,8 @@ const accessHref = `mailto:${deletionEmail}?subject=${encodeURIComponent(accessS
  * than performed automatically, including any third-party billing records.
  */
 export default function DataDeletionPage() {
+  const { isSignedIn } = useAuth();
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-2 py-8 sm:px-6 sm:py-16">
@@ -36,7 +39,7 @@ export default function DataDeletionPage() {
           </div>
           <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Delete your GravelKing Pro data</h1>
           <p className="mt-3 max-w-2xl text-muted-foreground leading-relaxed">
-            You may ask us to delete personal information associated with your use of GravelKing Pro.
+            You may ask us to delete your GravelKing Pro account and associated personal data.
             This public page explains what to send and what happens next; no sign-in is required.
           </p>
         </div>
@@ -47,13 +50,14 @@ export default function DataDeletionPage() {
             Submit a request
           </h2>
           <p className="mt-3 text-muted-foreground leading-relaxed">
-            Email us from the address connected to your account or use another identifier that helps us
-            locate your records. Do not include payment-card information in your message.
+              {isSignedIn
+                ? "You are signed in. Use the button below to send an account deletion request with your account identifier, or email us directly. Do not include payment-card information."
+                : "Email us from the address connected to your account or use another identifier that helps us locate your records. Do not include payment-card information."}
           </p>
           <Button asChild className="mt-5 bg-amber-500 font-semibold text-black hover:bg-amber-600">
             <a href={requestHref}>
               <Mail className="mr-2 h-4 w-4" />
-              Email a deletion request
+              {isSignedIn ? "Request account and data deletion" : "Email a deletion request"}
             </a>
           </Button>
           <p className="mt-3 text-sm text-muted-foreground">
