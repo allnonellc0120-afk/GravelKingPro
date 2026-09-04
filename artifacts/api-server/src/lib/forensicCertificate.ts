@@ -208,6 +208,24 @@ export function generateForensicCertificate(
  * evidence; the PDF is a human-readable wrapper.
  */
 export function certificateToPdf(certificate: ForensicCertificate): Buffer {
+  const wrap = (value: string, width = 92): string[] => {
+    const words = value.split(/\s+/);
+    const wrapped: string[] = [];
+    let line = "";
+    for (const word of words) {
+      if (!line) {
+        line = word;
+      } else if (line.length + 1 + word.length <= width) {
+        line += ` ${word}`;
+      } else {
+        wrapped.push(line);
+        line = word;
+      }
+    }
+    if (line) wrapped.push(line);
+    return wrapped.length ? wrapped : [""];
+  };
+
   const lines: string[] = [
     "DIGITAL CHAIN-OF-CUSTODY CERTIFICATE",
     "====================================",
@@ -275,7 +293,7 @@ export function certificateToPdf(certificate: ForensicCertificate): Buffer {
     ] : []),
     "LEGAL FORENSICS DISCLAIMER",
     "---------------------------",
-    certificate.legalDisclaimer,
+    ...wrap(certificate.legalDisclaimer),
     "",
     `Verification Endpoint: ${certificate.verificationUrl}`,
     "",
@@ -291,13 +309,14 @@ export function certificateToPdf(certificate: ForensicCertificate): Buffer {
   const obj3 = "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n";
 
   // Simple content stream: set font, draw text lines.
-  const contentLines = text.split("\n").map((line, i) => {
+  const textLines = text.split("\n");
+  const contentLines = textLines.map((line, i) => {
     const escaped = line
       .replace(/\\/g, "\\\\")
       .replace(/\(/g, "\\(")
       .replace(/\)/g, "\\)")
       .replace(/\n/g, "\\n");
-    return `BT /F1 10 Tf 50 ${720 - i * 14} Td (${escaped}) Tj ET`;
+    return `BT /F1 9 Tf 50 ${730 - i * 11} Td (${escaped}) Tj ET`;
   }).join("\n");
   const contentStream = `${contentLines}\n`;
   const obj4 = `4 0 obj\n<< /Length ${Buffer.byteLength(contentStream)} >>\nstream\n${contentStream}endstream\nendobj\n`;
