@@ -247,7 +247,7 @@ const maybeValidateIngestion = (req: Request, res: Response, next: NextFunction)
 };
 
 masterRouter.post(
-  ["/kernel/master", "/v1/ingest"],
+  ["/kernel/master", "/v1/ingest", "/export-wav"],
   requirePartnerApiKey,
   partnerAwareRateLimit,
   masterConcurrency,
