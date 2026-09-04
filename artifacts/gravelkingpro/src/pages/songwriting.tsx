@@ -30,10 +30,19 @@ type SongDraft = {
   modifiedAt: string;
   editCount: number;
 };
+type ArtistProfile = {
+  bio: string;
+  genre: string;
+  subGenres: string;
+  tempo: string;
+  stylisticRules: string;
+};
 
 const STORAGE_KEY = "gk:songwriting:canvas:v1";
 const HMAC_KEY_STORAGE = "gk:songwriting:hmac-key:v1";
 const BLOCK_TYPES: BlockType[] = ["Verse", "Chorus", "Bridge", "Hook", "Outro"];
+const ARTIST_PROFILE_KEY = "mlk_artist_profile";
+const DEFAULT_RULES = "Avoid simple AABB nursery rhymes. Use internal and slant rhymes, authentic flow, and natural meter.";
 
 function newBlock(type: BlockType = "Verse"): SongBlock {
   return { id: crypto.randomUUID(), type, content: "" };
@@ -157,6 +166,19 @@ export default function SongwritingStudio() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
+    try {
+      const saved = localStorage.getItem(ARTIST_PROFILE_KEY);
+      return saved ? { bio: "", genre: "", subGenres: "", tempo: "", stylisticRules: DEFAULT_RULES, ...JSON.parse(saved) } : { bio: "", genre: "", subGenres: "", tempo: "", stylisticRules: DEFAULT_RULES };
+    } catch { return { bio: "", genre: "", subGenres: "", tempo: "", stylisticRules: DEFAULT_RULES }; }
+  });
+  const [styleDescriptor, setStyleDescriptor] = useState("");
+  const [generatorLyrics, setGeneratorLyrics] = useState("");
+  const [generatorBusy, setGeneratorBusy] = useState(false);
+  const [generatorMessage, setGeneratorMessage] = useState("");
+  const [stage2Hash, setStage2Hash] = useState("");
+  const [stage3Hash, setStage3Hash] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -170,6 +192,16 @@ export default function SongwritingStudio() {
     }, 500);
     return () => window.clearTimeout(timer);
   }, [draft]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => localStorage.setItem(ARTIST_PROFILE_KEY, JSON.stringify(artistProfile)), 500);
+    return () => window.clearTimeout(timer);
+  }, [artistProfile]);
+
+  useEffect(() => {
+    const payload = JSON.stringify({ styleDescriptor, bpm: draft.bpm, key: draft.key, arrangement: draft.blocks.map((block) => block.type) });
+    void crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload)).then(bytesToHex).then(setStage2Hash);
+  }, [styleDescriptor, draft.bpm, draft.key, draft.blocks]);
 
   const generateCertificate = async () => {
     setCertificateBusy(true);
@@ -291,7 +323,7 @@ export default function SongwritingStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, artistProfile }),
       });
       const data = await result.json() as { text?: string; error?: string; remaining?: number | null };
       if (!result.ok) throw new Error(data.error || "JAX could not respond.");
@@ -301,6 +333,34 @@ export default function SongwritingStudio() {
       setGenerationError(error instanceof Error ? error.message : "JAX could not respond.");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const transferToGenerator = () => {
+    setGeneratorLyrics(draft.blocks.map((block) => `[${block.type.toUpperCase()}]\n${block.content}`).filter(Boolean).join("\n\n"));
+    document.getElementById("song-generator")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const generateSong = async () => {
+    if (!generatorLyrics.trim() || generatorBusy) return;
+    setGeneratorBusy(true);
+    setGeneratorMessage("");
+    try {
+      const result = await fetch("/api/mlk/v35/generate-master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: generatorLyrics, title: draft.title, stylePrompt: styleDescriptor, vocalMode: "lyrics", durationS: 120 }),
+      });
+      const data = await result.json() as { error?: string; trackId?: string; audioFullKey?: string; previewUrl?: string };
+      if (!result.ok) throw new Error(data.error || "Generator could not complete this take.");
+      const binding = JSON.stringify({ trackId: data.trackId, audioFullKey: data.audioFullKey, previewUrl: data.previewUrl, lyricsHash: activeHash, styleHash: stage2Hash });
+      setStage3Hash(bytesToHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(binding))));
+      setGeneratorMessage("Render complete. Stage 3 is bound to this generated track.");
+    } catch (error) {
+      setGeneratorMessage(error instanceof Error ? error.message : "Generator could not complete this take.");
+    } finally {
+      setGeneratorBusy(false);
     }
   };
 
@@ -430,6 +490,22 @@ export default function SongwritingStudio() {
                 )}
               </section>
 
+              <section className="mb-6 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
+                <button type="button" onClick={() => setProfileOpen((open) => !open)} className="flex w-full items-center justify-between text-left">
+                  <span><span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-300">Artist memory</span><span className="mt-1 block text-sm text-muted-foreground">Local MLK profile · injected into JAX prompts</span></span>
+                  <span className="text-xs text-muted-foreground">{profileOpen ? "Hide" : "Edit profile"}</span>
+                </button>
+                {profileOpen && (
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <Textarea value={artistProfile.bio} onChange={(event) => setArtistProfile((profile) => ({ ...profile, bio: event.target.value }))} className="min-h-24 border-white/10 bg-black/20 sm:col-span-2" placeholder="Bio / backstory context" aria-label="Artist bio and backstory" />
+                    <Input value={artistProfile.genre} onChange={(event) => setArtistProfile((profile) => ({ ...profile, genre: event.target.value }))} className="border-white/10 bg-black/20" placeholder="Core genre" aria-label="Core genre" />
+                    <Input value={artistProfile.subGenres} onChange={(event) => setArtistProfile((profile) => ({ ...profile, subGenres: event.target.value }))} className="border-white/10 bg-black/20" placeholder="Sub-genre tags" aria-label="Sub-genre tags" />
+                    <Input value={artistProfile.tempo} onChange={(event) => setArtistProfile((profile) => ({ ...profile, tempo: event.target.value }))} className="border-white/10 bg-black/20" placeholder="Tempo preferences" aria-label="Tempo preferences" />
+                    <Textarea value={artistProfile.stylisticRules} onChange={(event) => setArtistProfile((profile) => ({ ...profile, stylisticRules: event.target.value }))} className="min-h-20 border-white/10 bg-black/20 sm:col-span-2" placeholder={DEFAULT_RULES} aria-label="Stylistic rules" />
+                  </div>
+                )}
+              </section>
+
               <div className="space-y-4">
                 {draft.blocks.map((block, index) => (
                   <article
@@ -473,6 +549,28 @@ export default function SongwritingStudio() {
                   </Button>
                 ))}
               </div>
+              <div className="mt-5 flex justify-end">
+                <Button onClick={transferToGenerator} variant="outline" className="border-violet-400/40 text-violet-200 hover:bg-violet-400/10">
+                  Transfer to Generator
+                </Button>
+              </div>
+
+              <section id="song-generator" className="mt-10 rounded-2xl border border-amber-400/25 bg-amber-400/[0.045] p-5 sm:p-6">
+                <div className="mb-5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">Song Generator</p>
+                  <h2 className="mt-1 text-xl font-bold">Turn the canvas into a finished take</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Review the lyric handoff and refine the style before the existing MLK generator runs.</p>
+                </div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="generator-lyrics">Lyric input</label>
+                <Textarea id="generator-lyrics" value={generatorLyrics} onChange={(event) => setGeneratorLyrics(event.target.value)} className="min-h-36 border-white/10 bg-black/20 leading-7" placeholder="Transfer your active canvas blocks here…" />
+                <label className="mb-2 mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="style-descriptor">Style Descriptor</label>
+                <Textarea id="style-descriptor" value={styleDescriptor} onChange={(event) => setStyleDescriptor(event.target.value)} className="min-h-24 border-white/10 bg-black/20" placeholder="Warm late-night alt-R&B, close vocal, internal rhymes, natural conversational meter…" />
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">Arrangement: {draft.blocks.map((block) => block.type).join(" → ")}</span>
+                  <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
+                </div>
+                {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
+              </section>
             </div>
           </main>
 
@@ -499,6 +597,22 @@ export default function SongwritingStudio() {
                   <div className="flex items-center gap-2 text-xs font-semibold text-violet-200"><LockKeyhole className="h-3.5 w-3.5" /> Active HMAC-SHA256</div>
                   <code className="mt-2 block break-all rounded-lg bg-black/30 p-3 text-[10px] leading-4 text-emerald-300">{activeHash || "Computing first revision…"}</code>
                   <p className="mt-3 text-xs leading-relaxed text-muted-foreground">A new signature is computed after every debounced local save. The signing key remains on this device.</p>
+                </div>
+                <div className="mt-6 border-t border-white/10 pt-5">
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-violet-200">3-stage provenance</div>
+                  {[
+                    ["Stage 1", "Lyrics hash", activeHash],
+                    ["Stage 2", "Style & composition hash", stage2Hash],
+                    ["Stage 3", "Audio render hash", stage3Hash],
+                  ].map(([stage, label, hash]) => (
+                    <div key={stage} className="mb-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-semibold text-foreground">{stage} · {label}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] ${hash ? "bg-emerald-400/15 text-emerald-300" : "bg-white/10 text-muted-foreground"}`}>{hash ? "BOUND" : "PENDING"}</span>
+                      </div>
+                      <code className="mt-2 block break-all text-[9px] leading-4 text-emerald-300">{hash || "Awaiting milestone…"}</code>
+                    </div>
+                  ))}
                 </div>
               </div>
             </aside>
