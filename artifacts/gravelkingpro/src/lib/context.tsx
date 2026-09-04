@@ -15,13 +15,6 @@ export type Results = {
 
 export type SubscriptionTier = "weekly" | "monthly" | "node_auditor" | null;
 
-const PROMO_CODES: Record<string, SubscriptionTier> = {
-  // redeemPromo() lowercases input, so keys must be lowercase.
-  // GravelKing$$ — unlocks the entire app (Node Auditor tier).
-  "gravelking$$": "node_auditor",
-};
-const PROMO_STORAGE_KEY = "gkp_promo_code";
-
 const SEP_STRENGTH_KEY = "gkp_sep_strength";
 const DEFAULT_SEP_STRENGTH = 0.75;
 function clampStrength(n: number) {
@@ -50,7 +43,7 @@ interface AppState {
   /** null = no promo active, string = the active promo code */
   activePromo: string | null;
   /** Returns true if code was valid, false if invalid */
-  redeemPromo: (code: string) => boolean;
+  redeemPromo: (code: string) => Promise<boolean>;
   revokePromo: () => void;
   /** Persisted separation/carve strength (multiplier) applied across the separation tools */
   sepStrength: number;
@@ -92,13 +85,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sepStrength, setSepStrengthState] = useState<number>(DEFAULT_SEP_STRENGTH);
 
   useEffect(() => {
-    const saved = localStorage.getItem(PROMO_STORAGE_KEY);
-    if (saved && PROMO_CODES[saved]) {
-      setActivePromo(saved);
-    }
-  }, []);
-
-  useEffect(() => {
     const saved = localStorage.getItem(SEP_STRENGTH_KEY);
     if (saved !== null) setSepStrengthState(clampStrength(parseFloat(saved)));
   }, []);
@@ -108,11 +94,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIsLoadingSubscription(true);
       const resp = await fetch("/api/subscription/status", { credentials: "include" });
       if (resp.ok) {
-        const data = await resp.json() as { isPro: boolean; plan: string | null; isDeveloper?: boolean };
+        const data = await resp.json() as { isPro: boolean; plan: string | null; isDeveloper?: boolean; promoExpiresAt?: string };
         setPlan(data.plan);
         setIsDeveloper(data.isDeveloper ?? false);
         const t = normalizePlan(data.plan);
         setUserTier(t);
+        setActivePromo(data.promoExpiresAt && new Date(data.promoExpiresAt) > new Date() ? "GKPRO7DAY" : null);
         return { tier: t, plan: data.plan, isDeveloper: data.isDeveloper };
       }
     } catch {
@@ -127,7 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void refreshSubscription();
   }, [refreshSubscription]);
 
-  const promoTier: SubscriptionTier = activePromo ? (PROMO_CODES[activePromo] ?? null) : null;
+  const promoTier: SubscriptionTier = activePromo ? "monthly" : null;
   const tierOrder: Array<SubscriptionTier> = [null, "weekly", "monthly", "node_auditor"];
   const effectiveTier: SubscriptionTier =
     tierOrder.indexOf(promoTier) > tierOrder.indexOf(userTier) ? promoTier : userTier;
@@ -139,19 +126,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setTier = (t: SubscriptionTier) => setUserTier(t);
 
-  const redeemPromo = useCallback((code: string): boolean => {
-    const normalized = code.trim().toLowerCase();
-    if (PROMO_CODES[normalized]) {
-      setActivePromo(normalized);
-      localStorage.setItem(PROMO_STORAGE_KEY, normalized);
-      return true;
-    }
-    return false;
+  const redeemPromo = useCallback(async (code: string): Promise<boolean> => {
+    const response = await fetch("/api/promo/redeem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ code }),
+    });
+    if (!response.ok) return false;
+    setActivePromo("GKPRO7DAY");
+    await refreshSubscription();
+    return true;
   }, []);
 
   const revokePromo = useCallback(() => {
     setActivePromo(null);
-    localStorage.removeItem(PROMO_STORAGE_KEY);
   }, []);
 
   const setSepStrength = useCallback((n: number) => {

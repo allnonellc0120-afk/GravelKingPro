@@ -247,6 +247,14 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
     // 1. Clerk-authenticated user — check their DB row directly.
     if (req.dbUser) {
       const status = await storage.getUserSubscriptionStatus(req.dbUser);
+      const promoActive =
+        req.dbUser.promoCode === "GKPRO7DAY" &&
+        !!req.dbUser.promoExpiresAt &&
+        req.dbUser.promoExpiresAt > new Date();
+      if (promoActive) {
+        res.json({ isPro: true, plan: "Studio", tier: "monthly", trialEligible: false, promoExpiresAt: req.dbUser.promoExpiresAt });
+        return;
+      }
       res.json({ ...status, trialEligible: !req.dbUser.trialUsed });
       return;
     }
