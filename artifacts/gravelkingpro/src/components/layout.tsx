@@ -38,7 +38,6 @@ export function Layout({
   const links = [
     { href: "/mastering", label: "Mastering" },
     { href: "/vocal-booth", label: "Vocal Booth" },
-    { href: "/studio", label: "DAW" },
     { href: "/songwriting", label: "Lyrics Generator", icon: Sparkles },
     { href: "/convert", label: "Converter" },
     { href: "/label", label: "Label" },

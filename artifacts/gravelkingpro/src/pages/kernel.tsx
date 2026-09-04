@@ -224,9 +224,9 @@ function TrackOptimizer({ isNodeAuditor }: { isNodeAuditor: boolean }) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
         <Music className="w-10 h-10 text-muted-foreground/30" />
-        <p className="text-sm font-medium text-muted-foreground">No saved DAW projects yet</p>
-        <p className="text-xs text-muted-foreground max-w-xs">Save a project in the Mix Studio and it will appear here for optimization.</p>
-        <Link href="/studio"><Button variant="outline" size="sm" className="mt-2">Open Mix Studio <ArrowRight className="w-3.5 h-3.5 ml-1.5" /></Button></Link>
+        <p className="text-sm font-medium text-muted-foreground">No saved projects yet</p>
+        <p className="text-xs text-muted-foreground max-w-xs">Create a master in The Foundry and it will appear here for optimization.</p>
+        <Link href="/mastering"><Button variant="outline" size="sm" className="mt-2">Open The Foundry <ArrowRight className="w-3.5 h-3.5 ml-1.5" /></Button></Link>
       </div>
     );
   }
