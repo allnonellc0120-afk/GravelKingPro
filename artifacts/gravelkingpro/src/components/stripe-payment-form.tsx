@@ -26,7 +26,11 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
         ? await stripe.confirmSetup({ elements, redirect: "if_required" })
         : await stripe.confirmPayment({ elements, redirect: "if_required" });
       if (result.error) {
-        setError(result.error.message ?? "Payment could not be confirmed.");
+        setError(
+          result.error.type === "card_error"
+            ? (result.error.message ?? "Your payment was declined. Check the details and try again.")
+            : (result.error.message ?? "Payment could not be confirmed. You can safely try again."),
+        );
         return;
       }
       await onSuccess();
@@ -51,7 +55,7 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
       <PaymentElement options={{ layout: "tabs", wallets: { applePay: "auto", googlePay: "auto" } }} />
       {error && <p className="mt-3 text-sm text-red-400" role="alert">{error}</p>}
       <Button onClick={submit} disabled={!stripe || !elements || submitting} className="w-full mt-5 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold">
-        {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirming securely…</> : "Confirm subscription"}
+        {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirming securely…</> : intentType === "setup" ? "Save payment method securely" : "Confirm subscription"}
       </Button>
       <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Payment details are handled by Stripe
