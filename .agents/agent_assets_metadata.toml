@@ -53,36 +53,42 @@ id = "whvKht8bnIVNiskggSZrV"
 uri = "file://GravelKingPro_Product_Overview.md"
 type = "text"
 title = "GravelKing Productions — Product Overview"
+logical_id = "a8760ea7-295b-4ec2-b417-9c0dcb719398"
 
 [[outputs]]
 id = "xy5yDjWn3gNLHsu85ixsn"
 uri = "file://artifacts/gravelkingpro-promo/public/images/merch_1.jpg"
 type = "image"
 title = "streetwear fashion apparel model looking cool moody lighting"
+logical_id = "abc4945d-ca01-4448-b55e-50b1fd049056"
 
 [[outputs]]
 id = "NTqFac3qbFamRFsiwdibx"
 uri = "file://artifacts/gravelkingpro-promo/public/images/merch_2.jpg"
 type = "image"
 title = "streetwear fashion apparel model looking cool moody lighting"
+logical_id = "d0ccea54-7000-4769-a186-466a649c0cd7"
 
 [[outputs]]
 id = "M8xDppDd2LYH6eMLMr47x"
 uri = "file://artifacts/gravelkingpro-promo/public/images/merch_3.jpg"
 type = "image"
 title = "streetwear fashion apparel model looking cool moody lighting"
+logical_id = "09890244-fff7-4827-ad91-4dc02b382911"
 
 [[outputs]]
 id = "18uDO4OT_sLzcNpdJOIaF"
 uri = "file://artifacts/gravelkingpro-promo/public/audio/bg_music.mp3"
 type = "audio"
 title = "promo background bed"
+logical_id = "eaead0db-e029-4847-bf71-c406ead27eb7"
 
 [[outputs]]
 id = "0bGSRLzCk7DLVtbry7L7A"
 uri = "file://artifacts/gravelkingpro-promo/public/audio/gravelking_pro_soundtrack.mp3"
 type = "audio"
 title = "gravelking_pro_soundtrack"
+logical_id = "0a85218b-3bcf-480d-8b13-02abbd1655fa"
 
 [[outputs]]
 id = "dLolvStuoJdfJufxjGvra"
@@ -90,6 +96,7 @@ uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_WhitePaper.pdf"
 type = "pdf"
 title = "Morris Law Kernel V3.5 — White Paper (PDF)"
 description = "Technical white paper on the Morris Law Kernel v3.5 mastering and IP certification system."
+logical_id = "c9994435-05f0-4c1d-908c-836339ffb87f"
 
 [[outputs]]
 id = "Kap8xFsaJ_kX--TvbfwwH"
@@ -97,108 +104,128 @@ uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_PitchDeck.pdf"
 type = "pdf"
 title = "Morris Law Kernel V3 — Technical Pitch Deck (PDF)"
 description = "Technical pitch deck focused on the Morris Law Kernel v3 audio mastering engine."
+logical_id = "1850ddb3-3e67-4669-8ae6-8ea4a9a8ed5c"
 
 [[outputs]]
 id = "jwWuoMhaW3zvW94AARX9Z"
 uri = "file://screenshots/promo-video-intro.jpg"
 type = "image"
 title = "GravelKing Pro — Marketing Video (Intro Scene)"
+logical_id = "1bf9a701-b686-44cf-ac9f-e3126c84f4a1"
 
 [[outputs]]
 id = "wIrfgq2Ei8hI0skaQJlsv"
 uri = "file://exports/GravelKingPro-Pitch.pdf"
 type = "pdf"
 title = "GravelKing Pro — Promo Pitch (PDF)"
+logical_id = "3853160a-674d-4e4e-bc35-3d48cd1adbd1"
 
 [[outputs]]
 id = "xyH87XyRsCayoHj1HwdwC"
 uri = "file://exports/GravelKingPro-WhitePaper.pdf"
 type = "pdf"
 title = "GravelKing Pro — Technical White Paper (PDF)"
+logical_id = "4ea15c5e-9547-45bd-96c2-20512e781cdc"
 
 [[outputs]]
 id = "vvVM7oCbNVzHzxiFFgthg"
 uri = "file://artifacts/gravelkingpro/public/gkpro_ad.mp4"
 type = "video"
 title = "GK Pro Ad — 20s Cinematic Duet"
+logical_id = "48d1f516-bc91-492f-b3c7-feb11b96de1b"
 
 [[outputs]]
 id = "cANszSLCYlbIn9bKbJAuq"
 uri = "file://artifacts/gravelkingpro/public/gkpro_ad_full.mp4"
 type = "video"
 title = "GK Pro Ad — 52s Full Music Video"
+logical_id = "dc6a45fa-3027-475e-8cf1-ba082c981b14"
 
 [[outputs]]
 id = "Jr9uNyHF39Cu0uJdfq2rL"
 uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_promo_youtube.mp4"
 type = "video"
 title = "GravelKing Pro — YouTube Promo (99s, 1080p)"
+logical_id = "200e6d2c-1e08-4d82-942f-2278141b448e"
 
 [[outputs]]
 id = "vtsO69zU_zj12MlYc4aa_"
 uri = "file://attached_assets/gravelking_ip_certified_demo.mp3"
 type = "audio"
 title = "GravelKing IP Certified Demo — MLK v3.5 (30 sec)"
+logical_id = "ba48f563-ebb3-4ff9-ab42-430b30742d6a"
 
 [[outputs]]
 id = "bao-NyvBGLqkDcGUHIyPZ"
 uri = "file://attached_assets/promo/vo_hook.mp3"
 type = "audio"
 title = "pitch vo hook"
+logical_id = "6b877ab7-a6da-4ac1-a01a-49cc0278ed9d"
 
 [[outputs]]
 id = "LyIPeu9UQpdgvKeHFkHiB"
 uri = "file://attached_assets/promo/vo_intro.mp3"
 type = "audio"
 title = "pitch vo intro"
+logical_id = "095dbf4a-fb48-42e5-a72d-3b7f61c20b7d"
 
 [[outputs]]
 id = "nF62DXnokcncbD159TnIq"
 uri = "file://attached_assets/promo/vo_problem.mp3"
 type = "audio"
 title = "pitch vo problem"
+logical_id = "cc4340f6-d6e7-4941-b812-ab1de99ad403"
 
 [[outputs]]
 id = "PR23uzdT7ktg0wXZ8BUiY"
 uri = "file://attached_assets/promo/vo_market.mp3"
 type = "audio"
 title = "pitch vo market"
+logical_id = "c18abfa5-e9bf-4364-8c19-f45c7c30deba"
 
 [[outputs]]
 id = "rMu39G6tC9b5JbqXYoNWk"
 uri = "file://attached_assets/promo/vo_moat.mp3"
 type = "audio"
 title = "pitch vo moat"
+logical_id = "b479f5b3-3ecb-4da3-b76b-644e9f6b4e70"
 
 [[outputs]]
 id = "jOK8LrHXMU4ctjj_RnK-j"
 uri = "file://attached_assets/promo/vo_ask.mp3"
 type = "audio"
 title = "pitch vo ask"
+logical_id = "64e015ff-64ae-4b1c-bc51-0d7549af9016"
 
 [[outputs]]
 id = "vvPHiZVDfbPSc_TQAPhFP"
 uri = "file://attached_assets/promo/vo_revenue.mp3"
 type = "audio"
 title = "pitch vo revenue"
+logical_id = "e72e164c-7920-4cbb-ab79-893d656bfebe"
 
 [[outputs]]
 id = "n_wrSjV5FAwr3DklfP0Bx"
 uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_pitch_228.mp4"
 type = "video"
 title = "GravelKing Pro Pitch Video (228.5s MP4)"
+logical_id = "6d8e95a9-9f88-4f69-a00b-8ac93061e660"
 
 [[outputs]]
 id = "z3XhWnvAyEAT5WSM9lRxD"
 uri = "file://artifacts/gravelkingpro/public/pitch-paper.html"
-type = "unspecified"
+type = "text"
 title = "Investor Pitch Paper (Executive Pitch)"
+logical_id = "4a727454-1fb7-4d04-ae31-dc712f5a6e0c"
+content_type = "text/html"
 
 [[outputs]]
 id = "S2AMa_xYZkSuYlrG-6t8J"
 uri = "file://artifacts/gravelkingpro/public/admin-strategy.html"
-type = "unspecified"
+type = "text"
 title = "Admin Strategy Brief"
+logical_id = "647f831d-3916-476d-a6a0-a02046a13050"
+content_type = "text/html"
 
 [[outputs]]
 id = "JhrDqk3q2QqzbVsJgmnrb"
@@ -206,12 +233,14 @@ uri = "file://artifacts/gravelkingpro/public/GravelKingPro_PromoPitchDeck.pdf"
 type = "pdf"
 title = "GravelKing Pro — Promo Pitch Deck (PDF)"
 description = "Shorter promotional pitch deck for partners, accelerators, and deal platforms."
+logical_id = "8a69a04a-19cf-47e9-8ff7-db3ab29b829d"
 
 [[outputs]]
 id = "g9MMHbFDDRI_8GHuMHC2p"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_AdminStrategy.pdf"
 type = "pdf"
 title = "GravelKing Pro — Admin Strategy Brief"
+logical_id = "ca75edeb-0de7-461e-a0ec-c7a929bfb5ac"
 
 [[outputs]]
 id = "VO4iK_qXPSA_TARiKvUxM"
@@ -219,204 +248,238 @@ uri = "file://artifacts/gravelkingpro/public/GravelKingPro_DetailedPitchDeck.pdf
 type = "pdf"
 title = "GravelKing Pro — Detailed Pitch Deck (PDF)"
 description = "Full detailed pitch deck covering IP certification, mastering kernel, Vocal Booth, DAW, and market opportunity."
+logical_id = "96bf9303-fceb-459d-a904-01a8d57cc3a5"
 
 [[outputs]]
 id = "m1HEWpTw36naLxPC_sq9D"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_DetailedAdminDeck.pdf"
 type = "pdf"
 title = "GravelKing Pro — Detailed Admin Strategy & Operations Deck"
+logical_id = "b5cb60a3-d1c0-4a22-8373-86753cfd2af3"
 
 [[outputs]]
 id = "yxyF5_TwID32XEarqrwqL"
 uri = "file://attached_assets/gravelkingpro_dev_icon.jpg"
 type = "image"
 title = "Developer Icon — 512×512 (upload to Google Play)"
+logical_id = "d04a383b-2562-47f0-9084-f939bc92b1f7"
 
 [[outputs]]
 id = "jjn2Ge-WTTMqICoeO9sT1"
 uri = "file://attached_assets/gravelkingpro_dev_header.jpg"
 type = "image"
 title = "Header Image (upload to Google Play)"
+logical_id = "a775185d-1d4a-48b6-bbdd-671e97e3bc67"
 
 [[outputs]]
 id = "pJmMivuRCQam8ivdFpRA9"
 uri = "file://attached_assets/gravelkingpro_icon_512.jpg"
 type = "image"
 title = "Developer Icon — 512×512"
+logical_id = "5e1739bc-508e-419f-a48b-35ed5c6315aa"
 
 [[outputs]]
 id = "boVHWE8P4jnIuIJ4mthg9"
 uri = "file://attached_assets/gravelkingpro_header_512.jpg"
 type = "image"
 title = "Header Image — 512×512"
+logical_id = "199f0b9f-6797-4caa-a944-b889d52b34d2"
 
 [[outputs]]
 id = "Wp-_0q3L69aqgeMgg6-l-"
 uri = "file://attached_assets/gravelkingpro_icon_512x512.jpg"
 type = "image"
 title = "Developer Icon — exactly 512×512 px"
+logical_id = "d033cbe7-b083-4fb7-97fd-4720a7b2c585"
 
 [[outputs]]
 id = "I-STMGxpIG4OtOPoeeoMf"
 uri = "file://attached_assets/gravelkingpro_header_4096x2304.jpg"
 type = "image"
 title = "Header Image — exactly 4096×2304 px"
+logical_id = "743957d4-2a87-470b-9377-db32306329fb"
 
 [[outputs]]
 id = "hUvA4eVYg8hZW5ybdT8qN"
 uri = "file://attached_assets/generated_audio/speech_beavis_scene1.mp3"
 type = "audio"
 title = "beavis_scene1"
+logical_id = "fa7c7000-ffdf-47ff-a012-0dc1c0fef16e"
 
 [[outputs]]
 id = "k6O-8BFMM_BopL6-b_7g9"
 uri = "file://attached_assets/generated_audio/speech_butthead_scene2.mp3"
 type = "audio"
 title = "butthead_scene2"
+logical_id = "1e782038-6f4c-4ef9-9114-38400b523c92"
 
 [[outputs]]
 id = "o3MWvhlWL1GDBuiz5qpml"
 uri = "file://attached_assets/generated_audio/speech_beavis_scene1_2.mp3"
 type = "audio"
 title = "beavis_scene1"
+logical_id = "b4352361-33b6-4712-af4f-c2984952d0d8"
 
 [[outputs]]
 id = "eimUpfavsfDtplH3pYACQ"
 uri = "file://attached_assets/generated_audio/speech_beavis_scene3.mp3"
 type = "audio"
 title = "beavis_scene3"
+logical_id = "89a79881-c451-4bff-a92e-7cd2ca3524ad"
 
 [[outputs]]
 id = "W2I9-E4YucyxX1namnYmN"
 uri = "file://attached_assets/generated_audio/speech_butthead_scene4_2.mp3"
 type = "audio"
 title = "butthead_scene4"
+logical_id = "48e4e4d6-5c9b-42ab-868a-5413b32ad5b2"
 
 [[outputs]]
 id = "Ri_L4Fa6IMc3qjTbGpnwa"
 uri = "file://attached_assets/generated_audio/speech_butthead_scene2_2.mp3"
 type = "audio"
 title = "butthead_scene2"
+logical_id = "1044bfef-fb63-4480-99fb-2a63c315e939"
 
 [[outputs]]
 id = "qPL9ofyPcQld_rDtTzCXD"
 uri = "file://attached_assets/GravelKingPro-MLKv35-Technical-Brief.pdf"
 type = "pdf"
 title = "GravelKing Pro MLK V3.5 — Technical Brief (large print)"
+logical_id = "deafd2f7-3ddf-424b-8069-81ceb6805268"
 
 [[outputs]]
 id = "fzhiCeZCXjsU8ISJHy5S5"
 uri = "file://.local/outputs/Morris-Law-Kernel-v3-5---Pitch-Deck.pdf"
 type = "pdf"
 title = "Morris Law Kernel v3.5 — Pitch Deck.pdf"
+logical_id = "3d24a4ee-0dd7-437a-84f9-3223b9dc2d28"
 
 [[outputs]]
 id = "iiYSFhX1HITkxmD9bC3x9"
 uri = "file://.local/outputs/Morris-Law-Kernel-v3-5---Pitch-Deck.pptx"
 type = "slides"
 title = "Morris Law Kernel v3.5 — Pitch Deck.pptx"
+logical_id = "b8f5d27f-5fd8-4477-97b7-703d02a7d76f"
 
 [[outputs]]
 id = "zpEiwRnYGV25ZXS1RAbOX"
 uri = "file://business-package/pdf/START_HERE_Simple_Guide.pdf"
 type = "pdf"
 title = "Start Here — Simple Guide (PDF)"
+logical_id = "24f9cafa-5fdd-41ca-bd34-cb193ae79775"
 
 [[outputs]]
 id = "vaxvfMPNRzwzumRXHz3Px"
 uri = "file://business-package/pdf/MASTER_PACKAGE_INDEX.pdf"
 type = "pdf"
 title = "Master Package Index (PDF)"
+logical_id = "77378e85-3407-482f-890a-099e600f9411"
 
 [[outputs]]
 id = "046FDfAP27OvEdZaeFufC"
 uri = "file://business-package/pdf/ONE_PAGE_EXECUTIVE_SUMMARY.pdf"
 type = "pdf"
 title = "One-Page Executive Summary (PDF)"
+logical_id = "bba754ff-b5cd-4576-a469-299eea793e4f"
 
 [[outputs]]
 id = "lBcAxy-gJyFFcyYWNhriD"
 uri = "file://business-package/pdf/WHITE_PAPER_Morris_Law_Kernel_v3.5.pdf"
 type = "pdf"
 title = "White Paper — Morris Law Kernel v3.5 (PDF)"
+logical_id = "099f26c0-81f7-4ace-99c0-a8ef21a81b8f"
 
 [[outputs]]
 id = "KMDXIxQPOAoZTtw-oAx6D"
 uri = "file://business-package/pdf/TECHNICAL_ARCHITECTURE_OVERVIEW.pdf"
 type = "pdf"
 title = "Technical Architecture Overview (PDF)"
+logical_id = "78922887-3ca3-45b1-a031-799402bb859a"
 
 [[outputs]]
 id = "1si5oEIvQhe7CfQQv497b"
 uri = "file://business-package/pdf/PITCH_DECK_Morris_Law_Kernel_v3.5.pdf"
 type = "pdf"
 title = "Pitch Deck Content Outline (PDF)"
+logical_id = "10982cf9-d65f-4036-9836-196b44963712"
 
 [[outputs]]
 id = "KiJuFlEdmRZuuTJGfVBhG"
 uri = "file://business-package/pdf/PITCH_DECK_VISUALS_DESIGN.pdf"
 type = "pdf"
 title = "Pitch Deck Visuals & Design Guide (PDF)"
+logical_id = "6afcc030-ca27-4e78-a276-ab5f8d1253e4"
 
 [[outputs]]
 id = "vhg91P6eE7BQyTH1ByZ0C"
 uri = "file://business-package/pdf/FINANCIAL_PROJECTIONS.pdf"
 type = "pdf"
 title = "Financial Projections (PDF)"
+logical_id = "bf26f048-87ad-482b-867b-b4694ca48324"
 
 [[outputs]]
 id = "qnPnIKRXo3NAv5UujIMFQ"
 uri = "file://business-package/pdf/FINANCIAL_PLAN_0_30_Days_Bootstrapped.pdf"
 type = "pdf"
 title = "Financial Plan — First 30 Days, Bootstrapped (PDF)"
+logical_id = "b5d66604-bf7d-49b6-8397-d3ba99b2fd67"
 
 [[outputs]]
 id = "mnKDK-VsvU9tEHSddyAjt"
 uri = "file://business-package/pdf/LICENSING_TERMS_TEMPLATE.pdf"
 type = "pdf"
 title = "Licensing Terms Template (PDF)"
+logical_id = "6618acd5-50fa-4c83-9222-852db27f5669"
 
 [[outputs]]
 id = "7xabOJ4AfbSIChu-ypEjE"
 uri = "file://business-package/pdf/INVESTOR_PARTNER_EMAIL_TEMPLATES.pdf"
 type = "pdf"
 title = "Investor & Partner Email Templates (PDF)"
+logical_id = "ea380b1e-863e-4809-970a-e700e3e80bed"
 
 [[outputs]]
 id = "3x6ZWFnsgcNSkKcH195Yg"
 uri = "file://business-package/pdf/LINKEDIN_OUTREACH.pdf"
 type = "pdf"
 title = "LinkedIn Outreach Playbook (PDF)"
+logical_id = "15a0c12b-2390-48d2-b15d-32bbdfae4abf"
 
 [[outputs]]
 id = "-AFTognScaA0Tncox8xix"
 uri = "file://business-package/pdf/7_DAY_PROMO_POSTS.pdf"
 type = "pdf"
 title = "7-Day Promo Posts (PDF)"
+logical_id = "68e6b8a9-fa9a-423f-b80c-d84038f175b2"
 
 [[outputs]]
 id = "9uHpDNG0EUQUKLD-NTT6I"
 uri = "file://business-package/pdf/OUTREACH_TRACKER.pdf"
 type = "pdf"
 title = "Outreach Tracker (PDF)"
+logical_id = "46b320c7-aad6-4ec2-b9cd-09d75f628ecf"
 
 [[outputs]]
 id = "M0fzPhSqUpr0fvM3Xmosr"
 uri = "file://business-package/pdf/DATA_ROOM_STRUCTURE.pdf"
 type = "pdf"
 title = "Data Room Structure (PDF)"
+logical_id = "9aa59732-d215-4e66-aea9-c0b30cb77e4a"
 
 [[outputs]]
 id = "ixeX0D7fYT1k4x-XL4rvx"
 uri = "file://business-package/pdf/DATA_ROOM_CHECKLIST.pdf"
 type = "pdf"
 title = "Data Room Checklist (PDF)"
+logical_id = "f8ff1211-d7df-490a-8ef6-905d0356e155"
 
 [[outputs]]
 id = "JTcuDs0C5XoXz5OGoO4Z0"
 uri = "file://business-package/pdf/DEMO_VIDEO_SCRIPT.pdf"
 type = "pdf"
 title = "Demo Video Script (PDF)"
+logical_id = "0f8e2dcc-796c-4146-b6e1-b5478a138fea"
 
 [[outputs]]
 id = "m-xdR9osQVQAacF3ouo79"
@@ -424,6 +487,7 @@ uri = "file://deliverables/gravelking-ip-prospects-50.csv"
 type = "table"
 title = "Download: 50 IP-Tool Prospects Pitch List"
 description = "CSV spreadsheet with 50 ranked prospects, companies, decision-maker names and titles, LinkedIn links, available public emails, fit scores, and why-now pitch angles."
+logical_id = "b6b48c9d-8f6e-4765-b13c-a0318e3a6494"
 
 [[outputs]]
 id = "ncHvseQWP5DCdeeQdf8ZJ"
@@ -431,6 +495,7 @@ uri = "file://deliverables/gravelking-ip-prospects-50.txt"
 type = "text"
 title = "Download: GravelKing Pro 50 IP Prospects Document"
 description = "A plain-text document containing the complete 50-prospect IP-tool pitch list. Tap the file card to save it to your Files or Downloads folder."
+logical_id = "38e1c3af-2832-43b5-a1cb-dcdac57aa166"
 
 [[outputs]]
 id = "XhrcYEnUFGI1SvkhXrWxF"
@@ -438,6 +503,7 @@ uri = "file://deliverables/gravelking-ip-prospects-50-emails.pdf"
 type = "pdf"
 title = "GravelKing Pro — 50 IP Cert Prospects"
 description = "Prospect list with probable person-level emails, LinkedIn references, fit scores, and outreach rationale. Verify each address before sending."
+logical_id = "f65ba91d-6904-46a7-835d-f6a87fa1ebd7"
 
 [[outputs]]
 id = "QUA9d43_t5CEyDY7B8kRZ"
@@ -445,6 +511,7 @@ uri = "file://attached_assets/gravelkingpro-google-outreach.pdf"
 type = "pdf"
 title = "GravelKing Pro — AI Outreach Playbook"
 description = "Verified researcher emails, Google/DeepMind + other AI platform contact routes, copy-paste outreach emails, LinkedIn list with universal message, and a straight assessment of odds and what to ask for."
+logical_id = "7b7a69c2-8c0f-4272-8fa8-5e85cc6a3dc4"
 
 [[outputs]]
 id = "4vlqZi5uepAehavNsGfKv"
@@ -452,6 +519,7 @@ uri = "file://deliverables/gravelkingpro-google-play-data-safety.csv"
 type = "table"
 title = "Google Play Data Safety CSV"
 description = "Upload this file using Google Play Console’s Data safety → Import from CSV action."
+logical_id = "b272dc14-ad59-4b95-8886-659196a2ce12"
 
 [[outputs]]
 id = "BVQFVQuTpx_slZ0uCnACL"
@@ -459,6 +527,7 @@ uri = "file://deliverables/joel-api-readiness-and-load-test-report.pdf"
 type = "pdf"
 title = "Joel Meeting — Large-Text API Readiness & Load-Test Report"
 description = "Rebuilt for screen sharing: 13 landscape pages with presentation-sized text, one key point per page, verified metrics, IP-diff explanation, pilot projection, and handoff checklist."
+logical_id = "cd009adf-8a5a-46b5-84f1-d3a509b6298b"
 
 [[outputs]]
 id = "Voq_Q192ylcUqaiXhAYPO"
@@ -466,6 +535,7 @@ uri = "file://deliverables/joel-meeting-opening-one-page.pdf"
 type = "pdf"
 title = "Joel Meeting — Large-Text Opening (PDF)"
 description = "Rebuilt one-page opening slide with oversized headline and metrics for screen sharing."
+logical_id = "ceada2a3-02a4-431b-80aa-2cc39177993c"
 
 [[outputs]]
 id = "tmytUyTdmiBWM1_62PbOs"
@@ -473,6 +543,7 @@ uri = "file://deliverables/joel-meeting-opening-one-page.pptx"
 type = "slides"
 title = "Joel Meeting — Large-Text Opening (PowerPoint)"
 description = "Rebuilt editable PowerPoint opening slide with oversized text and metrics."
+logical_id = "491acefe-f759-465e-b456-1c3b454112ba"
 
 [[outputs]]
 id = "k2GFB4LY23FgMnEcG-zYz"
@@ -480,6 +551,7 @@ uri = "file://exports/GravelKingPro_MLK_v3.5_Speed_Benchmark.pdf"
 type = "pdf"
 title = "MLK V3.5 Speed Benchmark (PDF)"
 description = "One-pager with real measured speeds vs LANDR, eMastered, CloudBounce, BandLab, and human engineers — with methodology."
+logical_id = "d868c19e-2b02-4854-919e-a336385e4419"
 
 [[outputs]]
 id = "IgVr7FsrTcipuZ4uCXFM4"
@@ -487,6 +559,7 @@ uri = "file://exports/GravelKingPro_Speed_Comparison.png"
 type = "image"
 title = "Minutes vs Seconds — social graphic"
 description = "1600×900 comparison image: competitors' bars vs GravelKing Pro's measured 8.5-second full-song master."
+logical_id = "69575d0b-a78e-4b66-a194-7973223b0b0a"
 
 [[outputs]]
 id = "tCbbntOAppgbw-fwhedSs"
@@ -494,6 +567,7 @@ uri = "file://exports/GravelKingPro_MLK_v3.5_Metrics_By_Class.pdf"
 type = "pdf"
 title = "MLK V3.5 — Metrics by Class (PDF)"
 description = "2-page breakdown: health check, watermark verify, 30-second master, and full-song master — every run listed with cold/warm state, warm statistics, and industry comparison."
+logical_id = "bdd690b7-1314-40f0-8050-417165531ac3"
 
 [[outputs]]
 id = "TzMGtmtDFA2oagM0-s94n"
@@ -501,6 +575,7 @@ uri = "file://screenshots/mlk-v35-overview.jpg"
 type = "image"
 title = "Morris Law Kernel V3.5 — Overview"
 description = "Product overview screenshot for the F6S listing."
+logical_id = "11b5faf0-4c27-475a-aa4c-25a239deffaf"
 
 [[outputs]]
 id = "r__XbA5S52rmDgMFuKvvx"
@@ -508,6 +583,7 @@ uri = "file://screenshots/mlk-v35-benchmark.jpg"
 type = "image"
 title = "Morris Law Kernel V3.5 — Live Benchmark"
 description = "Live benchmark interface screenshot for the F6S listing."
+logical_id = "b09881df-575f-474b-9b93-b9f9756ab391"
 
 [[outputs]]
 id = "vPaBWMHuYY28AyRWaaIi6"
@@ -515,6 +591,7 @@ uri = "file://screenshots/mlk-v35-licensing.jpg"
 type = "image"
 title = "Morris Law Kernel V3.5 — Commercial Licensing"
 description = "Enterprise licensing page screenshot for the F6S listing."
+logical_id = "bd81704d-5666-4032-b3cd-967a2a3a2932"
 
 [[outputs]]
 id = "QgAhwTY9Bjeb6Ddz1aSJB"
@@ -522,6 +599,7 @@ uri = "file://.local/outputs/GravelKingPro-PitchDeck.pdf"
 type = "pdf"
 title = "GravelKing Pro — Pitch Deck (PDF)"
 description = "9-slide investor pitch deck for GravelKing Pro. Covers the product, technology, market, and team."
+logical_id = "468be2fc-b43b-40d9-8710-abe9a796b8d3"
 
 [[outputs]]
 id = "pxBnq3S23M_7Hn0ZAflFn"
@@ -529,6 +607,7 @@ uri = "file://screenshots/gravelkingpro-home.jpg"
 type = "image"
 title = "GravelKing Pro — Homepage Screenshot"
 description = "Live product screenshot of the GravelKing Pro homepage showing IP certification, mastering, and DAW."
+logical_id = "a22d501b-e523-4b53-915a-ce6614d50013"
 
 [[outputs]]
 id = "wmTyED5XypxSqXFmFqpjb"
@@ -536,6 +615,7 @@ uri = "file://screenshots/gravelkingpro-pricing.jpg"
 type = "image"
 title = "GravelKing Pro — Pricing Page Screenshot"
 description = "Live pricing page showing Starter (free), Weekly ($9.99), Pro Plus ($24.99/mo), and Node Auditor ($249.50/mo) tiers."
+logical_id = "0b57931a-ed91-4cc6-9ba2-d39de289fd00"
 
 [[outputs]]
 id = "0XdjqpnoggqQcXope4plj"
@@ -543,6 +623,7 @@ uri = "file://.local/outputs/GravelKing-Productions-F6S-Investor-Deck.pdf"
 type = "pdf"
 title = "GravelKing Productions — F6S Investor Deck (New PDF)"
 description = "Fresh PDF export with a new filename for uploading to F6S."
+logical_id = "353989d3-7673-4f0d-a6ae-5a290969b89a"
 
 [[outputs]]
 id = "rQLOTFCVwQn8tXhvNuAX-"
@@ -550,6 +631,7 @@ uri = "file://attached_assets/generated/gravelking-play-promo-90s.mp4"
 type = "video"
 title = "GravelKing Pro — Google Play Promo (97s)"
 description = "Vertical 1080x1920 promo cut from your real footage: music video hook, Kevin reaction, sub-second speed demo, export flow, Google Play download CTA, and music video outro. Loudness-normalized for social."
+logical_id = "5698872d-3fc8-46a3-91fa-834c6f9a9ac0"
 
 [[outputs]]
 id = "J3GBKkWQg5uUdnK2KY_ad"
@@ -557,6 +639,7 @@ uri = "file://attached_assets/generated_audio/gk_narration.mp3"
 type = "audio"
 title = "GravelKing Pro narration"
 description = "Text-to-speech audio: I used to make music on my couch — just me, my phone, and a dream. I wanted that studio sound — the kind you hear on real records. So I built it. GravelKing Pro gives you studio…"
+logical_id = "c146d417-abbc-4835-af78-63d4ba1600b6"
 
 [[outputs]]
 id = "O9NbgO-_0LN9ybGPP4Yqy"
@@ -564,6 +647,7 @@ uri = "file://attached_assets/gkpro_google_play_promo.mp4"
 type = "video"
 title = "GravelKing Pro — Google Play Promo Video"
 description = "84-second vertical (1080×1920, 30fps) promo. Couch-to-studio story with AI fill shots, real app footage, music-video clips, DAW screen recording, and a Google Play end card. AI-generated narration (labeled)."
+logical_id = "39279192-dcc4-4e8c-8c56-782334e23282"
 
 [[outputs]]
 id = "IZW3zZE_Elo91UV6V0gnd"
@@ -571,6 +655,7 @@ uri = "file://artifacts/api-server/local_masters/mlk_v35_08026afe-e332-4fcb-9e32
 type = "audio"
 title = "MLK v3.5 Test Master — Dark Cinematic R&B"
 description = "Lyria 3 Pro vocals from your test lyrics, mastered through the real MLK v3.5 kernel (baseline preset) with the Dual-Anchor cert nominator embedded. 2:36, 44.1 kHz stereo WAV."
+logical_id = "f64f1641-df21-4b16-86a6-fef1783b4be4"
 
 [[outputs]]
 id = "5ajaEFE6fgde0VmYZHcds"
@@ -578,6 +663,7 @@ uri = "file://attached_assets/promo/gkp-remix-launch-social.jpg"
 type = "image"
 title = "GravelKing Pro — Remix Launch Social Image"
 description = "16:9 promo image for LinkedIn/social — amber waveform, dark studio, brand aesthetic."
+logical_id = "b76f6ad5-d624-4b06-be06-e450df58dd2a"
 
 [[outputs]]
 id = "Yk-2mEFUvGjuEebG5PJgF"
@@ -585,6 +671,7 @@ uri = "file://attached_assets/promo/songwriting-studio-in-action.jpg"
 type = "image"
 title = "The Tool in Action — Songwriting Studio"
 description = "Real screenshot of the in-house studio UI, ready to attach to the post."
+logical_id = "8de657cb-1673-4982-8457-7fba18256dea"
 
 [[outputs]]
 id = "phROa3TdjHWtJ3RCMJ-ML"
@@ -592,6 +679,7 @@ uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_g
 type = "video"
 title = "GravelKing Pro Lyrics Generator — 30s HD Promo"
 description = "30-second 1920×1080 H.264/AAC promo video for YouTube and Facebook."
+logical_id = "11322c75-8816-41c6-8314-f6074db8bf4b"
 
 [[outputs]]
 id = "wqqr0zn-KHh53yW2FvXfu"
@@ -599,6 +687,7 @@ uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_g
 type = "video"
 title = "GravelKing Pro promo — 4K landscape (59s)"
 description = "Smooth 30fps 4K master with real people, large spoken headlines, warm voiceover, and a welcoming soundtrack."
+logical_id = "adf9016a-35aa-4042-a170-1306c3f99fd1"
 
 [[outputs]]
 id = "lQ0VLh22k8Ekb__dMmnKj"
@@ -606,6 +695,7 @@ uri = "file://artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_g
 type = "video"
 title = "GravelKing Pro promo — 4K vertical (59s)"
 description = "Vertical 2160x3840 master for Shorts/Reels/TikTok with the same voiceover, wording, and soundtrack."
+logical_id = "5878ab32-47c9-4f47-9758-17cc36605a01"
 
 [[outputs]]
 id = "9L4b2LEcYndlME5VXalyT"
@@ -613,6 +703,7 @@ uri = "file://screenshots/live-songwriting-generator.png"
 type = "image"
 title = "LIVE proof — song generator on gravelkingpro.it.com"
 description = "Real browser session on the published site: lyrics generated, then the Generate with MLK v3.5 card rendered below them (build v08/11/26 12:11 visible in footer)."
+logical_id = "0d307ef9-6901-4809-9567-0570a6ba4bb6"
 
 [[outputs]]
 id = "J6m62bPXrxwCjiFz9enKz"
@@ -620,6 +711,7 @@ uri = "file://attached_assets/generated_videos/promo_v2/soundtrack_warm.mp3"
 type = "audio"
 title = "warm welcoming promo bed"
 description = "Generated music: Warm welcoming uplifting modern pop instrumental, soft felt piano chords, warm acoustic guitar strums, gentle hand claps, airy synth pads, positive hopeful friendly feeling, smooth g…"
+logical_id = "f40a1f46-4197-468f-afd4-7751d14dfa36"
 
 [[outputs]]
 id = "PwUSIOVoHqSBrnCN6XIg2"
@@ -627,6 +719,7 @@ uri = "file://attached_assets/generated_audio/promo_v2/vo1.mp3"
 type = "audio"
 title = "vo1"
 description = "Text-to-speech audio: Got a song stuck in your head?"
+logical_id = "94c268ac-bf51-47ea-b90e-690740296e31"
 
 [[outputs]]
 id = "ZG-U1DhdlewPTJWvHkz_l"
@@ -634,6 +727,7 @@ uri = "file://attached_assets/generated_audio/promo_v2/vo2.mp3"
 type = "audio"
 title = "vo2"
 description = "Text-to-speech audio: Bring it to GravelKing Pro."
+logical_id = "a54175a7-7781-43b3-b17c-36cc77a9c041"
 
 [[outputs]]
 id = "rHj1Rjsp7Z8DNTHY0kLtP"
@@ -641,6 +735,7 @@ uri = "file://attached_assets/generated_audio/promo_v2/vo3.mp3"
 type = "audio"
 title = "vo3"
 description = "Text-to-speech audio: Turn your lyrics into a full song — your words, your style."
+logical_id = "a4b1b6e9-7157-4e3e-8605-0e9fb93a9d13"
 
 [[outputs]]
 id = "GE36Y8hx6kjhB3IUdqDBH"
@@ -648,6 +743,7 @@ uri = "file://attached_assets/generated_audio/promo_v2/vo5.mp3"
 type = "audio"
 title = "vo5"
 description = "Text-to-speech audio: Master your track with a single click."
+logical_id = "731fcb77-0dcd-4b13-974a-2553d511f70e"
 
 [[outputs]]
 id = "OLaRBFOVmmNlHYVRJjnTd"
@@ -655,6 +751,7 @@ uri = "file://attached_assets/generated_audio/promo_v2/vo4.mp3"
 type = "audio"
 title = "vo4"
 description = "Text-to-speech audio: Step into the vocal booth, and record."
+logical_id = "795e477d-c646-4743-aaa7-497e4907b784"
 
 [[outputs]]
 id = "JWz8E7t_062qgTEB1UHSE"
@@ -662,6 +759,7 @@ uri = "file://attached_assets/generated_audio/promo_v2/vo6.mp3"
 type = "audio"
 title = "vo6"
 description = "Text-to-speech audio: Then certify it, so the world knows it's yours."
+logical_id = "7fd5b7d3-e287-45a9-8cc2-cb636de8ef04"
 
 [[outputs]]
 id = "yvGJcQVhfAjlK_aRLZcA7"
@@ -669,6 +767,7 @@ uri = "file://attached_assets/generated_audio/promo_v2/vo7.mp3"
 type = "audio"
 title = "vo7"
 description = "Text-to-speech audio: GravelKing Pro. Your song starts today."
+logical_id = "c25f193b-dbb2-4dbf-8475-6d2965ccd621"
 
 [[outputs]]
 id = "TbnhXvhgy6JFIJZJMRRYt"
@@ -676,6 +775,7 @@ uri = "file://attached_assets/final_promos/gravelkingpro_promo_59s_16x9.mp4"
 type = "video"
 title = "GravelKing Pro Promo — 59s (16:9)"
 description = "Final promo master, landscape — for YouTube/web."
+logical_id = "3e4d80b5-59fc-4cb1-a19c-719248e2a5b5"
 
 [[outputs]]
 id = "WCjCBW6waaa1RSl6uiNBv"
@@ -683,6 +783,7 @@ uri = "file://attached_assets/final_promos/gravelkingpro_promo_59s_9x16.mp4"
 type = "video"
 title = "GravelKing Pro Promo — 59s (9:16)"
 description = "Final promo master, vertical — for TikTok/Reels/Shorts."
+logical_id = "431e3438-c9c8-4358-9087-6b6efb973caa"
 
 [[outputs]]
 id = "pPHF8OYo1JZRvCVfUFa5j"
@@ -690,6 +791,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/vo2.mp3"
 type = "audio"
 title = "promo_v3_vo2"
 description = "Text-to-speech audio: GravelKing Pro. Build it here."
+logical_id = "1ac7abd8-52ed-44a3-9556-1d0e6e2f40be"
 
 [[outputs]]
 id = "7BrWRIpzgQ9lDGgLi9CUO"
@@ -697,6 +799,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/vo1.mp3"
 type = "audio"
 title = "promo_v3_vo1"
 description = "Text-to-speech audio: You've got a song in your head. Let's get it out."
+logical_id = "dbb524f2-9869-4651-8a02-03ac636c61b9"
 
 [[outputs]]
 id = "NyZq70pXlJ8bKrbYhFrag"
@@ -704,6 +807,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/vo5.mp3"
 type = "audio"
 title = "promo_v3_vo5"
 description = "Text-to-speech audio: Master your track. One click."
+logical_id = "aee72a9a-5c0e-488e-9717-13ab8d325333"
 
 [[outputs]]
 id = "gkavMAeFmBIG2-kJX0nIW"
@@ -711,6 +815,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/vo3.mp3"
 type = "audio"
 title = "promo_v3_vo3"
 description = "Text-to-speech audio: Drop your lyrics. Get a full track. Your words. Your sound."
+logical_id = "f34a8dce-0d30-4ea1-b366-996d71d99df6"
 
 [[outputs]]
 id = "n1zIBRX7oNLncT4oXpsTS"
@@ -718,6 +823,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/vo6.mp3"
 type = "audio"
 title = "promo_v3_vo6"
 description = "Text-to-speech audio: Certify it. Lock it down. It's yours."
+logical_id = "5557f7f9-2648-4ebe-b09d-a887227bfb92"
 
 [[outputs]]
 id = "iEjWY08B6E7RTOXdfT1Pk"
@@ -725,6 +831,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/vo7.mp3"
 type = "audio"
 title = "promo_v3_vo7"
 description = "Text-to-speech audio: GravelKing Pro. Your track starts now."
+logical_id = "9c999479-7c0c-4400-b8b7-bbad9f3a68c6"
 
 [[outputs]]
 id = "WnwdQaYnR7lmlg2IKcW7y"
@@ -732,6 +839,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/vo4.mp3"
 type = "audio"
 title = "promo_v3_vo4"
 description = "Text-to-speech audio: Step in the booth and record."
+logical_id = "b94e2a0f-392c-437d-b340-ffa03ed2f243"
 
 [[outputs]]
 id = "2lng0PaLEACH3cwpPbhfX"
@@ -739,6 +847,7 @@ uri = "file://attached_assets/generated_audio/promo_v3/soundtrack.mp3"
 type = "audio"
 title = "promo_v3_trap_soundtrack"
 description = "Generated music: Hard-hitting trap hip hop instrumental, 2020s production style, 808 bass drops, crisp snares, atmospheric pads, dark cinematic energy, modern music app promo vibe, builds in intensit…"
+logical_id = "bdd49437-20a4-4bb0-9f41-6566514b9843"
 
 [[outputs]]
 id = "A6_68PF0vaDE1ugkua2l8"
@@ -746,6 +855,7 @@ uri = "file://exports/gravelking-live-backend-architecture.pdf"
 type = "pdf"
 title = "GravelKing Pro — Live Backend Architecture"
 description = "Four-page A3 landscape vector PDF mapping the code-audited mastering, lyrics, AI generation, ACRCloud classification, persistence, and certificate-stamping pipelines."
+logical_id = "937aaacb-0312-4e3e-ae0f-abdc9326c5ab"
 
 [[outputs]]
 id = "Ibao7saZqWjwbhxrnmWJ1"
@@ -753,6 +863,7 @@ uri = "file://.local/outputs/GravelKing-Pro---Studio-Proof-and-Release.pdf"
 type = "pdf"
 title = "GravelKing Pro — Studio, Proof & Release (PDF)"
 description = "The single 12-slide release, certificate-pipeline, F6S, B2B, and business-roadmap PDF."
+logical_id = "75bb6b87-f455-439b-a0e8-f480da1b483d"
 
 [[outputs]]
 id = "Xu7QhZn_9KVGwVlpo-Wve"
@@ -760,6 +871,7 @@ uri = "file://.local/outputs/GravelKing-Pro---Public-Promo-Deck.pdf"
 type = "pdf"
 title = "GravelKing Pro — Public Promo Deck (PDF)"
 description = "Postable promotional deck — no fundraising, valuation, or private details. Safe to share publicly."
+logical_id = "ec5bd44b-d3bd-425d-b1e2-2dd125440fe9"
 
 [[outputs]]
 id = "YxeyslfVVzc9dIDOzC5kg"
@@ -767,6 +879,7 @@ uri = "file://.local/outputs/GravelKingPro_Buyout_Valuation_Brief_PRIVATE.pdf"
 type = "pdf"
 title = "Buyout & Valuation Brief (PRIVATE — your eyes only)"
 description = "Asset-based valuation, asking prices by deal type (seed / buyout / licensing), negotiation floors and techniques. Do not share externally."
+logical_id = "be97979d-b471-4c7f-900c-d36573e09e12"
 
 [[outputs]]
 id = "kYPQXV-5GKANtNeCukM27"
@@ -774,6 +887,7 @@ uri = "file://.local/outputs/GravelKingPro_Outreach_Playbook_Road_to_100_PRIVATE
 type = "pdf"
 title = "Investor Outreach Playbook + 30-Day Road to 100 (PRIVATE — your eyes only)"
 description = "All 12 prospects with routes, per-target angles, ready-to-send DM copy, and the 30-day bootstrap plan to 100 subscribers/investors/license deals. Do not share externally."
+logical_id = "15e0a18d-0314-46c5-9656-164872a98527"
 
 [[outputs]]
 id = "s5mdBLqg_4XGYPSXkb6Zt"
@@ -781,6 +895,7 @@ uri = "file://.local/outputs/GravelKing-Productions---F6S-Investor-Deck.pdf"
 type = "pdf"
 title = "GravelKing Productions — F6S Investor Deck (PDF)"
 description = "11-slide investor deck for F6S upload and email distribution. All slides verified: correct fonts, images, slide order, and no blank pages."
+logical_id = "f288e18c-5598-49e5-b47c-553509fbeece"
 
 [[outputs]]
 id = "J7gga8t-CIVwXMUzfkJl9"
@@ -788,6 +903,7 @@ uri = "file://.local/outputs/MLK-v3-5-Pitch-Deck.pdf"
 type = "pdf"
 title = "Morris Law Kernel v3.5 — Pitch Deck"
 description = "9-slide MLK v3.5 pitch deck (PDF)"
+logical_id = "e8de4fb5-2790-4e71-aa2b-7b86a6b71179"
 
 [[outputs]]
 id = "zv4nSXhAzdt8f7aAL_fMP"
@@ -795,6 +911,7 @@ uri = "file://.local/outputs/GravelKing-Studio-Proof-Release.pdf"
 type = "pdf"
 title = "GravelKing Pro — Studio, Proof & Release"
 description = "12-slide GravelKing Pro deck (PDF)"
+logical_id = "2fe48d9c-18e7-46a2-ada7-f7b2f14348d8"
 
 [[outputs]]
 id = "lUJL4OcilmV1TF0dS7HLI"
@@ -802,6 +919,8 @@ uri = "file://pitch-files/matt-adel-musical-ai-one-pager.html"
 type = "text"
 title = "Musical AI One-Pager (Matt Adel)"
 description = "Simplified one-page partnership pitch"
+logical_id = "88637a00-d437-47ff-bf44-ea4cc17168cf"
+content_type = "text/html"
 
 [[outputs]]
 id = "qoO5AlHh-y2cQzxhOJgC4"
@@ -809,6 +928,8 @@ uri = "file://pitch-files/cert-lyrics.html"
 type = "text"
 title = "Certificate 1 of 3 — Lyrics Authorship"
 description = "\"You Used to Think I Was Superman\" — human-written lyrics certificate with real content hash from the released MP3."
+logical_id = "bbe0cd7c-b71f-4fc2-a62d-3642ce719fde"
+content_type = "text/html"
 
 [[outputs]]
 id = "81lpgXDfLLEPuyQxX15sx"
@@ -816,6 +937,8 @@ uri = "file://pitch-files/cert-instrumental.html"
 type = "text"
 title = "Certificate 2 of 3 — Instrumental Composition"
 description = "\"You Used to Think I Was Superman\" — instrumental certificate with disclosed AI model and style authorship score."
+logical_id = "c0e5311b-91ae-4864-a4e8-150f2439b93a"
+content_type = "text/html"
 
 [[outputs]]
 id = "PyNONW0p_ff9Nhn5LcNFX"
@@ -823,9 +946,26 @@ uri = "file://pitch-files/cert-vocal.html"
 type = "text"
 title = "Certificate 3 of 3 — Vocal Performance"
 description = "\"You Used to Think I Was Superman\" — human vocal booth performance certificate."
+logical_id = "53234c79-5b48-4ea5-83ac-3e329fbd1a7b"
+content_type = "text/html"
 
 [[outputs]]
 id = "hNMwwqBM7Bj3RWZwJoZe3"
 uri = "file://.local/outputs/GravelKing-Pro---Studio--Proof---Release.pdf"
 type = "pdf"
 title = "GravelKing Pro — Studio, Proof & Release.pdf"
+logical_id = "d24f0cd1-0911-4520-8c46-c3883209a03b"
+
+[[outputs]]
+id = "8WaZDZXPFbgq9tqFPGhht"
+uri = "file://exports/You-Used-to-Think-I-Was-Superman-IP-Provenance-Certificate.pdf"
+type = "pdf"
+title = "Superman IP Provenance Certificate"
+description = "Official owner-linked lyrics provenance certificate for You Used to Think I Was Superman, sealed with the Morris Kernel HMAC-SHA256 chain."
+logical_id = "cc0098f1-08a8-4c1d-8fc7-66261de51f95"
+content_hash = "sha256:c0b0fd234e2930bd56135efac0275c37a7dc859079bc4046aa37a05ac3fd96e6"
+size = 3654
+mtime_ms = 1788553871667
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/cc0098f1-08a8-4c1d-8fc7-66261de51f95/52803136-d668-41ed-905b-d3d1f9447523"
+storage_version_token = "1788553877616865"
+content_type = "application/pdf"
