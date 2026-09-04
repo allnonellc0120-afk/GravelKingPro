@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { createHash } from "node:crypto";
 import { db, ipCertStubsTable, usersTable, type User } from "@workspace/db";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { generateForensicCertificate, certificateToPdf } from "../lib/forensicCertificate";
@@ -84,6 +85,10 @@ async function gateCertDocument(
 }
 
 function buildCertificate(stub: StubRow) {
+  const nominator = createHash("sha256")
+    .update(`${stub.contentHash}|${stub.artist}|${stub.certId}`)
+    .digest("hex")
+    .slice(0, 32);
   const certificate = generateForensicCertificate(
     {
       contentHash: stub.contentHash,
@@ -91,7 +96,7 @@ function buildCertificate(stub: StubRow) {
     },
     {
       certId: stub.certId,
-      nominator: stub.denominator.slice(0, 32), // reconstruct from stub for cert display
+      nominator,
       denominator: stub.denominator,
       anchorA: 0,
       anchorB: 0,
@@ -120,7 +125,7 @@ function buildCertificate(stub: StubRow) {
     }
   );
   // Override the chain-of-custody values to match the real stub exactly.
-  certificate.chainOfCustody.nominator = stub.denominator.slice(0, 32);
+  certificate.chainOfCustody.nominator = nominator;
   certificate.chainOfCustody.denominator = stub.denominator;
   certificate.chainOfCustody.handshake = stub.handshake;
   return certificate;
