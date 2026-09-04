@@ -361,7 +361,11 @@ export default function Pricing() {
             intentType={paymentState.intentType}
             onCancel={() => setPaymentState(null)}
             onSuccess={async () => {
-              for (let attempt = 0; attempt < 10; attempt += 1) {
+              // Stripe confirms the PaymentIntent before our webhook updates the
+              // account row. Keep the embedded form open while that short
+              // propagation window closes instead of making a successful
+              // wallet/3DS payment look unfinished.
+              for (let attempt = 0; attempt < 40; attempt += 1) {
                 const status = await refreshSubscription();
                 if (status.tier) {
                   setPaymentState(null);
@@ -370,7 +374,10 @@ export default function Pricing() {
                 }
                 await new Promise((resolve) => setTimeout(resolve, 750));
               }
-              toast({ title: "Payment received", description: "Your subscription is syncing. Your access will unlock shortly." });
+              toast({
+                title: "Payment received — still syncing",
+                description: "Your payment cleared, but the subscription is taking longer than usual to activate. You can retry the confirmation or close this panel and refresh your status later.",
+              });
             }}
           />
         )}
