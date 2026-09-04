@@ -247,7 +247,7 @@ const maybeValidateIngestion = (req: Request, res: Response, next: NextFunction)
 };
 
 masterRouter.post(
-  ["/kernel/master", "/v1/ingest", "/export-wav"],
+  ["/kernel/master", "/v1/ingest", "/export-wav", "/export-mp3"],
   requirePartnerApiKey,
   partnerAwareRateLimit,
   masterConcurrency,
@@ -388,13 +388,21 @@ masterRouter.post(
     // export quota (paid is limited, not unlimited — owner directive
     // 2026-08-14). Free users get one full download, then 30-sec previews.
     const partnerReq = isPartnerRequest(req);
-    const paidTier = !partnerReq && await hasUnlimitedMasters(req);
-    const unlimited = partnerReq || paidTier;
+    const adminReq = isAdminAuthenticated(req);
+    const mp3Requested = req.path === "/export-mp3";
+    const paidTier = !partnerReq && !adminReq && await hasUnlimitedMasters(req);
+
+    // The master admin key is an explicit operational override: it bypasses
+    // tier, free allowance, and rolling export quota checks for this route.
+    // Pro users get unlimited MP3 exports, while WAV exports remain capped by
+    // the rolling 20-export ledger below.
+    const unlimited = partnerReq || adminReq || paidTier;
+    const wavQuotaEligible = paidTier && !mp3Requested;
 
     // Check (don't consume) BEFORE the expensive kernel run; consume after
     // a successful master, right where free downloads are counted.
     let exportUser: User | null = null;
-    if (paidTier) {
+    if (wavQuotaEligible) {
       exportUser = await getUsageUser(req, res);
       const quota = checkExportQuota(exportUser);
       if (!quota.allowed) {
@@ -406,6 +414,16 @@ masterRouter.post(
     let isSample = false;
     let usageUserId: string | null = null;
     let usedTotalDownloads = 0;
+    if (mp3Requested && !unlimited) {
+      res.status(402).json({
+        success: false,
+        code: "PRO_REQUIRED",
+        feature: "mp3_export",
+        error: "MP3 exports require a GravelKing Pro subscription.",
+        fallback: { action: "subscribe", url: "/pricing" },
+      });
+      return;
+    }
     if (!unlimited) {
       const usageUser = await getUsageUser(req, res);
       usageUserId = usageUser.id;
@@ -561,7 +579,7 @@ masterRouter.post(
         await incrementUsage(usageUserId, "totalDownloads");
       }
 
-      // Paid-tier export quota — consumed only after a successful master.
+      // Paid-tier WAV quota — consumed only after a successful WAV master.
       if (exportUser && !isSample) {
         const quota = await consumeExport(exportUser);
         if (!quota.allowed) {
@@ -728,6 +746,30 @@ masterRouter.post(
         res.setHeader("X-GK-Sample", "true");
         setResultHeaders();
         streamBuffer(res, outBuffer);
+        return;
+      }
+
+      if (mp3Requested) {
+        const mp3Id = randomUUID();
+        const mp3OutPath = `/tmp/gk_master_mp3_${mp3Id}.mp3`;
+        try {
+          await writeFile(`/tmp/gk_master_mp3_${mp3Id}.wav`, outBuffer);
+          await execFileAsync("ffmpeg", [
+            "-y", "-i", `/tmp/gk_master_mp3_${mp3Id}.wav`,
+            "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100",
+            mp3OutPath,
+          ], { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 });
+          const mp3Buffer = Buffer.from(await readFile(mp3OutPath));
+          res.setHeader("Content-Type", "audio/mpeg");
+          res.setHeader("Content-Disposition", `attachment; filename="${filename.replace(/\.wav$/, ".mp3")}"`);
+          res.setHeader("X-GK-Format", "mp3");
+          res.setHeader("X-GK-Sample", "false");
+          setResultHeaders();
+          streamBuffer(res, mp3Buffer);
+        } finally {
+          await unlink(`/tmp/gk_master_mp3_${mp3Id}.wav`).catch(() => {});
+          await unlink(mp3OutPath).catch(() => {});
+        }
         return;
       }
 

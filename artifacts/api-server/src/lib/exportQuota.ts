@@ -2,11 +2,10 @@ import { db, usersTable, type User } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 /**
- * Rolling 30-day WAV/MP3 export quota.
+ * Rolling 30-day WAV export quota.
  *
- * Applies to ALL users — paid tiers included (paid is capped, not unlimited,
- * by owner directive 2026-08-14). Free-tier users additionally keep their
- * stricter FREE_LIMITS gates; this quota is a shared ceiling on top.
+ * Applies to paid WAV exports. Pro MP3 exports are intentionally unlimited;
+ * the master route does not call this module for MP3 requests.
  *
  * Bypasses: developer/owner accounts (isDeveloper) and partner-API requests
  * (callers never reach this module for those).
@@ -114,7 +113,7 @@ export function exportLimitPayload(q: ExportQuotaStatus) {
     limit: q.limit,
     used: q.used,
     resetsAt: q.resetsAt,
-    error: `You've reached your export limit (${q.limit} WAV/MP3 exports per 30 days). ` +
+    error: `You've reached your WAV export limit (${q.limit} exports per 30 days). ` +
       (q.resetsAt ? `Your quota resets on ${new Date(q.resetsAt).toLocaleDateString("en-US", { month: "long", day: "numeric" })}.` : "Try again later."),
   };
 }
