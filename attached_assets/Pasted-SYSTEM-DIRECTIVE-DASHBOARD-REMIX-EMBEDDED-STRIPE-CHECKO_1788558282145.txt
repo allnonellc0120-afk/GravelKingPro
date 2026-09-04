@@ -1,0 +1,58 @@
+SYSTEM DIRECTIVE: DASHBOARD REMIX, EMBEDDED STRIPE CHECKOUT & TIER GATING
+
+Execute the following platform refactor sequentially. Do not mock dependencies; pull directly from the live Morris Kernel repo. Double confirm before deleting any existing routing or database tables.
+
+CRITICAL REQUIREMENT:
+DO NOT REMOVE OR BREAK THE MASTERING TOOL (/mastering). The mastering engine (Morris Law Kernel V3.5) remains a core centerpiece of this entire platform.
+
+TASK 1: COMPLIANCE & CRITICAL HOOKS
+- Google Play Compliance: Immediately create a clean, responsive public route at `/data-deletion`. Provide an account deletion request mechanism (email target: Allnonellc0120@gmail.com) to resolve the Google Play Policy warning before September 17, 2026.
+- Webhook Domain Lock: Verify `/api/stripe/webhook` handles live Stripe events and ensure it matches the production domain (https://gravelkingpro.it.com/api/stripe/webhook).
+
+TASK 2: LANDING PAGE & DASHBOARD REMIX
+- Keep and highlight the dedicated mastering tool: "The Foundry / Audio Mastering (Morris Law Kernel V3.5)".
+- Keep the main dashboard and landing page focused strictly on 4 core tool cards:
+  1. "The Foundry" (Morris Law Kernel V3.5 Mastering Engine - DO NOT REMOVE)
+  2. "JAX" (Songwriting Companion & Provenance)
+  3. "Vocal Booth" (Audio recording, backing track playback, clip/splice editor)
+  4. "Converter" (Audio container/format conversion utility)
+- Remove text bloat, essays, and confusing navigation. Keep the UI dark, streamlined, and utilitarian for mobile and tablet.
+
+TASK 3: IN-APP STRIPE PAYMENT ELEMENT (ZERO REDIRECTS)
+- Deprecate hosted Stripe Checkout redirects (stripe.checkout.sessions).
+- Implement Stripe Payment Element & Express Checkout Element directly on the frontend:
+  - Enable Apple Pay and Google Pay automatically via Express Checkout without leaving the app.
+  - Provide an inline credit card form embedded in an on-page checkout modal.
+- Backend route: POST /api/stripe/create-subscription-intent
+  - Create a customer and subscription with payment_behavior: 'default_incomplete'.
+  - Return the clientSecret to the frontend.
+- Frontend payment confirmation:
+  - Use stripe.confirmPayment({ elements, confirmParams: { return_url: window.location.href }, redirect: 'if_required' }).
+  - When payment confirms without redirect, immediately trigger a local state refresh and update user tier in real time without a page reload or sign-out.
+
+TASK 4: TIER SCHEMAS, PROMO PASS & ADMIN BYPASS
+Implement 3 tiers + Admin Bypass + Promo Code logic in user database:
+1. FREE ($0/mo):
+   - JAX lyric drafting enabled.
+   - Vocal booth tracking enabled.
+   - Unlimited MP3 exports.
+   - Morris Kernel mastering LOCKED.
+   - 24-bit WAV downloads LOCKED.
+   - IP Provenance Certificates LOCKED.
+2. PRO ($9.99/mo):
+   - All Free features.
+   - Morris Kernel V3.5 Mastering UNLOCKED.
+   - Quota: 20 High-Res WAV downloads / month (tracked in DB).
+   - Unlimited Mastered MP3 downloads.
+   - Audio Converter UNLOCKED.
+   - IP Provenance Certificates LOCKED.
+3. KING ($24.99/mo):
+   - All Pro features.
+   - Unlimited 24-bit WAV and MP3 downloads.
+   - JAX HMAC-SHA256 IP Provenance Certificates UNLOCKED (court-ready PDF generation).
+   - Forensic Signal Verification UNLOCKED.
+4. ADMIN BYPASS & 7-DAY PROMO:
+   - Identify account: Allnonellc0120@gmail.com. Unconditionally bypass all quotas, paywalls, and download locks permanently.
+   - Create a 7-day Pro access promo code mechanism for testing: authenticated users can redeem without entering a credit card or starting a Stripe trial.
+
+Halt and output "STEP-BY-STEP REFACTOR READY" for verification before writing breaking changes.
