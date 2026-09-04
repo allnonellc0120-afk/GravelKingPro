@@ -61,7 +61,7 @@ stripeRouter.get('/stripe/config', async (_req: Request, res: Response) => {
 // Create an in-app Payment Element subscription. Trialing subscriptions use
 // Stripe's pending SetupIntent because their first invoice is $0; paid
 // subscriptions return the initial invoice PaymentIntent client secret.
-stripeRouter.post('/payment-intent', async (req: Request, res: Response) => {
+const createSubscriptionIntent = async (req: Request, res: Response) => {
   try {
     if (!req.dbUser) {
       res.status(401).json({ error: 'Sign in required to subscribe', authRequired: true });
@@ -126,7 +126,12 @@ stripeRouter.post('/payment-intent', async (req: Request, res: Response) => {
     const message = err instanceof Error ? err.message : 'Unable to start payment.';
     res.status(500).json({ error: message });
   }
-});
+};
+
+// Canonical embedded-subscription endpoint. Keep /payment-intent as a
+// backwards-compatible alias for already deployed clients.
+stripeRouter.post('/create-subscription-intent', createSubscriptionIntent);
+stripeRouter.post('/payment-intent', createSubscriptionIntent);
 
 // Create Stripe Checkout Session — requires OIDC authentication
 stripeRouter.post('/checkout', async (req: Request, res: Response) => {
