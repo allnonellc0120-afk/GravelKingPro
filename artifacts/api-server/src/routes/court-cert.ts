@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { createHash } from "node:crypto";
 import { db, ipCertStubsTable, usersTable, type User } from "@workspace/db";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 import { generateForensicCertificate, certificateToPdf } from "../lib/forensicCertificate";
 import { logToolError } from "../lib/errorTracker";
 import { logger } from "../lib/logger";
@@ -84,7 +84,7 @@ async function gateCertDocument(
   return stub;
 }
 
-function buildCertificate(stub: StubRow) {
+async function buildCertificate(stub: StubRow) {
   const nominator = createHash("sha256")
     .update(`${stub.contentHash}|${stub.artist}|${stub.certId}`)
     .digest("hex")
@@ -124,6 +124,27 @@ function buildCertificate(stub: StubRow) {
         : undefined,
     }
   );
+  // A certificate stub stores its authoritative source hash in contentHash.
+  // Pull the companion certificate when available so every document carries
+  // both source inputs instead of rendering one of them as "N/A".
+  const siblingRows = await db
+    .select({ category: ipCertStubsTable.category, contentHash: ipCertStubsTable.contentHash })
+    .from(ipCertStubsTable)
+    .where(and(
+      eq(ipCertStubsTable.ownerUserId, stub.ownerUserId!),
+      eq(ipCertStubsTable.artist, stub.artist),
+      inArray(ipCertStubsTable.category, ["lyrics", "full_track", "vocal_performance", "instrumental"]),
+    ));
+  const lyricSource = stub.category === "lyrics"
+    ? stub
+    : siblingRows.find((row) => row.category === "lyrics");
+  const audioSource = stub.category === "lyrics"
+    ? siblingRows.find((row) => row.category === "full_track")
+      ?? siblingRows.find((row) => row.category === "vocal_performance")
+      ?? siblingRows.find((row) => row.category === "instrumental")
+    : stub;
+  certificate.inputs.lyricsHash = lyricSource?.contentHash ?? null;
+  certificate.inputs.rawPcmAudioHash = audioSource?.contentHash ?? null;
   // Override the chain-of-custody values to match the real stub exactly.
   certificate.chainOfCustody.nominator = nominator;
   certificate.chainOfCustody.denominator = stub.denominator;
@@ -364,7 +385,7 @@ router.get("/court-cert/:certId.pdf", async (req: Request, res: Response) => {
   try {
     const stub = await gateCertDocument(req, res, certId);
     if (!stub) return;
-    const pdf = certificateToPdf(buildCertificate(stub));
+    const pdf = certificateToPdf(await buildCertificate(stub));
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="gravelking-cert-${certId}.pdf"`);
     res.send(pdf);
@@ -386,7 +407,7 @@ router.get("/court-cert/:certId", async (req: Request, res: Response) => {
   try {
     const stub = await gateCertDocument(req, res, certId);
     if (!stub) return;
-    res.json({ success: true, certificate: buildCertificate(stub) });
+    res.json({ success: true, certificate: await buildCertificate(stub) });
   } catch (err) {
     logger.error({ err, certId }, "failed to generate court certificate");
     void logToolError("Court Certificate", "CERTIFICATE_GENERATION", err);
