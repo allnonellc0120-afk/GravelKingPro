@@ -969,3 +969,17 @@ mtime_ms = 1788554495627
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/cc0098f1-08a8-4c1d-8fc7-66261de51f95/5cb2c1be-260c-4c88-9ee7-2502b525c665"
 storage_version_token = "1788554500082477"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "EaRxbTRbdXvHPtbUlawIv"
+uri = "file://exports/gravelking-live-analytics-report.html"
+type = "text"
+title = "GravelKing Pro — Live Analytics & Stripe Reconciliation"
+description = "Printable visual report covering production page visits, signups, checkout drop-off, app entitlements, Stripe subscriptions, charges, refunds, and payouts for Aug 5–Sep 4, 2026."
+logical_id = "b33d4649-e970-4cac-9cf7-271b31d333ac"
+content_hash = "sha256:8b75218712f7976337deb5be467593f2fa404cc72ceaea0f01dcb34484188a87"
+size = 10759
+mtime_ms = 1788555640884
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b33d4649-e970-4cac-9cf7-271b31d333ac/174ae67a-69de-4616-92e1-4d2124f1db9b"
+storage_version_token = "1788555646250543"
+content_type = "text/html"
