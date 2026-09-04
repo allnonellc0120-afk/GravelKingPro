@@ -769,10 +769,10 @@ export default function Pricing() {
               </div>
             ) : (
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
                   setPromoError(false);
-                  const ok = redeemPromo(promoInput);
+                   const ok = await redeemPromo(promoInput);
                   if (ok) {
                     setPromoInput("");
                     toast({

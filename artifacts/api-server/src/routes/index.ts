@@ -29,6 +29,7 @@ import emailCaptureRouter from "./email-capture";
 import benchmarkRouter from "./benchmark";
 import referralsRouter from "./referrals";
 import investorsRouter from "./investors";
+import promoRouter from "./promos";
 
 const router: IRouter = Router();
 
@@ -62,5 +63,6 @@ router.use(emailCaptureRouter);
 router.use(benchmarkRouter);
 router.use(referralsRouter);
 router.use(investorsRouter);
+router.use(promoRouter);
 
 export default router;
