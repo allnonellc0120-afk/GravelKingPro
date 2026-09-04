@@ -10,52 +10,57 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 3107 >>
+<< /Length 3335 >>
 stream
-BT /F1 10 Tf 50 720 Td (DIGITAL CHAIN-OF-CUSTODY CERTIFICATE) Tj ET
-BT /F1 10 Tf 50 706 Td (====================================) Tj ET
-BT /F1 10 Tf 50 692 Td () Tj ET
-BT /F1 10 Tf 50 678 Td (Certificate ID: 70440f07-9891-4c72-bbad-61e798bc7362) Tj ET
-BT /F1 10 Tf 50 664 Td (Document Type: Digital Chain-of-Custody Certificate) Tj ET
-BT /F1 10 Tf 50 650 Td (Generated At: 2026-09-04T20:28:43.237Z) Tj ET
-BT /F1 10 Tf 50 636 Td () Tj ET
-BT /F1 10 Tf 50 622 Td (INPUT HASHES) Tj ET
-BT /F1 10 Tf 50 608 Td (------------) Tj ET
-BT /F1 10 Tf 50 594 Td (Lyrics Hash:        N/A) Tj ET
-BT /F1 10 Tf 50 580 Td (Style Prompt Hash:  N/A) Tj ET
-BT /F1 10 Tf 50 566 Td (Raw PCM Audio Hash: N/A) Tj ET
-BT /F1 10 Tf 50 552 Td (Content Hash:       8cf148f7fde8401be0e59795736255da1c30cf50681c42de5f4fa8e635db906d) Tj ET
-BT /F1 10 Tf 50 538 Td () Tj ET
-BT /F1 10 Tf 50 524 Td (CHAIN OF CUSTODY) Tj ET
-BT /F1 10 Tf 50 510 Td (----------------) Tj ET
-BT /F1 10 Tf 50 496 Td (Cert ID:     a6f14066-6491-495a-86af-5f32cbab38db) Tj ET
-BT /F1 10 Tf 50 482 Td (Nominator:   11b982f50ac23bfd5f50b0961a6e229c) Tj ET
-BT /F1 10 Tf 50 468 Td (Denominator: 934891ec66a53e1887f07138810705f6) Tj ET
-BT /F1 10 Tf 50 454 Td (Handshake:   47076b0e883e0ed074e2ff7375764432ca2a5eb44bb96eed813e78934e8845dd) Tj ET
-BT /F1 10 Tf 50 440 Td (Anchor A:    0) Tj ET
-BT /F1 10 Tf 50 426 Td (Anchor B:    0) Tj ET
-BT /F1 10 Tf 50 412 Td () Tj ET
-BT /F1 10 Tf 50 398 Td (PROVENANCE & ATTRIBUTION) Tj ET
-BT /F1 10 Tf 50 384 Td (------------------------) Tj ET
-BT /F1 10 Tf 50 370 Td (Generating AI Model: None  human performance / external upload) Tj ET
-BT /F1 10 Tf 50 356 Td (Certified Category:  lyrics) Tj ET
-BT /F1 10 Tf 50 342 Td (Audio Provenance:    human_authored) Tj ET
-BT /F1 10 Tf 50 328 Td () Tj ET
-BT /F1 10 Tf 50 314 Td (LOCAL AUDIO-SIGNATURE SCREEN) Tj ET
-BT /F1 10 Tf 50 300 Td (-----------------------------------) Tj ET
-BT /F1 10 Tf 50 286 Td (Result:   LOCAL SCAN COMPLETE  no local signature match) Tj ET
-BT /F1 10 Tf 50 272 Td (Global:   NOT CHECKED  worldwide commercial catalog scan unavailable) Tj ET
-BT /F1 10 Tf 50 258 Td (Provider: local-signature) Tj ET
-BT /F1 10 Tf 50 244 Td (Scanned:  2026-09-04T20:27:51.381Z) Tj ET
-BT /F1 10 Tf 50 230 Td () Tj ET
-BT /F1 10 Tf 50 216 Td (LEGAL FORENSICS DISCLAIMER) Tj ET
-BT /F1 10 Tf 50 202 Td (---------------------------) Tj ET
-BT /F1 10 Tf 50 188 Td (This document serves as an immutable, timestamped cryptographic proof-of-existence and chain-of-custody log generated at signal-level export. The dual-anchor HMAC handshake was generated exclusively by the GravelKing server and can be independently verified only by combining the track-embedded nominator with the server-retained denominator. Any lossy re-encoding, bit-level alteration, or removal of the embedded watermark revokes the chain of custody.) Tj ET
-BT /F1 10 Tf 50 174 Td () Tj ET
-BT /F1 10 Tf 50 160 Td (Verification Endpoint: /api/kernel/verify-cert) Tj ET
-BT /F1 10 Tf 50 146 Td () Tj ET
-BT /F1 10 Tf 50 132 Td (====================================) Tj ET
-BT /F1 10 Tf 50 118 Td (END OF CERTIFICATE) Tj ET
+BT /F1 9 Tf 50 730 Td (DIGITAL CHAIN-OF-CUSTODY CERTIFICATE) Tj ET
+BT /F1 9 Tf 50 719 Td (====================================) Tj ET
+BT /F1 9 Tf 50 708 Td () Tj ET
+BT /F1 9 Tf 50 697 Td (Certificate ID: d150636f-00d1-41ba-9e37-bbb35087a2d6) Tj ET
+BT /F1 9 Tf 50 686 Td (Document Type: Digital Chain-of-Custody Certificate) Tj ET
+BT /F1 9 Tf 50 675 Td (Generated At: 2026-09-04T20:41:30.547Z) Tj ET
+BT /F1 9 Tf 50 664 Td () Tj ET
+BT /F1 9 Tf 50 653 Td (INPUT HASHES) Tj ET
+BT /F1 9 Tf 50 642 Td (------------) Tj ET
+BT /F1 9 Tf 50 631 Td (Lyrics Hash:        8cf148f7fde8401be0e59795736255da1c30cf50681c42de5f4fa8e635db906d) Tj ET
+BT /F1 9 Tf 50 620 Td (Style Prompt Hash:  N/A) Tj ET
+BT /F1 9 Tf 50 609 Td (Raw PCM Audio Hash: b5f9d7268d2358eb2b0b063b29f52bb881167cbc97fbac6455857d9f8539b1fe) Tj ET
+BT /F1 9 Tf 50 598 Td (Content Hash:       8cf148f7fde8401be0e59795736255da1c30cf50681c42de5f4fa8e635db906d) Tj ET
+BT /F1 9 Tf 50 587 Td () Tj ET
+BT /F1 9 Tf 50 576 Td (CHAIN OF CUSTODY) Tj ET
+BT /F1 9 Tf 50 565 Td (----------------) Tj ET
+BT /F1 9 Tf 50 554 Td (Cert ID:     a6f14066-6491-495a-86af-5f32cbab38db) Tj ET
+BT /F1 9 Tf 50 543 Td (Nominator:   11b982f50ac23bfd5f50b0961a6e229c) Tj ET
+BT /F1 9 Tf 50 532 Td (Denominator: 934891ec66a53e1887f07138810705f6) Tj ET
+BT /F1 9 Tf 50 521 Td (Handshake:   47076b0e883e0ed074e2ff7375764432ca2a5eb44bb96eed813e78934e8845dd) Tj ET
+BT /F1 9 Tf 50 510 Td (Anchor A:    0) Tj ET
+BT /F1 9 Tf 50 499 Td (Anchor B:    0) Tj ET
+BT /F1 9 Tf 50 488 Td () Tj ET
+BT /F1 9 Tf 50 477 Td (PROVENANCE & ATTRIBUTION) Tj ET
+BT /F1 9 Tf 50 466 Td (------------------------) Tj ET
+BT /F1 9 Tf 50 455 Td (Generating AI Model: None  human performance / external upload) Tj ET
+BT /F1 9 Tf 50 444 Td (Certified Category:  lyrics) Tj ET
+BT /F1 9 Tf 50 433 Td (Audio Provenance:    human_authored) Tj ET
+BT /F1 9 Tf 50 422 Td () Tj ET
+BT /F1 9 Tf 50 411 Td (LOCAL AUDIO-SIGNATURE SCREEN) Tj ET
+BT /F1 9 Tf 50 400 Td (-----------------------------------) Tj ET
+BT /F1 9 Tf 50 389 Td (Result:   LOCAL SCAN COMPLETE  no local signature match) Tj ET
+BT /F1 9 Tf 50 378 Td (Global:   NOT CHECKED  worldwide commercial catalog scan unavailable) Tj ET
+BT /F1 9 Tf 50 367 Td (Provider: local-signature) Tj ET
+BT /F1 9 Tf 50 356 Td (Scanned:  2026-09-04T20:27:51.381Z) Tj ET
+BT /F1 9 Tf 50 345 Td () Tj ET
+BT /F1 9 Tf 50 334 Td (LEGAL FORENSICS DISCLAIMER) Tj ET
+BT /F1 9 Tf 50 323 Td (---------------------------) Tj ET
+BT /F1 9 Tf 50 312 Td (This document serves as an immutable, timestamped cryptographic proof-of-existence and) Tj ET
+BT /F1 9 Tf 50 301 Td (chain-of-custody log generated at signal-level export. The dual-anchor HMAC handshake was) Tj ET
+BT /F1 9 Tf 50 290 Td (generated exclusively by the GravelKing server and can be independently verified only by) Tj ET
+BT /F1 9 Tf 50 279 Td (combining the track-embedded nominator with the server-retained denominator. Any lossy) Tj ET
+BT /F1 9 Tf 50 268 Td (re-encoding, bit-level alteration, or removal of the embedded watermark revokes the chain of) Tj ET
+BT /F1 9 Tf 50 257 Td (custody.) Tj ET
+BT /F1 9 Tf 50 246 Td () Tj ET
+BT /F1 9 Tf 50 235 Td (Verification Endpoint: /api/kernel/verify-cert) Tj ET
+BT /F1 9 Tf 50 224 Td () Tj ET
+BT /F1 9 Tf 50 213 Td (====================================) Tj ET
+BT /F1 9 Tf 50 202 Td (END OF CERTIFICATE) Tj ET
 endstream
 endobj
 5 0 obj
@@ -68,9 +73,9 @@ xref
 0000000052 00000 n 
 0000000105 00000 n 
 0000000248 00000 n 
-00000003406 00000 n 
+00000003634 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-3479
+3707
 %%EOF
