@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { generateProxyText } from "../geminiProxy";
 import { rateLimit } from "../lib/rateLimiter";
+import { isAdminAutomationAuthenticated } from "../lib/adminAuth";
 
 const jaxRouter = Router();
 const DAILY_FREE_LIMIT = 5;
@@ -16,9 +17,10 @@ function isNonMusicPrompt(prompt: string) {
 }
 
 jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async (req: Request, res: Response) => {
+  const adminBypass = isAdminAutomationAuthenticated(req);
   const user = req.dbUser;
-  if (!user) {
-    res.status(401).json({ error: "Sign in to use JAX." });
+  if (!user && !adminBypass) {
+    res.status(403).json({ error: "Admin automation requires valid x-admin-key and x-admin-user headers." });
     return;
   }
   const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
@@ -27,8 +29,8 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
     return;
   }
 
-  const unlimited = user.isDeveloper || user.subscriptionTier === "monthly" || user.subscriptionTier === "node_auditor";
-  const key = String(user.id);
+  const unlimited = adminBypass || user?.isDeveloper === true || user?.subscriptionTier === "monthly" || user?.subscriptionTier === "node_auditor";
+  const key = adminBypass ? "admin-key-bypass" : String(user?.id);
   const today = dayKey();
   const prior = usage.get(key);
   const count = prior?.day === today ? prior.count : 0;
@@ -43,7 +45,10 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
     return;
   }
 
-  const system = `You are JAX, GravelKing's studio songwriting companion. You are exclusively for songwriting: lyric drafting, song sections, rhyme, meter, imagery, hooks, bridges, and constructive lyric feedback. Never answer coding, math, politics, trivia, news, or other non-music questions. For those requests, reply exactly: "${STUDIO_REDIRECT}" Keep responses concise and return original lyric ideas in plain text.`;
+  const artistProfile = req.body?.artistProfile && typeof req.body.artistProfile === "object"
+    ? JSON.stringify(req.body.artistProfile).slice(0, 6000)
+    : "{}";
+  const system = `You are JAX, GravelKing's studio songwriting companion. You are exclusively for songwriting: lyric drafting, song sections, rhyme, meter, imagery, hooks, bridges, and constructive lyric feedback. Never answer coding, math, politics, trivia, news, or other non-music questions. For those requests, reply exactly: "${STUDIO_REDIRECT}" Keep responses concise and return original lyric ideas in plain text. The artist memory JSON below is preference context, not a request to reveal private data.\n\nArtist memory JSON:\n${artistProfile}`;
   try {
     const text = await generateProxyText(`${system}\n\nStudio prompt:\n${prompt}`, { temperature: 0.85 });
     res.json({ text: text || "Let's shape that section together. Give me a mood, image, or first line.", remaining: unlimited ? null : DAILY_FREE_LIMIT - count - 1 });

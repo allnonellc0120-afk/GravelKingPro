@@ -12,6 +12,9 @@ import { getUsageUser } from "../lib/usage";
 import { isVertexConfigured } from "../geminiVertex";
 import { generateAndMasterTrack, remixTrack, type VocalMode } from "../services/mlkOrchestrator";
 import { verifyLyrics } from "../services/lyricGuard";
+import { isAdminAutomationAuthenticated, ADMIN_AUTOMATION_EMAIL } from "../lib/adminAuth";
+import { db, usersTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 
 const mlkGenerateRouter = Router();
 
@@ -28,7 +31,19 @@ mlkGenerateRouter.post(
     // Shared identity resolver: OIDC first, else gk_session — ISSUING the
     // cookie when absent so the same session can later fetch the track from
     // the gated /api/tracks/:id/download route.
-    const user = await getUsageUser(req, res);
+    let user = await getUsageUser(req, res);
+    if (isAdminAutomationAuthenticated(req)) {
+      const [adminUser] = await db
+        .select()
+        .from(usersTable)
+        .where(sql`lower(${usersTable.email}) = ${ADMIN_AUTOMATION_EMAIL.toLowerCase()}`)
+        .limit(1);
+      if (!adminUser) {
+        res.status(403).json({ error: "Bound admin identity is not provisioned." });
+        return;
+      }
+      user = adminUser;
+    }
     const userId = user.id;
 
     if (!isVertexConfigured()) {

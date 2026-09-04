@@ -15,6 +15,7 @@ import { promisify } from "node:util";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isAdminAutomationAuthenticated } from "../lib/adminAuth";
 
 const execFileAsync = promisify(execFile);
 
@@ -545,7 +546,8 @@ router.get("/tracks/:id/stream", async (req: Request, res: Response) => {
 /** GET /api/tracks/:id/download — stream purchased track directly to the user's device */
 router.get("/tracks/:id/download", async (req: Request, res: Response) => {
   const session = await resolveSessionUser(req);
-  if (!session) {
+  const adminBypass = isAdminAutomationAuthenticated(req);
+  if (!session && !adminBypass) {
     res.status(401).json({ error: "No session — purchase the track first" });
     return;
   }
@@ -561,17 +563,19 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
   // Private/generated tracks stay downloadable by their owner (export quota
   // still applies); label status only controls the PUBLIC page + checkout.
 
-  const [purchase] = await db
-    .select()
-    .from(purchasedTracksTable)
-    .where(and(
-      eq(purchasedTracksTable.userId, session.userId),
-      eq(purchasedTracksTable.trackId, trackId),
-    ));
+  if (!adminBypass) {
+    const [purchase] = await db
+      .select()
+      .from(purchasedTracksTable)
+      .where(and(
+        eq(purchasedTracksTable.userId, session!.userId),
+        eq(purchasedTracksTable.trackId, trackId),
+      ));
 
-  if (!purchase) {
-    res.status(403).json({ error: "Purchase this track to download it" });
-    return;
+    if (!purchase) {
+      res.status(403).json({ error: "Purchase this track to download it" });
+      return;
+    }
   }
 
   // Stream the file directly — no redirect, no signed URL, file lands on device.
@@ -613,8 +617,10 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
 
   // Rolling 30-day export quota — applies to paid tiers too (capped, not
   // unlimited). Consumed only once the file is confirmed available.
-  const [dlUser] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId));
-  if (dlUser) {
+  const [dlUser] = session
+    ? await db.select().from(usersTable).where(eq(usersTable.id, session.userId))
+    : [];
+  if (dlUser && !adminBypass) {
     const quota = await consumeExport(dlUser);
     if (!quota.allowed) {
       res.status(429).json(exportLimitPayload(quota));

@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import traceback
+import subprocess
 
 # Kernel lives next to this worker.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +40,7 @@ def main() -> int:
     ap.add_argument("--auto-offset", type=float, default=-15.5)
     ap.add_argument("--target-lufs", type=float, default=-14.0)
     ap.add_argument("--ceiling-db", type=float, default=-0.8)
+    ap.add_argument("--mp3-output", default=None)
     args = ap.parse_args()
 
     import numpy as np
@@ -94,14 +96,37 @@ def main() -> int:
         auto_offset_db=args.auto_offset,
     )
 
-    # 16-bit PCM output — matches the downstream LSB-embed WAV expectations.
-    wavfile.write(args.output, sr, (np.clip(out, -1.0, 1.0) * 32767.0).astype(np.int16))
+    # True 24-bit PCM WAV. The kernel output is quantized here only for the
+    # deliverable; all DSP above ran on float32 through MorrisLawKernel.
+    pcm24 = (np.clip(out, -1.0, 1.0) * 8388607.0).astype(np.int32)
+    if pcm24.ndim == 1:
+        pcm24 = pcm24[:, np.newaxis]
+    interleaved = pcm24.reshape(-1)
+    packed = np.empty((interleaved.size, 3), dtype=np.uint8)
+    packed[:, 0] = (interleaved & 0xFF).astype(np.uint8)
+    packed[:, 1] = ((interleaved >> 8) & 0xFF).astype(np.uint8)
+    packed[:, 2] = ((interleaved >> 16) & 0xFF).astype(np.uint8)
+    import wave
+    with wave.open(args.output, "wb") as wav:
+        wav.setnchannels(pcm24.shape[1])
+        wav.setsampwidth(3)
+        wav.setframerate(sr)
+        wav.writeframes(packed.tobytes())
+
+    if args.mp3_output:
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", args.output,
+             "-codec:a", "libmp3lame", "-b:a", "320k", args.mp3_output],
+            check=True,
+        )
 
     print(json.dumps({
         "ok": True,
         "engine": "morris-law-kernel-v3.5-python",
         "numba": getattr(kernel, "_use_numba", False),
         "sampleRate": sr,
+        "bitDepth": 24,
+        "mp3Output": args.mp3_output,
         "scFreqUsed": round(float(sc_freq_used), 1),
         "detectedRmsDb": round(detected_rms_db, 1),
         "appliedThresholdDb": round(applied_threshold_db, 1),

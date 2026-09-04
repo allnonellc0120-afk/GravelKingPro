@@ -14,9 +14,36 @@ import type { Request, Response } from "express";
 export const ADMIN_COOKIE = "gk_admin";
 const COOKIE_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
 const HMAC_DATA = "gk_admin_session_v1";
+export const ADMIN_AUTOMATION_EMAIL = "Allnonellc0120@gmail.com";
 
 function computeToken(adminKey: string): string {
   return createHmac("sha256", adminKey).update(HMAC_DATA).digest("hex");
+}
+
+function configuredAdminKey(): string {
+  return process.env.ADMIN_KEY?.trim() || process.env.ADMIN_SECRET?.trim() || "";
+}
+
+export function isAdminAutomationAuthenticated(req: Request): boolean {
+  const adminKey = configuredAdminKey();
+  const presentedUser = req.headers["x-admin-user"];
+  if (typeof presentedUser !== "string" || presentedUser !== ADMIN_AUTOMATION_EMAIL) return false;
+  return validHeaderKey(req, adminKey);
+}
+
+function validHeaderKey(req: Request, adminKey: string): boolean {
+  if (!adminKey) return false;
+  const candidates = [
+    req.headers["x-admin-key"],
+    typeof req.headers.authorization === "string" && req.headers.authorization.startsWith("Bearer ")
+      ? req.headers.authorization.slice("Bearer ".length)
+      : undefined,
+  ].filter((value): value is string => typeof value === "string");
+  return candidates.some((presented) => {
+    const a = Buffer.from(presented.trim(), "utf8");
+    const b = Buffer.from(adminKey, "utf8");
+    return a.length === b.length && timingSafeEqual(a, b);
+  });
 }
 
 /** Set the signed httpOnly admin session cookie. */
@@ -41,7 +68,7 @@ export function clearAdminCookie(res: Response): void {
 
 /** Returns true if the request carries a valid admin session (cookie or header) OR is an OIDC developer. */
 export function isAdminAuthenticated(req: Request): boolean {
-  const adminKey = process.env.ADMIN_KEY?.trim() ?? "";
+  const adminKey = configuredAdminKey();
   if (!adminKey) return false;
 
   // 1. Check httpOnly cookie (preferred — browser sessions after login).
@@ -60,8 +87,8 @@ export function isAdminAuthenticated(req: Request): boolean {
     }
   }
 
-  // 2. Fall back to x-admin-key header (curl / scripted access).
-  return req.headers["x-admin-key"] === adminKey;
+  // 2. Fall back to constant-time API-key headers (curl / scripted access).
+  return validHeaderKey(req, adminKey);
 }
 
 /** Returns true if the request is from a Clerk-authenticated user with isDeveloper=true. */
@@ -75,7 +102,7 @@ export async function isDeveloperAuthenticated(req: Request): Promise<boolean> {
  * Accepts either admin cookie/header OR developer OIDC users.
  */
 export async function requireAdmin(req: Request, res: Response): Promise<boolean> {
-  const adminKey = process.env.ADMIN_KEY?.trim() ?? "";
+  const adminKey = configuredAdminKey();
   if (!adminKey) {
     res.status(503).json({ error: "Admin key not configured on the server." });
     return false;
