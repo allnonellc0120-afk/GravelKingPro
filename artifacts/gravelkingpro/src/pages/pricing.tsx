@@ -61,8 +61,8 @@ const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref
   },
   monthly: {
     planName: "GravelKing Studio",
-    ctaLabel: "Open the Studio DAW",
-    ctaHref: "/studio",
+    ctaLabel: "Open The Foundry",
+    ctaHref: "/mastering",
   },
   node_auditor: {
     planName: "Node Auditor",

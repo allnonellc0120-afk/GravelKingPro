@@ -1201,8 +1201,8 @@ export default function Mastering() {
             <div className="flex flex-wrap gap-2">
               {[
                 { label: "Vocal Booth", href: "/vocal-booth" },
-                { label: "Live DAW", href: "/studio" },
-                { label: "Songwriting Studio", href: "/songwriting" },
+                { label: "JAX", href: "/songwriting" },
+                { label: "Converter", href: "/convert" },
                 { label: "Pricing", href: "/pricing" },
               ].map(({ label, href }) => (
                 <Link key={href} href={href}>

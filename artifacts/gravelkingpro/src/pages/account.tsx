@@ -235,8 +235,8 @@ export default function Account() {
           <Card className="border-border/40 bg-card/20">
             <CardContent className="pt-5 grid grid-cols-2 gap-2">
               {[
-                { href: "/studio", label: "Audio Studio" },
-                { href: "/mix", label: "Mix Studio" },
+                { href: "/mastering", label: "The Foundry" },
+                { href: "/vocal-booth", label: "Vocal Booth" },
                 { href: "/pricing", label: "View Plans" },
               ].map(({ href, label }) => (
                 <Link key={href} href={href}>

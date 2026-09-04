@@ -11,7 +11,6 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
 import Report from "@/pages/report";
-import Studio from "@/pages/mix-studio";
 import Mastering from "@/pages/mastering";
 import KernelDashboard from "@/pages/kernel";
 import Contact from "@/pages/contact";
@@ -180,8 +179,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/studio" component={Studio} />
-      <Route path="/mix" component={Studio} />
       <Route path="/mastering" component={Mastering} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/report" component={Report} />
