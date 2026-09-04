@@ -1,0 +1,32 @@
+SYSTEM DIRECTIVE FOR REPLIT AGENT:
+You are executing a production build for the Morris Kernel infrastructure. 
+CRITICAL RULE: You must execute this build sequentially. After completing a step, you MUST halt execution, output a confirmation that the step is complete, and explicitly wait for the user to reply with approval before starting the next step. Do not batch steps together. 
+
+PROJECT OVERVIEW:
+Deploy the "Kernel Muse Live" Songwriting Companion front-end/backend connections and patch the existing WAV export tool. All DSP and mastering logic must run exclusively through the live Morris Kernel engine from the official GitHub repository. Zero local mocking or simulation is permitted.
+
+STEP 1: Live GitHub Integration & WAV Export Patch
+* Action: Connect the environment directly to the live Morris Kernel GitHub repository. Ensure no mock audio drivers or stubs are used.
+* Patch: Update the `/api/export-wav` route. Add logic to verify Pro tier status. Fix the download hang by setting the response headers to `Content-Type: audio/wav` and `Content-Disposition: attachment` to stream the binary buffer directly from the live kernel output.
+* Stop & Confirm: Halt and wait for user approval.
+
+STEP 2: Artist Lore Vault & Ephemeral Token Route
+* Action: Create the `/api/session/token` endpoint (Cloud Run/Node.js).
+* Logic: When called, fetch the user's persistent Artist Memory Vault (JSON state containing history, themes, past songs). Wrap this JSON into the system instructions and mint a 30-minute ephemeral token for the Gemini Multimodal Live API.
+* Stop & Confirm: Halt and wait for user approval.
+
+STEP 3: Hands-Free WebSocket Audio Integration
+* Action: Set up the client-side bidirectional WebSocket (`wss://`) connection to the Gemini Live API using the ephemeral token.
+* Logic: Route the device microphone (16kHz PCM) for push-to-live, hands-free conversational audio with native barge-in enabled.
+* Stop & Confirm: Halt and wait for user approval.
+
+STEP 4: Full-Screen iPad UI & Touch-to-Edit Scratchpad
+* Action: Build the frontend interface. It must be a sleek, dark-mode terminal layout optimized for full-screen iPad display.
+* Logic: Create the dynamic text canvas. As Gemini generates lyrics over the WebSocket, they must populate onto this canvas. The user must be able to tap any word or line to instantly edit the text mid-session.
+* Stop & Confirm: Halt and wait for user approval.
+
+STEP 5: Diff Snapshot & IP Provenance Engine
+* Action: Implement real-time Delta tracking on the text canvas.
+* Logic: Capture a state snapshot every time Gemini generates text and every time the user edits it. Run a diff comparison to calculate the exact human vs. AI contribution percentage. 
+* Final Lock: When the user finalizes the song, package the diff tree and final lyrics into the Kernel JSON block, and process it through the Morris Kernel HMAC-SHA256 signing protocol for legal IP provenance.
+* Stop & Confirm: Halt and wait for final user approval.
