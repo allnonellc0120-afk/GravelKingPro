@@ -314,7 +314,7 @@ title = "Morris Law Kernel v3.5 — Pitch Deck.pdf"
 id = "iiYSFhX1HITkxmD9bC3x9"
 uri = "file://.local/outputs/Morris-Law-Kernel-v3-5---Pitch-Deck.pptx"
 type = "slides"
-title = "Morris Law Kernel v3.5 — Pitch Deck (PPTX)"
+title = "Morris Law Kernel v3.5 — Pitch Deck.pptx"
 
 [[outputs]]
 id = "zpEiwRnYGV25ZXS1RAbOX"
@@ -823,3 +823,9 @@ uri = "file://pitch-files/cert-vocal.html"
 type = "text"
 title = "Certificate 3 of 3 — Vocal Performance"
 description = "\"You Used to Think I Was Superman\" — human vocal booth performance certificate."
+
+[[outputs]]
+id = "hNMwwqBM7Bj3RWZwJoZe3"
+uri = "file://.local/outputs/GravelKing-Pro---Studio--Proof---Release.pdf"
+type = "pdf"
+title = "GravelKing Pro — Studio, Proof & Release.pdf"
