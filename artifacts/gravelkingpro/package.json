@@ -79,6 +79,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^5.4.0",
+    "@stripe/stripe-js": "^8.9.0",
     "@clerk/react": "^6.13.1",
     "@clerk/themes": "^2.4.57",
     "fflate": "^0.8.3",

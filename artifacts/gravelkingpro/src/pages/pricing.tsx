@@ -11,6 +11,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@clerk/react";
 import { usePlanPrices, FALLBACK_PRICES, type PlanPrice } from "@/lib/usePlanPrices";
 import { trackFunnelEvent } from "@/lib/useAnalytics";
+import { StripePaymentForm } from "@/components/stripe-payment-form";
 import {
   getPlayBillingService,
   purchasePlaySubscription,
@@ -85,6 +86,7 @@ export default function Pricing() {
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo>(null);
+  const [paymentState, setPaymentState] = useState<{ clientSecret: string; intentType: "payment" | "setup"; planId: PlanId } | null>(null);
   const [unseeded, setUnseeded] = useState(false);
   const { isLoaded: authLoaded, isSignedIn: clerkSignedIn } = useAuth();
   // null = still loading (preserves the old tri-state semantics)
@@ -298,7 +300,7 @@ export default function Pricing() {
 
       const priceId = product.prices[0].id;
 
-      const checkoutRes = await fetch("/api/checkout", {
+      const checkoutRes = await fetch("/api/payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -316,14 +318,9 @@ export default function Pricing() {
         trackFunnelEvent("checkout_error", { plan: planId, error: errMsg.slice(0, 100) });
         throw new Error(errMsg);
       }
-      const { url } = await checkoutRes.json() as { url: string };
-      if (url) {
-        // Fire trial_started before leaving the page so the beacon has time to send.
-        if (trialEligible && (planId === "weekly" || planId === "monthly")) {
-          trackFunnelEvent("trial_started", { plan: planId });
-        }
-        window.location.href = url;
-      }
+      const payment = await checkoutRes.json() as { clientSecret?: string; intentType?: "payment" | "setup"; };
+      if (!payment.clientSecret || !payment.intentType) throw new Error("Stripe did not return an in-app payment session.");
+      setPaymentState({ clientSecret: payment.clientSecret, intentType: payment.intentType, planId });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";
       toast({ title: "Checkout error", description: message, variant: "destructive" });
@@ -356,6 +353,26 @@ export default function Pricing() {
               </p>
             </div>
           </div>
+        )}
+
+        {paymentState && (
+          <StripePaymentForm
+            clientSecret={paymentState.clientSecret}
+            intentType={paymentState.intentType}
+            onCancel={() => setPaymentState(null)}
+            onSuccess={async () => {
+              for (let attempt = 0; attempt < 10; attempt += 1) {
+                const status = await refreshSubscription();
+                if (status.tier) {
+                  setPaymentState(null);
+                  setSuccessInfo({ planId: paymentState.planId, ...PLAN_SUCCESS[paymentState.planId] });
+                  return;
+                }
+                await new Promise((resolve) => setTimeout(resolve, 750));
+              }
+              toast({ title: "Payment received", description: "Your subscription is syncing. Your access will unlock shortly." });
+            }}
+          />
         )}
 
         {/* Subscription success banner */}
