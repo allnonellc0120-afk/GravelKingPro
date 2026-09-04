@@ -30,6 +30,7 @@ import benchmarkRouter from "./benchmark";
 import referralsRouter from "./referrals";
 import investorsRouter from "./investors";
 import promoRouter from "./promos";
+import jaxRouter from "./jax";
 
 const router: IRouter = Router();
 
@@ -64,5 +65,6 @@ router.use(benchmarkRouter);
 router.use(referralsRouter);
 router.use(investorsRouter);
 router.use(promoRouter);
+router.use(jaxRouter);
 
 export default router;

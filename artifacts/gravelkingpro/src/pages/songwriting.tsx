@@ -150,6 +150,13 @@ export default function SongwritingStudio() {
   const [certificateOpen, setCertificateOpen] = useState(false);
   const [certificateBusy, setCertificateBusy] = useState(false);
   const canCertify = tier === "node_auditor" || isDeveloper;
+  const [prompt, setPrompt] = useState("");
+  const [response, setResponse] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState("");
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -275,6 +282,78 @@ export default function SongwritingStudio() {
     });
   };
 
+  const generate = async () => {
+    if (!prompt.trim() || generating) return;
+    setGenerating(true);
+    setGenerationError("");
+    try {
+      const result = await fetch("/api/jax/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await result.json() as { text?: string; error?: string; remaining?: number | null };
+      if (!result.ok) throw new Error(data.error || "JAX could not respond.");
+      setResponse(data.text || "");
+      setRemaining(data.remaining ?? null);
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : "JAX could not respond.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const toggleListening = () => {
+    const SpeechRecognition = (window as unknown as { SpeechRecognition?: new () => {
+      lang: string; interimResults: boolean; continuous: boolean;
+      start: () => void; stop: () => void;
+      onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+      onend: (() => void) | null;
+    }; webkitSpeechRecognition?: new () => InstanceType<NonNullable<Window["SpeechRecognition"]>> }).SpeechRecognition
+      ?? (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setGenerationError("Voice drafting is not supported in this browser. You can still type your prompt.");
+      return;
+    }
+    if (listening) {
+      setListening(false);
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results).map((result) => result[0].transcript).join(" ");
+      setPrompt((current) => `${current}${current ? " " : ""}${transcript}`);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.start();
+    setListening(true);
+  };
+
+  const speakResponse = () => {
+    if (!response || !("speechSynthesis" in window)) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(response);
+    utterance.onend = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+    setSpeaking(true);
+  };
+
+  const pushToCanvas = () => {
+    if (!response) return;
+    const target = draft.blocks[0];
+    if (!target) return;
+    updateBlock(target.id, response);
+    setResponse("");
+  };
+
   return (
     <Layout hideChrome>
       <div className="min-h-screen bg-[#090a0c] text-foreground">
@@ -322,6 +401,34 @@ export default function SongwritingStudio() {
                   <Input aria-label="Key" value={draft.key} onChange={(event) => updateDraft((current) => ({ ...current, key: event.target.value }))} className="w-20 border-white/10 bg-white/[0.03]" placeholder="Key" />
                 </div>
               </div>
+
+              <section className="mb-6 rounded-2xl border border-violet-400/25 bg-violet-400/[0.06] p-4 sm:p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-300">Studio prompt</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Ask JAX for a lyric idea, hook, rewrite, rhyme, or section.</p>
+                  </div>
+                  {remaining !== null && <span className="text-xs text-muted-foreground">{remaining} free prompts left today</span>}
+                </div>
+                <div className="flex items-end gap-2">
+                  <Textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void generate(); }} placeholder="Try: Write a vulnerable pre-chorus about leaving the porch light on…" className="min-h-20 resize-none border-white/10 bg-black/20 focus-visible:ring-violet-400" />
+                  <Button type="button" variant="outline" onClick={toggleListening} className={listening ? "border-rose-400 text-rose-300" : "border-white/10"} aria-label={listening ? "Stop voice drafting" : "Start voice drafting"}>{listening ? "●" : "Mic"}</Button>
+                  <Button type="button" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white hover:bg-violet-400">{generating ? "Writing…" : "Write"}</Button>
+                </div>
+                {generationError && <p className="mt-3 text-sm text-rose-300">{generationError}</p>}
+                {response && (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-[#0d0e12] p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300">JAX response</span>
+                      <div className="flex gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={speakResponse} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button>
+                        <Button type="button" size="sm" onClick={pushToCanvas} className="bg-emerald-500 text-black hover:bg-emerald-400">Push to Canvas</Button>
+                      </div>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm leading-7 text-foreground/90">{response}</p>
+                  </div>
+                )}
+              </section>
 
               <div className="space-y-4">
                 {draft.blocks.map((block, index) => (
