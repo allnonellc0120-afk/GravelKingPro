@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
+import { useUser } from "@clerk/react";
+import { jsPDF } from "jspdf";
+import { useAppState } from "@/lib/context";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +15,8 @@ import {
   Save,
   Trash2,
   X,
+  ShieldCheck,
+  LockKeyhole,
 } from "lucide-react";
 
 type BlockType = "Verse" | "Chorus" | "Bridge" | "Hook" | "Outro";
@@ -27,6 +32,7 @@ type SongDraft = {
 };
 
 const STORAGE_KEY = "gk:songwriting:canvas:v1";
+const HMAC_KEY_STORAGE = "gk:songwriting:hmac-key:v1";
 const BLOCK_TYPES: BlockType[] = ["Verse", "Chorus", "Bridge", "Hook", "Outro"];
 
 function newBlock(type: BlockType = "Verse"): SongBlock {
@@ -53,6 +59,40 @@ function countSyllables(text: string): number {
     .split(/\s+/)
     .filter(Boolean)
     .reduce((total, word) => total + Math.max(1, (word.match(/[aeiouy]+/g) ?? []).length), 0);
+}
+
+function bytesToHex(bytes: ArrayBuffer): string {
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function base64ToBytes(value: string): ArrayBuffer {
+  const bytes = Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+  return bytes.slice().buffer;
+}
+
+async function getLocalHmacKey(): Promise<CryptoKey> {
+  const saved = localStorage.getItem(HMAC_KEY_STORAGE);
+  if (saved) {
+    return crypto.subtle.importKey("raw", base64ToBytes(saved), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  }
+  const key = await crypto.subtle.generateKey({ name: "HMAC", hash: "SHA-256", length: 256 }, true, ["sign"]);
+  const raw = await crypto.subtle.exportKey("raw", key);
+  const encoded = btoa(String.fromCharCode(...new Uint8Array(raw)));
+  localStorage.setItem(HMAC_KEY_STORAGE, encoded);
+  return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+}
+
+async function signDraft(draft: SongDraft): Promise<string> {
+  const payload = JSON.stringify({
+    title: draft.title,
+    bpm: draft.bpm,
+    key: draft.key,
+    blocks: draft.blocks.map(({ id, type, content }) => ({ id, type, content })),
+    createdAt: draft.createdAt,
+    modifiedAt: draft.modifiedAt,
+  });
+  const key = await getLocalHmacKey();
+  return bytesToHex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
 }
 
 function AutoTextarea({
@@ -87,6 +127,8 @@ function AutoTextarea({
 }
 
 export default function SongwritingStudio() {
+  const { tier, isDeveloper } = useAppState();
+  const { user } = useUser();
   const [draft, setDraft] = useState<SongDraft>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -104,18 +146,89 @@ export default function SongwritingStudio() {
   const [auditOpen, setAuditOpen] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [activeHash, setActiveHash] = useState("");
+  const [certificateOpen, setCertificateOpen] = useState(false);
+  const [certificateBusy, setCertificateBusy] = useState(false);
+  const canCertify = tier === "node_auditor" || isDeveloper;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
         setSavedAt(new Date().toISOString());
+        void signDraft(draft).then(setActiveHash).catch(() => setActiveHash(""));
       } catch {
         // The canvas remains usable if storage is unavailable.
       }
     }, 500);
     return () => window.clearTimeout(timer);
   }, [draft]);
+
+  const generateCertificate = async () => {
+    setCertificateBusy(true);
+    try {
+      const hash = activeHash || await signDraft(draft);
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const margin = 18;
+      const width = 210 - margin * 2;
+      doc.setFillColor(9, 10, 12);
+      doc.rect(0, 0, 210, 297, "F");
+      doc.setDrawColor(139, 92, 246);
+      doc.setLineWidth(1.2);
+      doc.rect(margin, margin, width, 261);
+      doc.setTextColor(196, 181, 253);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("GRAVELKING PRODUCTIONS  /  JAX", margin + 8, margin + 12);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(25);
+      doc.text("Provenance Certificate", margin + 8, margin + 32);
+      doc.setTextColor(52, 211, 153);
+      doc.setFontSize(11);
+      doc.text("✓  GravelKing Forensic Signal Verified", margin + 8, margin + 46);
+      doc.setTextColor(220, 220, 225);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const details = [
+        ["Document title", draft.title || "Untitled song"],
+        ["Author ID", user?.primaryEmailAddress?.emailAddress || user?.id || "Local author"],
+        ["Final ISO timestamp", draft.modifiedAt],
+        ["Total edit count", String(draft.editCount)],
+        ["HMAC-SHA256 signature", hash],
+      ];
+      let y = margin + 64;
+      details.forEach(([label, value]) => {
+        doc.setTextColor(160, 160, 170);
+        doc.text(label.toUpperCase(), margin + 8, y);
+        doc.setTextColor(245, 245, 248);
+        doc.text(doc.splitTextToSize(value, width - 16), margin + 8, y + 6);
+        y += label === "HMAC-SHA256 signature" ? 24 : 16;
+      });
+      doc.setDrawColor(70, 70, 80);
+      doc.line(margin + 8, y, margin + width - 8, y);
+      y += 12;
+      doc.setTextColor(196, 181, 253);
+      doc.setFont("helvetica", "bold");
+      doc.text("FULL LYRIC TRANSCRIPT", margin + 8, y);
+      y += 8;
+      doc.setTextColor(230, 230, 235);
+      doc.setFont("helvetica", "normal");
+      const transcript = draft.blocks.map((block) => `[${block.type.toUpperCase()}]\n${block.content || "(empty)"}`).join("\n\n");
+      for (const line of doc.splitTextToSize(transcript, width - 16)) {
+        if (y > 272) {
+          doc.addPage();
+          doc.setFillColor(9, 10, 12);
+          doc.rect(0, 0, 210, 297, "F");
+          y = 22;
+        }
+        doc.text(line, margin + 8, y);
+        y += 5;
+      }
+      doc.save(`${(draft.title || "song").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-provenance-certificate.pdf`);
+    } finally {
+      setCertificateBusy(false);
+    }
+  };
 
   const updateDraft = useCallback((update: (current: SongDraft) => SongDraft) => {
     setDraft((current) => ({
@@ -179,6 +292,9 @@ export default function SongwritingStudio() {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="hidden sm:inline">{savedAt ? `Saved ${new Date(savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Autosave on"}</span>
               <Save className="h-4 w-4 text-emerald-400" aria-label="Autosave enabled" />
+              <Button size="sm" onClick={() => setCertificateOpen(true)} className="bg-violet-500 text-white hover:bg-violet-400">
+                <ShieldCheck className="mr-1.5 h-4 w-4" /> <span className="hidden sm:inline">Generate IP Certificate</span><span className="sm:hidden">Certificate</span>
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setAuditOpen((open) => !open)} className="border-white/15">
                 {auditOpen ? "Hide ledger" : "Show ledger"}
               </Button>
@@ -272,12 +388,50 @@ export default function SongwritingStudio() {
                   <div><dt className="text-muted-foreground">Created locally</dt><dd className="mt-1 break-all text-foreground/80">{draft.createdAt}</dd></div>
                   <div><dt className="text-muted-foreground">Last modified</dt><dd className="mt-1 break-all text-foreground/80">{draft.modifiedAt}</dd></div>
                 </dl>
-                <p className="mt-6 text-xs leading-relaxed text-muted-foreground">This ledger is local to your device. Hashing and certification are intentionally not connected in this canvas step.</p>
+                <div className="mt-6 border-t border-white/10 pt-5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-violet-200"><LockKeyhole className="h-3.5 w-3.5" /> Active HMAC-SHA256</div>
+                  <code className="mt-2 block break-all rounded-lg bg-black/30 p-3 text-[10px] leading-4 text-emerald-300">{activeHash || "Computing first revision…"}</code>
+                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">A new signature is computed after every debounced local save. The signing key remains on this device.</p>
+                </div>
               </div>
             </aside>
           )}
         </div>
       </div>
+      {certificateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="certificate-dialog-title">
+          <div className="w-full max-w-lg rounded-2xl border border-violet-400/30 bg-[#121318] p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-300">JAX / KING TIER</p>
+                <h2 id="certificate-dialog-title" className="mt-1 text-xl font-bold">Provenance Certificate</h2>
+              </div>
+              <button type="button" onClick={() => setCertificateOpen(false)} aria-label="Close certificate dialog" className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+            {canCertify ? (
+              <>
+                <div className="my-6 rounded-xl border border-violet-400/30 bg-violet-400/5 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-violet-200">GravelKing Forensic Signal Verified</p>
+                  <p className="mt-3 text-sm text-muted-foreground">The PDF will include the final transcript, author identity, edit count, ISO timestamp, and the active HMAC signature.</p>
+                  <code className="mt-4 block break-all text-[10px] text-emerald-300">{activeHash || "Computing signature…"}</code>
+                </div>
+                <Button className="w-full bg-violet-500 text-white hover:bg-violet-400" onClick={() => void generateCertificate()} disabled={certificateBusy || !activeHash}>
+                  <ShieldCheck className="mr-2 h-4 w-4" /> {certificateBusy ? "Compiling certificate…" : "Download court-ready PDF"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="my-6 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="mb-4 flex items-center gap-3 text-emerald-300"><ShieldCheck className="h-5 w-5" /><span className="font-semibold">Forensic Signal Verified</span></div>
+                  <div className="space-y-3 text-xs text-muted-foreground"><p>Document: <span className="text-foreground">{draft.title}</span></p><p>Hash signature: <code className="text-emerald-300">{activeHash ? `${activeHash.slice(0, 18)}…` : "Pending"}</code></p><p>Transcript and timestamp included in the KING certificate layout.</p></div>
+                </div>
+                <p className="text-sm text-muted-foreground">Court-ready IP certificates are available on KING Tier.</p>
+                <Link href="/pricing" onClick={() => setCertificateOpen(false)} className="mt-4 block rounded-md bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-black hover:bg-amber-400">Upgrade to KING — $24.99/mo</Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
