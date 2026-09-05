@@ -182,39 +182,6 @@ export default function Pricing() {
       .catch(() => { /* ignore — banner is dev-only best-effort */ });
   }, []);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkout = params.get("checkout");
-
-    if (checkout === "success") {
-      trackFunnelEvent("checkout_returned", { outcome: "success" });
-      trackEvent("checkout_completed", { location: "pricing_page" });
-      const planParam = params.get("plan") as PlanId | null;
-      window.history.replaceState({}, "", "/pricing");
-      refreshSubscription().then(({ tier: freshTier }) => {
-        // Prefer the authoritative tier from the subscription status API.
-        // Fall back to the URL param (passed by the backend in success_url)
-        // in the rare case the webhook hasn't synced yet.
-        const resolvedId: PlanId =
-          freshTier && freshTier in PLAN_SUCCESS
-            ? (freshTier as PlanId)
-            : planParam && planParam in PLAN_SUCCESS
-              ? planParam
-              : "monthly";
-        setSuccessInfo({ planId: resolvedId, ...PLAN_SUCCESS[resolvedId] });
-      }).catch(() => {
-        const fallbackId: PlanId =
-          planParam && planParam in PLAN_SUCCESS ? planParam : "monthly";
-        setSuccessInfo({ planId: fallbackId, ...PLAN_SUCCESS[fallbackId] });
-      });
-    } else if (checkout === "cancelled") {
-      const planParam = params.get("plan") as PlanId | null;
-      trackFunnelEvent("checkout_returned", { outcome: "cancelled" });
-      trackFunnelEvent("checkout_abandoned", { plan: planParam ?? "unknown" });
-      toast({ title: "Checkout cancelled", description: "No charge was made.", variant: "destructive" });
-      window.history.replaceState({}, "", "/pricing");
-    }
-  }, [location]);
 
   // After sign-in returns to /pricing?plan=X, resume the checkout the visitor
   // already chose — one less click between intent and Stripe. Waits for Play
@@ -226,7 +193,6 @@ export default function Pricing() {
     // failed to load) — auto-resuming into Stripe there breaks Play policy.
     if (!playBillingChecked || playEnvDetected) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout")) return; // success/cancelled flows own this URL
     const planParam = params.get("plan") as PlanId | null;
     if (!planParam || !(planParam in PLAN_PRODUCT_NAMES)) return;
     autoResumeRef.current = true;
