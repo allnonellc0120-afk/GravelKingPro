@@ -9,8 +9,11 @@
  *   - adaptive_mode off/bass_aware combined with the sidechain values
  *   - malformed values (sidechainFreq=NaN, intensity=-1) → 400, never 500
  *
- * MLK_KERNEL_URL is cleared so the LOCAL Python worker path (the code under
- * test) runs deterministically — no dependency on the Cloud Run service.
+ * MLK_KERNEL_URL is saved and then cleared so the LOCAL Python worker path
+ * (the code under test) runs deterministically. When the saved URL is
+ * reachable, the same matrix is also posted directly to the Cloud Run
+ * /master endpoint and its measurement headers are compared with a direct
+ * local-worker invocation.
  */
 import http from "node:http";
 import { execFile } from "node:child_process";
@@ -19,6 +22,8 @@ import { writeFile, unlink, symlink, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
+
+const configuredRemoteKernelUrl = process.env.MLK_KERNEL_URL?.replace(/\/$/, "");
 
 // Force the local Python worker BEFORE the app/route modules load.
 delete process.env.MLK_KERNEL_URL;
@@ -42,6 +47,25 @@ function check(label: string, cond: boolean, detail = ""): void {
     console.error(`  ✗ ${label}${detail ? ` — ${detail}` : ""}`);
   }
 }
+
+type MatrixCase = {
+  label: string;
+  sidechainFilter: "none" | "highpass" | "lowpass";
+  adaptiveMode: "off" | "bass_aware";
+  autoThreshold: boolean;
+};
+
+const SIDECHAIN_MATRIX: MatrixCase[] = [
+  { label: "highpass + bass_aware + auto_threshold=true", sidechainFilter: "highpass", adaptiveMode: "bass_aware", autoThreshold: true },
+  { label: "lowpass + off + auto_threshold=false", sidechainFilter: "lowpass", adaptiveMode: "off", autoThreshold: false },
+  { label: "none + bass_aware + auto_threshold=true", sidechainFilter: "none", adaptiveMode: "bass_aware", autoThreshold: true },
+];
+
+type LocalWorkerStats = {
+  scFreqUsed: number;
+  detectedRmsDb: number;
+  appliedThresholdDb: number;
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function makeTrueStereoWav(seconds = 2): Promise<Buffer> {
@@ -88,6 +112,78 @@ function buildForm(fields: Record<string, string>, wav: Buffer): FormData {
   return fd;
 }
 
+function buildRemoteForm(fields: Record<string, string>, wav: Buffer): FormData {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+  fd.append("audio", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "in.wav");
+  return fd;
+}
+
+function remoteFields(c: MatrixCase, overrides: Record<string, string> = {}): Record<string, string> {
+  return {
+    preset: "natural_body",
+    intensity: "75",
+    sidechain_filter: c.sidechainFilter,
+    sidechain_freq: "160",
+    stereo_link: "true",
+    adaptive_mode: c.adaptiveMode,
+    auto_threshold: c.autoThreshold ? "true" : "false",
+    auto_offset: "-16",
+    target_lufs: "-14",
+    ceiling_db: "-0.8",
+    ...overrides,
+  };
+}
+
+async function runLocalWorkerStats(wav: Buffer, c: MatrixCase): Promise<LocalWorkerStats> {
+  const id = randomUUID();
+  const inputPath = `/tmp/gk_mtest_remote_parity_${id}.wav`;
+  const outputPath = `/tmp/gk_mtest_remote_parity_${id}.out.wav`;
+  const workerPath = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
+  await writeFile(inputPath, wav);
+  try {
+    const { stdout } = await execFileAsync("python3", [
+      workerPath,
+      "--input", inputPath,
+      "--output", outputPath,
+      "--preset", "natural_body",
+      "--intensity", "75",
+      "--sidechain-filter", c.sidechainFilter,
+      "--sidechain-freq", "160",
+      "--stereo-link", "true",
+      "--adaptive-mode", c.adaptiveMode,
+      "--auto-threshold", c.autoThreshold ? "true" : "false",
+      "--auto-offset", "-16",
+      "--target-lufs", "-14",
+      "--ceiling-db", "-0.8",
+    ], { maxBuffer: 10 * 1024 * 1024, timeout: 120_000 });
+    const parsed = JSON.parse(stdout.trim().split("\n").pop() ?? "{}") as Partial<LocalWorkerStats>;
+    return {
+      scFreqUsed: Number(parsed.scFreqUsed),
+      detectedRmsDb: Number(parsed.detectedRmsDb),
+      appliedThresholdDb: Number(parsed.appliedThresholdDb),
+    };
+  } finally {
+    await unlink(inputPath).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+  }
+}
+
+async function isRemoteKernelReachable(base: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`healthz HTTP ${res.status}`);
+    return true;
+  } catch (err) {
+    console.warn(
+      `[remote parity] MLK_KERNEL_URL is configured but unreachable; skipping Cloud Run checks: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return false;
+  }
+}
+
 /**
  * The bundled route resolves the Python worker relative to its own module
  * (`../python/mlk_master.py`). The test bundle lives in dist-test/, so that
@@ -124,18 +220,7 @@ async function main(): Promise<void> {
     // ── 1. Success matrix: sidechain_filter × adaptive_mode × auto_threshold ──
     // Covers all three sidechain_filter values, both adaptive modes, and both
     // auto-threshold paths across three real kernel runs.
-    const matrix: Array<{
-      label: string;
-      sidechainFilter: "none" | "highpass" | "lowpass";
-      adaptiveMode: "off" | "bass_aware";
-      autoThreshold: boolean;
-    }> = [
-      { label: "highpass + bass_aware + auto_threshold=true",  sidechainFilter: "highpass", adaptiveMode: "bass_aware", autoThreshold: true  },
-      { label: "lowpass + off + auto_threshold=false",         sidechainFilter: "lowpass",  adaptiveMode: "off",        autoThreshold: false },
-      { label: "none + bass_aware + auto_threshold=true",      sidechainFilter: "none",     adaptiveMode: "bass_aware", autoThreshold: true  },
-    ];
-
-    for (const [i, c] of matrix.entries()) {
+    for (const [i, c] of SIDECHAIN_MATRIX.entries()) {
       console.log(`\n[${i + 1}] POST /api/kernel/master — ${c.label}`);
       const res = await fetch(`${base}/api/kernel/master`, {
         method: "POST",
@@ -170,8 +255,72 @@ async function main(): Promise<void> {
       await assertDecodableWav(c.label, buf);
     }
 
-    // ── 2. Malformed values → 400, never 500 ──────────────────────────────────
-    console.log("\n[4] Malformed values → 400");
+    // ── 2. Optional Cloud Run parity check ─────────────────────────────────────
+    // The production API currently uses the local worker, so this direct
+    // service check is deliberately opt-in. It never makes ordinary CI depend
+    // on network access, but catches a deployed Cloud Run contract drift when
+    // MLK_KERNEL_URL is configured and healthy.
+    if (configuredRemoteKernelUrl && await isRemoteKernelReachable(configuredRemoteKernelUrl)) {
+      const remoteHeaders: Record<string, string> = {};
+      const remoteApiKey = process.env.REMOTE_KERNEL_API_KEY;
+      if (remoteApiKey) remoteHeaders["x-api-key"] = remoteApiKey;
+
+      console.log("\n[4] Cloud Run /master parity");
+      for (const c of SIDECHAIN_MATRIX) {
+        const expected = await runLocalWorkerStats(stereoWav, c);
+        const res = await fetch(`${configuredRemoteKernelUrl}/master`, {
+          method: "POST",
+          headers: remoteHeaders,
+          body: buildRemoteForm(remoteFields(c), stereoWav),
+          signal: AbortSignal.timeout(120_000),
+        });
+        const detail = res.status === 200 ? "" : (await res.text()).slice(0, 240);
+        check(`[remote] ${c.label}: HTTP 200`, res.status === 200, `got ${res.status} ${detail}`);
+        if (res.status !== 200) continue;
+
+        const actualScFreq = parseFloat(res.headers.get("x-mlk-scfreqused") ?? "");
+        const actualRms = parseFloat(res.headers.get("x-mlk-detectedrmsdb") ?? "");
+        const actualThreshold = parseFloat(res.headers.get("x-mlk-appliedthresholddb") ?? "");
+        check(
+          `[remote] ${c.label}: scFreqUsed matches local worker`,
+          Number.isFinite(actualScFreq) && Math.abs(actualScFreq - expected.scFreqUsed) < 0.05,
+          `remote=${actualScFreq} local=${expected.scFreqUsed}`,
+        );
+        check(
+          `[remote] ${c.label}: detectedRmsDb matches local worker`,
+          Number.isFinite(actualRms) && Math.abs(actualRms - expected.detectedRmsDb) < 0.05,
+          `remote=${actualRms} local=${expected.detectedRmsDb}`,
+        );
+        check(
+          `[remote] ${c.label}: appliedThresholdDb matches local worker`,
+          Number.isFinite(actualThreshold) && Math.abs(actualThreshold - expected.appliedThresholdDb) < 0.05,
+          `remote=${actualThreshold} local=${expected.appliedThresholdDb}`,
+        );
+        await assertDecodableWav(`[remote] ${c.label}`, Buffer.from(await res.arrayBuffer()));
+      }
+
+      const malformedRemote: Array<{ label: string; overrides: Record<string, string> }> = [
+        { label: "sidechain_filter=invalid", overrides: { sidechain_filter: "invalid" } },
+        { label: "adaptive_mode=invalid", overrides: { adaptive_mode: "invalid" } },
+        { label: "sidechain_freq=NaN", overrides: { sidechain_freq: "NaN" } },
+        { label: "intensity=-1", overrides: { intensity: "-1" } },
+      ];
+      for (const malformed of malformedRemote) {
+        const res = await fetch(`${configuredRemoteKernelUrl}/master`, {
+          method: "POST",
+          headers: remoteHeaders,
+          body: buildRemoteForm(remoteFields(SIDECHAIN_MATRIX[0], malformed.overrides), stereoWav),
+          signal: AbortSignal.timeout(120_000),
+        });
+        const detail = res.status === 400 ? "" : (await res.text()).slice(0, 240);
+        check(`[remote] ${malformed.label}: HTTP 400 (never 500)`, res.status === 400, `got ${res.status} ${detail}`);
+      }
+    } else if (!configuredRemoteKernelUrl) {
+      console.log("\n[4] Cloud Run /master parity skipped (MLK_KERNEL_URL is not configured)");
+    }
+
+    // ── 3. Malformed values → 400, never 500 ──────────────────────────────────
+    console.log("\n[5] Malformed values → 400");
     {
       const res = await fetch(`${base}/api/kernel/master`, {
         method: "POST",

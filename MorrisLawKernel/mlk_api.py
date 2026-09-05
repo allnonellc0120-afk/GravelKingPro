@@ -21,6 +21,7 @@ request must carry a matching `x-api-key` header.
 import os
 import tempfile
 import traceback
+import math
 
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -67,6 +68,13 @@ async def master(
         raise HTTPException(status_code=400, detail="sidechain_filter must be none|highpass|lowpass")
     if adaptive_mode not in ("off", "bass_aware"):
         raise HTTPException(status_code=400, detail="adaptive_mode must be off|bass_aware")
+    if not math.isfinite(intensity) or intensity < 0 or intensity > 100:
+        raise HTTPException(status_code=400, detail="intensity must be between 0 and 100")
+    if not math.isfinite(sidechain_freq) or sidechain_freq <= 0:
+        raise HTTPException(status_code=400, detail="sidechain_freq must be a positive frequency")
+    # Match the Node route's supported detector band. Values inside the
+    # positive domain are clamped; malformed/non-positive values are rejected.
+    sidechain_freq = float(np.clip(sidechain_freq, 20, 2000))
 
     from scipy.io import wavfile
 
@@ -92,7 +100,7 @@ async def master(
         kernel = MorrisLawKernel(sample_rate=sr)
         link = stereo_link.lower() != "false"
         auto = auto_threshold.lower() == "true"
-        intensity = float(np.clip(intensity, 0, 100))
+        intensity = float(intensity)
 
         # Observability from the same post-EQ/saturation signal the compressor sees
         S = intensity / 100.0
