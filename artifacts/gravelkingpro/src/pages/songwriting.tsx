@@ -55,6 +55,21 @@ const DEFAULT_JAX_VOICE_PRESETS: JaxVoicePreset[] = [
   ["pqHfZKP75CvOlQylNhV4", "JAX Classic Vintage"],
 ] as const;
 
+function mergeJaxVoicePresets(
+  voices: Array<{ voiceId?: string; label?: string }> | undefined,
+): JaxVoicePreset[] {
+  if (!voices?.length) return DEFAULT_JAX_VOICE_PRESETS;
+
+  const labelsById = new Map(
+    voices
+      .filter((voice): voice is { voiceId: string; label: string } => Boolean(voice.voiceId?.trim() && voice.label?.trim()))
+      .map((voice) => [voice.voiceId, voice.label] as const),
+  );
+  return DEFAULT_JAX_VOICE_PRESETS.map(([voiceId, defaultLabel]) => [
+    voiceId,
+    labelsById.get(voiceId) ?? defaultLabel,
+  ] as const);
+}
 function newBlock(type: BlockType = "Verse"): SongBlock {
   return { id: crypto.randomUUID(), type, content: "" };
 }
@@ -221,15 +236,21 @@ export default function SongwritingStudio() {
   }, [selectedVoice]);
 
   useEffect(() => {
+    if (!jaxVoicePresets.some(([voiceId]) => voiceId === selectedVoice)) {
+      setSelectedVoice(jaxVoicePresets[0]?.[0] ?? DEFAULT_JAX_VOICE_PRESETS[0][0]);
+    }
+  }, [jaxVoicePresets, selectedVoice]);
+
+  useEffect(() => {
     let cancelled = false;
     void fetch("/api/jax/voices", { credentials: "include" })
       .then(async (result) => {
         if (!result.ok) throw new Error("Voice metadata unavailable");
-        return result.json() as Promise<{ voices?: Array<{ voiceId: string; label: string }> }>;
+        return result.json() as Promise<{ voices?: Array<{ voiceId?: string; label?: string }> }>;
       })
       .then((data) => {
         if (!cancelled && data.voices?.length) {
-          setJaxVoicePresets(data.voices.map(({ voiceId, label }) => [voiceId, label]));
+          setJaxVoicePresets(mergeJaxVoicePresets(data.voices));
         }
       })
       .catch(() => {
