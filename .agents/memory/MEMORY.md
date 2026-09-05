@@ -80,6 +80,7 @@
 - [Stripe idempotency races](stripe-idempotency-races.md) — stable keys need bounded retry for in-flight conflicts; customer relinking must remain CAS-protected
 - [Package firewall blocked packages](package-firewall-block.md) — deploy installs 403 on some npm packages (all `tar` versions); fix by vendoring the tgz + pnpm file: override
 - [Cert document paywall](cert-paywall.md) — stamping free, doc owner-only+unlock-gated; $1.99 or 20/30d Studio allowance; Express 5: register `/:id.pdf` route BEFORE `/:id` or it's dead
+- [Production certificate verification](production-certificate-verification.md) — generated cert proof requires global ACRCloud no_match; local_no_match/unavailable intentionally produces no cert
 - [API test suite flock + lyric-owner cookie rule](api-test-suite-flock.md) — test script must stay flock-wrapped (dist-test races); legacy lyric rows never grant access via gk_session cookie
 - [JAX route faked responses](jax-route-faked-responses.md) — generation routes must call the live model; never canned placeholder strings
 - [Stripe wallet domain](stripe-wallet-domain.md) — embedded Apple/Google Pay need a validated Payment Method Domain + live .well-known association file; live domain is gravelkingpro.com (.it.com is dead)
