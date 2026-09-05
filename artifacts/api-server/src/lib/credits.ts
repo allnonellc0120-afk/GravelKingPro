@@ -5,24 +5,22 @@ import { db, creditTransactionsTable, type User, usersTable } from "@workspace/d
 import { storage } from "../storage";
 
 export const CREDIT_COSTS = {
-  song: 4,
-  master: 4,
-  certificate: 4,
+  song: 20,
+  master: 75,
+  certificate: 0,
 } as const;
 
 export const CREDIT_PACKS = [
-  { id: "starter", name: "Starter", credits: 10, amountCents: 499, description: "10 credits for occasional takes" },
-  { id: "artist", name: "Artist", credits: 25, amountCents: 999, description: "25 credits for your next release" },
-  { id: "studio", name: "Studio", credits: 60, amountCents: 1999, description: "60 credits for a full project" },
+  { id: "starter", name: "Starter", credits: 500, amountCents: 999, description: "500 credits for trying the workflow" },
+  { id: "artist", name: "Artist", credits: 1250, amountCents: 1999, description: "1,250 credits for a release project" },
+  { id: "studio", name: "Studio", credits: 2500, amountCents: 3499, description: "2,500 credits — less than a monthly plan" },
 ] as const;
 
-// One monthly allotment covers ten four-credit actions, matching the paid
-// plan's 10-WAV-download promise. King keeps the same predictable baseline;
-// its additional value remains the advanced studio features and certificate
-// access.
+// Subscription credits are a hard reset, not a rollover balance. The webhook
+// resets the wallet to this exact amount at each paid billing renewal.
 export const MONTHLY_CREDITS = {
-  pro: 40,
-  king: 40,
+  pro: 800,
+  king: 2500,
 } as const;
 
 export type CreditSpendKind = "song" | "master" | "certificate";
@@ -128,5 +126,32 @@ export async function grantCredits(
       .where(eq(usersTable.id, userId))
       .returning({ creditsBalance: usersTable.creditsBalance });
     return { granted: true, balance: updated?.creditsBalance ?? 0 };
+  });
+}
+
+/** Replace a subscription wallet at renewal; unused credits never roll over. */
+export async function resetCredits(
+  userId: string,
+  amount: number,
+  kind: string,
+  reference: string,
+): Promise<{ reset: boolean; balance: number }> {
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Credit reset amount must be a positive integer.");
+  return db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(creditTransactionsTable)
+      .values({ userId, delta: amount, kind, reference })
+      .onConflictDoNothing()
+      .returning({ id: creditTransactionsTable.id });
+    if (inserted.length === 0) {
+      const [current] = await tx.select({ creditsBalance: usersTable.creditsBalance }).from(usersTable).where(eq(usersTable.id, userId));
+      return { reset: false, balance: current?.creditsBalance ?? 0 };
+    }
+    const [updated] = await tx
+      .update(usersTable)
+      .set({ creditsBalance: amount })
+      .where(eq(usersTable.id, userId))
+      .returning({ creditsBalance: usersTable.creditsBalance });
+    return { reset: true, balance: updated?.creditsBalance ?? amount };
   });
 }

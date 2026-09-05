@@ -31,15 +31,15 @@ const CATALOG: Array<{
     description:
       "Pro access to mastering and converter, with unlimited MP3 exports and 10 WAV exports per rolling 7 days.",
     tier: "pro",
-    unitAmount: 999,
-    interval: "month",
+    unitAmount: 899,
+    interval: "week",
   },
   {
     name: "GravelKing Studio",
     description:
       "Everything in Pro plus King access, 40 WAV exports per rolling 30 days, and unlimited included certificate unlocks.",
     tier: "king",
-    unitAmount: 2499,
+    unitAmount: 1999,
     interval: "month",
   },
   {

@@ -97,7 +97,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
             <h2 className="text-xl font-bold">Credits wallet</h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pay per song, master, or certificate instead of committing to a plan.
+             Buy credits when you want to generate or master without subscribing.
           </p>
         </div>
         <div className="rounded-lg border border-sky-400/30 bg-sky-400/10 px-4 py-2 text-right">
@@ -128,9 +128,9 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
       </div>
 
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-        <span>Song generation: <strong className="text-foreground">4 credits</strong></span>
-        <span>Full master: <strong className="text-foreground">4 credits</strong></span>
-        <span>Certificate: <strong className="text-foreground">4 credits</strong> ($1.99 alternative)</span>
+         <span>Song generation: <strong className="text-foreground">20 credits</strong></span>
+         <span>Master + download: <strong className="text-foreground">75 credits</strong></span>
+         <span>Certificate: <strong className="text-foreground">Free</strong> with Pro</span>
       </div>
 
       {payment && (

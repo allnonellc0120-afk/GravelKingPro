@@ -16,21 +16,20 @@ import type Stripe from 'stripe';
 const stripeRouter = Router();
 
 const CHECKOUT_CATALOG = {
-  "GravelKing Weekly": { plan: "pro", unitAmount: 999 },
-  "GravelKing Studio": { plan: "king", unitAmount: 2499 },
-  "Node Auditor": { plan: "node_auditor", unitAmount: 24950 },
+  "GravelKing Weekly": { plan: "pro", unitAmount: 899, interval: "week" },
+  "GravelKing Studio": { plan: "king", unitAmount: 1999, interval: "month" },
+  "Node Auditor": { plan: "node_auditor", unitAmount: 24950, interval: "month" },
 } as const;
 
 /** Never trust a client-selected tier or arbitrary product price. */
 async function canonicalPlanForPrice(stripe: Stripe, priceId: string): Promise<"pro" | "king" | "node_auditor" | null> {
   const price = await stripe.prices.retrieve(priceId);
-  // Legacy weekly prices remain active only so existing subscriptions continue
-  // billing. They are never valid for a newly-created subscription.
-  if (!price.active || price.currency !== "usd" || price.recurring?.interval !== "month") return null;
   const productId = typeof price.product === "string" ? price.product : price.product.id;
   const product = await stripe.products.retrieve(productId);
   const approved = CHECKOUT_CATALOG[product.name as keyof typeof CHECKOUT_CATALOG];
-  if (!approved || price.unit_amount !== approved.unitAmount) return null;
+  if (!approved || !price.active || price.currency !== "usd" ||
+      price.recurring?.interval !== approved.interval ||
+      price.unit_amount !== approved.unitAmount) return null;
   const sameNameProducts: Stripe.Product[] = [];
   for await (const candidate of stripe.products.search({
     query: `name:'${product.name}' AND active:'true'`,
@@ -52,7 +51,7 @@ async function canonicalPlanForPrice(stripe: Stripe, priceId: string): Promise<"
     if (
       candidate.currency === "usd" &&
       candidate.unit_amount === approved.unitAmount &&
-      candidate.recurring?.interval === "month"
+      candidate.recurring?.interval === approved.interval
     ) exactPrices.push(candidate);
   }
   const canonicalPrice = exactPrices.sort(
@@ -85,7 +84,7 @@ stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
         ? prices.data.filter((p) =>
             p.currency === "usd" &&
             p.unit_amount === approved.unitAmount &&
-            p.recurring?.interval === "month"
+            p.recurring?.interval === approved.interval
           ).sort((a, b) => a.created - b.created || a.id.localeCompare(b.id)).slice(0, 1)
         : [];
         return {

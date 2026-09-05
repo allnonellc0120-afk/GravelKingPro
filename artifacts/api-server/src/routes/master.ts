@@ -400,7 +400,9 @@ masterRouter.post(
       ? await resolveCreditUser(req)
       : null;
     const walletMode = !!creditUser && !creditUser.isDeveloper;
-    const walletCost = CREDIT_COSTS.master + (certify ? CREDIT_COSTS.certificate : 0);
+    // Certification is intentionally free while the provenance workflow is
+    // being adopted. A master + its download is one 75-credit action.
+    const walletCost = CREDIT_COSTS.master;
     const walletReference = `master:${randomUUID()}`;
     let walletSpent = false;
     // Mastering is a monthly-subscription feature (owner directive): weekly

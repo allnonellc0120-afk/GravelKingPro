@@ -6,8 +6,8 @@ import { storage } from "../storage";
 /**
  * Canonical subscription tiers.
  *   free          — no paid plan
- *   pro           — $9.99/month: mastering and converter
- *   king          — $24.99/month: Pro plus included unlimited certificate unlocks
+ *   pro           — $8.99/week: 800 credits and Pro tools
+ *   king          — $19.99/month: 2,500 credits, advanced tools, and free certificates
  *   node_auditor  — $249.50/month enterprise tier (superset of everything)
  */
 export type Tier = "free" | "pro" | "king" | "node_auditor";

@@ -35,10 +35,10 @@ const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
 const WEEKLY_FEATURES = [
   { label: "The Foundry mastering", highlight: "Morris Law Kernel v3.5 presets" },
   { label: "10 WAV exports per rolling week", highlight: "Release-ready 44.1kHz output" },
-  { label: "40 wallet credits each paid month", highlight: "Ten song, master, or certificate actions" },
+  { label: "800 credits each paid week", highlight: "40 generated songs, or 10 masters, or a mix" },
   { label: "Unlimited MP3 exports", highlight: "No MP3 export cap" },
   { label: "Vocal Booth", highlight: "Record, clip, splice, and layer audio" },
-  { label: "JAX certificates", highlight: "$1.99 per permanent certificate unlock" },
+  { label: "Free certificates", highlight: "Certify your eligible songs while you build trust" },
   { label: "Converter", highlight: "Convert supported audio formats" },
   { label: "No watermark", highlight: "Clean, professional output" },
   { label: "Cancel anytime", highlight: "No commitment, full control" },
@@ -50,9 +50,8 @@ const STUDIO_FEATURES = [
   { label: "JAX songwriting companion", highlight: "Develop lyrics, document co-writers, and preserve your creative timeline" },
   { label: "Unlimited included JAX certificates", highlight: "Shareable authorship and IP records" },
   { label: "40 WAV exports per rolling month", highlight: "Plus unlimited MP3 exports" },
-  { label: "40 wallet credits each paid month", highlight: "Ten song, master, or certificate actions" },
+  { label: "2,500 credits each paid month", highlight: "125 generated songs, 33 masters, or any mix" },
   { label: "Converter", highlight: "Prepare audio in supported delivery formats" },
-  { label: "Kernel Dashboard (10 optimizations/day)", highlight: "Before/after waveform comparison on saved Vocal Booth tracks" },
   { label: "PDF export reports", highlight: "Shareable mastering and provenance certificates" },
   { label: "Priority support", highlight: "48-hour response guarantee" },
 ];
@@ -274,8 +273,9 @@ export default function Pricing() {
         return;
       }
 
-      const priceId = product.prices.find((p) => p.recurring?.interval === "month")?.id;
-      if (!priceId) throw new Error("The selected plan has no monthly Stripe price.");
+      const expectedInterval = planId === "weekly" ? "week" : "month";
+      const priceId = product.prices.find((p) => p.recurring?.interval === expectedInterval)?.id;
+      if (!priceId) throw new Error(`The selected plan has no ${expectedInterval} Stripe price.`);
 
       const checkoutRes = await fetch("/api/stripe/create-subscription-intent", {
         method: "POST",
@@ -515,10 +515,10 @@ export default function Pricing() {
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
                   <FeatureRow yes>JAX songwriting companion</FeatureRow>
-                  <FeatureRow yes>Vocal Booth access</FeatureRow>
-                  <FeatureRow yes>The Foundry 30s preview</FeatureRow>
+                   <FeatureRow yes>Try JAX songwriting</FeatureRow>
+                   <FeatureRow yes>Preview The Foundry</FeatureRow>
                   <FeatureRow yes={false}>Converter access</FeatureRow>
-                  <FeatureRow yes>$1.99 certificate unlocks</FeatureRow>
+                   <FeatureRow yes={false}>Pro Vocal Booth</FeatureRow>
                   <FeatureRow yes={false}>Full-length mastering exports</FeatureRow>
                 </ul>
               </CardContent>
@@ -609,7 +609,7 @@ export default function Pricing() {
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500">
-                    <ArrowRight className="w-3 h-3 mr-1" />Includes local hardware optimization
+                     <ArrowRight className="w-3 h-3 mr-1" />2,500 credits reset monthly
                   </Badge>
                 </div>
               </CardHeader>

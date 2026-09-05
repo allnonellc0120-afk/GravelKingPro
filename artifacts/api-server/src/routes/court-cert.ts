@@ -206,8 +206,9 @@ router.get("/court-cert/:certId/status", async (req: Request, res: Response) => 
       return;
     }
 
-    const tier = await resolveTier(req);
-    const hasUnlimitedIncluded = tier === "king" || tier === "node_auditor" || user.isDeveloper;
+    // Certificates are free while the provenance workflow is being adopted.
+    // Do not put a credit or dollar gate in front of certification.
+    const hasUnlimitedIncluded = true;
 
     res.json({
       success: true,
@@ -254,29 +255,8 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
       return;
     }
 
-    const tier = await resolveTier(req);
-    const includedUnlock = tier === "king" || tier === "node_auditor" || user.isDeveloper;
-    const creditReference = `certificate:${certId}`;
-    let creditsSpent = false;
+    const includedUnlock = true;
     let creditsBalance: number | undefined;
-    if (!includedUnlock) {
-      const spent = await spendCredits(user.id, CREDIT_COSTS.certificate, "certificate", creditReference);
-      if (!spent.ok) {
-        res.status(402).json({
-          success: false,
-          code: "CERT_PURCHASE_REQUIRED",
-          error: `This certificate costs ${CREDIT_COSTS.certificate} credits. You have ${spent.balance}. Buy a credit pack or unlock it for $1.99.`,
-          priceCents: CERT_UNLOCK_PRICE_CENTS,
-          creditsRequired: CREDIT_COSTS.certificate,
-          creditsBalance: spent.balance,
-          checkoutUrl: `/api/court-cert/${certId}/checkout`,
-          purchaseUrl: "/pricing#credits",
-        });
-        return;
-      }
-      creditsSpent = true;
-      creditsBalance = spent.balance;
-    }
 
     // Claim conditional on still-locked. Included King unlocks are unlimited;
     // paid wallet unlocks are refunded if a concurrent request wins the claim.
@@ -284,16 +264,13 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
       .update(ipCertStubsTable)
       .set({
         unlockedAt: sql`NOW()`,
-        unlockSource: user.isDeveloper ? "admin" : includedUnlock ? "included" : "credits",
+        unlockSource: user.isDeveloper ? "admin" : "free",
       })
       .where(and(eq(ipCertStubsTable.certId, certId), isNull(ipCertStubsTable.unlockedAt)))
       .returning({ certId: ipCertStubsTable.certId });
 
     if (claimed.length === 0) {
       // Raced with another unlock — it's unlocked now either way.
-      if (creditsSpent) {
-        await grantCredits(user.id, CREDIT_COSTS.certificate, "duplicate_certificate_refund", `refund:${creditReference}`);
-      }
       res.json({ success: true, unlocked: true, alreadyUnlocked: true });
       return;
     }
