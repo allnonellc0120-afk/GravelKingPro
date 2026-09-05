@@ -25,8 +25,8 @@ for (const entry of fs.readdirSync(tmpDir)) {
 
 const WIDTH = isVertical ? 1080 : 1920;
 const HEIGHT = isVertical ? 1920 : 1080;
-const SCALED_WIDTH = isVertical ? 2160 : 3840;
-const SCALED_HEIGHT = isVertical ? 3840 : 2160;
+const SCALED_WIDTH = WIDTH;
+const SCALED_HEIGHT = HEIGHT;
 const FPS = 30;
 const DURATION_MS = 59000; // matches SCENE_DURATIONS total
 const SLOWDOWN_FACTOR = 1.05;
@@ -50,13 +50,12 @@ function findChromium() {
 }
 
 async function startStaticServer() {
-  const basePath = '/gravelkingpro-promo/';
+  const basePath = '/';
   const server = createServer((req, res) => {
     let url = new URL(req.url, 'http://localhost').pathname;
     if (!url.startsWith(basePath)) {
       res.writeHead(404); res.end('not found'); return;
     }
-    url = url.slice(basePath.length - 1); // keep leading slash
     if (url === '/') url = '/index.html';
     const file = path.join(dist, url);
     if (!file.startsWith(dist)) {
@@ -100,24 +99,22 @@ async function mixAudio() {
   const soundtrack = path.join(root, 'public/audio/gravelking_pro_soundtrack_warm.mp3');
   execFileSync('ffmpeg', [
     '-y', '-stream_loop', '-1', '-i', soundtrack, 
-    '-i', path.join(root, 'public/audio/vo_scene1.mp3'),
-    '-i', path.join(root, 'public/audio/vo_scene2.mp3'),
-    '-i', path.join(root, 'public/audio/vo_scene3.mp3'),
-    '-i', path.join(root, 'public/audio/vo_scene4.mp3'),
-    '-i', path.join(root, 'public/audio/vo_scene5.mp3'),
-    '-i', path.join(root, 'public/audio/vo_scene6.mp3'),
-    '-i', path.join(root, 'public/audio/vo_scene7.mp3'),
+    '-i', path.join(root, 'public/audio/jax_vo1.mp3'),
+    '-i', path.join(root, 'public/audio/jax_vo2.mp3'),
+    '-i', path.join(root, 'public/audio/jax_vo3.mp3'),
+    '-i', path.join(root, 'public/audio/jax_vo4.mp3'),
+    '-i', path.join(root, 'public/audio/jax_vo5.mp3'),
+    '-i', path.join(root, 'public/audio/jax_vo6.mp3'),
     '-t', '59',
     '-filter_complex', `
       [0:a]volume=0.15,afade=t=in:st=0:d=0.5,afade=t=out:st=57.5:d=1.5[music];
       [1:a]adelay=0|0,volume=1.0[v1];
       [2:a]adelay=7000|7000,volume=1.0[v2];
-      [3:a]adelay=14500|14500,volume=1.0[v3];
-      [4:a]adelay=23000|23000,volume=1.0[v4];
-      [5:a]adelay=32000|32000,volume=1.0[v5];
-      [6:a]adelay=41000|41000,volume=1.0[v6];
-      [7:a]adelay=49000|49000,volume=1.0[v7];
-      [music][v1][v2][v3][v4][v5][v6][v7]amix=inputs=8:duration=first:dropout_transition=2[aout]
+      [3:a]adelay=17000|17000,volume=1.0[v3];
+      [4:a]adelay=26000|26000,volume=1.0[v4];
+      [5:a]adelay=42000|42000,volume=1.0[v5];
+      [6:a]adelay=51000|51000,volume=1.0[v6];
+      [music][v1][v2][v3][v4][v5][v6]amix=inputs=7:duration=first:dropout_transition=2[aout]
     `,
     '-map', '[aout]',
     '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
@@ -157,10 +154,16 @@ async function recordVideo() {
   await client.send('Animation.setPlaybackRate', { playbackRate: 1 / SLOWDOWN_FACTOR });
 
   const formatQuery = isVertical ? '&format=vertical' : '';
-  await page.goto(`http://127.0.0.1:${EXPORT_PORT}/gravelkingpro-promo/?export=1${formatQuery}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  page.on('pageerror', error => console.error('Browser page error:', error.message));
+  page.on('console', message => {
+    if (message.type() === 'error') console.error('Browser console error:', message.text());
+  });
+  await page.goto(`http://127.0.0.1:${EXPORT_PORT}/?export=1${formatQuery}`, { waitUntil: 'networkidle', timeout: 60000 });
 
   // Wait for the first frame to render.
   await page.waitForTimeout(1000);
+  const rootText = await page.locator('#root').innerText().catch(() => '');
+  if (!rootText.trim()) throw new Error('Export page rendered no visible scene content');
 
   // Ensure audio is unmuted and playing (in case autoplay was blocked).
   await page.evaluate(() => {
@@ -197,6 +200,7 @@ async function combine(videoPath, audioPath) {
     '-threads', '4',
     '-profile:v', 'high', '-level', '4.2',
     '-c:a', 'aac', '-b:a', '320k', '-ar', '48000',
+    '-t', '59',
     '-movflags', '+faststart',
     output,
   ], { stdio: 'inherit' });
