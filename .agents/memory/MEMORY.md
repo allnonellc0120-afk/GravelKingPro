@@ -80,3 +80,4 @@
 - [Package firewall blocked packages](package-firewall-block.md) — deploy installs 403 on some npm packages (all `tar` versions); fix by vendoring the tgz + pnpm file: override
 - [Cert document paywall](cert-paywall.md) — stamping free, doc owner-only+unlock-gated; $1.99 or 20/30d Studio allowance; Express 5: register `/:id.pdf` route BEFORE `/:id` or it's dead
 - [API test suite flock + lyric-owner cookie rule](api-test-suite-flock.md) — test script must stay flock-wrapped (dist-test races); legacy lyric rows never grant access via gk_session cookie
+- [JAX route faked responses](jax-route-faked-responses.md) — generation routes must call the live model; never canned placeholder strings
