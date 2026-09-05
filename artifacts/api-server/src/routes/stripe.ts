@@ -6,6 +6,11 @@ import { eq } from 'drizzle-orm';
 import { getStripePublishableKey, getUncachableStripeClient } from '../stripeClient';
 import { ensureCustomerOnCurrentAccount } from '../lib/stripeCustomers';
 import { recordAnalyticsEvent } from '../analytics';
+import {
+  CREDIT_PACKS,
+  getCreditsBalance,
+  resolveCreditUser,
+} from '../lib/credits';
 import type Stripe from 'stripe';
 
 const stripeRouter = Router();
@@ -120,6 +125,76 @@ stripeRouter.get('/stripe/config', async (_req: Request, res: Response) => {
     res.json({ publishableKey: await getStripePublishableKey() });
   } catch (err: unknown) {
     res.status(503).json({ error: err instanceof Error ? err.message : 'Stripe is unavailable.' });
+  }
+});
+
+/** Public catalog for one-time wallet purchases. Prices are server-owned. */
+stripeRouter.get('/stripe/credit-packs', (_req: Request, res: Response) => {
+  res.json({
+    data: CREDIT_PACKS.map(({ id, name, credits, amountCents, description }) => ({
+      id,
+      name,
+      credits,
+      amountCents,
+      description,
+    })),
+  });
+});
+
+stripeRouter.get('/credits/balance', async (req: Request, res: Response) => {
+  try {
+    const user = await resolveCreditUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Sign in required', authRequired: true });
+      return;
+    }
+    res.json({ creditsBalance: await getCreditsBalance(user.id) });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load credits.' });
+  }
+});
+
+stripeRouter.post('/stripe/create-credit-purchase-intent', async (req: Request, res: Response) => {
+  try {
+    const user = await resolveCreditUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Sign in required', authRequired: true });
+      return;
+    }
+    const packId = typeof req.body?.packId === 'string' ? req.body.packId : '';
+    const pack = CREDIT_PACKS.find((candidate) => candidate.id === packId);
+    if (!pack) {
+      res.status(400).json({ error: 'Select a valid credit pack.' });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const customerId = await ensureCustomerOnCurrentAccount(stripe, user);
+    const intent = await stripe.paymentIntents.create({
+      amount: pack.amountCents,
+      currency: 'usd',
+      customer: customerId,
+      automatic_payment_methods: { enabled: true },
+      description: `${pack.name} credit pack — ${pack.credits} credits`,
+      metadata: {
+        kind: 'credits_purchase',
+        user_id: user.id,
+        pack_id: pack.id,
+        credits: String(pack.credits),
+      },
+    });
+    if (!intent.client_secret) {
+      res.status(502).json({ error: 'Stripe did not return a payment secret.' });
+      return;
+    }
+    res.json({
+      clientSecret: intent.client_secret,
+      intentType: 'payment',
+      credits: pack.credits,
+      amountCents: pack.amountCents,
+    });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to start credit purchase.' });
   }
 });
 

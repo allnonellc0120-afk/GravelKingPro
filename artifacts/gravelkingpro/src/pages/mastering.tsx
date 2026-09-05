@@ -21,6 +21,7 @@ import { StripePaymentForm } from "@/components/stripe-payment-form";
 import { ExportQuotaBadge } from "@/components/export-quota-badge";
 import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
 import { Link } from "wouter";
+import { useCredits } from "@/components/credit-wallet";
 
 type State = "idle" | "compressing" | "processing" | "done" | "error";
 
@@ -51,6 +52,8 @@ type CertCategory = (typeof CERT_CATEGORIES)[number]["id"];
 interface CertStatus {
   unlocked: boolean;
   priceCents: number;
+  creditsBalance?: number;
+  creditCost?: number;
   includedUnlocks: {
     available: boolean;
     unlimited?: boolean;
@@ -168,6 +171,9 @@ function CertUnlockCard({ certId }: { certId: string }) {
         Your track is stamped and the server record is sealed. Unlock the court-ready certificate
         document (JSON + PDF) whenever you need it — the unlock is permanent for this certificate.
       </p>
+      <p className="text-xs text-sky-300">
+        Wallet: {status.creditsBalance ?? 0} credits · Credit unlock: {status.creditCost ?? 4} credits · Card unlock: ${(status.priceCents / 100).toFixed(2)}
+      </p>
       {paymentSecret ? (
         <StripePaymentForm
           clientSecret={paymentSecret}
@@ -188,10 +194,10 @@ function CertUnlockCard({ certId }: { certId: string }) {
               : `Included unlocks used${inc.resetsAt ? ` — resets ${formatResetDate(inc.resetsAt)}` : ""}`}
           </Button>
         )}
-        <Button size="sm" disabled={busy} onClick={buyUnlock} variant={inc ? "outline" : "default"}
+         <Button size="sm" disabled={busy} onClick={inc ? buyUnlock : useIncluded} variant={inc ? "outline" : "default"}
           className={inc ? "flex-1 border-sky-500/30" : "flex-1 bg-sky-600 hover:bg-sky-700"}
           data-testid="button-cert-buy">
-          Unlock for ${(status.priceCents / 100).toFixed(2)}
+           {inc ? `Pay ${(status.priceCents / 100).toFixed(2)}` : `Unlock with ${status.creditCost ?? 4} credits`}
         </Button>
       </div>
       )}
@@ -244,6 +250,7 @@ export default function Mastering() {
   const [ipiNumber, setIpiNumber] = useState("");
   const [iswc, setIswc] = useState("");
   const [isrc, setIsrc] = useState("");
+  const { balance: creditsBalance } = useCredits();
 
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
   const { quota, refresh: refreshQuota } = useExportQuota();
@@ -526,9 +533,12 @@ export default function Mastering() {
               note="Runs locally with MLK v3 — your audio is never uploaded to a third party."
             />
           </div>
-          <p className="text-sm text-muted-foreground">
+           <p className="text-sm text-muted-foreground">
             Apply a professional mastering chain with optional denoise. Runs locally with MLK v3 — no upload to third parties.
           </p>
+           <p className="mt-2 text-xs text-sky-300">
+             Wallet: {creditsBalance === null ? "sign in to view your balance" : `${creditsBalance} credits`} · Full master: 4 credits · Certificate: +4 credits
+           </p>
         </div>
 
         {/* MLK v3.5 Remix Engine — only for tracks loaded from the user's vault */}

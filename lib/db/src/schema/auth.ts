@@ -43,6 +43,7 @@ export const usersTable = pgTable("users", {
   // Rolling 30-day included certificate-unlock allowance (monthly/Studio+ only).
   certUnlocks: integer("cert_unlocks").notNull().default(0),
   certUnlockPeriodStart: timestamp("cert_unlock_period_start", { withTimezone: true }),
+  creditsBalance: integer("credits_balance").notNull().default(0),
   promoCode: varchar("promo_code"),
   promoExpiresAt: timestamp("promo_expires_at", { withTimezone: true }),
 });

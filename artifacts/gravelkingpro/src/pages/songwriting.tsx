@@ -6,6 +6,7 @@ import { useAppState } from "@/lib/context";
 import { Layout } from "@/components/layout";
 import { downloadBlob } from "@/lib/download";
 import { trackEvent } from "@/lib/analytics";
+import { useCredits } from "@/components/credit-wallet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -215,6 +216,7 @@ export default function SongwritingStudio() {
   const [stage2Hash, setStage2Hash] = useState("");
   const [stage3Hash, setStage3Hash] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+  const { balance: creditsBalance } = useCredits();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -653,8 +655,8 @@ export default function SongwritingStudio() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">The take lands in your library when it finishes rendering.</span>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate with MLK"}</Button>
-              <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with JAX (Pro)"}</Button>
+                    <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate with MLK (4 credits)"}</Button>
+                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with JAX (4 credits)"}</Button>
             </div>
           </div>
           {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
@@ -824,10 +826,13 @@ export default function SongwritingStudio() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <span className="text-xs text-muted-foreground">Arrangement: {draft.blocks.map((block) => block.type).join(" → ")}</span>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
-                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (Pro)"}</Button>
+                    <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song (4 credits)"}</Button>
+                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (4 credits)"}</Button>
                   </div>
                 </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Wallet balance: <strong className="text-foreground">{creditsBalance === null ? "sign in to view" : `${creditsBalance} credits`}</strong>. Each finished song uses 4 credits.
+                </p>
                 {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
               </section>
             </div>

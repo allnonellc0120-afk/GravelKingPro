@@ -12,6 +12,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import type { Request } from 'express';
 import { recordAnalyticsEvent } from './analytics';
+import { grantCredits, MONTHLY_CREDITS } from './lib/credits';
 
 /**
  * Loads the managed webhook signing secrets from stripe._managed_webhooks.
@@ -120,6 +121,31 @@ export class WebhookHandlers {
         if (event.type === 'payment_intent.succeeded') {
           const intent = event.data.object as Stripe.PaymentIntent;
           const meta = intent.metadata ?? {};
+          if (meta.kind === 'credits_purchase' && meta.user_id && meta.credits) {
+            const credits = Number(meta.credits);
+            if (!Number.isInteger(credits) || credits <= 0) {
+              throw new Error(`Invalid credits purchase metadata for ${intent.id}`);
+            }
+            const grant = await grantCredits(
+              meta.user_id,
+              credits,
+              'stripe_purchase',
+              `stripe-payment-intent:${intent.id}`,
+              intent.id,
+            );
+            void recordAnalyticsEvent({
+              type: "purchase_completed",
+              sessionId: meta.user_id,
+              path: "/pricing",
+              metadata: {
+                kind: "credits",
+                credits,
+                paymentIntentId: intent.id,
+                duplicate: !grant.granted,
+              },
+            }).catch(() => {});
+            return;
+          }
           if (meta.type === 'track' && meta.track_id && meta.user_id) {
             await db
               .insert(purchasedTracksTable)
@@ -231,6 +257,29 @@ export class WebhookHandlers {
         if (event.type === 'invoice.paid') {
           const invoice = event.data.object;
           const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+          if (customerId && invoice.amount_paid > 0 && invoice.id) {
+            const [subscriber] = await db
+              .select({
+                id: usersTable.id,
+                subscriptionTier: usersTable.subscriptionTier,
+              })
+              .from(usersTable)
+              .where(eq(usersTable.stripeCustomerId, customerId));
+            const tier = subscriber?.subscriptionTier;
+            const monthlyCredits = tier === 'pro' || tier === 'weekly'
+              ? MONTHLY_CREDITS.pro
+              : tier === 'king' || tier === 'monthly'
+                ? MONTHLY_CREDITS.king
+                : 0;
+            if (subscriber && monthlyCredits > 0) {
+              await grantCredits(
+                subscriber.id,
+                monthlyCredits,
+                'subscription_monthly',
+                `stripe-invoice:${invoice.id}`,
+              );
+            }
+          }
           if (customerId && invoice.amount_paid > 0 && invoice.id) {
             const [user] = await db
               .select({ id: usersTable.id })

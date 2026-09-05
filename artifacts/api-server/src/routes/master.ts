@@ -25,6 +25,12 @@ import { backupCertStub } from "../lib/firestore";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
+import {
+  CREDIT_COSTS,
+  grantCredits,
+  resolveCreditUser,
+  spendCredits,
+} from "../lib/credits";
 
 /** Optional denoise stage folded into mastering (applied before the preset). */
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
@@ -390,6 +396,13 @@ masterRouter.post(
     const partnerReq = isPartnerRequest(req);
     const adminReq = isAdminAuthenticated(req);
     const mp3Requested = req.path === "/export-mp3";
+    const creditUser = !partnerReq && !adminReq && !mp3Requested
+      ? await resolveCreditUser(req)
+      : null;
+    const walletMode = !!creditUser && !creditUser.isDeveloper;
+    const walletCost = CREDIT_COSTS.master + (certify ? CREDIT_COSTS.certificate : 0);
+    const walletReference = `master:${randomUUID()}`;
+    let walletSpent = false;
     // Mastering is a monthly-subscription feature (owner directive): weekly
     // no longer counts — only Studio(monthly)/King and above master.
     const paidTier = !partnerReq && !adminReq && await hasStudio(req);
@@ -425,7 +438,7 @@ masterRouter.post(
       });
       return;
     }
-    if (!unlimited) {
+    if (!unlimited && !walletMode) {
       const usageUser = await getUsageUser(req, res);
       usageUserId = usageUser.id;
 
@@ -562,6 +575,26 @@ masterRouter.post(
         req.log.warn({ autoThresholdOffset }, "kernel worker returned no RMS measurement");
       }
 
+      // Wallet users pay only after the kernel succeeds. This avoids charging
+      // for malformed audio or a failed DSP run while keeping the balance
+      // check atomic immediately before fulfillment.
+      if (walletMode && !isSample) {
+        const spent = await spendCredits(creditUser!.id, walletCost, "master", walletReference);
+        if (!spent.ok) {
+          res.status(402).json({
+            success: false,
+            code: "INSUFFICIENT_CREDITS",
+            error: `This master${certify ? " and certificate" : ""} costs ${walletCost} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
+            creditsRequired: walletCost,
+            creditsBalance: spent.balance,
+            purchaseUrl: "/pricing#credits",
+          });
+          return;
+        }
+        walletSpent = true;
+        res.setHeader("X-GK-Credits-Balance", String(spent.balance));
+      }
+
       // Count the free user's first full download against their allowance.
       if (!isSample && usageUserId) {
         if (usedTotalDownloads >= FREE_LIMITS.totalDownloads) {
@@ -584,6 +617,10 @@ masterRouter.post(
       if (exportUser && !isSample) {
         const quota = await consumeExport(exportUser);
         if (!quota.allowed) {
+          if (walletSpent && creditUser) {
+            await grantCredits(creditUser.id, walletCost, "quota_master_refund", `refund:${walletReference}`);
+            walletSpent = false;
+          }
           res.status(429).json(exportLimitPayload(quota));
           return;
         }
@@ -780,6 +817,9 @@ masterRouter.post(
       setResultHeaders();
       streamBuffer(res, outBuffer);
     } catch (err: any) {
+      if (walletSpent && creditUser) {
+        await grantCredits(creditUser.id, walletCost, "failed_master_refund", `refund:${walletReference}`);
+      }
       void logToolError("Mastering Tool", "MASTERING", err);
       res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });
     } finally {
