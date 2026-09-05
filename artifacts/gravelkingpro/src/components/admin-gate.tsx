@@ -9,6 +9,7 @@ import {
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock } from "lucide-react";
+import { useAuth } from "@clerk/react";
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -39,17 +40,22 @@ export function AdminGate({
   title = "Admin Area",
   description = "Enter your admin key to continue.",
 }: AdminGateProps) {
+  const { isLoaded: clerkLoaded } = useAuth();
   const [status, setStatus] = useState<AuthState>("checking");
   const [keyInput, setKeyInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Check for an existing valid session on mount.
+  // Clerk must finish restoring its session before checking developer/admin
+  // access. Otherwise the first request can be anonymous and permanently
+  // leave the gate locked until the user signs out and back in.
   useEffect(() => {
+    if (!clerkLoaded) return;
+    setStatus("checking");
     fetch("/api/admin/check", { credentials: "include" })
       .then((r) => setStatus(r.ok ? "unlocked" : "locked"))
       .catch(() => setStatus("locked"));
-  }, []);
+  }, [clerkLoaded]);
 
   const handleLogin = useCallback(async () => {
     const k = keyInput.trim();

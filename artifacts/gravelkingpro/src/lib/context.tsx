@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { useAuth } from "@clerk/react";
 
 export type Results = {
   throughput: string;
@@ -74,6 +75,7 @@ function normalizePlan(plan?: string | null): SubscriptionTier {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const [userTier, setUserTier] = useState<SubscriptionTier>(null);
   const [plan, setPlan] = useState<string | null>(null);
   const [isDeveloper, setIsDeveloper] = useState(false);
@@ -110,8 +112,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!clerkLoaded) return;
     void refreshSubscription();
-  }, [refreshSubscription]);
+  }, [clerkLoaded, isSignedIn, refreshSubscription]);
+
+  useEffect(() => {
+    if (!clerkLoaded) return;
+    const refresh = () => { void refreshSubscription(); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [clerkLoaded, refreshSubscription]);
 
   const promoTier: SubscriptionTier = activePromo ? "monthly" : null;
   const tierOrder: Array<SubscriptionTier> = [null, "weekly", "monthly", "node_auditor"];
