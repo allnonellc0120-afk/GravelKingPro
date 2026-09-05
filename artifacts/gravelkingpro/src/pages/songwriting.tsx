@@ -44,8 +44,9 @@ const BLOCK_TYPES: BlockType[] = ["Verse", "Chorus", "Bridge", "Hook", "Outro"];
 const ARTIST_PROFILE_KEY = "mlk_artist_profile";
 const DEFAULT_RULES = "Avoid simple AABB nursery rhymes. Use internal and slant rhymes, authentic flow, and natural meter.";
 const JAX_VOICE_STORAGE_KEY = "mlk_jax_selected_voice";
-const JAX_VOICE_PRESETS = [
-  ["admin", "Admin Custom Cloned Voice"],
+type JaxVoicePreset = readonly [string, string];
+const DEFAULT_JAX_VOICE_PRESETS: JaxVoicePreset[] = [
+  ["admin", "Admin Configured Voice"],
   ["pNInz6obpgDQGcFmaJgB", "JAX Baritone (Deep & Resonant)"],
   ["N2lVS1w4EtoT3dr4eOWO", "JAX Gritty Blues / Rough"],
   ["ErXwobaYiN019PkySvjV", "JAX Smooth Studio / Conversational"],
@@ -176,6 +177,7 @@ export default function SongwritingStudio() {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem(JAX_VOICE_STORAGE_KEY) || "pNInz6obpgDQGcFmaJgB");
+  const [jaxVoicePresets, setJaxVoicePresets] = useState<JaxVoicePreset[]>(DEFAULT_JAX_VOICE_PRESETS);
   const [voiceError, setVoiceError] = useState("");
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
@@ -213,6 +215,24 @@ export default function SongwritingStudio() {
   useEffect(() => {
     localStorage.setItem(JAX_VOICE_STORAGE_KEY, selectedVoice);
   }, [selectedVoice]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/jax/voices", { credentials: "include" })
+      .then(async (result) => {
+        if (!result.ok) throw new Error("Voice metadata unavailable");
+        return result.json() as Promise<{ voices?: Array<{ voiceId: string; label: string }> }>;
+      })
+      .then((data) => {
+        if (!cancelled && data.voices?.length) {
+          setJaxVoicePresets(data.voices.map(({ voiceId, label }) => [voiceId, label]));
+        }
+      })
+      .catch(() => {
+        // Keep the curated client defaults if the metadata endpoint is unavailable.
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const payload = JSON.stringify({ styleDescriptor, bpm: draft.bpm, key: draft.key, arrangement: draft.blocks.map((block) => block.type) });
@@ -530,7 +550,7 @@ export default function SongwritingStudio() {
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <label htmlFor="jax-voice-model" className="sr-only">JAX Voice Model</label>
                           <select id="jax-voice-model" value={selectedVoice} onChange={(event) => setSelectedVoice(event.target.value)} className="h-9 max-w-[220px] rounded-md border border-white/10 bg-black/30 px-2 text-xs text-foreground outline-none focus:border-violet-400">
-                            {JAX_VOICE_PRESETS.map(([voiceId, label]) => <option key={voiceId} value={voiceId}>{label}</option>)}
+                            {jaxVoicePresets.map(([voiceId, label]) => <option key={voiceId} value={voiceId}>{label}</option>)}
                           </select>
                           <Button type="button" size="sm" variant="outline" onClick={() => void speakResponse()} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button>
                         </div>

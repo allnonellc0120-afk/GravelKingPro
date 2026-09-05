@@ -12,14 +12,32 @@ const usage = new Map<string, { day: string; count: number }>();
 const ttsUsage = new Map<string, { day: string; count: number }>();
 const STUDIO_REDIRECT = "I'm locked in the booth for songwriting only. Let's get back to the track. What section are we working on next?";
 const elevenLabs = new ReplitConnectors();
+const GEORGE_PREMADE_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
+
+function configuredAdminVoiceLabel() {
+  return JAX_VOICE_PRESETS.admin.voiceId() === GEORGE_PREMADE_VOICE_ID
+    ? "George (Premade)"
+    : "Admin Configured Voice";
+}
+
 export const JAX_VOICE_PRESETS = {
-  admin: { label: "Admin Custom Cloned Voice", voiceId: () => process.env.JAX_VOICE_ID?.trim() ?? "" },
+  admin: { label: configuredAdminVoiceLabel, voiceId: () => process.env.JAX_VOICE_ID?.trim() ?? "" },
   adam: { label: "JAX Baritone (Deep & Resonant)", voiceId: () => "pNInz6obpgDQGcFmaJgB" },
   callum: { label: "JAX Gritty Blues / Rough", voiceId: () => "N2lVS1w4EtoT3dr4eOWO" },
   antoni: { label: "JAX Smooth Studio / Conversational", voiceId: () => "ErXwobaYiN019PkySvjV" },
   josh: { label: "JAX Heavy Low-End / Narrator", voiceId: () => "TxGEqnHWrfWFTfGW9XjX" },
   bill: { label: "JAX Classic Vintage", voiceId: () => "pqHfZKP75CvOlQylNhV4" },
 } as const;
+
+jaxRouter.get("/jax/voices", (_req: Request, res: Response) => {
+  res.json({
+    voices: Object.entries(JAX_VOICE_PRESETS).map(([key, preset]) => ({
+      key,
+      voiceId: key === "admin" ? "admin" : preset.voiceId(),
+      label: key === "admin" ? JAX_VOICE_PRESETS.admin.label() : String(preset.label),
+    })).filter((preset) => preset.key !== "admin" || Boolean(JAX_VOICE_PRESETS.admin.voiceId())),
+  });
+});
 
 function dayKey() {
   return new Date().toISOString().slice(0, 10);
