@@ -997,3 +997,17 @@ mtime_ms = 1788608895779
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ddd2ef2f-1cd4-464c-bc20-2121dbd97f80/c1e1ac24-d225-4978-b577-8cbd459786bd"
 storage_version_token = "1788609305990436"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "LeYogrE1cnV-GLTZqQVDk"
+uri = "file://artifacts/gravelking-promo/public/videos/jax_studio_companion_59s_9x16.mp4"
+type = "video"
+title = "JAX Studio Companion — 59s Vertical Promo"
+description = "New 59-second 9:16 promo for the JAX Songwriting Companion: prompt, write, compose, Vocal Booth, master, release with proof. ElevenLabs voiceover, no people."
+logical_id = "97c34ce1-5ba9-44d2-9737-72334c2d3fc4"
+content_hash = "sha256:d50aa3b182133d5c8e8234d660bc4ce9d1d2c61e3175a8cd9595e7d962952fa2"
+size = 2713753
+mtime_ms = 1788610027323
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/97c34ce1-5ba9-44d2-9737-72334c2d3fc4/6bb3f13e-bf64-4b7c-82f1-4abc61221fe3"
+storage_version_token = "1788610048492744"
+content_type = "video/mp4"
