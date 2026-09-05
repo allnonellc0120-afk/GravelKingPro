@@ -1333,3 +1333,31 @@ mtime_ms = 1788643793038
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b9f76ff7-c71e-4e07-bda9-8600b043b198/89987e90-3ba8-4f40-8436-cefb0c44048b"
 storage_version_token = "1788643802968751"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "dIMBQS4wjBTJqx27nLX7h"
+uri = "file://GravelKingPro_Simple_PitchDeck.pdf"
+type = "pdf"
+title = "GravelKing Pro — Simple Pitch Deck (PDF)"
+description = "8-page plain-English walkthrough: the four tools, blank-page-to-mastered-record workflow, current pricing and credits, and what the certificate means for labels and platforms."
+logical_id = "c908df2f-b4a7-4465-bf44-8d0ca2853727"
+content_hash = "sha256:f80f80b29fed73fe86c71477fc63ed42cac423f08d86a5d624621562def7a7c7"
+size = 138328
+mtime_ms = 1788643900940
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/c908df2f-b4a7-4465-bf44-8d0ca2853727/5fb482f4-e1a3-40b2-b4fb-737555a66811"
+storage_version_token = "1788643910078420"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "rCvh06DZOs4hJBdDU8Je8"
+uri = "file://GravelKingPro_Technical_WhitePaper.pdf"
+type = "pdf"
+title = "GravelKing Pro — Technical White Paper (PDF)"
+description = "8-page code-derived white paper: MLK mastering targets and preset matrix, JAX provider architecture, credit/entitlement system, dual-anchor HMAC chain of custody, verification endpoints, security controls, and legal boundaries."
+logical_id = "1c623dbe-2178-490d-ac26-570aa0607701"
+content_hash = "sha256:3adf302264f91c0ade54323e02611f81867900e9c3d4056ae22f71b478c660f7"
+size = 318193
+mtime_ms = 1788643900946
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/1c623dbe-2178-490d-ac26-570aa0607701/7ec6faa1-6ef9-41a0-83bd-47358b3583e2"
+storage_version_token = "1788643911075249"
+content_type = "application/pdf"
