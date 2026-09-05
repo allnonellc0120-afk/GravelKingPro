@@ -258,6 +258,13 @@ async function main(): Promise<void> {
         check(`public storage rejects ${label}`, writerRejected);
       }
 
+      const publicPreviewKey = keys.audioPreviewKey;
+      const publicCoverKey = `tracks/${trackId}/cover_art.png`;
+      const publicPreviewBody = Buffer.from("representative preview bytes");
+      const publicCoverBody = Buffer.from("representative cover bytes");
+      await publicObjectStorage.savePublicObject(publicPreviewKey, publicPreviewBody, "audio/mpeg");
+      await publicObjectStorage.savePublicObject(publicCoverKey, publicCoverBody, "image/png");
+
       const source = await makeTinyWav(31);
       const preview = `/tmp/gk_preview_test_${randomUUID()}.mp3`;
       const sourcePath = `/tmp/gk_preview_source_${randomUUID()}.wav`;
@@ -323,6 +330,36 @@ async function main(): Promise<void> {
     const base = `http://127.0.0.1:${(appServer.address() as AddressInfo).port}`;
     const ownerAuth = { Authorization: `Bearer ${owner.sid}` };
     const strangerAuth = { Authorization: `Bearer ${stranger.sid}` };
+
+    // ── 1c. Public object route serves preview and cover art ────────────────
+    console.log("\n[1c] GET /api/storage/public-objects — preview and cover art remain readable");
+    {
+      const publicObjects = [
+        {
+          label: "preview",
+          key: buildGeneratedAudioKeys(trackId).audioPreviewKey,
+          expectedType: "audio/mpeg",
+          expectedBody: Buffer.from("representative preview bytes"),
+        },
+        {
+          label: "cover art",
+          key: `tracks/${trackId}/cover_art.png`,
+          expectedType: "image/png",
+          expectedBody: Buffer.from("representative cover bytes"),
+        },
+      ];
+      for (const { label, key, expectedType, expectedBody } of publicObjects) {
+        const response = await fetch(`${base}/api/storage/public-objects/${key}`);
+        const body = Buffer.from(await response.arrayBuffer());
+        check(`public ${label} route → HTTP 200`, response.status === 200, `got ${response.status}`);
+        check(
+          `public ${label} route preserves content type`,
+          response.headers.get("content-type") === expectedType,
+          `got ${response.headers.get("content-type")}`,
+        );
+        check(`public ${label} route returns the stored bytes`, body.equals(expectedBody));
+      }
+    }
 
     // ── 2. /api/lyrics/verify contract ──────────────────────────────────────
     console.log("\n[2] POST /api/lyrics/verify");
