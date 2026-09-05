@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 export type PlanTier = "weekly" | "monthly" | "node_auditor";
 
 export interface PlanPrice {
-  /** Formatted dollar amount, e.g. "$9.99" */
+  /** Formatted dollar amount, e.g. "$24.99" */
   amount: string;
   /** Billing period suffix, e.g. "/week" or "/mo" */
   period: string;

@@ -17,3 +17,15 @@ listable fallback bucket independently.
 **How to apply:** Report the permission limitation explicitly. Only delete a
 confirmed public full take after an anonymous URL check succeeds and its
 private counterpart has been verified.
+
+The idempotent managed Object Storage setup does not repair an already
+provisioned bucket's IAM policy. The configured owner-project service account
+may also lack `storage.buckets.getIamPolicy`, so the deployment identity grant
+must be repaired by the platform or bucket owner rather than by application
+code.
+
+**Why:** Re-running setup returned an already-provisioned result while direct
+list and metadata probes continued to return 403.
+
+**How to apply:** Keep inventory reads primary-only and prefix-scoped so a
+fallback bucket cannot hide a managed-bucket permission regression.

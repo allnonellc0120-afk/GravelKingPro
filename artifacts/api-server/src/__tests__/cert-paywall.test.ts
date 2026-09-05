@@ -295,7 +295,7 @@ async function main(): Promise<void> {
       // Cert should now be unlocked in DB
       const certRow1 = await readCertRow(certId);
       check("6.6 cert unlockedAt is set", !!certRow1?.unlockedAt);
-      check("6.7 cert unlockSource is 'included'", certRow1?.unlockSource === "included", `got ${certRow1?.unlockSource}`);
+      check("6.7 cert unlockSource is 'free'", certRow1?.unlockSource === "free", `got ${certRow1?.unlockSource}`);
 
       // Second call (idempotent)
       const r2 = await fetch(`${base}/api/court-cert/${certId}/unlock`, {
