@@ -28,7 +28,7 @@ const BASE = "https://lrclib.net/api";
 /** Search tracks by query string */
 export async function searchLyrics(query: string): Promise<LrclibTrack[]> {
   const url = `${BASE}/search?q=${encodeURIComponent(query)}`;
-  const res = await fetch(url, { headers: { "Lrclib-Client": "GravelKingPro/1.0 (gravelkingpro.it.com)" } });
+  const res = await fetch(url, { headers: { "Lrclib-Client": "GravelKingPro/1.0 (gravelkingpro.com)" } });
   if (!res.ok) throw new Error(`lrclib search failed: ${res.status}`);
   return res.json();
 }
@@ -36,7 +36,7 @@ export async function searchLyrics(query: string): Promise<LrclibTrack[]> {
 /** Get a specific track by artist + title */
 export async function getLyrics(artist: string, title: string): Promise<LrclibTrack | null> {
   const url = `${BASE}/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`;
-  const res = await fetch(url, { headers: { "Lrclib-Client": "GravelKingPro/1.0 (gravelkingpro.it.com)" } });
+  const res = await fetch(url, { headers: { "Lrclib-Client": "GravelKingPro/1.0 (gravelkingpro.com)" } });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`lrclib get failed: ${res.status}`);
   return res.json();

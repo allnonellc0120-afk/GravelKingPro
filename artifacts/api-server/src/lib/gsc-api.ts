@@ -5,8 +5,8 @@
  */
 import { GoogleAuth } from "google-auth-library";
 
-const SITE_URL = "https://gravelkingpro.it.com/";
-const SITEMAP_URL = "https://gravelkingpro.it.com/sitemap.xml";
+const SITE_URL = "https://gravelkingpro.com/";
+const SITEMAP_URL = "https://gravelkingpro.com/sitemap.xml";
 const GSC_BASE = "https://www.googleapis.com/webmasters/v3";
 
 export interface GscResult {

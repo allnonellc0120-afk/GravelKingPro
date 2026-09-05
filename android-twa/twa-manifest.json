@@ -1,6 +1,6 @@
 {
   "packageId": "com.gravelkingpro.app",
-  "host": "gravelkingpro.it.com",
+  "host": "gravelkingpro.com",
   "name": "GravelKing Pro",
   "launcherName": "GravelKing",
   "display": "standalone",
@@ -13,7 +13,7 @@
   "backgroundColor": "#000000",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://gravelkingpro.it.com/icon-512.png",
+  "iconUrl": "https://gravelkingpro.com/icon-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android.keystore",
@@ -23,7 +23,7 @@
   "appVersionCode": 4,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://gravelkingpro.it.com/manifest.webmanifest",
+  "webManifestUrl": "https://gravelkingpro.com/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {
     "playBilling": {
@@ -36,7 +36,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://gravelkingpro.it.com/",
+  "fullScopeUrl": "https://gravelkingpro.com/",
   "minSdkVersion": 23,
   "orientation": "default",
   "fingerprints": [],

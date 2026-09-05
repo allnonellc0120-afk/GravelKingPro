@@ -55,9 +55,9 @@ Browse the GK Productions roster and artist pages, explore the public Library, a
 - From idea to release — write, record, mix, master, and submit to the label without leaving the app.
 
 ## Promote it
-Send your audience straight to the app at https://gravelkingpro.it.com. Every paid plan starts with a free trial, so your referrals can try the full studio risk-free.
+Send your audience straight to the app at https://gravelkingpro.com. Every paid plan starts with a free trial, so your referrals can try the full studio risk-free.
 
 ## Copy you can paste
 - One-liner: Make, split, master, and own your music in one browser tab — GravelKing Pro.
 - Short: Stop paying for four tools. GravelKing Pro is a full browser studio — AI songwriting, stem splitting, a live DAW, and mastering — starting free.
-- Social: Wrote, recorded, mixed and mastered a track without leaving my browser. GravelKing Pro is wild → gravelkingpro.it.com
+- Social: Wrote, recorded, mixed and mastered a track without leaving my browser. GravelKing Pro is wild → gravelkingpro.com

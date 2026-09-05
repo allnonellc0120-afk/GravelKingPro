@@ -54,7 +54,7 @@ Prompt JAX → refine lyrics with authorship scoring → compose the track → c
 Organic-first: TikTok/Reels/Shorts demos of the write→master→certify flow, Reddit credibility in r/Songwriting and r/WeAreTheMusicMakers, Facebook groups for indie artists, referral program with commission on verified paid invoices only.
 
 ## Slide 10 — Traction & Status
-- Live in production at gravelkingpro.it.com (custom domain).
+- Live in production at gravelkingpro.com (custom domain).
 - Stripe live, embedded checkout with Apple Pay / Google Pay.
 - Android app in Google Play review.
 - Full pipeline — lyrics to certified master — working end to end.
@@ -67,4 +67,4 @@ If you know 500 songwriters, you know our first 50 customers.
 ## Slide 12 — Closing
 **Every song deserves its receipt.**
 GravelKing Pro — Write. Compose. Record. Master. Release with Proof.
-gravelkingpro.it.com
+gravelkingpro.com

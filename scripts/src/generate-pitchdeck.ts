@@ -148,7 +148,7 @@ async function createPitchDeck() {
   drawSlideBody(page, "Starter (Free): Basic analysis, standard reports.");
   drawSlideBody(page, "Pro ($39.99/month): Full real-time metrics, unlimited runs, PDF reports, WAV downloads, priority support.");
   drawSlideBody(page, "Node Auditor ($499/month): Enterprise benchmarking, 1T scale, Morris Law V2 access.");
-  drawSlideBody(page, "Download GravelKing Pro at gravelkingpro.it.com.");
+  drawSlideBody(page, "Download GravelKing Pro at gravelkingpro.com.");
 
   // ===== FOOTER =====
   const pageCount = pdfDoc.getPageCount();

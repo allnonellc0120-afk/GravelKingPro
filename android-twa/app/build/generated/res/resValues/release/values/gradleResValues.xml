@@ -28,13 +28,13 @@
     <!-- Value from default config. -->
     <string name="fallbackType" translatable="false">customtabs</string>
     <!-- Value from default config. -->
-    <string name="fullScopeUrl" translatable="false">https://gravelkingpro.it.com/</string>
+    <string name="fullScopeUrl" translatable="false">https://gravelkingpro.com/</string>
     <!-- Value from default config. -->
     <string name="generatorApp" translatable="false">bubblewrap-cli</string>
     <!-- Value from default config. -->
-    <string name="hostName" translatable="false">gravelkingpro.it.com</string>
+    <string name="hostName" translatable="false">gravelkingpro.com</string>
     <!-- Value from default config. -->
-    <string name="launchUrl" translatable="false">https://gravelkingpro.it.com/</string>
+    <string name="launchUrl" translatable="false">https://gravelkingpro.com/</string>
     <!-- Value from default config. -->
     <string name="launcherName" translatable="false">GravelKing</string>
     <!-- Value from default config. -->
@@ -42,6 +42,6 @@
     <!-- Value from default config. -->
     <string name="providerAuthority" translatable="false">com.gravelkingpro.app.fileprovider</string>
     <!-- Value from default config. -->
-    <string name="webManifestUrl" translatable="false">https://gravelkingpro.it.com/manifest.webmanifest</string>
+    <string name="webManifestUrl" translatable="false">https://gravelkingpro.com/manifest.webmanifest</string>
 
 </resources>

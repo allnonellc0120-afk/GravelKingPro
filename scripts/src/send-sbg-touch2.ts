@@ -14,8 +14,8 @@ async function main() {
   const to = "contact@sbg.vc";
   const subject = "Re: Live music-IP certification platform - seed";
 
-  // Proof point: live certified tracks on gravelkingpro.it.com
-  const proofUrl = "https://gravelkingpro.it.com";
+  // Proof point: live certified tracks on gravelkingpro.com
+  const proofUrl = "https://gravelkingpro.com";
   const body = [
     "Hi again —",
     "",

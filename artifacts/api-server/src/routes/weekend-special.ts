@@ -287,7 +287,7 @@ router.post("/weekend-special/submit", async (req: Request, res: Response): Prom
         `Track 2: ${paid.session.metadata?.slot_2_name ?? "?"}`,
         `Track 3: ${paid.session.metadata?.slot_3_name ?? "?"}`,
         "",
-        "Review and deliver: https://gravelkingpro.it.com/admin/orders",
+        "Review and deliver: https://gravelkingpro.com/admin/orders",
       ].join("\n"),
     }).catch(() => {});
 
@@ -511,7 +511,7 @@ router.post(
         return;
       }
 
-      const deliveryLink = `https://gravelkingpro.it.com/weekend-special?session_id=${encodeURIComponent(
+      const deliveryLink = `https://gravelkingpro.com/weekend-special?session_id=${encodeURIComponent(
         sessionId,
       )}&fulfillment_token=${encodeURIComponent(meta.fulfillment_token ?? "")}`;
       const emailed = await sendGmail({
@@ -575,7 +575,7 @@ router.post(
         return;
       }
 
-      const deliveryLink = `https://gravelkingpro.it.com/weekend-special?session_id=${encodeURIComponent(
+      const deliveryLink = `https://gravelkingpro.com/weekend-special?session_id=${encodeURIComponent(
         sessionId,
       )}&fulfillment_token=${encodeURIComponent(meta.fulfillment_token ?? "")}`;
       const emailed = await sendGmail({

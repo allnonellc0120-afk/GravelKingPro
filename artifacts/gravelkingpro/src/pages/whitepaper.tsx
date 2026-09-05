@@ -309,7 +309,7 @@ const SECTIONS = [
         <div className="grid sm:grid-cols-2 gap-4">
           {[
             { title: "Kernel Architecture", icon: <Server className="w-4 h-4 text-cyan-400" />, items: ["Node.js 22 LTS + ffmpeg-headless", "mmap() — zero-copy audio buffer access", "mlockall() — pins pages, prevents swap", "Per-request process isolation + resource limits", "Zero secrets in Docker image"] },
-            { title: "Deployment Targets", icon: <Globe className="w-4 h-4 text-cyan-400" />, items: ["SaaS — gravelkingpro.it.com (immediate)", "AWS ECS / GCP Cloud Run (auto-scale)", "On-premise Docker Compose (air-gapped)", "White-label API (custom subdomain + branding)", "Webhook delivery for async cert events"] },
+            { title: "Deployment Targets", icon: <Globe className="w-4 h-4 text-cyan-400" />, items: ["SaaS — gravelkingpro.com (immediate)", "AWS ECS / GCP Cloud Run (auto-scale)", "On-premise Docker Compose (air-gapped)", "White-label API (custom subdomain + branding)", "Webhook delivery for async cert events"] },
           ].map(({ title, icon, items }) => (
             <div key={title} className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-4 space-y-3">
               <div className="flex items-center gap-2">
@@ -475,7 +475,7 @@ export default function WhitepaperPage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground pt-2">
-            kevm@gravelkingpro.it.com · All N One LLC · GravelKing Productions
+            kevm@gravelkingpro.com · All N One LLC · GravelKing Productions
           </p>
         </motion.div>
 

@@ -216,9 +216,9 @@ router.get("/v1/whitepaper-spec", (_req: Request, res: Response) => {
       title: "GravelKing Pro MLK V3.5 — Technical Brief",
       version: "3.5.0",
       issuer: "All N One LLC — GravelKing Productions",
-      contact: "kevm@gravelkingpro.it.com",
-      demoLab: "https://gravelkingpro.it.com/verify",
-      pdfBrief: "https://gravelkingpro.it.com/whitepaper",
+      contact: "kevm@gravelkingpro.com",
+      demoLab: "https://gravelkingpro.com/verify",
+      pdfBrief: "https://gravelkingpro.com/whitepaper",
       publishedAt: "2026-07-22T00:00:00Z",
     },
     technology: {
@@ -263,7 +263,7 @@ router.get("/v1/whitepaper-spec", (_req: Request, res: Response) => {
       ],
     },
     api: {
-      baseUrl: "https://gravelkingpro.it.com",
+      baseUrl: "https://gravelkingpro.com",
       endpoints: [
         { method: "POST", path: "/api/v1/ingest", alias: "/api/kernel/master", description: "Submit audio for MLK V3.5 watermarking + mastering. Returns processed stream + X-GK-CertId header.", requiresAuth: true },
         { method: "POST", path: "/api/v1/verify", alias: "/api/kernel/verify-signal", description: "Public clean-room verification. No auth required. Returns VerifyResult JSON.", requiresAuth: false, medianLatencyMs: 2 },
@@ -310,13 +310,13 @@ router.get("/v1/whitepaper-spec", (_req: Request, res: Response) => {
       kernel: "C-bound DSP via Node.js FFI",
       memoryAccess: "mmap() zero-copy + mlockall() page-lock",
       containerization: "Docker multi-stage (Node 22 LTS + ffmpeg-headless)",
-      deploymentTargets: ["SaaS (gravelkingpro.it.com)", "AWS ECS", "GCP Cloud Run", "On-premise Docker Compose (air-gapped)", "White-label API"],
+      deploymentTargets: ["SaaS (gravelkingpro.com)", "AWS ECS", "GCP Cloud Run", "On-premise Docker Compose (air-gapped)", "White-label API"],
       secretsInjection: "Runtime environment only — no secrets in Docker image",
     },
     licensing: {
-      saas: { url: "https://gravelkingpro.it.com/pricing", pricing: "usage-based" },
-      whiteLabel: { contact: "kevm@gravelkingpro.it.com", pricing: "volume negotiated" },
-      onPremise: { contact: "kevm@gravelkingpro.it.com", pricing: "enterprise license" },
+      saas: { url: "https://gravelkingpro.com/pricing", pricing: "usage-based" },
+      whiteLabel: { contact: "kevm@gravelkingpro.com", pricing: "volume negotiated" },
+      onPremise: { contact: "kevm@gravelkingpro.com", pricing: "enterprise license" },
     },
   });
 });

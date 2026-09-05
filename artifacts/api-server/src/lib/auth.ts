@@ -7,7 +7,7 @@ import type { AuthUser } from "@workspace/api-zod";
 export const SESSION_COOKIE = "sid";
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 export const DEMO_USER_ID = "demo-play-reviewer";
-export const DEMO_EMAIL = "play-reviewer@gravelkingpro.it.com";
+export const DEMO_EMAIL = "play-reviewer@gravelkingpro.com";
 export const DEMO_PASSWORD_HASH =
   "scrypt$16384$8$1$aU2yGuX7hkcfFITrbGJ3HQ$nrWDEWmM3gFOCTl2zP2Ielt1f4oOjMfTsSIinHGEmjvPInMslUhaGa4XrOAXLWBPa7PZ8FwcUoQ3jppCUU9neg";
 

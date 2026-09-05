@@ -65,9 +65,9 @@ const set = (questionId, responseId, value) => {
 // Current account creation is through Replit OIDC OAuth; there is no local
 // username/password account flow.
 set("PSL_SUPPORTED_ACCOUNT_CREATION_METHODS", "PSL_ACM_OAUTH", "true");
-set("PSL_ACCOUNT_DELETION_URL", "", "https://gravelkingpro.it.com/data-deletion");
+set("PSL_ACCOUNT_DELETION_URL", "", "https://gravelkingpro.com/data-deletion");
 set("PSL_SUPPORT_DATA_DELETION_BY_USER", "DATA_DELETION_YES", "true");
-set("PSL_DATA_DELETION_URL", "", "https://gravelkingpro.it.com/data-deletion");
+set("PSL_DATA_DELETION_URL", "", "https://gravelkingpro.com/data-deletion");
 
 // The current template uses this question ID for the deletion mechanism.
 answers.delete("PSL_DATA_COLLECTION_USER_REQUEST_DELETE\u0000");

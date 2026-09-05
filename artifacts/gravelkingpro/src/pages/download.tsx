@@ -72,7 +72,7 @@ export default function DownloadPage() {
             <Button onClick={handleDownload} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-12 px-8 text-base">
               <Download className="w-5 h-5 mr-2" /> Download Free — v1.0
             </Button>
-            <a href="https://gravelkingpro.it.com" target="_blank" rel="noopener noreferrer">
+            <a href="https://gravelkingpro.com" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" className="h-12 px-6 border-border/40">
                 <Globe className="w-4 h-4 mr-2" /> Web Version <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
               </Button>
@@ -107,7 +107,7 @@ export default function DownloadPage() {
                 <Wifi className="w-5 h-5 text-amber-400" />
                 <span className="font-semibold text-amber-400">Connects Online — Paid</span>
               </div>
-              <p className="text-xs text-muted-foreground">Paid features route to <strong>gravelkingpro.it.com</strong> servers. Upgrade flows open in your browser.</p>
+              <p className="text-xs text-muted-foreground">Paid features route to <strong>gravelkingpro.com</strong> servers. Upgrade flows open in your browser.</p>
               <ul className="space-y-2">
                 {PRO_ONLINE.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-xs">
@@ -142,7 +142,7 @@ export default function DownloadPage() {
                   step: "3",
                   icon: <Wifi className="w-5 h-5 text-sky-400" />,
                   title: "Upgrade Online",
-                  desc: "Click any Pro feature to open gravelkingpro.it.com for account setup and paid processing.",
+                  desc: "Click any Pro feature to open gravelkingpro.com for account setup and paid processing.",
                 },
               ].map((s) => (
                 <div key={s.step} className="flex gap-3">
@@ -186,7 +186,7 @@ export default function DownloadPage() {
                 <Zap className="w-4 h-4 text-amber-500" /> Upgrade Anytime
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                The free download connects to <strong className="text-foreground">gravelkingpro.it.com</strong> for authentication and upgrades. Purchasing any paid plan unlocks additional processing via our servers — your local install automatically detects the upgrade.
+                The free download connects to <strong className="text-foreground">gravelkingpro.com</strong> for authentication and upgrades. Purchasing any paid plan unlocks additional processing via our servers — your local install automatically detects the upgrade.
               </p>
               <div className="space-y-2">
                 {[
@@ -270,7 +270,7 @@ export default function DownloadPage() {
 
         <p className="text-center text-xs text-muted-foreground">
           © {new Date().getFullYear()} GravelKing Productions · All N One LLC ·{" "}
-          <a href="mailto:kevm@gravelkingpro.it.com" className="text-amber-500 hover:text-amber-400 underline">kevm@gravelkingpro.it.com</a>
+          <a href="mailto:kevm@gravelkingpro.com" className="text-amber-500 hover:text-amber-400 underline">kevm@gravelkingpro.com</a>
         </p>
 
       </motion.div>

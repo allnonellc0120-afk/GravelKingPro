@@ -5,7 +5,7 @@ Updated: 2026-08-03
 ## Current workspace state
 
 - Main product: GravelKing Pro audio platform.
-- Live website: `https://gravelkingpro.it.com`
+- Live website: `https://gravelkingpro.com`
 - Main web artifact: `artifacts/gravelkingpro`
 - Shared API artifact: `artifacts/api-server`
 - Mobile artifact: `artifacts/gravelkingpro-mobile`

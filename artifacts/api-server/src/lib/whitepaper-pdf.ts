@@ -77,7 +77,7 @@ export function buildWhitepaperPdf(): Buffer {
   doc.setFontSize(10.5);
   doc.setTextColor(113, 113, 122);
   doc.text("CONFIDENTIAL — For authorized enterprise evaluation only.", W / 2, 268, { align: "center" });
-  doc.text("gravelkingpro.it.com  ·  kevm@gravelkingpro.it.com", W / 2, 276, { align: "center" });
+  doc.text("gravelkingpro.com  ·  kevm@gravelkingpro.com", W / 2, 276, { align: "center" });
 
   // ── Layout helpers ──────────────────────────────────────────────────────────
   const section = (num: string, title: string) => {
@@ -248,7 +248,7 @@ export function buildWhitepaperPdf(): Buffer {
   bullet("Process isolation: each ingest request runs in a sandboxed child process with resource limits");
   bullet("Zero secrets in Docker image — all credentials injected at runtime");
   heading("Deployment Targets");
-  bullet("SaaS (gravelkingpro.it.com) — immediate access, usage-based billing");
+  bullet("SaaS (gravelkingpro.com) — immediate access, usage-based billing");
   bullet("AWS ECS / GCP Cloud Run — container registry publish, auto-scale on CPU, 99.9% SLA");
   bullet("On-premise Docker Compose — air-gapped for major labels and studios, no data egress");
   bullet("White-label API — custom subdomain, volume pricing, dedicated webhooks, custom branding");
@@ -272,11 +272,11 @@ export function buildWhitepaperPdf(): Buffer {
   doc.setLineWidth(0.4);
   doc.line(MARGIN_L, 102, MARGIN_R, 102);
   const contacts: Array<[string, string]> = [
-    ["Demo Lab", "gravelkingpro.it.com/verify"],
-    ["Enterprise Contact", "kevm@gravelkingpro.it.com"],
-    ["Technical Brief", "gravelkingpro.it.com/whitepaper"],
-    ["PDF Download (API)", "gravelkingpro.it.com/api/v1/download-whitepaper"],
-    ["API Spec (JSON)", "gravelkingpro.it.com/api/v1/whitepaper-spec"],
+    ["Demo Lab", "gravelkingpro.com/verify"],
+    ["Enterprise Contact", "kevm@gravelkingpro.com"],
+    ["Technical Brief", "gravelkingpro.com/whitepaper"],
+    ["PDF Download (API)", "gravelkingpro.com/api/v1/download-whitepaper"],
+    ["API Spec (JSON)", "gravelkingpro.com/api/v1/whitepaper-spec"],
   ];
   y = 120;
   contacts.forEach(([label, val]) => {

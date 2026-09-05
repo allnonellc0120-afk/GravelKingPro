@@ -14,4 +14,4 @@ Disallow: /weekend-special
 Disallow: /mix
 Disallow: /demo
 
-Sitemap: https://gravelkingpro.it.com/sitemap.xml
+Sitemap: https://gravelkingpro.com/sitemap.xml

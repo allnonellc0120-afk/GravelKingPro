@@ -155,22 +155,22 @@ function AnalyticsDashboard() {
     {
       key: "twitter1",
       label: "Twitter/X — Feature",
-      text: `🎚️ GravelKing Pro just dropped — JAX songwriting and IP provenance, Vocal Booth recording, Foundry mastering, and audio conversion in your browser.\n\nFree trial 👇\nhttps://gravelkingpro.it.com #MusicProduction #AudioMastering #IndieArtist`,
+      text: `🎚️ GravelKing Pro just dropped — JAX songwriting and IP provenance, Vocal Booth recording, Foundry mastering, and audio conversion in your browser.\n\nFree trial 👇\nhttps://gravelkingpro.com #MusicProduction #AudioMastering #IndieArtist`,
     },
     {
       key: "twitter2",
       label: "Twitter/X — IP angle",
-      text: `Your music has a fingerprint. GravelKing Pro embeds a cryptographic certificate into every master — provable, verifiable, court-ready.\n\nTry it free: https://gravelkingpro.it.com #MusicIP #Copyright #BeatMaker`,
+      text: `Your music has a fingerprint. GravelKing Pro embeds a cryptographic certificate into every master — provable, verifiable, court-ready.\n\nTry it free: https://gravelkingpro.com #MusicIP #Copyright #BeatMaker`,
     },
     {
       key: "instagram",
       label: "Instagram caption",
-      text: `Stop paying $200+ per track for mastering. GravelKing Pro brings JAX songwriting and IP provenance, Vocal Booth recording, Foundry mastering, and audio conversion into one focused toolkit. ☕🎛️\n\nLink in bio → https://gravelkingpro.it.com\n\n#GravelKing #AudioMastering #MusicProduction #IndieArtist #MusicBusiness #VocalBooth #MusicIP`,
+      text: `Stop paying $200+ per track for mastering. GravelKing Pro brings JAX songwriting and IP provenance, Vocal Booth recording, Foundry mastering, and audio conversion into one focused toolkit. ☕🎛️\n\nLink in bio → https://gravelkingpro.com\n\n#GravelKing #AudioMastering #MusicProduction #IndieArtist #MusicBusiness #VocalBooth #MusicIP`,
     },
     {
       key: "reddit",
       label: "Reddit post (r/WeAreTheMusicMakers)",
-      text: `I built GravelKing Pro — a browser-based creative audio toolkit\n\nHey r/WeAreTheMusicMakers — I've been building GravelKing Pro for the past year and it's finally live.\n\nWhat it does:\n• JAX songwriting companion with IP provenance certificates\n• Vocal Booth recording, clipping, splicing, and layering\n• The Foundry with Morris Law Kernel v3.5 mastering\n• Audio format conversion\n\nFree trial, no install: https://gravelkingpro.it.com\n\nWould love feedback from producers!`,
+      text: `I built GravelKing Pro — a browser-based creative audio toolkit\n\nHey r/WeAreTheMusicMakers — I've been building GravelKing Pro for the past year and it's finally live.\n\nWhat it does:\n• JAX songwriting companion with IP provenance certificates\n• Vocal Booth recording, clipping, splicing, and layering\n• The Foundry with Morris Law Kernel v3.5 mastering\n• Audio format conversion\n\nFree trial, no install: https://gravelkingpro.com\n\nWould love feedback from producers!`,
     },
     {
       key: "producthunt",
@@ -180,7 +180,7 @@ function AnalyticsDashboard() {
   ];
 
   const DIRECTORIES = [
-    { name: "Google Search Console", url: "https://search.google.com/search-console", desc: "Submit sitemap: https://gravelkingpro.it.com/sitemap.xml", urgent: true },
+    { name: "Google Search Console", url: "https://search.google.com/search-console", desc: "Submit sitemap: https://gravelkingpro.com/sitemap.xml", urgent: true },
     { name: "Bing Webmaster Tools", url: "https://www.bing.com/webmasters", desc: "Submit sitemap to reach Bing & DuckDuckGo traffic", urgent: true },
     { name: "Product Hunt", url: "https://www.producthunt.com/posts/new", desc: "Schedule a launch — can drive hundreds of signups in 24h", urgent: true },
     { name: "Indie Hackers", url: "https://www.indiehackers.com/product/new", desc: "Post your product and MRR story", urgent: false },
@@ -375,11 +375,11 @@ function AnalyticsDashboard() {
               <CardContent className="pt-5 space-y-4">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">SEO Checklist — do these first</div>
                 {[
-                  { done: true, label: "Sitemap at /sitemap.xml", detail: "gravelkingpro.it.com/sitemap.xml ✓" },
+                  { done: true, label: "Sitemap at /sitemap.xml", detail: "gravelkingpro.com/sitemap.xml ✓" },
                   { done: true, label: "robots.txt configured", detail: "Allows all public pages, blocks /admin & /api ✓" },
                   { done: true, label: "Google verification file present", detail: "google47e9ec0db824f939.html ✓" },
                   { done: true, label: '"Gravel King" added to meta keywords', detail: 'Title & description now include both "GravelKing" and "Gravel King" ✓' },
-                  { done: false, label: "Submit sitemap to Google Search Console", detail: "Go to search.google.com/search-console → Sitemaps → paste https://gravelkingpro.it.com/sitemap.xml" },
+                  { done: false, label: "Submit sitemap to Google Search Console", detail: "Go to search.google.com/search-console → Sitemaps → paste https://gravelkingpro.com/sitemap.xml" },
                   { done: false, label: "Submit sitemap to Bing Webmaster Tools", detail: "Covers Bing + DuckDuckGo in one step" },
                   { done: false, label: "Launch on Product Hunt", detail: "Single biggest free traffic spike available — plan for a Tuesday–Thursday launch" },
                 ].map((item) => (

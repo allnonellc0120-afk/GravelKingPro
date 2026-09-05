@@ -162,7 +162,7 @@ async function buildValuationBrief(outDir: string) {
 
   newPage(ctx);
   heading(ctx, "1. What Is Being Valued");
-  body(ctx, "GravelKing Pro is a live, revenue-wired music platform: AI-attributed IP certification (split-key certificates), proprietary Morris Law Kernel v3.5 multi-band mastering DSP, browser Vocal Booth and karaoke DAW, generative music pipeline, Stripe + Google Play billing, Android TWA on the Play Store, and a production deployment at gravelkingpro.it.com. Built and shipped bootstrapped by a solo founder.");
+  body(ctx, "GravelKing Pro is a live, revenue-wired music platform: AI-attributed IP certification (split-key certificates), proprietary Morris Law Kernel v3.5 multi-band mastering DSP, browser Vocal Booth and karaoke DAW, generative music pipeline, Stripe + Google Play billing, Android TWA on the Play Store, and a production deployment at gravelkingpro.com. Built and shipped bootstrapped by a solo founder.");
   divider(ctx);
 
   heading(ctx, "2. Asset-Based Valuation (Replacement Cost)");
@@ -171,7 +171,7 @@ async function buildValuationBrief(outDir: string) {
     ["Split-key cert + provenance architecture", "$200K - $500K", "Nominator in audio LSBs, denominator + HMAC server-side; AI attribution + catalog screening on every cert."],
     ["Generative pipeline + AI integrations", "$150K - $400K", "Lyria 3 generation, Gemini pre-pass safety, authorship scoring, karaoke sync."],
     ["Registry data + customer base", "$50K - $200K", "Growing certified-track registry; compounds as a data asset no acquirer can rebuild retroactively."],
-    ["Brand, domain, store presence", "$20K - $80K", "gravelkingpro.it.com, Play Store listing, referral program."],
+    ["Brand, domain, store presence", "$20K - $80K", "gravelkingpro.com, Play Store listing, referral program."],
   ];
   for (const [name, range, note] of rows) {
     ensureSpace(ctx, 50);
@@ -258,28 +258,28 @@ async function buildOutreachPlaybook(outDir: string) {
       why: "Cross-border VC with an explicit music-tech / creator-tools investment thesis.",
       route: "Official site contact form + LinkedIn partner outreach. No public email verified.",
       angle: "They look for infrastructure plays, not another streaming app. Pitch certification-as-infrastructure: the credit bureau of AI-era music.",
-      message: "Hi - I built GravelKing Pro, a live platform that masters, certifies, and AI-attributes music. Every track gets a split-key certificate with the AI model named and a catalog screen result. It's live on web + Google Play, billing wired, bootstrapped solo. Given your music-tech infrastructure thesis, I'd value 15 minutes: [public deck link] + live demo at gravelkingpro.it.com.",
+      message: "Hi - I built GravelKing Pro, a live platform that masters, certifies, and AI-attributes music. Every track gets a split-key certificate with the AI model named and a catalog screen result. It's live on web + Google Play, billing wired, bootstrapped solo. Given your music-tech infrastructure thesis, I'd value 15 minutes: [public deck link] + live demo at gravelkingpro.com.",
     },
     {
       name: "2. Decile Access / Joker Deck Ventures",
       why: "Early-stage network writing micro-checks into pre-seed products already in market.",
       route: "Decile Group network application on official site; LinkedIn for the Joker Deck GP.",
       angle: "They favor shipped products with founders who don't need permission. Lead with 'live in production, bootstrapped to billing' - that IS their filter.",
-      message: "Hi - solo founder, shipped product: GravelKing Pro certifies who made a song (human vs AI, catalog-screened) and masters it with proprietary DSP. Live on web and Play Store with Stripe + Play Billing wired. Pre-seed opening now. Public deck: [link]. Live: gravelkingpro.it.com.",
+      message: "Hi - solo founder, shipped product: GravelKing Pro certifies who made a song (human vs AI, catalog-screened) and masters it with proprietary DSP. Live on web and Play Store with Stripe + Play Billing wired. Pre-seed opening now. Public deck: [link]. Live: gravelkingpro.com.",
     },
     {
       name: "3. Amplify Music Ventures / Amplify.LA",
       why: "LA accelerator/fund with a music-tech portfolio and hands-on GTM support.",
       route: "Application form on official site; warm intros via their portfolio founders on LinkedIn.",
       angle: "They add distribution muscle. Pitch the wedge: free cert stamping grows the registry, the $1.99 document and $9.99 Studio convert - they can pour fuel on a working funnel.",
-      message: "Hi Amplify team - GravelKing Pro is a live music platform where creators master, record, and get AI-attribution certificates ($1.99/doc, $9.99/mo Studio). Free stamping seeds a provenance registry that compounds. I want a partner who knows music GTM. Deck: [link], live at gravelkingpro.it.com.",
+      message: "Hi Amplify team - GravelKing Pro is a live music platform where creators master, record, and get AI-attribution certificates ($1.99/doc, $9.99/mo Studio). Free stamping seeds a provenance registry that compounds. I want a partner who knows music GTM. Deck: [link], live at gravelkingpro.com.",
     },
     {
       name: "4. Jukebox",
       why: "Music investment platform - fans and investors buying into music royalties and assets.",
       route: "Official site contact/partnerships page.",
       angle: "Their whole model depends on clean chain-of-title. Pitch certification as the diligence layer for every asset they list: partnership first, investment second.",
-      message: "Hi - royalty investing only works when provenance is clean. GravelKing Pro issues split-key certificates recording who made each track (human vs AI) plus a commercial-catalog screen. Could be a diligence layer for assets on Jukebox. 15 minutes to explore a partnership or more? gravelkingpro.it.com.",
+      message: "Hi - royalty investing only works when provenance is clean. GravelKing Pro issues split-key certificates recording who made each track (human vs AI) plus a commercial-catalog screen. Could be a diligence layer for assets on Jukebox. 15 minutes to explore a partnership or more? gravelkingpro.com.",
     },
     {
       name: "5. Yamaha Music Innovations",
@@ -293,7 +293,7 @@ async function buildOutreachPlaybook(outDir: string) {
       why: "Pre-seed fund investing specifically in music-tech infrastructure.",
       route: "Official site pitch form; LinkedIn GP outreach.",
       angle: "Exact stage + sector match. Don't oversell - state stage, traction wiring, and the ask window plainly. They see hundreds of decks; live product is the differentiator.",
-      message: "Hi Backbeat - pre-seed music-tech: GravelKing Pro, live AI-attribution certification + proprietary mastering, web + Play Store, billing wired, solo founder, bootstrapped. Opening a seed conversation this quarter. Deck: [link]. Live: gravelkingpro.it.com.",
+      message: "Hi Backbeat - pre-seed music-tech: GravelKing Pro, live AI-attribution certification + proprietary mastering, web + Play Store, billing wired, solo founder, bootstrapped. Opening a seed conversation this quarter. Deck: [link]. Live: gravelkingpro.com.",
     },
     {
       name: "7. Creator Ventures",
@@ -314,7 +314,7 @@ async function buildOutreachPlaybook(outDir: string) {
       why: "Seed fund with music/entertainment exposure. The only prospect with a verified public email.",
       route: "Email contact@sbg.vc directly. This is the first message to send - lowest friction.",
       angle: "Straight seed pitch with the strongest proof points up front; ask for a call, offer the demo.",
-      message: "Subject: Live music-IP certification platform - seed. Hi SBG team - I'm the founder of GravelKing Pro (gravelkingpro.it.com): AI-attribution certificates + proprietary mastering, live on web and Google Play with billing wired, bootstrapped solo. Warner's Sureel acquisition shows where attribution is heading. Public deck attached - could I get 15 minutes this week or next?",
+      message: "Subject: Live music-IP certification platform - seed. Hi SBG team - I'm the founder of GravelKing Pro (gravelkingpro.com): AI-attribution certificates + proprietary mastering, live on web and Google Play with billing wired, bootstrapped solo. Warner's Sureel acquisition shows where attribution is heading. Public deck attached - could I get 15 minutes this week or next?",
     },
     {
       name: "10. Sound Media Ventures",
@@ -328,14 +328,14 @@ async function buildOutreachPlaybook(outDir: string) {
       why: "Rights-cleared AI training data company - adjacent, not competing. Reports of a 2026 raise are UNVERIFIED.",
       route: "Official site + LinkedIn to founders. Partnership conversation, not a cold pitch for money.",
       angle: "Their business needs attribution records; ours produces them. Open as data/API partnership - if it works, they're a natural acquirer of the registry.",
-      message: "Hi - you're solving rights-cleared training; I'm solving rights-cleared output. GravelKing Pro certificates record human vs AI contribution per track with catalog screening. Feels like our registries should talk - open to a 20-minute call on a data partnership? gravelkingpro.it.com.",
+      message: "Hi - you're solving rights-cleared training; I'm solving rights-cleared output. GravelKing Pro certificates record human vs AI contribution per track with catalog screening. Feels like our registries should talk - open to a 20-minute call on a data partnership? gravelkingpro.com.",
     },
     {
       name: "12. AudioShake  [partner/acquirer track]",
       why: "AI stem separation leader; complementary tech. Reports about their seed round are UNVERIFIED.",
       route: "Official site contact; LinkedIn.",
       angle: "Their stems feed production; our certs prove provenance of the result. Integration partnership first (stems in, certified masters out), acquisition optionality later.",
-      message: "Hi AudioShake team - GravelKing Pro masters and certifies tracks with AI-attribution built in. Your separation + our certification = a full provenance-safe production loop. Worth 20 minutes to explore an integration? Live product: gravelkingpro.it.com.",
+      message: "Hi AudioShake team - GravelKing Pro masters and certifies tracks with AI-attribution built in. Your separation + our certification = a full provenance-safe production loop. Worth 20 minutes to explore an integration? Live product: gravelkingpro.com.",
     },
   ];
 

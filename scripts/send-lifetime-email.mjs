@@ -19,7 +19,7 @@ Node Auditor is the top tier — everything unlocked:
 - Every future Pro feature as it ships
 
 How to activate (takes 10 seconds):
-1. Go to https://gravelkingpro.it.com
+1. Go to https://gravelkingpro.com
 2. Click Sign In and choose Continue with Google
 3. Use THIS email address (martypodany63@gmail.com) — your lifetime access applies automatically the moment you sign in. No code needed.
 
@@ -27,7 +27,7 @@ If anything doesn't show up unlocked after you sign in, just reply to this email
 
 Welcome aboard,
 GravelKing Pro — All N One LLC
-https://gravelkingpro.it.com
+https://gravelkingpro.com
 `;
 
 const raw = [
