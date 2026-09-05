@@ -83,3 +83,4 @@
 - [JAX route faked responses](jax-route-faked-responses.md) — generation routes must call the live model; never canned placeholder strings
 - [Stripe wallet domain](stripe-wallet-domain.md) — embedded Apple/Google Pay need a validated Payment Method Domain + live .well-known association file; live domain is gravelkingpro.com (.it.com is dead)
 - [Credit pricing rules](credit-pricing-rules.md) — generation 20 credits, master+download 75, free certificates, Pro $6.99/800 weekly, King Pro $24.99/2,500 monthly with hard reset
+- [Revenue metric integrity](revenue-metric-integrity.md) — MRR is active live Stripe subscriptions only; trials stay separate, revenue is live charges net of refunds

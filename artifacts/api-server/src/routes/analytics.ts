@@ -12,7 +12,7 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type Stripe from "stripe";
-import { db, analyticsEventsTable, emailCaptureTable } from "@workspace/db";
+import { db, analyticsEventsTable, emailCaptureTable, usersTable } from "@workspace/db";
 import { recordAnalyticsEvent } from "../analytics";
 import { getUncachableStripeClient } from "../stripeClient";
 import { createHash } from "crypto";
@@ -234,6 +234,13 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
       .from(analyticsEventsTable)
       .where(gte(analyticsEventsTable.createdAt, since));
 
+    const [accountTotals] = await db
+      .select({
+        localRecords: sql<number>`count(*)`,
+        verifiedEmailAccounts: sql<number>`count(*) filter (where nullif(btrim(${usersTable.email}), '') is not null)`,
+      })
+      .from(usersTable);
+
     const seriesRows = await db
       .select({
         day: sql<string>`to_char(date_trunc('day', ${analyticsEventsTable.createdAt}), 'YYYY-MM-DD')`,
@@ -309,11 +316,14 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
             ...(startingAfter ? { starting_after: startingAfter } : {}),
           });
           for (const sub of page.data) {
+            // Production metrics must never count Stripe test-mode objects.
+            if (!sub.livemode) continue;
             if (status === "active") activeSubs += 1;
             else if (status === "trialing") trialingSubs += 1;
             else pastDueSubs += 1;
-            // Only count active + trialing toward MRR (past_due may never collect)
-            if (status === "active" || status === "trialing") {
+            // MRR is contracted live recurring revenue from active subscriptions.
+            // Trials have not converted and must remain visible only as trials.
+            if (status === "active") {
               for (const item of sub.items.data) {
                 mrrCents += monthlyCentsFor(item.price, item.quantity ?? 1);
               }
@@ -333,10 +343,11 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
           ...(chargeAfter ? { starting_after: chargeAfter } : {}),
         });
         for (const charge of page.data) {
-          if (charge.paid && !charge.refunded) {
-            lifetimeRevenueCents += charge.amount;
+          if (charge.livemode && charge.paid && charge.status === "succeeded") {
+            const netAmount = Math.max(0, charge.amount - charge.amount_refunded);
+            lifetimeRevenueCents += netAmount;
             if (charge.created >= windowStart) {
-              recentRevenueCents += charge.amount;
+              recentRevenueCents += netAmount;
             }
           }
         }
@@ -363,6 +374,13 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
     res.json({
       rangeDays: days,
       totals: { pageviews, uniqueVisitors, externalVisitors, checkoutStarts },
+      accounts: {
+        localRecords: Number(accountTotals?.localRecords ?? 0),
+        verifiedEmailAccounts: Number(accountTotals?.verifiedEmailAccounts ?? 0),
+        anonymousRecords:
+          Number(accountTotals?.localRecords ?? 0) -
+          Number(accountTotals?.verifiedEmailAccounts ?? 0),
+      },
       subscriptions: {
         active: activeSubs,
         trialing: trialingSubs,

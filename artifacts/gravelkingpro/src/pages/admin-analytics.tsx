@@ -17,6 +17,7 @@ import { useLocation } from "wouter";
 interface Summary {
   rangeDays: number;
   totals: { pageviews: number; uniqueVisitors: number; externalVisitors: number; checkoutStarts: number };
+  accounts: { localRecords: number; verifiedEmailAccounts: number; anonymousRecords: number };
   subscriptions: {
     active: number; trialing: number; pastDue: number; total: number;
     mrr: number; recentRevenue: number; lifetimeRevenue: number; stripeOk: boolean;
@@ -461,13 +462,15 @@ function AnalyticsDashboard() {
               <StatCard icon={<Users className="w-4 h-4" />} label="All Visitors" value={fmt(data.totals.uniqueVisitors)} sub={`last ${data.rangeDays}d (incl. internal)`} />
               <StatCard icon={<Users className="w-4 h-4 text-amber-400" />} label="External Visitors" value={fmt(data.totals.externalVisitors ?? data.totals.uniqueVisitors)} sub="excl. admin-only sessions" accent="text-amber-400" />
               <StatCard icon={<Eye className="w-4 h-4" />} label="Pageviews" value={fmt(data.totals.pageviews)} sub={`last ${data.rangeDays}d`} />
-              <StatCard icon={<Crown className="w-4 h-4 text-amber-500" />} label="Active Subs" value={fmt(data.subscriptions.active)} sub={data.subscriptions.pastDue > 0 ? `+ ${data.subscriptions.pastDue} past due` : "paying"} accent="text-amber-500" />
+              <StatCard icon={<Crown className="w-4 h-4 text-amber-500" />} label="Active Paid Subs" value={fmt(data.subscriptions.active)} sub={data.subscriptions.pastDue > 0 ? `+ ${data.subscriptions.pastDue} past due` : "live Stripe subscriptions"} accent="text-amber-500" />
+              <StatCard icon={<Users className="w-4 h-4 text-emerald-400" />} label="Verified Email Accounts" value={fmt(data.accounts.verifiedEmailAccounts)} sub="registered users with an email on file" accent="text-emerald-400" />
+              <StatCard icon={<Eye className="w-4 h-4 text-muted-foreground" />} label="Anonymous Local Records" value={fmt(data.accounts.anonymousRecords)} sub="visitors or partial sessions — not sign-ups" />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              <StatCard icon={<Clock className="w-4 h-4" />} label="Trialing" value={fmt(data.subscriptions.trialing)} sub="in free trial" />
-              <StatCard icon={<DollarSign className="w-4 h-4 text-emerald-400" />} label="MRR" value={data.subscriptions.stripeOk ? money(data.subscriptions.mrr) : "—"} sub={data.subscriptions.stripeOk ? "recurring/mo" : "stripe unavailable"} accent="text-emerald-400" />
-              <StatCard icon={<TrendingUp className="w-4 h-4 text-sky-400" />} label={`Revenue (${data.rangeDays}d)`} value={data.subscriptions.stripeOk ? money(data.subscriptions.recentRevenue) : "—"} sub="from Stripe charges" accent="text-sky-400" />
-              <StatCard icon={<Wallet className="w-4 h-4 text-violet-400" />} label="Lifetime Revenue" value={data.subscriptions.stripeOk ? money(data.subscriptions.lifetimeRevenue) : "—"} sub="all-time charges" accent="text-violet-400" />
+              <StatCard icon={<Clock className="w-4 h-4" />} label="Live Trials" value={fmt(data.subscriptions.trialing)} sub="not counted as MRR" />
+              <StatCard icon={<DollarSign className="w-4 h-4 text-emerald-400" />} label="Verified Live MRR" value={data.subscriptions.stripeOk ? money(data.subscriptions.mrr) : "—"} sub={data.subscriptions.stripeOk ? "active live subscriptions only" : "stripe unavailable"} accent="text-emerald-400" />
+              <StatCard icon={<TrendingUp className="w-4 h-4 text-sky-400" />} label={`Net Live Revenue (${data.rangeDays}d)`} value={data.subscriptions.stripeOk ? money(data.subscriptions.recentRevenue) : "—"} sub="successful live charges less refunds" accent="text-sky-400" />
+              <StatCard icon={<Wallet className="w-4 h-4 text-violet-400" />} label="Lifetime Net Live Revenue" value={data.subscriptions.stripeOk ? money(data.subscriptions.lifetimeRevenue) : "—"} sub="successful live charges less refunds" accent="text-violet-400" />
             </div>
 
             {/* Funnel */}
@@ -493,7 +496,7 @@ function AnalyticsDashboard() {
                   {" · "}Activations (webhook): <span className="text-foreground font-semibold">{fmt(data.conversion.subscriptionActivations)}</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Current paying subs (all-time): <span className="text-foreground font-semibold">{fmt(data.subscriptions.total)}</span>
+                  Current live active + trialing subscriptions: <span className="text-foreground font-semibold">{fmt(data.subscriptions.total)}</span>
                   {" · "}External visitor→paid: <span className="text-foreground font-semibold">{data.conversion.externalVisitorToPaidPct ?? 0}%</span>
                   {" · "}Activations count webhook-confirmed subscriptions in this window.
                 </p>
