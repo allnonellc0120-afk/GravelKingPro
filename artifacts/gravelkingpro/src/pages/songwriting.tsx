@@ -378,6 +378,9 @@ export default function SongwritingStudio() {
   const generate = async () => {
     if (!prompt.trim() || generating) return;
     const submittedPrompt = prompt.trim();
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setListening(false);
     setChatMessages((messages) => [...messages, { id: crypto.randomUUID(), role: "user", content: submittedPrompt }]);
     setPrompt("");
     setGenerating(true);
