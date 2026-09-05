@@ -1,0 +1,37 @@
+SYSTEM OVERRIDE: PRIORITY DOCUMENTATION GENERATION
+Do not run background builds, touch audio pipelines, or modify UI components. Generate two clear, standalone documentation files in the project root right now based on the current live codebase and active settings.
+
+DOCUMENT 1: GravelKingPro_Simple_PitchDeck.md
+(Target: Plain-English, dummy-proof walkthrough for everyday creators and investors)
+- What GravelKing Pro is and why it exists.
+- The 4 core tools broken down simply:
+  1. JAX (Songwriting companion & lyric generator)
+  2. Vocal Booth (Drop your beat, record vocals, clip & slice)
+  3. The Foundry (Mastering tool to make it loud and ready for streaming)
+  4. Format Converter (Audio file converter)
+- Step-by-step walkthrough from blank page to mastered record:
+  * Talking to JAX to write bars
+  * Editing lines and capturing human proof
+  * Singing/rapping over beats in the booth
+  * Mastering with 1 click to hit streaming standards (-14 LUFS)
+  * Downloading your track and getting legal proof of ownership
+- Simple pricing breakdown (Free vs. Pro @ $9.99 vs. King @ $24.99) and what credits get used for.
+- What happens when you submit your finished track to a record label or streaming platform with your certificate.
+
+DOCUMENT 2: GravelKingPro_Technical_WhitePaper.md
+(Target: Comprehensive technical architecture and legal forensics)
+- Full system map of the Morris Kernel V3.5 engine:
+  * Current live DSP target specs (-14.0 LUFS, -1.0 dBTP ceiling, mid/side polarity alignment)
+  * Breakdown of what each mastering parameter is currently doing under the hood
+- JAX Architecture:
+  * Dual-engine logic (ElevenLabs voice generation vs. Gemini narrative/lyric logic)
+  * 16kHz PCM WebSocket streaming integration
+  * In-memory lore and character-level diff tracking
+- Legal Chain of Custody & Cryptography:
+  * HMAC-SHA256 dual-anchor hashing (Nominator, Denominator, Handshake)
+  * Lyric hashes vs. Raw PCM audio hashes
+  * Legal standing under 17 U.S.C. proving substantial human authorship against AI copyright rejections
+  * Verification endpoint `/api/kernel/verify-cert` operations
+- Exhaustive credit cost matrix and tier gating logic across every route.
+
+Halt immediately after writing both files. Output "DOCUMENTATION GENERATED" and list the exact file paths.
