@@ -1,6 +1,6 @@
 # Morris Law Kernel v3.5
 
-**Court-grade IP protection + production audio DSP — the technical moat for [GravelKing Pro](https://gravelkingpro.it.com).**
+**Court-grade IP protection + production audio DSP — the technical moat for [GravelKing Pro](https://gravelkingpro.com).**
 
 Owner: Kevin Morris / GravelKing Productions · Proprietary (see [LICENSE](LICENSE))
 

@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 GRAVELKING_VERIFY_URL = os.environ.get(
     "GRAVELKING_VERIFY_URL",
-    "https://gravelkingpro.it.com/api/kernel/verify-cert",
+    "https://gravelkingpro.com/api/kernel/verify-cert",
 )
 GKP_MAGIC = b"GKPW\x03"  # 5 bytes, format version 3 — must match kernel-v3.ts
 

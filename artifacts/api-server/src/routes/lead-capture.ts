@@ -73,10 +73,10 @@ router.post("/v1/lead-capture", async (req: Request, res: Response): Promise<voi
       const { Resend } = await import("resend");
       const resend = new Resend(resendKey);
 
-      const whitepaperUrl = "https://gravelkingpro.it.com/api/whitepaper.pdf";
+      const whitepaperUrl = "https://gravelkingpro.com/api/whitepaper.pdf";
 
       const { error } = await resend.emails.send({
-        from: "GravelKing Pro <noreply@gravelkingpro.it.com>",
+        from: "GravelKing Pro <noreply@gravelkingpro.com>",
         to: email!.trim(),
         subject: "Your GravelKing Pro Technical Brief + Demo API Key",
         html: `
@@ -102,10 +102,10 @@ router.post("/v1/lead-capture", async (req: Request, res: Response): Promise<voi
             </a>
 
             <p style="color: #a1a1aa; margin-bottom: 8px;">Try the live signal verification at:</p>
-            <a href="https://gravelkingpro.it.com/verify" style="color: #f59e0b;">gravelkingpro.it.com/verify</a>
+            <a href="https://gravelkingpro.com/verify" style="color: #f59e0b;">gravelkingpro.com/verify</a>
 
             <hr style="border: none; border-top: 1px solid #27272a; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #52525b;">GravelKing Productions · All N One LLC · <a href="mailto:kevm@gravelkingpro.it.com" style="color: #f59e0b;">kevm@gravelkingpro.it.com</a></p>
+            <p style="font-size: 12px; color: #52525b;">GravelKing Productions · All N One LLC · <a href="mailto:kevm@gravelkingpro.com" style="color: #f59e0b;">kevm@gravelkingpro.com</a></p>
           </div>
         `,
       });

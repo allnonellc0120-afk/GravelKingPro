@@ -3,18 +3,18 @@ import { Router, Request, Response } from "express";
 const downloadRouter = Router();
 
 const README_CONTENT = `# GravelKing Productions — Free Edition v1.0
-# © ${new Date().getFullYear()} All N One LLC | kevm@gravelkingpro.it.com | gravelkingpro.it.com
+# © ${new Date().getFullYear()} All N One LLC | kevm@gravelkingpro.com | gravelkingpro.com
 
 ## What This Is
 GravelKing Productions Free Edition runs on your local machine using Node.js and ffmpeg.
-Free features process audio locally. Paid features route to gravelkingpro.it.com automatically.
+Free features process audio locally. Paid features route to gravelkingpro.com automatically.
 
 ## Free Tier (limited, 100% local processing)
 - Voice Removal — 3 free runs (downloadable WAV)
 - Stem Splitting — 1 free run (5 stems: vocals, drums, bass, other, instrumental)
 - Mastering — 1 full free download, then 30-second previews (all presets, denoise toggle)
 
-## Paid Features (Connects to gravelkingpro.it.com)
+## Paid Features (Connects to gravelkingpro.com)
 - GravelKing Weekly ($9.99/week): unlimited voice removal + stem splitting, preset mastering with denoise
 - GravelKing Studio ($29.99/mo): everything in Weekly plus fully adjustable mastering and the live DAW (multitrack mixing, recording, per-stem live metrics)
 - Node Auditor ($249.50/mo): Kernel Dashboard, remote endpoint access, raw telemetry
@@ -36,25 +36,25 @@ Free features process audio locally. Paid features route to gravelkingpro.it.com
 4. Run: pnpm --filter @workspace/api-server run dev
 5. Open: http://localhost:5000
 
-### Connecting to gravelkingpro.it.com (for upgrades)
-The app automatically connects to https://gravelkingpro.it.com when you:
+### Connecting to gravelkingpro.com (for upgrades)
+The app automatically connects to https://gravelkingpro.com when you:
 - Click any Pro/Splits feature
 - Sign in via the auth flow
 - Your local server proxies paid processing securely
 
 ### Environment (optional)
 Create a .env file in artifacts/api-server/ with:
-  REMOTE_KERNEL_URL=https://gravelkingpro.it.com/api/kernel
+  REMOTE_KERNEL_URL=https://gravelkingpro.com/api/kernel
   REMOTE_KERNEL_API_KEY=your_key_here
 
 ## Architecture
   Free tier  →  Local ffmpeg processing  (your machine)
-  Paid tier  →  gravelkingpro.it.com API  (GravelKing servers)
+  Paid tier  →  gravelkingpro.com API  (GravelKing servers)
   Kernel     →  MLK v3 multi-band amplitude carving (local or remote)
 
 ## Support
-Email:   kevm@gravelkingpro.it.com
-Website: https://gravelkingpro.it.com
+Email:   kevm@gravelkingpro.com
+Website: https://gravelkingpro.com
 
 ────────────────────────────────────────────
 GravelKing Productions | All N One LLC

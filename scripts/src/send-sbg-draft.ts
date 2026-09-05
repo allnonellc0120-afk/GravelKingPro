@@ -32,7 +32,7 @@ async function main() {
   const subject = "Live music-IP certification platform - seed";
   const to = "contact@sbg.vc";
   const body =
-    "Hi SBG team - I'm the founder of GravelKing Pro (gravelkingpro.it.com): " +
+    "Hi SBG team - I'm the founder of GravelKing Pro (gravelkingpro.com): " +
     "AI-attribution certificates + proprietary mastering, live on web and Google Play " +
     "with billing wired, bootstrapped solo. Warner's Sureel acquisition shows where " +
     "attribution is heading. Public deck attached - could I get 15 minutes this week or next?";

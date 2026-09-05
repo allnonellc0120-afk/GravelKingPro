@@ -19,7 +19,7 @@ export default function Contact() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
-    const mailto = `mailto:kevm@gravelkingpro.it.com?subject=${encodeURIComponent(subject || "GravelKing Productions Inquiry")}&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\n${message}`)}`;
+    const mailto = `mailto:kevm@gravelkingpro.com?subject=${encodeURIComponent(subject || "GravelKing Productions Inquiry")}&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\n${message}`)}`;
     window.location.href = mailto;
     setTimeout(() => {
       setSending(false);
@@ -43,8 +43,8 @@ export default function Contact() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            { icon: <Mail className="w-5 h-5 text-amber-500" />, label: "Email", value: "kevm@gravelkingpro.it.com", href: "mailto:kevm@gravelkingpro.it.com" },
-            { icon: <Globe className="w-5 h-5 text-sky-400" />, label: "Website", value: "gravelkingpro.it.com", href: "https://gravelkingpro.it.com" },
+            { icon: <Mail className="w-5 h-5 text-amber-500" />, label: "Email", value: "kevm@gravelkingpro.com", href: "mailto:kevm@gravelkingpro.com" },
+            { icon: <Globe className="w-5 h-5 text-sky-400" />, label: "Website", value: "gravelkingpro.com", href: "https://gravelkingpro.com" },
             { icon: <Building2 className="w-5 h-5 text-emerald-400" />, label: "Company", value: "All N One LLC", href: undefined },
           ].map((item) => (
             <Card key={item.label} className="border-border/40 bg-card/40">

@@ -7,7 +7,7 @@ import { Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
 
 export default function DemoLogin() {
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("play-reviewer@gravelkingpro.it.com");
+  const [email, setEmail] = useState("play-reviewer@gravelkingpro.com");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

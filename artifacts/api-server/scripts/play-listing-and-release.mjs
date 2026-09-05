@@ -60,7 +60,7 @@ Made for independent artists who want to own their music — and prove it.`,
 await j(await fetch(`${E}/details`, {
   method: "PUT",
   headers: { ...H, "Content-Type": "application/json" },
-  body: JSON.stringify({ defaultLanguage: "en-US", contactWebsite: "https://gravelkingpro.it.com", contactEmail: "support@gravelkingpro.it.com" }),
+  body: JSON.stringify({ defaultLanguage: "en-US", contactWebsite: "https://gravelkingpro.com", contactEmail: "support@gravelkingpro.com" }),
 }), "details", false);
 
 // 3. images

@@ -17,18 +17,18 @@
         \"relation\": [\"delegate_permission/common.handle_all_urls\"],
         \"target\": {
             \"namespace\": \"web\",
-            \"site\": \"https://gravelkingpro.it.com\"
+            \"site\": \"https://gravelkingpro.com\"
         }
     }]
     
   </string>
     <string name="fallbackType" translatable="false">customtabs</string>
-    <string name="fullScopeUrl" translatable="false">https://gravelkingpro.it.com/</string>
+    <string name="fullScopeUrl" translatable="false">https://gravelkingpro.com/</string>
     <string name="generatorApp" translatable="false">bubblewrap-cli</string>
-    <string name="hostName" translatable="false">gravelkingpro.it.com</string>
-    <string name="launchUrl" translatable="false">https://gravelkingpro.it.com/</string>
+    <string name="hostName" translatable="false">gravelkingpro.com</string>
+    <string name="launchUrl" translatable="false">https://gravelkingpro.com/</string>
     <string name="launcherName" translatable="false">GravelKing</string>
     <string name="orientation" translatable="false">default</string>
     <string name="providerAuthority" translatable="false">com.gravelkingpro.app.fileprovider</string>
-    <string name="webManifestUrl" translatable="false">https://gravelkingpro.it.com/manifest.webmanifest</string>
+    <string name="webManifestUrl" translatable="false">https://gravelkingpro.com/manifest.webmanifest</string>
 </resources>

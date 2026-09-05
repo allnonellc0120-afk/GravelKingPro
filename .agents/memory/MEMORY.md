@@ -9,7 +9,7 @@
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [Python MLK is sole mastering DSP](mlk-python-primary.md) — worker subprocess, no ffmpeg fallback by user directive; handover kernel had signal-nulling bugs (fixed both copies); verify handover code numerically before wiring
 - [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
-- [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.it.com for paid
+- [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.com for paid
 - [Object storage public prefix](object-storage-public-prefix.md) — public assets must live UNDER the PUBLIC_OBJECT_SEARCH_PATHS prefix, not bucket root, or the serve route 404s
 - [Clerk auth migration](clerk-auth-migration.md) — users.id bridge = sessionClaims.userId; req.dbUser replaces req.isAuthenticated(); gk_session + Bearer-sid fallbacks must survive
 - [Clerk vs gk_session subscription status](oidc-subscription-status.md) — /api/subscription/status must check req.dbUser FIRST; Clerk users never get a gk_session cookie so they'd show isPro:false without this
@@ -51,7 +51,7 @@
 - [IP Cert split-key architecture](cert-split-architecture.md) — nominator in track LSBs, denominator+HMAC on server only; dual-stored Postgres+Firestore; style score 0–100 in cert
 - [Authorship scoring](authorship-scoring.md) — shared @workspace/authorship lib (diff-match-patch); score MUST stay 0–100 to preserve >=25 copyright gate; delete+retype-same=0 credit; client import aliased to avoid state-var collision
 - [Admin Ops diagnostics pattern](admin-ops-diagnostics.md) — logToolError/recordActivity conventions, admin_settings-backed kill switch (bypasses via isAdminAuthenticated not requireAdmin), /tmp-scoped cache purge
-- [Custom domain + GoDaddy DNS](custom-domain-godaddy.md) — gravelkingpro.it.com attached to THIS repl's deploy; relink issues new replit-verify TXT; GoDaddy API secrets exist; PUT replaces ALL apex TXT (keep MS/SPF)
+- [Custom domain + GoDaddy DNS](custom-domain-godaddy.md) — gravelkingpro.com attached to THIS repl's deploy; relink issues new replit-verify TXT; GoDaddy API secrets exist; PUT replaces ALL apex TXT (keep MS/SPF)
 - [Tailwind v4 legacy directives](tailwind-v4-legacy-directives.md) — v3 @tailwind lines under the v4 engine compile a PARTIAL utility set (inset-0/from-* missing) → invisible 0×0 UIs; use @import 'tailwindcss'; ?still/?scene poster QA for videos
 - [Two MLK v3.5 products](mlk-naming-collision.md) — audio Morris Law Kernel ≠ mlk-licensing matrix-multiplication site; never mix assets/copy between them
 - [PWA SW navigateFallback hijack](pwa-sw-navigate-fallback.md) — generateSW serves SPA shell for /api/* navigations → sign-in 404s for RETURNING users only; curl can't see it; denylist server + sibling-artifact prefixes

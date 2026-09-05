@@ -1,7 +1,7 @@
 # GravelKing Pro — White Paper
 
 **Write. Compose. Record. Master. Release with Proof.**
-gravelkingpro.it.com · September 2026
+gravelkingpro.com · September 2026
 
 ---
 
@@ -75,7 +75,7 @@ Certificates are **free to stamp**; the official document is unlocked per-track 
 
 ## 8. Status
 
-Live at gravelkingpro.it.com (custom domain, production deployment). Android app in Play review track. Stripe live. JAX, Vocal Booth, Foundry, and certificate pipeline all in production.
+Live at gravelkingpro.com (custom domain, production deployment). Android app in Play review track. Stripe live. JAX, Vocal Booth, Foundry, and certificate pipeline all in production.
 
 ---
 

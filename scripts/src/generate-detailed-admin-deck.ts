@@ -336,7 +336,7 @@ async function createDetailedAdminDeck() {
       subheading("Day 1: Hook — The Rights Crisis");
       page.drawText("Instagram / TikTok / Facebook", { x: margin, y, size: 10, font: fb, color: accent });
       y -= 14;
-      body("200 million AI tracks hit streaming last year. If you used AI to help write your song, can you prove YOU made it? GravelKing Pro can. Start free at gravelkingpro.it.com.");
+      body("200 million AI tracks hit streaming last year. If you used AI to help write your song, can you prove YOU made it? GravelKing Pro can. Start free at gravelkingpro.com.");
       y -= 10;
       page.drawText("LinkedIn / X", { x: margin, y, size: 10, font: fb, color: accent });
       y -= 14;
@@ -366,7 +366,7 @@ async function createDetailedAdminDeck() {
       body('Post: Show the IP certificate UI. "This is your proof-of-ownership document. Not metadata. Not a receipt. A forensic record of your human creative contribution."');
       y -= 10;
       subheading("Day 6: Offer — Free Trial");
-      body('Post: "7-day free trial of Pro Plus. Full studio, unlimited runs, IP certificates. Cancel anytime. Try it at gravelkingpro.it.com."');
+      body('Post: "7-day free trial of Pro Plus. Full studio, unlimited runs, IP certificates. Cancel anytime. Try it at gravelkingpro.com."');
       y -= 10;
       subheading("Day 7: Behind the Scenes / Founder");
       body("Post: Personal founder story. Kevin Morris, the MLK engine, why the problem matters. Build trust and humanize the brand.");

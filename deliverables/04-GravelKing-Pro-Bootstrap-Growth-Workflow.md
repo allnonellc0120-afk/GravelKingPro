@@ -11,7 +11,7 @@
 ## 1. Assets We Already Have
 
 - 59-second vertical promo video (JAX → Vocal Booth → Foundry → certificate) — TikTok/Reels/Shorts ready.
-- Live product at gravelkingpro.it.com with free tier (JAX writing + Vocal Booth recording).
+- Live product at gravelkingpro.com with free tier (JAX writing + Vocal Booth recording).
 - $1.99 certificate impulse unlock — the lowest-friction paid moment in music software.
 - Referral program: commission paid only on verified paid invoices.
 

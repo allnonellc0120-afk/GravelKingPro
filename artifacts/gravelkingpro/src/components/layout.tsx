@@ -265,7 +265,7 @@ export function Layout({
                 <User className="w-3 h-3" />Account
               </span>
             </Link>
-            <a href="https://gravelkingpro.it.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition-colors">gravelkingpro.it.com</a>
+            <a href="https://gravelkingpro.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition-colors">gravelkingpro.com</a>
             <a
               href="https://www.f6s.com/member/kevin-mo?follow=1"
               target="_blank"

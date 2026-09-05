@@ -1035,7 +1035,7 @@ export default function Mastering() {
                   <Button variant="outline" onClick={reset} className="border-border/40">New File</Button>
                 </div>
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("Just mastered my track with GravelKing Pro 🎚️ Server-side mastering, no plugins needed — free to try → gravelkingpro.it.com #MusicProduction #Mastering #AudioEngineering #BeatMaker")}`}
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("Just mastered my track with GravelKing Pro 🎚️ Server-side mastering, no plugins needed — free to try → gravelkingpro.com #MusicProduction #Mastering #AudioEngineering #BeatMaker")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 w-full rounded-md border border-border/40 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"

@@ -162,7 +162,7 @@ async function createWhitePaper() {
   drawParagraph(page, "MLK v3 is not a filter. It is not a preset. It is a mathematically verified, multi-band amplitude carving engine that transforms raw audio into broadcast-ready output with guaranteed integrity.");
   drawParagraph(page, "For independent artists, producers, and engineers, GravelKing Pro puts that same engine at the center of every workflow. From the first upload to the final master, MLK v3 ensures your signal is as strong as the grit that inspired it.");
   drawParagraph(page, "The GravelKing name came from the grit. The MLK v3 engine came from the discipline. Together, they are GravelKing Productions.");
-  drawParagraph(page, "Download GravelKing Pro at gravelkingpro.it.com.");
+  drawParagraph(page, "Download GravelKing Pro at gravelkingpro.com.");
   drawParagraph(page, "Follow Kevin Morris live: StarMaker, KevJamm84, The Juke Joint party room, Friday & Saturday nights at 8 PM CST.");
 
   // ===== FOOTER =====

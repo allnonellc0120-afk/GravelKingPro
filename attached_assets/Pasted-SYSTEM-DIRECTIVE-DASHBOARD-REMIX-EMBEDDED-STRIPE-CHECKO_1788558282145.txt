@@ -7,7 +7,7 @@ DO NOT REMOVE OR BREAK THE MASTERING TOOL (/mastering). The mastering engine (Mo
 
 TASK 1: COMPLIANCE & CRITICAL HOOKS
 - Google Play Compliance: Immediately create a clean, responsive public route at `/data-deletion`. Provide an account deletion request mechanism (email target: Allnonellc0120@gmail.com) to resolve the Google Play Policy warning before September 17, 2026.
-- Webhook Domain Lock: Verify `/api/stripe/webhook` handles live Stripe events and ensure it matches the production domain (https://gravelkingpro.it.com/api/stripe/webhook).
+- Webhook Domain Lock: Verify `/api/stripe/webhook` handles live Stripe events and ensure it matches the production domain (https://gravelkingpro.com/api/stripe/webhook).
 
 TASK 2: LANDING PAGE & DASHBOARD REMIX
 - Keep and highlight the dedicated mastering tool: "The Foundry / Audio Mastering (Morris Law Kernel V3.5)".

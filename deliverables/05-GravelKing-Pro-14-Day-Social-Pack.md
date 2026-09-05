@@ -2,7 +2,7 @@
 
 *Ready-to-post copy for Facebook, TikTok, and Reddit — Days 1–14. Each block has the post text plus an IMAGE PROMPT to paste into Gemini for the matching visual. Hand the whole file to Nina; each day is self-contained.*
 
-**Link in bio / profile: gravelkingpro.it.com — never beg, always show.**
+**Link in bio / profile: gravelkingpro.com — never beg, always show.**
 **Hashtag base (rotate 3–5 per post):** #songwriting #independentartist #originalmusic #musicproducer #singersongwriter #newmusic #songwriter
 
 ---
@@ -10,7 +10,7 @@
 ## DAY 1
 
 **Facebook**
-> I wrote a song about my ex at 1am, had it mastered by breakfast, and by lunch I held a cryptographic certificate proving every word is mine. No studio. No $1,000 invoice. Just my phone. If you write songs and you've never been able to PROVE they're yours — this is for you. First verse is free: gravelkingpro.it.com
+> I wrote a song about my ex at 1am, had it mastered by breakfast, and by lunch I held a cryptographic certificate proving every word is mine. No studio. No $1,000 invoice. Just my phone. If you write songs and you've never been able to PROVE they're yours — this is for you. First verse is free: gravelkingpro.com
 
 **TikTok** (caption; video = screen record the JAX chat writing a verse)
 > POV: it's 2026 and you can finally prove the song is yours 📝🔒 #songwriting #independentartist #originalmusic
@@ -86,7 +86,7 @@
 ## DAY 6
 
 **Facebook**
-> Saturday challenge: give JAX one line — any line — and see what it turns into. Sad, angry, funny, whatever. Post your favorite result below. First verse free at gravelkingpro.it.com.
+> Saturday challenge: give JAX one line — any line — and see what it turns into. Sad, angry, funny, whatever. Post your favorite result below. First verse free at gravelkingpro.com.
 
 **TikTok**
 > I gave an AI ONE line and it wrote the whole verse… then I made it a real song 🔥 (screen record: prompt → lyrics → generate → play 5 seconds)
@@ -208,7 +208,7 @@
 ## DAY 14
 
 **Facebook**
-> Two weeks in. What I learned: songwriters don't want another complicated tool. They want to write, sing, and own it. So that's the whole product: JAX writes with you, Vocal Booth records you, the Foundry masters it, and the certificate proves it's yours. Free to start: gravelkingpro.it.com
+> Two weeks in. What I learned: songwriters don't want another complicated tool. They want to write, sing, and own it. So that's the whole product: JAX writes with you, Vocal Booth records you, the Foundry masters it, and the certificate proves it's yours. Free to start: gravelkingpro.com
 
 **TikTok**
 > I built the app I needed as a songwriter. Here's the whole thing in 59 seconds. (use the JAX promo video)

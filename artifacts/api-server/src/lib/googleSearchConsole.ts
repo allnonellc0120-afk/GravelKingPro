@@ -13,8 +13,8 @@
  * to that email in the GSC dashboard).
  */
 
-const SITE_URL = "https://gravelkingpro.it.com/";
-const SITEMAP_URL = "https://gravelkingpro.it.com/sitemap.xml";
+const SITE_URL = "https://gravelkingpro.com/";
+const SITEMAP_URL = "https://gravelkingpro.com/sitemap.xml";
 const SCOPES = ["https://www.googleapis.com/auth/webmasters"];
 
 interface ServiceAccountKey {

@@ -128,7 +128,7 @@ async function createDetailedPitchDeck() {
       page.drawText("We Built the Proof — And the Platform That Captures It.", { x: margin, y: pageH - 250, size: 14, font: f, color: lightGray });
       page.drawText("High-Performance Sales Tactic: Lead with the Liability, Not the Feature.", { x: margin, y: pageH - 320, size: 12, font: fb, color: accent });
       body("Every distributor, label, and attorney will soon need chain-of-title documentation for AI-assisted music. GravelKing Pro is the only live platform that produces it automatically while the artist creates. We do not sell a DAW. We sell legal protection against a $200M-problem tidal wave.");
-      page.drawText("gravelkingpro.it.com", { x: margin, y: 70, size: 11, font: fb, color: accent });
+      page.drawText("gravelkingpro.com", { x: margin, y: 70, size: 11, font: fb, color: accent });
       footer(true);
     },
   });
@@ -528,7 +528,7 @@ async function createDetailedPitchDeck() {
       y -= 20;
       page.drawText("The music industry has a rights crisis.", { x: margin, y: pageH - 340, size: 14, font: fb, color: white });
       page.drawText("We have the solution.", { x: margin, y: pageH - 370, size: 14, font: fb, color: accent });
-      page.drawText("gravelkingpro.it.com · All N One LLC · Kevin Morris, Chief Architect", { x: margin, y: 60, size: 10, font: f, color: lightGray });
+      page.drawText("gravelkingpro.com · All N One LLC · Kevin Morris, Chief Architect", { x: margin, y: 60, size: 10, font: f, color: lightGray });
       footer(true);
     },
   });

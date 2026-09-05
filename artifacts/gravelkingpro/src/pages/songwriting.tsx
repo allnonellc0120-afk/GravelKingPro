@@ -614,7 +614,8 @@ export default function SongwritingStudio() {
 
   return (
     <Layout hideChrome>
-      <div className="flex min-h-screen flex-col bg-[#08090c] text-foreground">
+      <div className="bg-[#08090c] text-foreground">
+      <div className="flex h-screen flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4 sm:px-6">
           <div className="flex items-center gap-3"><button type="button" onClick={() => setSidebarOpen((open) => !open)} className="rounded-lg p-2 text-muted-foreground hover:bg-white/10" aria-label="Toggle sessions sidebar"><ChevronDown className={`h-4 w-4 ${sidebarOpen ? "rotate-90" : "-rotate-90"}`} /></button><Link href="/" className="text-sm font-semibold"><span className="mr-2 text-[10px] uppercase tracking-[0.25em] text-violet-300">JAX</span>Songwriting Companion</Link></div>
           <div className="flex items-center gap-2"><span className="hidden text-xs text-muted-foreground sm:inline">{savedAt ? `Saved ${new Date(savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Local session"}</span><Button size="sm" onClick={() => setCertificateOpen(true)} className="bg-violet-500 text-white hover:bg-violet-400"><ShieldCheck className="mr-1.5 h-4 w-4" />Certificate</Button></div>
@@ -624,31 +625,35 @@ export default function SongwritingStudio() {
           <main className="flex min-w-0 flex-1 flex-col">
             <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto px-4 py-8 sm:px-8">
               {chatMessages.length === 0 ? <div className="m-auto max-w-xl text-center"><div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/15 text-xl font-bold text-violet-300">J</div><h1 className="text-3xl font-bold tracking-tight">What are we writing today?</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Tell JAX the story, mood, genre, or lyric you have in mind. We’ll shape it together.</p></div> : <div className="space-y-6">{chatMessages.map((message) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-violet-500 text-white" : "border border-white/10 bg-white/[0.04]"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.role === "jax" && <div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => void speakResponse()} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button><Button size="sm" variant="outline" onClick={pushToCanvas} className="border-white/10">Save to song</Button></div>}</div></div>)}{generating && <div className="text-sm text-muted-foreground">JAX is writing…</div>}{generationError && <p className="text-sm text-rose-300">{generationError}</p>}</div>}
-
-              <section id="song-generator" className="mt-4 mb-6 rounded-2xl border border-amber-400/25 bg-amber-400/[0.045] p-5 sm:p-6">
-                <div className="mb-5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">Song Generator</p>
-                  <h2 className="mt-1 text-xl font-bold">Turn the lyrics into a finished take</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Your JAX lyrics carry down automatically. Leave either box empty and JAX fills it in for you.</p>
-                </div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="generator-lyrics">Lyric input</label>
-                <Textarea id="generator-lyrics" value={generatorLyrics} onChange={(event) => setGeneratorLyrics(event.target.value)} className="min-h-36 border-white/10 bg-black/20 leading-7" placeholder="Empty? JAX writes the lyrics for you…" />
-                <label className="mb-2 mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="style-descriptor">Style prompt</label>
-                <Textarea id="style-descriptor" value={styleDescriptor} onChange={(event) => setStyleDescriptor(event.target.value)} className="min-h-24 border-white/10 bg-black/20" placeholder="Empty? JAX picks a style. Or be exact: sad outlaw grunge, 70 BPM, dark raw acoustic…" />
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">The take lands in your library when it finishes rendering.</span>
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
-                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (Pro)"}</Button>
-                  </div>
-                </div>
-                {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
-              </section>
             </div>
             <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex items-center justify-between px-3 pb-1 pt-2 text-xs text-muted-foreground"><span>{remaining !== null ? `${remaining} prompts left today` : "JAX learns from this conversation"}</span><button type="button" onClick={() => setAutoVoice((enabled) => !enabled)} className={`rounded-full px-2.5 py-1 ${autoVoice ? "bg-violet-400/20 text-violet-200" : "bg-white/5"}`}>Auto-Voice {autoVoice ? "On" : "Off"}</button></div></div>{voiceError && <p className="mt-2 text-xs text-rose-300">{voiceError}</p>}</div></div>
           </main>
         </div>
       </div>
+
+      <section id="song-generator" className="border-t border-amber-400/25 bg-amber-400/[0.045] px-4 py-10 sm:px-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">Song Generator</p>
+            <h2 className="mt-1 text-xl font-bold">Turn the lyrics into a finished take</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Your JAX lyrics carry down automatically. Leave either box empty and JAX fills it in for you.</p>
+          </div>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="generator-lyrics">Lyric input</label>
+          <Textarea id="generator-lyrics" value={generatorLyrics} onChange={(event) => setGeneratorLyrics(event.target.value)} className="min-h-36 border-white/10 bg-black/20 leading-7" placeholder="Empty? JAX writes the lyrics for you…" />
+          <label className="mb-2 mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="style-descriptor">Style prompt</label>
+          <Textarea id="style-descriptor" value={styleDescriptor} onChange={(event) => setStyleDescriptor(event.target.value)} className="min-h-24 border-white/10 bg-black/20" placeholder="Empty? JAX picks a style. Or be exact: sad outlaw grunge, 70 BPM, dark raw acoustic…" />
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">The take lands in your library when it finishes rendering.</span>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
+              <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (Pro)"}</Button>
+            </div>
+          </div>
+          {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
+        </div>
+      </section>
+      </div>
+
       {certificateOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"><div className="w-full max-w-lg rounded-2xl border border-violet-400/30 bg-[#121318] p-6"><div className="flex items-start justify-between"><div><p className="text-[10px] uppercase tracking-[0.2em] text-violet-300">JAX / PROVENANCE</p><h2 className="mt-1 text-xl font-bold">Provenance Certificate</h2></div><button type="button" onClick={() => setCertificateOpen(false)} aria-label="Close certificate dialog"><X className="h-5 w-5" /></button></div><p className="my-6 text-sm leading-6 text-muted-foreground">The certificate includes your transcript, edit history, timestamp, and active HMAC signature.</p><Button className="w-full bg-violet-500 text-white" onClick={() => void generateCertificate()} disabled={certificateBusy || !activeHash}>{certificateBusy ? "Compiling certificate…" : "Download certificate PDF"}</Button></div></div>}
       {/*
     <Layout hideChrome>

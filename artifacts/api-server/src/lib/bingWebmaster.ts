@@ -10,8 +10,8 @@
  */
 
 const BING_API_BASE = "https://ssl.bing.com/webmaster/api.svc/json";
-const SITE_URL = "https://gravelkingpro.it.com/";
-const SITEMAP_URL = "https://gravelkingpro.it.com/sitemap.xml";
+const SITE_URL = "https://gravelkingpro.com/";
+const SITEMAP_URL = "https://gravelkingpro.com/sitemap.xml";
 
 export interface BingResult {
   ok: boolean;

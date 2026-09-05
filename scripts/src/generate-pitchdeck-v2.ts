@@ -78,7 +78,7 @@ async function createPitchDeckV2() {
   page.drawText("GRAVELKING PRO", { x: margin, y: pageH - 200, size: 44, font: bold, color: white });
   page.drawText("The Pitch", { x: margin, y: pageH - 250, size: 30, font: bold, color: accent });
   page.drawText("The only music studio that proves you made it.", { x: margin, y: pageH - 300, size: 16, font: font, color: white });
-  page.drawText("gravelkingpro.it.com", { x: margin, y: 80, size: 12, font: bold, color: accent });
+  page.drawText("gravelkingpro.com", { x: margin, y: 80, size: 12, font: bold, color: accent });
   y = 0;
 
   // PROBLEM
@@ -149,7 +149,7 @@ async function createPitchDeckV2() {
   bodyCopy("We are raising capital to scale the enterprise verification pipeline: distributor integrations, label audit tiers, and chain-of-title API capacity.");
   bodyCopy("The music industry has a rights crisis. We have the solution.");
   y -= 30;
-  page.drawText("gravelkingpro.it.com", { x: margin, y, size: 14, font: bold, color: accent });
+  page.drawText("gravelkingpro.com", { x: margin, y, size: 14, font: bold, color: accent });
   page.drawText("All N One LLC · Kevin Morris, Chief Architect", { x: margin, y: y - 22, size: 11, font: font, color: gray });
 
   // Footer on all pages
