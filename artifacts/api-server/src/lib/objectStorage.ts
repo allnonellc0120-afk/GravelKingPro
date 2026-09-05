@@ -105,7 +105,16 @@ export async function primaryWriteHealthy(): Promise<boolean> {
   return primaryWriteHealth.ok;
 }
 
-const PRIVATE_FULL_AUDIO_KEY_PATTERN = /^private\/tracks\/[^/]+\/audio_full\.(?:wav|mp3)$/i;
+/**
+ * Every private full-length audio naming family currently used by production
+ * and seed code. Keep the extension open-ended: the upload route preserves
+ * the sanitized source extension, while the older release/demo seed paths
+ * are WAV today.
+ */
+const PRIVATE_FULL_AUDIO_KEY_PATTERNS = [
+  /^private\/tracks\/[^/]+\/audio_full\.[^/]+$/i,
+  /^private\/(?:releases|demo)\/[^/]+\/[^/]+-full\.[^/]+$/i,
+];
 
 /**
  * Generated full-length audio is always stored under the private tracks
@@ -113,7 +122,7 @@ const PRIVATE_FULL_AUDIO_KEY_PATTERN = /^private\/tracks\/[^/]+\/audio_full\.(?:
  * cannot accidentally make a full take reachable through public storage.
  */
 export function isPrivateFullAudioKey(key: string): boolean {
-  return PRIVATE_FULL_AUDIO_KEY_PATTERN.test(key);
+  return PRIVATE_FULL_AUDIO_KEY_PATTERNS.some((pattern) => pattern.test(key));
 }
 
 export async function saveObjectWithFallback(

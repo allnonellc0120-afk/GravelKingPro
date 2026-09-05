@@ -215,18 +215,47 @@ async function main(): Promise<void> {
         !fullAudioKeys.some((key) => key.startsWith("tracks/")),
         JSON.stringify(fullAudioKeys),
       );
+      const privateFullAudioKeyCases: Array<{ label: string; key: string; rejected: boolean }> = [
+        // Current generated/uploaded track convention.
+        { label: "generated WAV", key: `private/tracks/${trackId}/audio_full.wav`, rejected: true },
+        { label: "generated MP3", key: `private/tracks/${trackId}/audio_full.mp3`, rejected: true },
+        { label: "uploaded M4A", key: `private/tracks/${trackId}/audio_full.m4a`, rejected: true },
+        // Legacy operator release and demo seed conventions.
+        {
+          label: "release seed WAV",
+          key: "private/releases/tgk-the-gravelking/you-used-to-think-i-was-superman-full.wav",
+          rejected: true,
+        },
+        {
+          label: "demo seed WAV",
+          key: "private/demo/founder/gravel-road-origin-full.wav",
+          rejected: true,
+        },
+        // These remain valid public assets.
+        { label: "generated preview", key: keys.audioPreviewKey, rejected: false },
+        { label: "generated cover art", key: `tracks/${trackId}/cover_art.png`, rejected: false },
+        { label: "release preview", key: "releases/tgk-the-gravelking/you-used-to-think-i-was-superman-preview.wav", rejected: false },
+        { label: "demo cover art", key: "demo/founder/gravel-road-origin-cover.png", rejected: false },
+      ];
+      for (const { label, key, rejected } of privateFullAudioKeyCases) {
+        check(
+          `full-audio key table: ${label}`,
+          isPrivateFullAudioKey(key) === rejected,
+          key,
+        );
+      }
       const publicObjectStorage = new ObjectStorageService();
-      for (const key of fullAudioKeys) {
-        let rejected = false;
+      for (const { label, key } of privateFullAudioKeyCases.filter((testCase) => testCase.rejected)) {
+        let writerRejected = false;
         try {
           await publicObjectStorage.savePublicObject(key, Buffer.from("full-audio"), "audio/mpeg");
         } catch (error) {
-          rejected =
+          writerRejected =
             isPrivateFullAudioKey(key) &&
             error instanceof Error &&
             error.message.includes("Refusing public object write");
         }
-        check(`public storage rejects ${key}`, rejected);
+        check(`public storage rejects ${label}`, writerRejected);
       }
 
       const source = await makeTinyWav(31);
