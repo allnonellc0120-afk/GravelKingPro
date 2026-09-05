@@ -4,6 +4,18 @@ import { generateVertexText, isVertexConfigured } from "../geminiVertex";
 import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { randomUUID } from "crypto";
+import { execFile as execFileCb } from "child_process";
+import { promisify } from "util";
+import { writeFile, readFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { db, tracksTable, purchasedTracksTable } from "@workspace/db";
+import { ObjectStorageService, saveObjectWithFallback } from "../lib/objectStorage";
+import { buildCoverArgs } from "../services/mlkOrchestrator";
+
+const execFileAsync = promisify(execFileCb);
+const objectStorage = new ObjectStorageService();
 
 const jaxRouter = Router();
 const connectors = new ReplitConnectors();
@@ -189,13 +201,58 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     });
     if (!response.ok) {
       req.log.warn({ status: response.status }, "ElevenLabs music generation rejected request");
-      res.status(502).json({ error: "ElevenLabs could not finish this take. Adjust the lyrics or style and try again." });
+      res.status(502).json({ error: "JAX could not finish this take. Adjust the lyrics or style and try again." });
       return;
     }
-    res.type("audio/mpeg").send(Buffer.from(await response.arrayBuffer()));
+
+    const mp3 = Buffer.from(await response.arrayBuffer());
+    const trackTitle = title || "JAX Take";
+
+    // Save the take to the user's vault so it behaves like every other
+    // library track — playable in-app, and openable in the Mastering tool
+    // via ?gkTrack=<id> (the MLK pipeline does the same).
+    const trackId = randomUUID();
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
+    // Convention (see mlkOrchestrator): audioFullKey names the WAV slot; the
+    // full MP3 sits beside it with the same basename. The stream/download
+    // routes derive the .mp3 key from audioFullKey, so no schema change.
+    const audioFullKey = `private/tracks/${trackId}/audio_full.wav`;
+    const audioFullMp3Key = `private/tracks/${trackId}/audio_full.mp3`;
+    const audioPreviewKey = `tracks/${trackId}/audio_preview.mp3`;
+    const coverArtKey = `tracks/${trackId}/cover_art.png`;
+    const coverPath = join(tmpdir(), `jax-cover-${trackId}.png`);
+    await execFileAsync("ffmpeg", buildCoverArgs(trackId, trackTitle, coverPath), { timeout: 30_000 });
+    await Promise.all([
+      saveObjectWithFallback(bucketId, audioFullMp3Key, mp3, { contentType: "audio/mpeg" }),
+      objectStorage.savePublicObject(audioPreviewKey, mp3, "audio/mpeg"),
+      readFile(coverPath).then((b) => objectStorage.savePublicObject(coverArtKey, b, "image/png")),
+    ]);
+    await db.transaction(async (tx) => {
+      await tx.insert(tracksTable).values({
+        id: trackId,
+        title: trackTitle,
+        artistName: "JAX",
+        audioFullKey,
+        audioPreviewKey,
+        coverArtKey,
+        // PRIVATE: generated takes land ONLY in the creator's library.
+        status: "private",
+        price: 0,
+        submittedByUserId: user?.id ?? null,
+        lyricsText: lyrics || null,
+      });
+      if (user?.id) {
+        await tx.insert(purchasedTracksTable).values({
+          userId: user.id,
+          trackId,
+          stripeCheckoutSessionId: `jax-music-${trackId}`,
+        });
+      }
+    });
+    res.json({ success: true, trackId, title: trackTitle });
   } catch (error) {
     req.log.error({ error }, "ElevenLabs music generation failed");
-    res.status(502).json({ error: "ElevenLabs music generation is temporarily unavailable." });
+    res.status(502).json({ error: "JAX music generation is temporarily unavailable." });
   }
 });
 

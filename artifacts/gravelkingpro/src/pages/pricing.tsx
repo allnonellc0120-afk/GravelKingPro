@@ -11,6 +11,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@clerk/react";
 import { usePlanPrices, FALLBACK_PRICES, type PlanPrice } from "@/lib/usePlanPrices";
 import { trackFunnelEvent } from "@/lib/useAnalytics";
+import { trackEvent } from "@/lib/analytics";
 import { StripePaymentForm } from "@/components/stripe-payment-form";
 import {
   getPlayBillingService,
@@ -183,6 +184,7 @@ export default function Pricing() {
 
     if (checkout === "success") {
       trackFunnelEvent("checkout_returned", { outcome: "success" });
+      trackEvent("checkout_completed", { location: "pricing_page" });
       const planParam = params.get("plan") as PlanId | null;
       window.history.replaceState({}, "", "/pricing");
       refreshSubscription().then(({ tier: freshTier }) => {
@@ -234,6 +236,7 @@ export default function Pricing() {
 
   const handleCheckout = async (planId: PlanId) => {
     trackFunnelEvent("plan_selected", { plan: planId });
+    trackEvent("plan_selected", { plan: planId, location: "pricing_page" });
     // Require sign-in before checkout — the purchase must attach to an
     // account so it unlocks every platform, not just this device.
     if (!isSignedIn) {
@@ -682,8 +685,7 @@ export default function Pricing() {
                 <CardTitle className="text-lg">Node Auditor</CardTitle>
                 <CardDescription>Unlimited optimization runs — up to 100 devices, personal use</CardDescription>
                 <div className="mt-3">
-                  <span className="text-3xl font-bold">{planPrices.node_auditor.amount}</span>
-                  <span className="text-muted-foreground text-sm">{planPrices.node_auditor.period}</span>
+                  <span className="text-lg font-semibold text-muted-foreground">Contact us for access</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
@@ -711,15 +713,11 @@ export default function Pricing() {
                     Current Plan
                   </Badge>
                 ) : isUpgrade("node_auditor") ? (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleCheckout("node_auditor")}
-                    disabled={loadingTier !== null}
-                    data-testid="button-upgrade-auditor"
-                  >
-                    {loadingTier === "node_auditor" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : "Subscribe"}
-                  </Button>
+                  <a href="/contact" className="block">
+                    <Button variant="outline" className="w-full" data-testid="button-contact-auditor">
+                      Contact me
+                    </Button>
+                  </a>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
                 )}
