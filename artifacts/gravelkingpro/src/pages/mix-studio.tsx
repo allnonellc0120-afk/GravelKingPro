@@ -122,8 +122,8 @@ export default function MixStudio() {
       <div className="max-w-lg mx-auto space-y-6 py-16">
         <div className="text-center space-y-4">
           <div className="text-5xl">🎛️</div>
-          <h1 className="text-2xl font-bold">GravelKing Studio</h1>
-          <p className="text-muted-foreground text-sm">The full DAW — multi-track recording, stems, plugins, and mixing — is available on GravelKing Pro.</p>
+          <h1 className="text-2xl font-bold">Vocal Booth</h1>
+          <p className="text-muted-foreground text-sm">Vocal Booth recording, clipping, splicing, and layering are available on GravelKing Pro.</p>
           <a href="/pricing" className="inline-block mt-2">
             <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro</button>
           </a>
@@ -149,7 +149,7 @@ export default function MixStudio() {
             <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] shrink-0">Studio</Badge>
             <ToolHelp
               title="Mix Studio"
-              summary="A full in-browser DAW — record and import multiple tracks, add plugins, and mix them into a final stereo track."
+              summary="Use Vocal Booth to record, clip, splice, and layer audio into a finished performance."
               steps={[
                 "Add tracks by importing files or recording live.",
                 "Set volume and pan, and add plugins per track.",

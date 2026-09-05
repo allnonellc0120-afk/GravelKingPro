@@ -19,7 +19,6 @@ import Account from "@/pages/account";
 import AdminAnalytics from "@/pages/admin-analytics";
 import AdminWaitlist from "@/pages/admin-waitlist";
 import AdminTracks from "@/pages/admin-tracks";
-import Optimizer from "@/pages/optimizer";
 import LabelPage from "@/pages/label";
 import LabelArtistPage from "@/pages/label-artist";
 import LibraryPage from "@/pages/library";
@@ -194,7 +193,6 @@ function Router() {
       <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/admin/emails" component={AdminEmails} />
       <Route path="/admin/integration-demo" component={AdminIntegrationDemo} />
-      <Route path="/optimizer" component={Optimizer} />
       <Route path="/label" component={LabelPage} />
       <Route path="/label/:artist" component={LabelArtistPage} />
       <Route path="/library" component={LibraryPage} />

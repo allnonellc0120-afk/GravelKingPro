@@ -243,7 +243,7 @@ function OpsDashboard() {
             {integrity ? (
               <div className="flex flex-wrap gap-2 items-center">
                 <StatusPill ok={integrity.gcpServiceAccountConfigured} label="Google Cloud service account" />
-                <StatusPill ok={integrity.demucsUrlConfigured ? integrity.demucsReachable : null} label="Cloud Run Demucs" />
+                <StatusPill ok={integrity.demucsUrlConfigured ? integrity.demucsReachable : null} label="Legacy audio service" />
                 <span className="text-xs text-muted-foreground ml-1">checked {fmt(integrity.checkedAt)}</span>
               </div>
             ) : (

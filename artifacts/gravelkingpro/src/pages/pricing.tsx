@@ -31,23 +31,23 @@ const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
 };
 
 const WEEKLY_FEATURES = [
-  { label: "Full MLK v3 mastering suite", highlight: "6 broadcast-ready presets" },
-  { label: "Unlimited WAV exports", highlight: "Studio-quality 44.1kHz output" },
-  { label: "Vocal Booth + karaoke DAW", highlight: "Record over any backing track" },
-  { label: "IP Embed Code", highlight: "Certified authorship widget" },
+  { label: "The Foundry mastering", highlight: "Morris Law Kernel v3.5 presets" },
+  { label: "Full-length WAV exports", highlight: "Release-ready 44.1kHz output" },
+  { label: "Vocal Booth", highlight: "Record, clip, splice, and layer audio" },
+  { label: "JAX certificates", highlight: "Document songwriting provenance" },
+  { label: "Converter", highlight: "Convert supported audio formats" },
   { label: "No watermark", highlight: "Clean, professional output" },
   { label: "Cancel anytime", highlight: "No commitment, full control" },
 ];
 
 const STUDIO_FEATURES = [
-  { label: "MLK v3 mastering kernel", highlight: "All 6 presets + fully adjustable EQ, compression, limiting" },
-  { label: "Vocal Booth + karaoke DAW", highlight: "Sing along with lyric sync, teleprompter, and guide vocal" },
-  { label: "Live multitrack DAW", highlight: "Mix 8+ tracks in real time with per-channel metering" },
-  { label: "Live microphone recording", highlight: "USB mic, audio interface, phone input" },
-  { label: "IP Embed Code — shareable certificate", highlight: "Hashed embed widget for your website, bio, or press kit" },
-  { label: "Songwriting Studio", highlight: "Document lyrics, co-writers, and creative timeline" },
-  { label: "Kernel Dashboard (10 optimizations/day)", highlight: "Before/after waveform comparison on saved DAW tracks" },
-  { label: "PDF export reports", highlight: "Shareable mastering + authorship certificates" },
+  { label: "The Foundry mastering", highlight: "Morris Law Kernel v3.5 with adjustable EQ, compression, and limiting" },
+  { label: "Vocal Booth editing", highlight: "Record, clip, splice, and layer your performances" },
+  { label: "JAX songwriting companion", highlight: "Develop lyrics, document co-writers, and preserve your creative timeline" },
+  { label: "JAX provenance certificates", highlight: "Shareable authorship and IP records" },
+  { label: "Converter", highlight: "Prepare audio in supported delivery formats" },
+  { label: "Kernel Dashboard (10 optimizations/day)", highlight: "Before/after waveform comparison on saved Vocal Booth tracks" },
+  { label: "PDF export reports", highlight: "Shareable mastering and provenance certificates" },
   { label: "Priority support", highlight: "48-hour response guarantee" },
 ];
 
@@ -55,12 +55,12 @@ type SuccessInfo = { planId: PlanId; planName: string; ctaLabel: string; ctaHref
 
 const PLAN_SUCCESS: Record<PlanId, { planName: string; ctaLabel: string; ctaHref: string }> = {
   weekly: {
-    planName: "GravelKing Weekly",
+    planName: "Pro",
     ctaLabel: "Master your first track",
     ctaHref: "/mastering",
   },
   monthly: {
-    planName: "GravelKing Studio",
+    planName: "King",
     ctaLabel: "Open The Foundry",
     ctaHref: "/mastering",
   },
@@ -454,10 +454,10 @@ export default function Pricing() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            GravelKing Studio is the recommended plan for independent artists — pro-level mastering, live DAW, vocal booth, and IP certification in one subscription.
+            King is the recommended plan for independent artists — JAX, Vocal Booth, The Foundry, and Converter in one subscription.
             {trialEligible && !playMode && (
               <span className="block text-sm text-emerald-400 font-medium mt-2">
-                New accounts get a 7-day free trial on Studio. Card required at checkout — cancel anytime during the trial.
+                New accounts get a 7-day free trial on King. Card required at checkout — cancel anytime during the trial.
               </span>
             )}
           </motion.p>
@@ -480,7 +480,7 @@ export default function Pricing() {
               ? [
                   "Sign in to start your free trial",
                   "Cancel anytime — 1-click in app",
-                  "7-day free trial on Studio",
+                  "7-day free trial on King",
                   "One trial per account, ever",
                 ]
               : [
@@ -527,7 +527,7 @@ export default function Pricing() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
             <Card className="flex flex-col h-full border-border/40 bg-card/20">
               <CardHeader>
-                <CardTitle className="text-lg">Starter</CardTitle>
+                <CardTitle className="text-lg">Free</CardTitle>
                 <CardDescription>Try every tool, no account needed</CardDescription>
                 <div className="mt-3">
                   <span className="text-3xl font-bold">Free</span>
@@ -535,11 +535,11 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Mastering 30s preview</FeatureRow>
+                  <FeatureRow yes>JAX songwriting companion</FeatureRow>
                   <FeatureRow yes>Vocal Booth access</FeatureRow>
-                  <FeatureRow yes>Songwriting Studio (basic)</FeatureRow>
-                  <FeatureRow yes={false}>Full WAV exports</FeatureRow>
-                  <FeatureRow yes={false}>IP Embed Code</FeatureRow>
+                  <FeatureRow yes>The Foundry 30s preview</FeatureRow>
+                  <FeatureRow yes>Converter access</FeatureRow>
+                  <FeatureRow yes={false}>Full-length mastering exports</FeatureRow>
                 </ul>
               </CardContent>
               <CardFooter>
@@ -565,8 +565,8 @@ export default function Pricing() {
                 FLEXIBLE
               </div>
               <CardHeader>
-                <CardTitle className="text-lg text-emerald-400">GravelKing Weekly</CardTitle>
-                <CardDescription>Unlimited removal, splitting &amp; preset masters</CardDescription>
+                <CardTitle className="text-lg text-emerald-400">Pro</CardTitle>
+                <CardDescription>All four tools for your creative workflow</CardDescription>
                 <div className="mt-3">
                   <span className="text-3xl font-bold">{planPrices.weekly.amount}</span>
                   <span className="text-muted-foreground text-sm">{planPrices.weekly.period}</span>
@@ -578,7 +578,7 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Everything in Starter, plus:</li>
+                  <li className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Everything in Free, plus:</li>
                   {WEEKLY_FEATURES.map((f) => (
                     <li key={f.label} className="flex items-start gap-2.5">
                       <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -602,7 +602,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-weekly"
                   >
-                    {loadingTier === "weekly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 3-day trial") : "Get Weekly"}
+                    {loadingTier === "weekly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 3-day trial") : "Get Pro"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
@@ -619,9 +619,9 @@ export default function Pricing() {
               </div>
               <CardHeader>
                 <CardTitle className="text-lg text-amber-500 flex items-center gap-2">
-                  <Crown className="w-4 h-4" /> GravelKing Studio
+                  <Crown className="w-4 h-4" /> King
                 </CardTitle>
-                <CardDescription>Everything an independent artist needs — mastering, DAW, vocal booth, IP cert</CardDescription>
+                <CardDescription>Advanced access to JAX, Vocal Booth, The Foundry, and Converter</CardDescription>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold">{planPrices.monthly.amount}</span>
                   <span className="text-muted-foreground text-sm">{planPrices.monthly.period}</span>
@@ -635,7 +635,7 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">Everything in Weekly, plus:</li>
+                  <li className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">Everything in Pro, plus:</li>
                   {STUDIO_FEATURES.map((f) => (
                     <li key={f.label} className="flex items-start gap-2.5">
                       <Check className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
@@ -647,7 +647,7 @@ export default function Pricing() {
                   ))}
                 </ul>
                 <p className="mt-3 text-xs text-amber-500/80 italic">
-                  “The live DAW alone is worth the price — it replaced my $400/year DAW subscription.”
+                  “The four-tool workflow keeps songwriting, recording, mastering, and conversion together.”
                 </p>
               </CardContent>
               <CardFooter>
@@ -666,7 +666,7 @@ export default function Pricing() {
                     disabled={loadingTier !== null}
                     data-testid="button-upgrade-studio"
                   >
-                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 7-day trial") : playMode || !trialEligible ? "Get Studio" : "Start Free Trial — Get Studio"}
+                    {loadingTier === "monthly" ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : isSignedIn === false ? (playMode || !trialEligible ? "Sign in to subscribe" : "Sign in for 7-day trial") : playMode || !trialEligible ? "Get King" : "Start Free Trial — Get King"}
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>Lower tier</Button>
@@ -688,7 +688,7 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
-                  <FeatureRow yes>Everything in Studio</FeatureRow>
+                  <FeatureRow yes>Everything in King</FeatureRow>
                   <FeatureRow yes>Unlimited MLK V3.5 optimizer runs</FeatureRow>
                   <FeatureRow yes>Up to 100 devices optimized</FeatureRow>
                   <FeatureRow yes>White-label WAV &amp; PDF exports</FeatureRow>

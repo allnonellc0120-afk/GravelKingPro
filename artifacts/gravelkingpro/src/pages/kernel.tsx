@@ -529,7 +529,7 @@ export default function KernelDashboard() {
               </div>
               <Link href="/pricing">
                 <Button className="bg-amber-500 hover:bg-amber-600 text-black font-semibold h-10 px-8">
-                  Upgrade to Studio — {planPrices.monthly.label}
+                  Upgrade to King — {planPrices.monthly.label}
                 </Button>
               </Link>
               <p className="text-xs text-muted-foreground">Node Auditor ({planPrices.node_auditor.amount}) includes unlimited track optimization + remote kernel.</p>
@@ -566,9 +566,9 @@ export default function KernelDashboard() {
                   <Music className="w-3.5 h-3.5" />My Tracks
                   <ToolHelp
                     title="Track Optimizer"
-                    summary="Select saved DAW tracks and run them through the MLK V3 kernel. See a before/after waveform comparison and download the optimized WAV."
+                    summary="Select saved Vocal Booth tracks and run them through the MLK V3 kernel. See a before/after waveform comparison and download the optimized WAV."
                     steps={[
-                      "Save tracks in the Mix Studio first — they appear here automatically.",
+                      "Save tracks in Vocal Booth first — they appear here automatically.",
                       "Expand a project and check the tracks you want to optimize.",
                       "Hit 'Optimize Selected' — each track is processed through the mastering kernel.",
                       "Compare before/after waveforms and download the optimized WAV.",
