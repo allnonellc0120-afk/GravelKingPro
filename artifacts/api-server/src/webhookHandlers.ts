@@ -112,6 +112,55 @@ export class WebhookHandlers {
             await db.update(usersTable).set({ isPro: true }).where(eq(usersTable.id, userId));
           }
         }
+        // ── Embedded one-time purchases (Payment Element flow) ──────────
+        // Track sales and $1.99 certificate unlocks now confirm in-app via a
+        // PaymentIntent, so fulfillment must listen to payment_intent.succeeded
+        // as well as checkout.session.completed (hosted fallback). Same
+        // metadata contract and the same idempotency guards.
+        if (event.type === 'payment_intent.succeeded') {
+          const intent = event.data.object as Stripe.PaymentIntent;
+          const meta = intent.metadata ?? {};
+          if (meta.type === 'track' && meta.track_id && meta.user_id) {
+            await db
+              .insert(purchasedTracksTable)
+              .values({
+                userId: meta.user_id,
+                trackId: meta.track_id,
+                stripeCheckoutSessionId: intent.id,
+              })
+              .onConflictDoNothing();
+            void recordAnalyticsEvent({
+              type: "purchase_completed",
+              sessionId: meta.user_id,
+              path: "/label",
+              metadata: { kind: "track", trackId: meta.track_id, paymentIntentId: intent.id },
+            }).catch(() => {});
+            // Track purchases are fully handled here.
+            return;
+          }
+          if (meta.kind === 'cert_unlock' && meta.cert_id && meta.user_id) {
+            await db
+              .update(ipCertStubsTable)
+              .set({
+                unlockedAt: sql`NOW()`,
+                unlockSource: 'purchase',
+                stripeSessionId: intent.id,
+              })
+              .where(
+                sql`${ipCertStubsTable.certId} = ${meta.cert_id}
+                  AND ${ipCertStubsTable.ownerUserId} = ${meta.user_id}
+                  AND ${ipCertStubsTable.unlockedAt} IS NULL`,
+              );
+            void recordAnalyticsEvent({
+              type: "purchase_completed",
+              sessionId: meta.user_id,
+              path: "/mastering",
+              metadata: { kind: "cert_unlock", certId: meta.cert_id, paymentIntentId: intent.id },
+            }).catch(() => {});
+            // Cert unlocks are fully handled here.
+            return;
+          }
+        }
         if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           const userId = session.client_reference_id ?? session.metadata?.userId;

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StripePaymentForm } from "@/components/stripe-payment-form";
 import { Play, Pause, Volume2, CheckCircle2, Loader2, AlertCircle, Zap, Clock, FileAudio, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -9,52 +10,68 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function WeekendSpecial() {
   const [checkoutState, setCheckoutState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [orderState, setOrderState] = useState<"sales" | "verifying" | "upload" | "submitted" | "delivered" | "expired" | "error">("sales");
+  const [orderState, setOrderState] = useState<"sales" | "paying" | "verifying" | "upload" | "submitted" | "delivered" | "expired" | "error">("sales");
   const [masters, setMasters] = useState<Array<{ slot: number; name: string }>>([]);
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
   const [downloadingSlot, setDownloadingSlot] = useState<number | null>(null);
   const [files, setFiles] = useState<Array<File | null>>([null, null, null]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  // Embedded checkout state — email is collected up front because receipts and
+  // delivery updates are sent there.
+  const [email, setEmail] = useState("");
+  const [payment, setPayment] = useState<{ clientSecret: string; paymentIntentId: string; fulfillmentToken: string } | null>(null);
+  // Order identity is reactive state (not just URL params) so an in-app payment
+  // can flow straight into the upload step without a page reload.
+  const initialParams = new URLSearchParams(window.location.search);
+  const [orderId, setOrderId] = useState<string | null>(initialParams.get("session_id"));
+  const [orderToken, setOrderToken] = useState<string | null>(initialParams.get("fulfillment_token"));
 
-  const sessionId = new URLSearchParams(window.location.search).get("session_id");
-  const fulfillmentToken = new URLSearchParams(window.location.search).get("fulfillment_token");
-  const checkoutCancelled =
-    new URLSearchParams(window.location.search).get("checkout") === "cancelled";
+  const checkoutCancelled = initialParams.get("checkout") === "cancelled";
 
   const handleCheckout = async () => {
     setCheckoutState("loading");
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/weekend-special/checkout", {
+      const response = await fetch("/api/weekend-special/payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ email }),
       });
 
-      if (!response.ok) {
-        const data = await response.json() as { error?: string };
+      const data = await response.json() as { clientSecret?: string; paymentIntentId?: string; fulfillmentToken?: string; error?: string };
+      if (!response.ok || !data.clientSecret || !data.paymentIntentId || !data.fulfillmentToken) {
         throw new Error(data.error ?? "Checkout failed");
       }
-
-      const data = await response.json() as { url: string };
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("No checkout URL returned");
-      }
+      setPayment({ clientSecret: data.clientSecret, paymentIntentId: data.paymentIntentId, fulfillmentToken: data.fulfillmentToken });
+      setOrderState("paying");
+      setCheckoutState("idle");
     } catch (err: unknown) {
       setCheckoutState("error");
       setErrorMessage(err instanceof Error ? err.message : "Something went wrong");
     }
   };
 
+  // Payment confirmed in-app — adopt the order identity and let the order
+  // lookup effect move us to the upload step.
+  const onPaid = () => {
+    if (!payment) return;
+    window.history.replaceState({}, "", `/weekend-special?session_id=${encodeURIComponent(payment.paymentIntentId)}&fulfillment_token=${encodeURIComponent(payment.fulfillmentToken)}`);
+    setOrderId(payment.paymentIntentId);
+    setOrderToken(payment.fulfillmentToken);
+    setPayment(null);
+  };
+
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!sessionId || !fulfillmentToken) return;
+  }, []);
+
+  useEffect(() => {
+    if (!orderId || !orderToken) return;
     setOrderState("verifying");
-    fetch(`/api/weekend-special/order?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}`)
+    fetch(`/api/weekend-special/order?session_id=${encodeURIComponent(orderId)}&fulfillment_token=${encodeURIComponent(orderToken)}`)
       .then(async (response) => {
         const data = await response.json() as { paid?: boolean; submitted?: boolean; delivered?: boolean; downloadExpired?: boolean; masters?: Array<{ slot: number; name: string }>; downloadToken?: string | null; error?: string };
         if (!response.ok || !data.paid) throw new Error(data.error ?? "Payment could not be confirmed");
@@ -74,10 +91,10 @@ export default function WeekendSpecial() {
         setErrorMessage(error instanceof Error ? error.message : "Order lookup failed");
         setOrderState("error");
       });
-  }, [sessionId, fulfillmentToken]);
+  }, [orderId, orderToken]);
 
   const submitTracks = async () => {
-    if (!sessionId || !fulfillmentToken || files.some((file) => !file)) return;
+    if (!orderId || !orderToken || files.some((file) => !file)) return;
     setUploading(true);
     setErrorMessage(null);
     try {
@@ -89,7 +106,7 @@ export default function WeekendSpecial() {
         formData.append("index", String(index));
         formData.append("file", file);
         const urlResponse = await fetch(
-          `/api/weekend-special/upload?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}`,
+          `/api/weekend-special/upload?session_id=${encodeURIComponent(orderId)}&fulfillment_token=${encodeURIComponent(orderToken)}`,
           {
           method: "POST",
           body: formData,
@@ -105,7 +122,7 @@ export default function WeekendSpecial() {
       const submitResponse = await fetch("/api/weekend-special/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, fulfillmentToken, files: uploaded }),
+        body: JSON.stringify({ sessionId: orderId, fulfillmentToken: orderToken, files: uploaded }),
       });
       const submitData = await submitResponse.json() as { success?: boolean; error?: string };
       if (!submitResponse.ok || !submitData.success) {
@@ -120,6 +137,28 @@ export default function WeekendSpecial() {
       setUploadProgress("");
     }
   };
+
+  if (orderState === "paying" && payment) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto py-16 px-4">
+          <div className="border border-amber-500/30 bg-card/30 p-6 sm:p-8">
+            <h1 className="text-2xl font-black text-center">3 Songs Mastered — $9.99</h1>
+            <p className="text-sm text-muted-foreground text-center mt-2">
+              Pay securely below — you stay right here, and upload your tracks as soon as it clears.
+            </p>
+            <StripePaymentForm
+              clientSecret={payment.clientSecret}
+              intentType="payment"
+              submitLabel="Pay $9.99"
+              onSuccess={onPaid}
+              onCancel={() => { setPayment(null); setOrderState("sales"); }}
+            />
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   if (orderState !== "sales") {
     return (
@@ -200,12 +239,12 @@ export default function WeekendSpecial() {
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
                         disabled={downloadingSlot !== null}
                         onClick={async () => {
-                          if (!sessionId || !fulfillmentToken || !downloadToken) return;
+                          if (!orderId || !orderToken || !downloadToken) return;
                           setDownloadingSlot(master.slot);
                           setErrorMessage(null);
                           try {
                             const response = await fetch(
-                              `/api/weekend-special/master?session_id=${encodeURIComponent(sessionId)}&fulfillment_token=${encodeURIComponent(fulfillmentToken)}&download_token=${encodeURIComponent(downloadToken)}&slot=${master.slot}`,
+                              `/api/weekend-special/master?session_id=${encodeURIComponent(orderId)}&fulfillment_token=${encodeURIComponent(orderToken)}&download_token=${encodeURIComponent(downloadToken)}&slot=${master.slot}`,
                             );
                             const data = await response.json() as { url?: string; error?: string };
                             if (!response.ok || !data.url) throw new Error(data.error ?? "Download failed");
@@ -287,10 +326,19 @@ export default function WeekendSpecial() {
           </div>
 
           {/* Primary CTA */}
-          <div className="pt-2">
+          <div className="pt-2 space-y-3 max-w-md mx-auto">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Email for receipt & delivery"
+              className="w-full h-12 px-4 bg-background/60 border border-border/60 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/60"
+              data-testid="input-checkout-email"
+            />
             <Button
               size="lg"
-              className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-14 px-10 text-lg shadow-lg shadow-amber-500/20"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-14 px-10 text-lg shadow-lg shadow-amber-500/20"
               onClick={handleCheckout}
               disabled={checkoutState === "loading"}
               data-testid="button-checkout-primary"

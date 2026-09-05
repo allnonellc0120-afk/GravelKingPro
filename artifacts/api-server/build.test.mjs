@@ -28,6 +28,7 @@ async function buildTest() {
       path.resolve(artifactDir, "src/__tests__/price-parity.test.ts"),
       path.resolve(artifactDir, "src/__tests__/download-gate.test.ts"),
       path.resolve(artifactDir, "src/__tests__/webhook-track-purchase.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/track-buyer-identity.test.ts"),
       path.resolve(artifactDir, "src/__tests__/referral-commission.test.ts"),
       path.resolve(artifactDir, "src/__tests__/benchmark.test.ts"),
       path.resolve(artifactDir, "src/__tests__/clerk-jit-provision.test.ts"),

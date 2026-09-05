@@ -39,8 +39,69 @@ const uploadRateLimit = rateLimit({
   message: "Too many upload attempts. Please wait a few minutes and retry.",
 });
 
-async function getPaidOfferSession(sessionId: string, fulfillmentToken: string) {
+/**
+ * A paid weekend-special order, normalized over the two Stripe objects we
+ * accept: legacy hosted Checkout Sessions (cs_…) and embedded PaymentIntents
+ * (pi_…). All order state lives in the object's metadata either way.
+ */
+interface PaidOrder {
+  stripe: Stripe;
+  id: string;
+  created: number;
+  amountTotal: number | null;
+  email: string | null;
+  metadata: Stripe.Metadata;
+  update: (metadata: Stripe.Metadata) => Promise<void>;
+}
+
+function orderFromSession(stripe: Stripe, session: Stripe.Checkout.Session): PaidOrder {
+  return {
+    stripe,
+    id: session.id,
+    created: session.created,
+    amountTotal: session.amount_total,
+    email: session.customer_details?.email ?? null,
+    metadata: session.metadata ?? {},
+    update: async (metadata) => {
+      await stripe.checkout.sessions.update(session.id, { metadata });
+      if (typeof session.payment_intent === "string") {
+        await stripe.paymentIntents.update(session.payment_intent, { metadata }).catch(() => null);
+      }
+    },
+  };
+}
+
+function orderFromIntent(stripe: Stripe, intent: Stripe.PaymentIntent): PaidOrder {
+  const charge = typeof intent.latest_charge === "object" && intent.latest_charge
+    ? intent.latest_charge as Stripe.Charge
+    : null;
+  return {
+    stripe,
+    id: intent.id,
+    created: intent.created,
+    amountTotal: intent.amount,
+    email: intent.metadata?.customer_email || intent.receipt_email || charge?.billing_details?.email || null,
+    metadata: intent.metadata ?? {},
+    update: async (metadata) => {
+      await stripe.paymentIntents.update(intent.id, { metadata });
+    },
+  };
+}
+
+async function getPaidOfferSession(sessionId: string, fulfillmentToken: string): Promise<PaidOrder | null> {
   const stripe = await getUncachableStripeClient();
+  if (sessionId.startsWith("pi_")) {
+    const intent = await stripe.paymentIntents.retrieve(sessionId, { expand: ["latest_charge"] });
+    if (
+      intent.status !== "succeeded" ||
+      intent.metadata?.offer !== OFFER_ID ||
+      !fulfillmentToken ||
+      intent.metadata?.fulfillment_token !== fulfillmentToken
+    ) {
+      return null;
+    }
+    return orderFromIntent(stripe, intent);
+  }
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   if (
     session.payment_status !== "paid" ||
@@ -51,8 +112,71 @@ async function getPaidOfferSession(sessionId: string, fulfillmentToken: string) 
   ) {
     return null;
   }
-  return { stripe, session };
+  return orderFromSession(stripe, session);
 }
+
+/**
+ * POST /api/weekend-special/payment-intent — embedded-checkout variant.
+ * Returns a PaymentIntent client secret so the buyer pays in-app (card /
+ * Apple Pay / Google Pay) and lands directly on the upload step. The buyer's
+ * email is captured up front because delivery updates are sent there.
+ */
+router.post("/weekend-special/payment-intent", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      res.status(400).json({ error: "Enter a valid email — your masters and receipt are delivered there." });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const price = await stripe.prices.retrieve(WEEKEND_SPECIAL_PRICE_ID);
+    const amount = price.unit_amount ?? 999;
+    const fulfillmentToken = randomUUID();
+
+    const intent = await stripe.paymentIntents.create({
+      amount,
+      currency: price.currency ?? "usd",
+      automatic_payment_methods: { enabled: true },
+      receipt_email: email,
+      description: "Weekend Special — 3 songs mastered",
+      metadata: {
+        offer: OFFER_ID,
+        fulfillment_status: "awaiting_uploads",
+        fulfillment_token: fulfillmentToken,
+        customer_email: email.slice(0, 200),
+      },
+    });
+    if (!intent.client_secret) {
+      res.status(502).json({ error: "Checkout is temporarily unavailable. Please try again." });
+      return;
+    }
+
+    const visitorId = (req.cookies as Record<string, string>)?.gk_vid ?? null;
+    void recordAnalyticsEvent({
+      type: "checkout_started",
+      visitorId,
+      sessionId: intent.id,
+      path: "/weekend-special",
+      metadata: { priceId: WEEKEND_SPECIAL_PRICE_ID, offer: OFFER_ID, embedded: "true" },
+    }).catch(() => {});
+
+    res.json({
+      clientSecret: intent.client_secret,
+      paymentIntentId: intent.id,
+      fulfillmentToken,
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "Weekend special payment-intent failed");
+    res.status(500).json({ error: "Checkout is temporarily unavailable. Please try again." });
+  }
+});
+
+/**
+ * POST /api/weekend-special/checkout
+ * DEPRECATED: hosted-checkout fallback kept for older app versions; the web
+ * client uses /payment-intent above.
+ */
 
 router.post("/weekend-special/checkout", async (req: Request, res: Response): Promise<void> => {
   try {
@@ -97,7 +221,7 @@ router.get("/weekend-special/order", async (req: Request, res: Response): Promis
   const sessionId = typeof req.query.session_id === "string" ? req.query.session_id : "";
   const fulfillmentToken =
     typeof req.query.fulfillment_token === "string" ? req.query.fulfillment_token : "";
-  if (!sessionId.startsWith("cs_") || !fulfillmentToken) {
+  if ((!sessionId.startsWith("cs_") && !sessionId.startsWith("pi_")) || !fulfillmentToken) {
     res.status(400).json({ error: "Invalid order" });
     return;
   }
@@ -108,7 +232,7 @@ router.get("/weekend-special/order", async (req: Request, res: Response): Promis
       res.status(403).json({ error: "Payment has not been confirmed" });
       return;
     }
-    const meta = paid.session.metadata ?? {};
+    const meta = paid.metadata;
     const masters = [1, 2, 3]
       .filter((slot) => meta[`master_${slot}_path`])
       .map((slot) => ({ slot, name: meta[`master_${slot}_name`] ?? `master-${slot}.wav` }));
@@ -135,13 +259,13 @@ router.post(
     const sessionId = typeof req.query.session_id === "string" ? req.query.session_id : "";
     const fulfillmentToken =
       typeof req.query.fulfillment_token === "string" ? req.query.fulfillment_token : "";
-    if (!sessionId.startsWith("cs_") || !fulfillmentToken) {
+    if ((!sessionId.startsWith("cs_") && !sessionId.startsWith("pi_")) || !fulfillmentToken) {
       res.status(403).json({ error: "A confirmed paid order is required before uploading." });
       return;
     }
     try {
       const paid = await getPaidOfferSession(sessionId, fulfillmentToken);
-      if (!paid || paid.session.metadata?.fulfillment_status === "files_submitted") {
+      if (!paid || paid.metadata?.fulfillment_status === "files_submitted") {
         res.status(403).json({ error: "This order cannot accept more uploads." });
         return;
       }
@@ -167,7 +291,7 @@ router.post(
         return;
       }
 
-      const paid = res.locals.weekendOrder as Awaited<ReturnType<typeof getPaidOfferSession>>;
+      const paid = res.locals.weekendOrder as PaidOrder | null;
       if (!paid) throw new Error("Missing verified order");
 
       await execFileAsync(
@@ -192,12 +316,10 @@ router.post(
           original_name: req.file.originalname.slice(0, 200),
         },
       );
-      await paid.stripe.checkout.sessions.update(sessionId, {
-        metadata: {
-          ...paid.session.metadata,
-          [`slot_${index + 1}_path`]: objectPath,
-          [`slot_${index + 1}_name`]: req.file.originalname.slice(0, 300),
-        },
+      await paid.update({
+        ...paid.metadata,
+        [`slot_${index + 1}_path`]: objectPath,
+        [`slot_${index + 1}_name`]: req.file.originalname.slice(0, 300),
       });
       res.json({ objectPath, name: req.file.originalname });
     } catch (error) {
@@ -240,13 +362,13 @@ router.post("/weekend-special/submit", async (req: Request, res: Response): Prom
       res.status(403).json({ error: "A confirmed payment is required." });
       return;
     }
-    if (paid.session.metadata?.fulfillment_status === "files_submitted") {
+    if (paid.metadata?.fulfillment_status === "files_submitted") {
       res.status(409).json({ error: "This order was already submitted." });
       return;
     }
 
     const safeFiles = files as Array<{ objectPath: string }>;
-    const expectedPaths = [1, 2, 3].map((slot) => paid.session.metadata?.[`slot_${slot}_path`]);
+    const expectedPaths = [1, 2, 3].map((slot) => paid.metadata?.[`slot_${slot}_path`]);
     if (
       new Set(safeFiles.map((file) => file.objectPath)).size !== 3 ||
       safeFiles.some((file, index) => file.objectPath !== expectedPaths[index])
@@ -259,22 +381,19 @@ router.post("/weekend-special/submit", async (req: Request, res: Response): Prom
     );
 
     const metadata = {
-      ...paid.session.metadata,
+      ...paid.metadata,
       fulfillment_status: "files_submitted",
       submitted_at: new Date().toISOString(),
-      track_1: `${paid.session.metadata?.slot_1_name}|${safeFiles[0].objectPath}`.slice(0, 500),
-      track_2: `${paid.session.metadata?.slot_2_name}|${safeFiles[1].objectPath}`.slice(0, 500),
-      track_3: `${paid.session.metadata?.slot_3_name}|${safeFiles[2].objectPath}`.slice(0, 500),
+      track_1: `${paid.metadata?.slot_1_name}|${safeFiles[0].objectPath}`.slice(0, 500),
+      track_2: `${paid.metadata?.slot_2_name}|${safeFiles[1].objectPath}`.slice(0, 500),
+      track_3: `${paid.metadata?.slot_3_name}|${safeFiles[2].objectPath}`.slice(0, 500),
     };
-    await paid.stripe.checkout.sessions.update(sessionId, { metadata });
-    if (typeof paid.session.payment_intent === "string") {
-      await paid.stripe.paymentIntents.update(paid.session.payment_intent, { metadata });
-    }
+    await paid.update(metadata);
 
     req.log.info({ checkoutSessionId: sessionId }, "Weekend mastering order files submitted");
 
     // Owner notification — fail-soft, never blocks the customer.
-    const customerEmail = paid.session.customer_details?.email ?? "unknown";
+    const customerEmail = paid.email ?? "unknown";
     void sendGmail({
       to: NOTIFY_EMAIL,
       subject: `New weekend mastering order — 3 tracks in (${customerEmail})`,
@@ -282,10 +401,10 @@ router.post("/weekend-special/submit", async (req: Request, res: Response): Prom
         "A paid weekend-special order just submitted all three tracks.",
         "",
         `Customer: ${customerEmail}`,
-        `Checkout session: ${sessionId}`,
-        `Track 1: ${paid.session.metadata?.slot_1_name ?? "?"}`,
-        `Track 2: ${paid.session.metadata?.slot_2_name ?? "?"}`,
-        `Track 3: ${paid.session.metadata?.slot_3_name ?? "?"}`,
+        `Order: ${sessionId}`,
+        `Track 1: ${paid.metadata?.slot_1_name ?? "?"}`,
+        `Track 2: ${paid.metadata?.slot_2_name ?? "?"}`,
+        `Track 3: ${paid.metadata?.slot_3_name ?? "?"}`,
         "",
         "Review and deliver: https://gravelkingpro.com/admin/orders",
       ].join("\n"),
@@ -306,7 +425,7 @@ router.get("/weekend-special/master", async (req: Request, res: Response): Promi
   const slot = Number(req.query.slot);
   const downloadToken =
     typeof req.query.download_token === "string" ? req.query.download_token : "";
-  if (!sessionId.startsWith("cs_") || !fulfillmentToken || ![1, 2, 3].includes(slot)) {
+  if ((!sessionId.startsWith("cs_") && !sessionId.startsWith("pi_")) || !fulfillmentToken || ![1, 2, 3].includes(slot)) {
     res.status(400).json({ error: "Invalid download request" });
     return;
   }
@@ -316,20 +435,20 @@ router.get("/weekend-special/master", async (req: Request, res: Response): Promi
   }
   try {
     const paid = await getPaidOfferSession(sessionId, fulfillmentToken);
-    if (!paid || paid.session.metadata?.fulfillment_status !== "delivered") {
+    if (!paid || paid.metadata?.fulfillment_status !== "delivered") {
       res.status(403).json({ error: "This order has no delivered masters yet." });
       return;
     }
-    if (deliveryExpired(paid.session.metadata ?? {})) {
+    if (deliveryExpired(paid.metadata ?? {})) {
       res.status(410).json({ error: "Downloads for this order expired 7 days after delivery. Contact support if you need your masters re-sent." });
       return;
     }
-    const path = paid.session.metadata?.[`master_${slot}_path`];
+    const path = paid.metadata?.[`master_${slot}_path`];
     if (!path) {
       res.status(404).json({ error: "Master not found for this slot." });
       return;
     }
-    const name = paid.session.metadata?.[`master_${slot}_name`] ?? `master-${slot}.wav`;
+    const name = paid.metadata?.[`master_${slot}_name`] ?? `master-${slot}.wav`;
     const url = await objectStorageService.getSignedDownloadURL(path, 3600, name);
     res.json({ url, name });
   } catch (error) {
@@ -340,22 +459,29 @@ router.get("/weekend-special/master", async (req: Request, res: Response): Promi
 
 // ── Admin: order management ──────────────────────────────────────────────────
 
-async function getAdminOfferSession(sessionId: string) {
+async function getAdminOfferSession(sessionId: string): Promise<PaidOrder | null> {
   const stripe = await getUncachableStripeClient();
+  if (sessionId.startsWith("pi_")) {
+    const intent = await stripe.paymentIntents.retrieve(sessionId, { expand: ["latest_charge"] });
+    if (intent.metadata?.offer !== OFFER_ID || intent.status !== "succeeded") {
+      return null;
+    }
+    return orderFromIntent(stripe, intent);
+  }
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   if (session.metadata?.offer !== OFFER_ID || session.payment_status !== "paid") {
     return null;
   }
-  return { stripe, session };
+  return orderFromSession(stripe, session);
 }
 
-function orderSummary(session: Stripe.Checkout.Session) {
-  const meta = session.metadata ?? {};
+function orderSummary(order: PaidOrder) {
+  const meta = order.metadata ?? {};
   return {
-    id: session.id,
-    created: session.created,
-    customerEmail: session.customer_details?.email ?? null,
-    amountTotal: session.amount_total,
+    id: order.id,
+    created: order.created,
+    customerEmail: order.email,
+    amountTotal: order.amountTotal,
     status: meta.fulfillment_status ?? "awaiting_uploads",
     submittedAt: meta.submitted_at ?? null,
     deliveredAt: meta.delivered_at ?? null,
@@ -372,7 +498,8 @@ function orderSummary(session: Stripe.Checkout.Session) {
   };
 }
 
-// List all paid weekend-special orders (newest first).
+// List all paid weekend-special orders (newest first) — both legacy hosted
+// checkout sessions and embedded payment intents.
 router.get("/weekend-special/admin/orders", async (req: Request, res: Response): Promise<void> => {
   if (!(await requireAdmin(req, res))) return;
   try {
@@ -386,12 +513,28 @@ router.get("/weekend-special/admin/orders", async (req: Request, res: Response):
       });
       for (const session of batch.data) {
         if (session.metadata?.offer === OFFER_ID && session.payment_status === "paid") {
-          orders.push(orderSummary(session));
+          orders.push(orderSummary(orderFromSession(stripe, session)));
         }
       }
       if (!batch.has_more || batch.data.length === 0) break;
       startingAfter = batch.data[batch.data.length - 1]?.id;
     }
+    startingAfter = undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const batch = await stripe.paymentIntents.list({
+        limit: 100,
+        expand: ["data.latest_charge"],
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      for (const intent of batch.data) {
+        if (intent.metadata?.offer === OFFER_ID && intent.status === "succeeded") {
+          orders.push(orderSummary(orderFromIntent(stripe, intent)));
+        }
+      }
+      if (!batch.has_more || batch.data.length === 0) break;
+      startingAfter = batch.data[batch.data.length - 1]?.id;
+    }
+    orders.sort((a, b) => b.created - a.created);
     res.json({ orders });
   } catch (error) {
     req.log.error({ err: error }, "Weekend admin order list failed");
@@ -406,18 +549,18 @@ router.get(
     if (!(await requireAdmin(req, res))) return;
     const sessionId = String(req.params.sessionId ?? "");
     const slot = Number(req.params.slot);
-    if (!sessionId.startsWith("cs_") || ![1, 2, 3].includes(slot)) {
+    if ((!sessionId.startsWith("cs_") && !sessionId.startsWith("pi_")) || ![1, 2, 3].includes(slot)) {
       res.status(400).json({ error: "Invalid request" });
       return;
     }
     try {
       const order = await getAdminOfferSession(sessionId);
-      const path = order?.session.metadata?.[`slot_${slot}_path`];
+      const path = order?.metadata?.[`slot_${slot}_path`];
       if (!order || !path) {
         res.status(404).json({ error: "No upload found for this slot." });
         return;
       }
-      const name = order.session.metadata?.[`slot_${slot}_name`] ?? `track-${slot}`;
+      const name = order.metadata?.[`slot_${slot}_name`] ?? `track-${slot}`;
       const url = await objectStorageService.getSignedDownloadURL(path, 3600, name);
       res.json({ url, name });
     } catch (error) {
@@ -440,7 +583,7 @@ router.post(
     try {
       const sessionId = String(req.params.sessionId ?? "");
       const slot = Number(req.params.slot);
-      if (!sessionId.startsWith("cs_") || ![1, 2, 3].includes(slot) || !req.file) {
+      if ((!sessionId.startsWith("cs_") && !sessionId.startsWith("pi_")) || ![1, 2, 3].includes(slot) || !req.file) {
         res.status(400).json({ error: "A valid order, slot (1-3), and audio file are required." });
         return;
       }
@@ -464,12 +607,10 @@ router.post(
           original_name: req.file.originalname.slice(0, 200),
         },
       );
-      await order.stripe.checkout.sessions.update(sessionId, {
-        metadata: {
-          ...order.session.metadata,
-          [`master_${slot}_path`]: objectPath,
-          [`master_${slot}_name`]: req.file.originalname.slice(0, 300),
-        },
+      await order.update({
+        ...order.metadata,
+        [`master_${slot}_path`]: objectPath,
+        [`master_${slot}_name`]: req.file.originalname.slice(0, 300),
       });
       res.json({ objectPath, name: req.file.originalname, slot });
     } catch (error) {
@@ -487,7 +628,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     if (!(await requireAdmin(req, res))) return;
     const sessionId = String(req.params.sessionId ?? "");
-    if (!sessionId.startsWith("cs_")) {
+    if (!sessionId.startsWith("cs_") && !sessionId.startsWith("pi_")) {
       res.status(400).json({ error: "Invalid order" });
       return;
     }
@@ -497,7 +638,7 @@ router.post(
         res.status(404).json({ error: "Paid weekend-special order not found." });
         return;
       }
-      const meta = order.session.metadata ?? {};
+      const meta = order.metadata ?? {};
       const missing = [1, 2, 3].filter((slot) => !meta[`master_${slot}_path`]);
       if (missing.length > 0) {
         res.status(400).json({
@@ -505,7 +646,7 @@ router.post(
         });
         return;
       }
-      const customerEmail = order.session.customer_details?.email;
+      const customerEmail = order.email;
       if (!customerEmail) {
         res.status(400).json({ error: "This order has no customer email on file." });
         return;
@@ -531,12 +672,10 @@ router.post(
         ].join("\n"),
       });
 
-      await order.stripe.checkout.sessions.update(sessionId, {
-        metadata: {
-          ...meta,
-          fulfillment_status: "delivered",
-          delivered_at: new Date().toISOString(),
-        },
+      await order.update({
+        ...meta,
+        fulfillment_status: "delivered",
+        delivered_at: new Date().toISOString(),
       });
       req.log.info({ checkoutSessionId: sessionId, emailed }, "Weekend order delivered");
       res.json({ success: true, emailed, deliveryLink });
@@ -554,7 +693,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     if (!(await requireAdmin(req, res))) return;
     const sessionId = String(req.params.sessionId ?? "");
-    if (!sessionId.startsWith("cs_")) {
+    if (!sessionId.startsWith("cs_") && !sessionId.startsWith("pi_")) {
       res.status(400).json({ error: "Invalid order" });
       return;
     }
@@ -564,12 +703,12 @@ router.post(
         res.status(404).json({ error: "Paid weekend-special order not found." });
         return;
       }
-      const meta = order.session.metadata ?? {};
+      const meta = order.metadata ?? {};
       if (meta.fulfillment_status !== "delivered") {
         res.status(400).json({ error: "Only delivered orders can have their download link re-sent." });
         return;
       }
-      const customerEmail = order.session.customer_details?.email;
+      const customerEmail = order.email;
       if (!customerEmail) {
         res.status(400).json({ error: "This order has no customer email on file." });
         return;
@@ -594,12 +733,10 @@ router.post(
         ].join("\n"),
       });
 
-      await order.stripe.checkout.sessions.update(sessionId, {
-        metadata: {
-          ...meta,
-          fulfillment_status: "delivered",
-          delivered_at: new Date().toISOString(),
-        },
+      await order.update({
+        ...meta,
+        fulfillment_status: "delivered",
+        delivered_at: new Date().toISOString(),
       });
       req.log.info({ checkoutSessionId: sessionId, emailed }, "Weekend order download link re-sent");
       res.json({ success: true, emailed, deliveryLink });

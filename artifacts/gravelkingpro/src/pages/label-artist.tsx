@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { TrackCard, type LabelTrack } from "@/components/track-card";
+import { useTrackPurchase } from "@/hooks/use-track-purchase";
 import { useToast } from "@/hooks/use-toast";
 import { Disc3, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "wouter";
@@ -21,31 +22,15 @@ function useArtistTracks(artist: string) {
   return { tracks, loading };
 }
 
-function useBuy() {
-  const { toast } = useToast();
-  const [buying, setBuying] = useState<string | null>(null);
-  const buy = async (trackId: string) => {
-    setBuying(trackId);
-    try {
-      const r = await fetch(`/api/tracks/${trackId}/checkout`, { method: "POST", credentials: "include" });
-      const data = await r.json();
-      if (data.url) { window.location.href = data.url; return; }
-      toast({ title: "Purchase failed", description: data.error || "Please try again.", variant: "destructive" });
-    } catch {
-      toast({ title: "Error", description: "Could not start checkout.", variant: "destructive" });
-    } finally { setBuying(null); }
-  };
-  return { buy, buying };
-}
-
 export default function LabelArtistPage() {
   const params = useParams();
   const artist = params.artist ? decodeURIComponent(params.artist) : "";
   const { tracks, loading } = useArtistTracks(artist);
-  const { buy, buying } = useBuy();
+  const { buy, buying, checkoutElement } = useTrackPurchase();
 
   return (
     <Layout>
+      {checkoutElement}
       <div className="max-w-6xl mx-auto py-8 space-y-6">
         <div className="flex items-center gap-2">
           <Link href="/label">
