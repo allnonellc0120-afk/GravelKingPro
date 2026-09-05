@@ -15,8 +15,10 @@ export type CreditPack = {
 
 type CreditTransaction = { id: string; delta: number; kind: string; createdAt: string };
 
+type PendingPurchase = { paymentIntentId: string; credits: number; since: number };
 export function useCredits() {
   const [balance, setBalance] = useState<number | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -26,7 +28,8 @@ export function useCredits() {
         setBalance(null);
         return null;
       }
-      const data = await response.json() as { creditsBalance?: number };
+      const data = await response.json() as { creditsBalance?: number; userId?: string };
+      setUserId(data.userId ?? null);
       const next = Number.isInteger(data.creditsBalance) ? data.creditsBalance! : 0;
       setBalance(next);
       return next;
@@ -39,14 +42,16 @@ export function useCredits() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
-  return { balance, loading, refresh };
+  return { balance, loading, refresh, userId };
 }
 
 export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
-  const { balance, loading, refresh } = useCredits();
+  const { balance, loading, refresh, userId: walletUserId } = useCredits();
   const [packs, setPacks] = useState<CreditPack[]>([]);
   const [busyPack, setBusyPack] = useState<string | null>(null);
-  const [payment, setPayment] = useState<{ secret: string; credits: number; amountCents: number; startingBalance: number | null } | null>(null);
+  const [payment, setPayment] = useState<{ secret: string; paymentIntentId: string; credits: number; amountCents: number } | null>(null);
+  const [pendingPurchase, setPendingPurchase] = useState<PendingPurchase | null>(null);
+  const [settling, setSettling] = useState(false);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<CreditTransaction[]>([]);
   const [historyPage, setHistoryPage] = useState(1);
@@ -74,6 +79,22 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
       .then((data) => setPacks(Array.isArray(data.data) ? data.data : []))
       .catch(() => setPacks([]));
   }, []);
+  useEffect(() => {
+    setPendingPurchase(null);
+    if (!walletUserId) return;
+    try {
+      const returnedIntent = new URLSearchParams(window.location.search).get("payment_intent");
+      const saved = JSON.parse(localStorage.getItem(`${PENDING_PURCHASE_KEY}:${walletUserId}`) ?? "null") as PendingPurchase | null;
+      if (saved && Number.isInteger(saved.credits) && Number.isFinite(saved.since)) setPendingPurchase(saved);
+      if (returnedIntent && !saved) {
+        const recovered = { paymentIntentId: returnedIntent, credits: 0, since: Date.now() };
+        setPendingPurchase(recovered);
+        localStorage.setItem(`${PENDING_PURCHASE_KEY}:${walletUserId}`, JSON.stringify(recovered));
+      }
+    } catch {
+      if (walletUserId) localStorage.removeItem(`${PENDING_PURCHASE_KEY}:${walletUserId}`);
+    }
+  }, [walletUserId]);
   useEffect(() => { void loadHistory(1); }, [loadHistory]);
 
   const buy = async (pack: CreditPack) => {
@@ -90,9 +111,9 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
         credentials: "include",
         body: JSON.stringify({ packId: pack.id }),
       });
-      const data = await response.json() as { clientSecret?: string; error?: string };
-      if (!response.ok || !data.clientSecret) throw new Error(data.error ?? "Could not start credit checkout.");
-      setPayment({ secret: data.clientSecret, credits: pack.totalCredits, amountCents: pack.amountCents, startingBalance: balance });
+      const data = await response.json() as { clientSecret?: string; paymentIntentId?: string; error?: string };
+      if (!response.ok || !data.clientSecret || !data.paymentIntentId) throw new Error(data.error ?? "Could not start credit checkout.");
+      setPayment({ secret: data.clientSecret, paymentIntentId: data.paymentIntentId, credits: pack.totalCredits, amountCents: pack.amountCents });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start credit checkout.");
     } finally {
@@ -101,16 +122,44 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
   };
 
   const confirmPurchase = async () => {
+    if (!payment) return;
+    const purchase = { paymentIntentId: payment.paymentIntentId, credits: payment.credits, since: Date.now() };
+    setPendingPurchase(purchase);
+    if (walletUserId) localStorage.setItem(`${PENDING_PURCHASE_KEY}:${walletUserId}`, JSON.stringify(purchase));
+    setSettling(true);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const next = await refresh();
-      if (next !== null && (payment?.startingBalance === null || next > payment!.startingBalance)) {
+      const status = await fetch(`/api/credits/purchase-status?paymentIntentId=${encodeURIComponent(purchase.paymentIntentId)}`, { credentials: "include" }).then((r) => r.ok ? r.json() as Promise<{ settled?: boolean }> : { settled: false }).catch(() => ({ settled: false }));
+      if (status.settled) {
         void loadHistory(1);
         setPayment(null);
+        setPendingPurchase(null);
+        if (walletUserId) localStorage.removeItem(`${PENDING_PURCHASE_KEY}:${walletUserId}`);
+        setSettling(false);
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 750));
     }
     setPayment(null);
+    setSettling(false);
+  };
+
+  const retryPendingPurchase = async () => {
+    if (!pendingPurchase) return;
+    setSettling(true);
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const next = await refresh();
+      const status = await fetch(`/api/credits/purchase-status?paymentIntentId=${encodeURIComponent(pendingPurchase.paymentIntentId)}`, { credentials: "include" }).then((r) => r.ok ? r.json() as Promise<{ settled?: boolean }> : { settled: false }).catch(() => ({ settled: false }));
+      if (status.settled) {
+        void loadHistory(1);
+        setPendingPurchase(null);
+        if (walletUserId) localStorage.removeItem(`${PENDING_PURCHASE_KEY}:${walletUserId}`);
+        setSettling(false);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+    setSettling(false);
   };
 
   const formatKind = (kind: string) => kind.replace(/^spend_/, "").replace(/^credits_/, "")
@@ -156,7 +205,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
             <Button
               className="mt-3 w-full bg-sky-500 text-black hover:bg-sky-400"
               onClick={() => void buy(pack)}
-              disabled={busyPack !== null || !!payment}
+              disabled={busyPack !== null || !!payment || !!pendingPurchase}
             >
               {busyPack === pack.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Buy ${(pack.amountCents / 100).toFixed(2)}
@@ -176,9 +225,22 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
           clientSecret={payment.secret}
           intentType="payment"
           submitLabel={`Buy ${payment.credits} credits for $${(payment.amountCents / 100).toFixed(2)}`}
-          onCancel={() => setPayment(null)}
+          onCancel={() => { if (!settling) setPayment(null); }}
           onSuccess={confirmPurchase}
         />
+      )}
+      {pendingPurchase && (
+        <div className="mt-6 rounded-lg border border-amber-400/40 bg-amber-400/[0.08] p-4" role="status">
+          <p className="font-semibold text-amber-200">Payment received — credits are still being added</p>
+          <p className="mt-1 text-sm text-amber-100/80">
+            Please don’t buy again. Stripe has confirmed your payment, and the wallet will update as soon as it settles.
+            If it takes longer than a minute, refresh your balance or try again below.
+          </p>
+          <Button className="mt-3" variant="outline" onClick={() => void retryPendingPurchase()} disabled={settling}>
+            {settling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {settling ? "Checking wallet…" : "Refresh credit balance"}
+          </Button>
+        </div>
       )}
       {signedIn && (
         <div className="mt-6 border-t border-border/40 pt-5" id="credit-history">
@@ -210,3 +272,5 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
     </section>
   );
 }
+
+const PENDING_PURCHASE_KEY = "gk_pending_credit_purchase";
