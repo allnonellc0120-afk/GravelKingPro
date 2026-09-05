@@ -1375,3 +1375,17 @@ mtime_ms = 1788644156469
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/3e3659fb-4aa9-463a-b8a6-2b798320ee3b/c4dc30e1-4596-4e7c-9add-648734f5983d"
 storage_version_token = "1788644163368580"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "ynNOuGZQLrFL8-Uf3NYsk"
+uri = "file://GravelKingPro_3_Minute_Vertical_Walkthrough.mp4"
+type = "video"
+title = "GravelKing Pro — 3-Minute Vertical App Walkthrough"
+description = "1080×1920 upright walkthrough for phone and iPad viewing. Uses the real GravelKing Pro interface across Pricing, JAX, Song Generator, The Foundry, Vocal Booth, and Label, with long processing waits cut forward and JAX voice commentary."
+logical_id = "0b5755b2-cd7c-48b9-b3e7-b06150b64b53"
+content_hash = "sha256:d8775930e1f49a0aecd15b8ef928dfa787d0893cade596a2fdcd86bd9b771a17"
+size = 11024922
+mtime_ms = 1788645272780
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/0b5755b2-cd7c-48b9-b3e7-b06150b64b53/ce634e78-dc1d-4020-9909-713e7671b9d7"
+storage_version_token = "1788645308438628"
+content_type = "video/mp4"
