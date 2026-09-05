@@ -25,6 +25,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { fileURLToPath } from "url";
 import { randomUUID, createHash, createHmac } from "crypto";
+import { existsSync } from "fs";
 import { readFile, writeFile, unlink, mkdir } from "fs/promises";
 
 import { db, ipCertStubsTable, tracksTable, purchasedTracksTable } from "@workspace/db";
@@ -139,10 +140,17 @@ export function buildCoverArgs(trackId: string, title: string, outPath: string):
     .replace(/[':,\[\]=;#%]/g, " ")
     .trim() || "GravelKing Track";
   const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
-  return [
+  const args = [
     "-y",
     "-f", "lavfi",
     "-i", `gradients=s=600x600:c0=${c0}:c1=${c1}:x0=0:y0=0:x1=600:y1=600,format=rgb24`,
+  ];
+  if (!existsSync(font)) {
+    logger.warn({ font, trackId }, "mlkOrchestrator: cover font is missing; using a no-text gradient cover");
+    return [...args, "-frames:v", "1", outPath];
+  }
+  return [
+    ...args,
     "-vf",
     `drawtext=fontfile=${font}:text='${safeTitle}':fontcolor=white@0.92:fontsize=40:x=(w-text_w)/2:y=h-120,` +
       `drawtext=fontfile=${font}:text='GRAVELKING PRO':fontcolor=white@0.45:fontsize=18:x=(w-text_w)/2:y=h-64`,
