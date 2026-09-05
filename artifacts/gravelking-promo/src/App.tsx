@@ -88,14 +88,13 @@ function VideoPlayer() {
 
 export default function App() {
   const isExport = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("export") === "1";
-  const format = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("format") === "vertical" ? "vertical" : "landscape";
   const isWorkflow = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("video") === "workflow";
   
   if (isExport) {
     if (isWorkflow) {
       return <WorkflowTemplate loop={false} muted={false} />;
     }
-    return <VideoTemplate format={format} loop={false} muted={false} />;
+    return <VideoTemplate loop={false} muted={false} />;
   }
 
   return (
