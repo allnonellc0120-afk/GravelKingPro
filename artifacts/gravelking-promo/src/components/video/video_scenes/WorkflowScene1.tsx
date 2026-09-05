@@ -21,7 +21,7 @@ export function WorkflowScene1() {
       <div className="absolute inset-0 bg-gradient-to-t from-[#08090c] via-transparent to-[#08090c]" />
 
       <div className="z-20 w-full flex flex-col items-center justify-center px-[8vw]">
-        {/* The Stamp: THANK IT. */}
+        {/* The Stamp: THINK IT. */}
         <motion.div
           className="overflow-hidden mb-[8vh]"
         >
@@ -31,7 +31,7 @@ export function WorkflowScene1() {
             animate={{ scale: 1, opacity: 1, y: "0%" }}
             transition={{ duration: 0.6, type: "spring", bounce: 0.4, delay: 0.3 }}
           >
-            THANK IT.
+            THINK IT.
           </motion.h1>
         </motion.div>
 
