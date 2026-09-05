@@ -422,7 +422,7 @@ export default function SongwritingStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ text: response, voiceId: selectedVoice === "admin" ? "" : selectedVoice }),
+        body: JSON.stringify({ text: response, voiceId: selectedVoice }),
       });
       if (!result.ok) throw new Error((await result.json() as { error?: string }).error || "Voice playback unavailable.");
       const objectUrl = URL.createObjectURL(await result.blob());
