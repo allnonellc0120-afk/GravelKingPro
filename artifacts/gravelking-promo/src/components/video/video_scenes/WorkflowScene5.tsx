@@ -82,7 +82,7 @@ export function WorkflowScene5() {
           animate={{ opacity: 1 }}
           transition={{ delay: 5.5, duration: 0.7 }}
         >
-          From first thought to finished record.
+          Create It. Own It. Release It.
         </motion.div>
       </div>
     </motion.div>
