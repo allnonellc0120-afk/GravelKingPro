@@ -1361,3 +1361,17 @@ mtime_ms = 1788643900946
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/1c623dbe-2178-490d-ac26-570aa0607701/7ec6faa1-6ef9-41a0-83bd-47358b3583e2"
 storage_version_token = "1788643911075249"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "uxjNegGEzabZawMqDuESu"
+uri = "file://GravelKingPro_Complete_Screen_Recording_Walkthrough.pdf"
+type = "pdf"
+title = "GravelKing Pro — Screen-Recording Walkthrough Script (PDF)"
+description = "Word-for-word beginner-to-label walkthrough script: from typing gravelkingpro.com in a blank browser, through JAX songwriting, generation, library review, mastering, certification, downloading, and label submission. Includes scene directions, SAY blocks, a recording checklist, and a 60–90 second short version."
+logical_id = "3e3659fb-4aa9-463a-b8a6-2b798320ee3b"
+content_hash = "sha256:ccdfbd039282187f90c474f486a1f7395ccbfb02f06a7355194421960626cdc4"
+size = 212222
+mtime_ms = 1788644156469
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/3e3659fb-4aa9-463a-b8a6-2b798320ee3b/c4dc30e1-4596-4e7c-9add-648734f5983d"
+storage_version_token = "1788644163368580"
+content_type = "application/pdf"
