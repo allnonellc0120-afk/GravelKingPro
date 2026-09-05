@@ -1249,3 +1249,17 @@ mtime_ms = 1788627771467
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/f75a7e45-0bc5-4d77-91f4-545d97bce4bc/03e413d3-9db4-4c9b-8e92-bea1ffb8187d"
 storage_version_token = "1788627776069208"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "VsyZfJfF6fg66x-if_mj8"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_workflow_45s_4x5.mp4"
+type = "video"
+title = "GravelKing Pro — 45s Workflow Promo"
+description = "A 4:5 Instagram-ready 45-second workflow promo: Thank It, Certify It, Sing It, Master It, Sell It."
+logical_id = "21036d01-78fb-4815-9994-fef978e0d46a"
+content_hash = "sha256:93a4d02e4b123a3aaa88f4aa7d7ebb7c7ffc393a7f6a2ffd6040856dad23e5f3"
+size = 19822002
+mtime_ms = 1788633686131
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/21036d01-78fb-4815-9994-fef978e0d46a/14e0b811-7e12-48f7-bc82-08b0af14bac5"
+storage_version_token = "1788633697580526"
+content_type = "video/mp4"
