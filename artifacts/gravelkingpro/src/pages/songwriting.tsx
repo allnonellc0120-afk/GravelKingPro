@@ -37,6 +37,7 @@ type ArtistProfile = {
   tempo: string;
   stylisticRules: string;
 };
+type ChatMessage = { id: string; role: "user" | "jax"; content: string };
 
 const STORAGE_KEY = "gk:songwriting:canvas:v1";
 const HMAC_KEY_STORAGE = "gk:songwriting:hmac-key:v1";
@@ -170,6 +171,9 @@ export default function SongwritingStudio() {
   const [certificateBusy, setCertificateBusy] = useState(false);
   const canCertify = tier === "node_auditor" || isDeveloper;
   const [prompt, setPrompt] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [autoVoice, setAutoVoice] = useState(false);
   const [response, setResponse] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState("");
@@ -352,6 +356,9 @@ export default function SongwritingStudio() {
 
   const generate = async () => {
     if (!prompt.trim() || generating) return;
+    const submittedPrompt = prompt.trim();
+    setChatMessages((messages) => [...messages, { id: crypto.randomUUID(), role: "user", content: submittedPrompt }]);
+    setPrompt("");
     setGenerating(true);
     setGenerationError("");
     try {
@@ -359,11 +366,13 @@ export default function SongwritingStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ prompt, artistProfile }),
+        body: JSON.stringify({ prompt: submittedPrompt, artistProfile }),
       });
       const data = await result.json() as { text?: string; error?: string; remaining?: number | null };
       if (!result.ok) throw new Error(data.error || "JAX could not respond.");
-      setResponse(data.text || "");
+      const reply = data.text || "";
+      setResponse(reply);
+      setChatMessages((messages) => [...messages, { id: crypto.randomUUID(), role: "jax", content: reply }]);
       setRemaining(data.remaining ?? null);
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "JAX could not respond.");
@@ -493,6 +502,24 @@ export default function SongwritingStudio() {
   };
 
   return (
+    <Layout hideChrome>
+      <div className="flex min-h-screen flex-col bg-[#08090c] text-foreground">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4 sm:px-6">
+          <div className="flex items-center gap-3"><button type="button" onClick={() => setSidebarOpen((open) => !open)} className="rounded-lg p-2 text-muted-foreground hover:bg-white/10" aria-label="Toggle sessions sidebar"><ChevronDown className={`h-4 w-4 ${sidebarOpen ? "rotate-90" : "-rotate-90"}`} /></button><Link href="/" className="text-sm font-semibold"><span className="mr-2 text-[10px] uppercase tracking-[0.25em] text-violet-300">JAX</span>Songwriting Companion</Link></div>
+          <div className="flex items-center gap-2"><span className="hidden text-xs text-muted-foreground sm:inline">{savedAt ? `Saved ${new Date(savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Local session"}</span><Button size="sm" onClick={() => setCertificateOpen(true)} className="bg-violet-500 text-white hover:bg-violet-400"><ShieldCheck className="mr-1.5 h-4 w-4" />Certificate</Button></div>
+        </header>
+        <div className="flex min-h-0 flex-1">
+          {sidebarOpen && <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-white/[0.02] p-4 md:block"><Button variant="outline" className="mb-5 w-full justify-start border-white/10" onClick={() => { setChatMessages([]); setResponse(""); setPrompt(""); }}>+ New session</Button><p className="mb-3 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Saved songs</p><button type="button" className="w-full rounded-lg bg-violet-400/10 px-3 py-3 text-left text-sm text-violet-100">{draft.title || "Untitled song"}<span className="mt-1 block text-xs text-muted-foreground">Current session</span></button><div className="mt-8 rounded-xl border border-white/10 p-3 text-xs leading-5 text-muted-foreground"><p className="font-semibold text-foreground">JAX remembers as you chat</p><p className="mt-1">Genre, tempo, and your story become background context—no forms required.</p></div></aside>}
+          <main className="flex min-w-0 flex-1 flex-col">
+            <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto px-4 py-8 sm:px-8">
+              {chatMessages.length === 0 ? <div className="m-auto max-w-xl text-center"><div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/15 text-xl font-bold text-violet-300">J</div><h1 className="text-3xl font-bold tracking-tight">What are we writing today?</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Tell JAX the story, mood, genre, or lyric you have in mind. We’ll shape it together.</p></div> : <div className="space-y-6">{chatMessages.map((message) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-violet-500 text-white" : "border border-white/10 bg-white/[0.04]"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.role === "jax" && <div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => void speakResponse()} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button><Button size="sm" variant="outline" onClick={pushToCanvas} className="border-white/10">Save to song</Button></div>}</div></div>)}{generating && <div className="text-sm text-muted-foreground">JAX is writing…</div>}{generationError && <p className="text-sm text-rose-300">{generationError}</p>}</div>}
+            </div>
+            <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex items-center justify-between px-3 pb-1 pt-2 text-xs text-muted-foreground"><span>{remaining !== null ? `${remaining} prompts left today` : "JAX learns from this conversation"}</span><button type="button" onClick={() => setAutoVoice((enabled) => !enabled)} className={`rounded-full px-2.5 py-1 ${autoVoice ? "bg-violet-400/20 text-violet-200" : "bg-white/5"}`}>Auto-Voice {autoVoice ? "On" : "Off"}</button></div></div>{voiceError && <p className="mt-2 text-xs text-rose-300">{voiceError}</p>}</div></div>
+          </main>
+        </div>
+      </div>
+      {certificateOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"><div className="w-full max-w-lg rounded-2xl border border-violet-400/30 bg-[#121318] p-6"><div className="flex items-start justify-between"><div><p className="text-[10px] uppercase tracking-[0.2em] text-violet-300">JAX / PROVENANCE</p><h2 className="mt-1 text-xl font-bold">Provenance Certificate</h2></div><button type="button" onClick={() => setCertificateOpen(false)} aria-label="Close certificate dialog"><X className="h-5 w-5" /></button></div><p className="my-6 text-sm leading-6 text-muted-foreground">The certificate includes your transcript, edit history, timestamp, and active HMAC signature.</p><Button className="w-full bg-violet-500 text-white" onClick={() => void generateCertificate()} disabled={certificateBusy || !activeHash}>{certificateBusy ? "Compiling certificate…" : "Download certificate PDF"}</Button></div></div>}
+      {/*
     <Layout hideChrome>
       <div className="min-h-screen bg-[#090a0c] text-foreground">
         <header className="sticky top-0 z-20 border-b border-white/10 bg-[#090a0c]/95 backdrop-blur">
@@ -739,5 +766,6 @@ export default function SongwritingStudio() {
         </div>
       )}
     </Layout>
+  */}</Layout>
   );
 }
