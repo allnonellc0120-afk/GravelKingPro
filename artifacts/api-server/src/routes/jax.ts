@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { generateProxyText } from "../geminiProxy";
 import { rateLimit } from "../lib/rateLimiter";
-import { isAdminAutomationAuthenticated } from "../lib/adminAuth";
+import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 
 const jaxRouter = Router();
@@ -18,6 +18,16 @@ export function configuredAdminVoiceLabel() {
   return JAX_VOICE_PRESETS.admin.voiceId() === GEORGE_PREMADE_VOICE_ID
     ? "George (Premade)"
     : "Admin Configured Voice";
+}
+
+export function getConfiguredAdminVoiceDiagnostic() {
+  const configuredVoiceId = JAX_VOICE_PRESETS.admin.voiceId();
+  const isGeorgePremade = configuredVoiceId === GEORGE_PREMADE_VOICE_ID;
+  return {
+    configuredVoiceId,
+    resolvedLabel: isGeorgePremade ? "George (Premade)" : "Admin Configured Voice",
+    isGeorgePremade,
+  };
 }
 
 export const JAX_VOICE_PRESETS = {
@@ -39,6 +49,12 @@ export function getJaxVoiceMetadata() {
 
 jaxRouter.get("/jax/voices", (_req: Request, res: Response) => {
   res.json({ voices: getJaxVoiceMetadata() });
+});
+
+/** GET /api/admin/jax/voice-config — admin-only release/configuration check. */
+jaxRouter.get("/admin/jax/voice-config", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  res.json(getConfiguredAdminVoiceDiagnostic());
 });
 
 function dayKey() {
