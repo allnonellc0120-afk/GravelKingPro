@@ -31,7 +31,7 @@ const CATALOG: Array<{
     description:
       "Pro access to mastering and converter, with unlimited MP3 exports and 10 WAV exports per rolling 7 days.",
     tier: "pro",
-    unitAmount: 899,
+    unitAmount: 699,
     interval: "week",
   },
   {
@@ -39,7 +39,7 @@ const CATALOG: Array<{
     description:
       "Everything in Pro plus King access, 40 WAV exports per rolling 30 days, and unlimited included certificate unlocks.",
     tier: "king",
-    unitAmount: 1999,
+    unitAmount: 2499,
     interval: "month",
   },
   {

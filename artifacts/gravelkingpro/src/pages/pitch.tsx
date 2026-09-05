@@ -70,7 +70,7 @@ const FAQ = [
   },
   {
     q: "Does it work without Pro?",
-    a: "Generation uses credits. King Pro is $19.99/month and includes the forensic authorship ledger plus free certificates.",
+    a: "Generation uses credits. King Pro is $24.99/month and includes the forensic authorship ledger plus free certificates.",
   },
   {
     q: "What does the embed code look like on my website?",
@@ -119,7 +119,7 @@ export default function PitchPage() {
           </div>
           {!isPro && (
             <p className="text-xs text-muted-foreground">
-              Generation uses credits · <span className="text-amber-400 font-medium">King Pro is $19.99/mo</span>
+              Generation uses credits · <span className="text-amber-400 font-medium">King Pro is $24.99/mo</span>
             </p>
           )}
         </div>
@@ -244,7 +244,7 @@ export default function PitchPage() {
                 </Button>
               </Link>
             </div>
-            <p className="text-[10px] text-muted-foreground">$19.99/mo · 2,500 credits reset monthly · free certificates</p>
+            <p className="text-[10px] text-muted-foreground">$24.99/mo · 2,500 credits reset monthly · free certificates</p>
           </div>
         )}
 
