@@ -125,8 +125,8 @@ playBillingRouter.post('/play/verify-purchase', async (req: Request, res: Respon
 
     const plan =
       v.tier === 'node_auditor' ? 'Node Auditor'
-      : v.tier === 'monthly' ? 'Studio'
-      : 'Weekly';
+      : v.tier === 'king' ? 'King'
+      : 'Pro';
     res.json({ ok: true, isPro: true, plan, tier: v.tier });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';

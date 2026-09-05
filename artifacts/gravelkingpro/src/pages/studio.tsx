@@ -308,7 +308,7 @@ export default function Studio() {
     if (state !== "ready" || !loadedFileRef.current) return;
 
     if (mode === "standard" && !isPro) {
-      toast({ title: "Studio required", description: "GravelKing Standard processing requires a Studio subscription.", variant: "destructive" });
+      toast({ title: "King required", description: "GravelKing Standard processing requires a King subscription.", variant: "destructive" });
       return;
     }
 
@@ -985,7 +985,7 @@ export default function Studio() {
                   {mode === "standard" && !isPro && (
                     <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
                       <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      GravelKing Kernel requires the Studio (monthly) subscription.{" "}
+                      GravelKing Kernel requires the King subscription.{" "}
                       <Link href="/pricing" className="underline font-medium">Upgrade</Link>
                     </div>
                   )}
@@ -1499,7 +1499,7 @@ export default function Studio() {
                   </div>
                   <h3 className="text-base font-bold text-white">
                     {paywall.code === "UPGRADE_REQUIRED"
-                      ? "Studio subscription required"
+                      ? "King subscription required"
                       : "Upgrade for full access"}
                   </h3>
                 </div>

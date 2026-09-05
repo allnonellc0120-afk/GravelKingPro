@@ -8,6 +8,7 @@ import { sanitizeExt } from "../lib/audioGuards";
 import { streamBuffer } from "../lib/streamResponse";
 import { getUsageUser } from "../lib/usage";
 import { checkExportQuota, consumeExport, exportLimitPayload } from "../lib/exportQuota";
+import { resolveTier } from "../lib/entitlement";
 import type { User } from "@workspace/db";
 
 const execFileAsync = promisify(execFile);
@@ -87,6 +88,18 @@ convertRouter.post(
     const inputPath = req.file.path;
     const rawFormat = ((req.body.format as string) ?? "mp3").toLowerCase() as OutputFormat;
     const format: OutputFormat = FORMAT_CODEC[rawFormat] ? rawFormat : "mp3";
+    const tier = await resolveTier(req);
+    if (tier === "free") {
+      await unlink(inputPath).catch(() => {});
+      res.status(402).json({
+        success: false,
+        code: "PRO_REQUIRED",
+        feature: "converter",
+        error: "Converter is available on Pro and King plans.",
+        fallback: { action: "subscribe", url: "/pricing" },
+      });
+      return;
+    }
 
     // Sample rate (Hz) — whitelisted values, default 44100.
     const rawRate = Number(String(req.body.samplerate ?? "").trim());
@@ -98,10 +111,9 @@ convertRouter.post(
       ? Math.round(Math.min(320, Math.max(64, rawBitrate)))
       : null;
 
-    // WAV/MP3 outputs count against the rolling 30-day export quota
-    // (paid tiers included — capped, not unlimited).
+    // MP3 is unlimited for paid plans. Only WAV consumes the tier-aware quota.
     let exportUser: User | null = null;
-    if (format === "wav" || format === "mp3") {
+    if (format === "wav") {
       exportUser = await getUsageUser(req, res);
       const quota = checkExportQuota(exportUser);
       if (!quota.allowed) {

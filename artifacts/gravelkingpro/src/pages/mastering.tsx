@@ -50,13 +50,19 @@ type CertCategory = (typeof CERT_CATEGORIES)[number]["id"];
 interface CertStatus {
   unlocked: boolean;
   priceCents: number;
-  includedUnlocks: { available: boolean; used: number; limit: number; resetsAt: string | null } | null;
+  includedUnlocks: {
+    available: boolean;
+    unlimited?: boolean;
+    used: number;
+    limit: number | null;
+    resetsAt: string | null;
+  } | null;
 }
 
 /**
  * Certificate document access — the stamp is free, but the court document
- * (JSON + PDF) stays private until unlocked: $1.99 one-time, or one of a
- * Studio subscriber's 20 included unlocks per rolling 30 days.
+ * (JSON + PDF) stays private until unlocked: $1.99 one-time at any tier, or
+ * included without a per-certificate charge on King.
  */
 function CertUnlockCard({ certId }: { certId: string }) {
   const { toast } = useToast();
@@ -144,7 +150,9 @@ function CertUnlockCard({ certId }: { certId: string }) {
           <Button size="sm" disabled={busy || !inc.available} onClick={useIncluded}
             className="flex-1 bg-sky-600 hover:bg-sky-700" data-testid="button-cert-included">
             {inc.available
-              ? `Use included unlock (${inc.limit - inc.used} left)`
+              ? inc.unlimited
+                ? "Use included unlock — unlimited"
+                : `Use included unlock (${Math.max(0, (inc.limit ?? 0) - inc.used)} left)`
               : `Included unlocks used${inc.resetsAt ? ` — resets ${formatResetDate(inc.resetsAt)}` : ""}`}
           </Button>
         )}
@@ -159,13 +167,13 @@ function CertUnlockCard({ certId }: { certId: string }) {
 }
 
 export default function Mastering() {
-  const { isPro, isDeveloper } = useAppState();
+  const { hasSplits, isDeveloper } = useAppState();
   const { toast } = useToast();
   const emailGate = useEmailGate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Admin/developer accounts always bypass the Pro paywall (same rule as the
   // Lyric Studio generate card).
-  const hasProAccess = isPro || isDeveloper;
+  const hasProAccess = hasSplits || isDeveloper;
   // Set when the loaded input came from the user's vault (?gkTrack=…) — only
   // those tracks can be remixed through the MLK v3.5 Remix Engine.
   const [gkLoaded, setGkLoaded] = useState<{ id: string; title: string } | null>(null);
@@ -468,7 +476,7 @@ export default function Mastering() {
           <div className="flex items-center gap-2">
             <Wand2 className="w-5 h-5 text-sky-400" />
             <h1 className="text-2xl font-bold tracking-tight">Mastering</h1>
-            {!isPro && (
+            {!hasProAccess && (
               <Badge variant="outline" className="text-[10px] border-sky-500/30 text-sky-400">
                 1 free download
               </Badge>
@@ -605,7 +613,7 @@ export default function Mastering() {
             {/* Preset grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {PRESETS.map((p) => {
-                const locked = !p.free && !isPro;
+                const locked = !p.free && !hasProAccess;
                 return (
                   <button
                     key={p.id}
@@ -952,9 +960,9 @@ export default function Mastering() {
               </Button>
             )}
 
-            {!isPro && (
+            {!hasProAccess && (
               <p className="text-xs text-center text-muted-foreground">
-                Free tier: 1 full download. <Link href="/pricing" className="text-sky-400 hover:underline">Upgrade</Link> for unlimited + all presets.
+                Free tier: 1 full download. <Link href="/pricing" className="text-sky-400 hover:underline">Upgrade</Link> for full access and all presets.
               </p>
             )}
           </motion.div>
@@ -1007,7 +1015,7 @@ export default function Mastering() {
                     <p className="font-semibold text-sm">Mastered — {selectedPreset.label}</p>
                     <p className="text-xs text-muted-foreground">{fileName}</p>
                   </div>
-                  {remaining !== null && !isPro && (
+                  {remaining !== null && !hasProAccess && (
                     <Badge variant="outline" className="ml-auto text-[10px] border-sky-500/30 text-sky-400">
                       {remaining} free left
                     </Badge>

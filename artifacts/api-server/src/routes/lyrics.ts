@@ -209,7 +209,7 @@ async function requireStudio(req: Request, res: Response, next: NextFunction): P
     next();
     return;
   }
-  res.status(403).json({ error: "A Pro (Studio) subscription is required for this feature." });
+  res.status(403).json({ error: "A King subscription is required for this feature." });
 }
 
 // STRICT owner check for the by-id lyric routes. The caller must present a
@@ -502,7 +502,7 @@ STYLE_PROMPT: [genre] [2-3 mood adjectives] [key instruments] [tempo] vocals`;
 });
 
 // ─── POST /api/lyrics/regenerate-line ────────────────────────────────────────
-// Returns 3 distinct variations. Pro only — enforced server-side via requireStudio.
+// Returns 3 distinct variations. King only — enforced server-side via requireStudio.
 lyricsRouter.post("/lyrics/regenerate-line", lyricsAiRateLimit, requireStudio, async (req: Request, res: Response) => {
   const { line, instruction, sectionLabel, genre, songConcept, prevLine, nextLine } = req.body as {
     line?: string;
@@ -994,12 +994,12 @@ lyricsRouter.get("/library/studio", async (req: Request, res: Response) => {
 });
 
 // ─── GET /api/lyrics/certificate/:projectId ──────────────────────────────────
-// Server-verified IP certificate payload. Requires Studio (Pro) tier AND a
+// Server-verified IP certificate payload. Requires King tier AND a
 // project that has reached the 25% human-authorship threshold. Gating lives
 // here, not just in the UI, so the certificate cannot be minted by faking client state.
 lyricsRouter.get("/lyrics/certificate/:projectId", async (req: Request, res: Response) => {
   if (!(await hasStudio(req))) {
-    res.status(403).json({ error: "A Pro (Studio) subscription is required to certify authorship." });
+    res.status(403).json({ error: "A King subscription is required to certify authorship." });
     return;
   }
 

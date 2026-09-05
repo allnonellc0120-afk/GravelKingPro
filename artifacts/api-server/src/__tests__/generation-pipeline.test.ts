@@ -29,7 +29,7 @@ import { buildCoverArgs, extractInteractionLyrics } from "../services/mlkOrchest
 import type { InteractionResponse } from "../services/mlkOrchestrator";
 import { primeLyricVerificationForTest, parseScreeningResponse } from "../services/lyricGuard";
 import { saveObjectWithFallback } from "../lib/objectStorage";
-import { consumeExport, EXPORT_LIMIT } from "../lib/exportQuota";
+import { consumeExport, KING_EXPORT_LIMIT } from "../lib/exportQuota";
 import {
   db,
   usersTable,
@@ -69,7 +69,7 @@ async function makeTinyWav(seconds = 1): Promise<Buffer> {
   return buf;
 }
 
-async function seedUserWithSession(tier: "monthly" | "free"): Promise<{ userId: string; sid: string }> {
+async function seedUserWithSession(tier: "king" | "free"): Promise<{ userId: string; sid: string }> {
   const userId = `test-pipeline-${randomUUID()}`;
   const sid = randomBytes(32).toString("hex");
   await db.insert(usersTable).values({
@@ -90,7 +90,7 @@ async function seedUserWithSession(tier: "monthly" | "free"): Promise<{ userId: 
 
 async function main(): Promise<void> {
   const appServer = http.createServer(app);
-  const owner = await seedUserWithSession("monthly");
+  const owner = await seedUserWithSession("king");
   const stranger = await seedUserWithSession("free");
 
   const trackId = randomUUID();
@@ -630,7 +630,7 @@ async function main(): Promise<void> {
       }).where(eq(usersTable.id, owner.userId));
       const [quotaUser] = await db.select().from(usersTable).where(eq(usersTable.id, owner.userId));
       const results = await Promise.all(
-        Array.from({ length: EXPORT_LIMIT + 8 }, () => consumeExport(quotaUser)),
+        Array.from({ length: KING_EXPORT_LIMIT + 8 }, () => consumeExport(quotaUser)),
       );
       const allowed = results.filter((result) => result.allowed);
       const denied = results.filter((result) => !result.allowed);
@@ -638,9 +638,9 @@ async function main(): Promise<void> {
         .select({ monthlyExports: usersTable.monthlyExports })
         .from(usersTable)
         .where(eq(usersTable.id, owner.userId));
-      check("simultaneous exports allow exactly 20", allowed.length === EXPORT_LIMIT, `${allowed.length} allowed`);
+      check("King simultaneous WAV exports allow exactly 40", allowed.length === KING_EXPORT_LIMIT, `${allowed.length} allowed`);
       check("simultaneous exports deny the overflow", denied.length === 8, `${denied.length} denied`);
-      check("database counter never exceeds 20", quotaAfter?.monthlyExports === EXPORT_LIMIT, String(quotaAfter?.monthlyExports));
+      check("King WAV counter never exceeds 40", quotaAfter?.monthlyExports === KING_EXPORT_LIMIT, String(quotaAfter?.monthlyExports));
     }
   } finally {
     // ── Cleanup (FK-safe order) ───────────────────────────────────────────────

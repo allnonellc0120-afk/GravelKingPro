@@ -43,14 +43,14 @@ import type { NextFunction } from "express";
 
 const execFileAsync = promisify(execFile);
 
-/** Auth-gating middleware: process-audio requires Studio (monthly) tier.
+/** Auth-gating middleware: process-audio requires King tier.
  *  Runs BEFORE multer so unauthenticated requests never write to /tmp
  *  and cannot reach the ingestion validator. */
 async function requireStudioForAudio(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!await hasStudio(req)) {
     res.status(403).json({
       success: false,
-      error: "Processing audio requires a GravelKing Studio (monthly) subscription.",
+      error: "Processing audio requires a King subscription.",
       code: "STUDIO_REQUIRED",
     });
     return;
@@ -277,7 +277,8 @@ audioRouter.get("/usage/status", async (req: Request, res: Response) => {
     exports: {
       used: exportQuota.used,
       limit: exportQuota.limit,
-      remaining: Math.max(0, exportQuota.limit - exportQuota.used),
+      remaining: exportQuota.unlimited ? -1 : Math.max(0, exportQuota.limit - exportQuota.used),
+      unlimited: exportQuota.unlimited ?? false,
       resetsAt: exportQuota.resetsAt,
     },
   });
@@ -355,11 +356,11 @@ audioRouter.post(
     }
 
     // ── Free-tier limits for split modes ───────────────────────────────────────
-    // weekly+ tiers are unlimited; free users get a fixed number of runs each,
+    // Pro+ tiers are unlimited; free users get a fixed number of runs each,
     // tracked server-side per user / gk_session. On exhaustion we return a
     // 402 LIMIT_REACHED payload that drives the paywall funnel.
     //
-    // Studio stem split path: no free trial — requires Pro (monthly+) subscription.
+    // Studio stem split path: no free trial — requires King subscription.
     // When source === "studio" for stem_split, the free-tier counter is bypassed
     // entirely and a Pro check is enforced instead.
     let isFreeUse = false;
@@ -368,19 +369,19 @@ audioRouter.post(
     let freeRemaining = 0;
     if (mode === "voice_remove" || mode === "stem_split") {
       if (mode === "stem_split" && source === "studio") {
-        // Studio path: Pro subscription required — no free trial allowance
+        // Studio path: King subscription required — no free trial allowance
         if (!await hasStudio(req)) {
           await unlink(filePath).catch(() => {});
           res.status(402).json({
             success: false,
             code: "UPGRADE_REQUIRED",
             feature: "stem_split",
-            error: "Stem Splitting in Studio requires a GravelKing Studio (monthly) subscription.",
+            error: "Stem Splitting in Studio requires a King subscription.",
             fallback: { action: "subscribe", url: "/pricing" },
           });
           return;
         }
-        // Pro confirmed — proceed with no usage accounting
+        // King confirmed — proceed with no usage accounting
       } else {
         const unlimited = await hasUnlimitedSplits(req);
         if (!unlimited) {
@@ -399,8 +400,8 @@ audioRouter.post(
               used,
               error:
                 mode === "voice_remove"
-                  ? `You've used all ${limit} free voice removals. Subscribe to GravelKing Weekly for unlimited access.`
-                  : `You've used your free stem split. Subscribe to GravelKing Weekly for unlimited access.`,
+                  ? `You've used all ${limit} free voice removals. Subscribe to GravelKing Pro for unlimited access.`
+                  : `You've used your free stem split. Subscribe to GravelKing Pro for unlimited access.`,
               fallback: { action: "subscribe", url: "/pricing" },
             });
             return;
@@ -414,7 +415,7 @@ audioRouter.post(
               feature: mode,
               limit: FREE_LIMITS.totalDownloads,
               used: usedTotal,
-              error: "You've used your free download. Subscribe to GravelKing Weekly for unlimited access.",
+              error: "You've used your free download. Subscribe to GravelKing Pro for unlimited access.",
               fallback: { action: "subscribe", url: "/pricing" },
             });
             return;
@@ -425,10 +426,10 @@ audioRouter.post(
       }
     }
 
-    // ── Rolling 30-day export quota — WAV/MP3/stem-ZIP outputs count ─────────
-    // Applies to paid tiers too (capped, not unlimited — owner directive
-    // 2026-08-14). Checked here before expensive processing; consumed only
-    // after a successful run, right before the bytes stream.
+    // ── Tier-aware WAV export quota ─────────────────────────────────────────
+    // Pro has 10 WAV exports per rolling 7 days; King has 40 per rolling 30
+    // days. Checked before expensive processing and consumed only after a
+    // successful WAV-producing run, right before bytes stream.
     const exportQuotaUser = await getUsageUser(req, res);
     {
       const quota = checkExportQuota(exportQuotaUser);
@@ -759,7 +760,7 @@ audioRouter.post(
       await unlink(filePath).catch(() => {});
       res.status(403).json({
         success: false,
-        error: "GravelKing Standard processing requires a GravelKing Studio subscription.",
+        error: "GravelKing Standard processing requires a GravelKing King subscription.",
         code: "STUDIO_REQUIRED",
       });
       return;

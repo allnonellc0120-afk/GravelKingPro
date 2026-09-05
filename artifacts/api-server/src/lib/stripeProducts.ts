@@ -29,16 +29,16 @@ const CATALOG: Array<{
   {
     name: "GravelKing Weekly",
     description:
-      "Unlimited 2-stem voice removal and stem splitting with downloadable WAV stems, plus preset mastering (with denoise). No live Studio.",
-    tier: "weekly",
+      "Pro access to mastering and converter, with unlimited MP3 exports and 10 WAV exports per rolling 7 days.",
+    tier: "pro",
     unitAmount: 999,
-    interval: "week",
+    interval: "month",
   },
   {
     name: "GravelKing Studio",
     description:
-      "Everything in Weekly plus fully adjustable mastering and the live DAW — multitrack mixing, recording, and per-stem live metrics.",
-    tier: "monthly",
+      "Everything in Pro plus King access, 40 WAV exports per rolling 30 days, and unlimited included certificate unlocks.",
+    tier: "king",
     unitAmount: 2499,
     interval: "month",
   },
@@ -150,7 +150,7 @@ async function ensurePrice(
 }
 
 /**
- * Ensure the three subscription products (and their prices) exist on whatever
+ * Ensure the subscription products (and their prices) exist on whatever
  * Stripe account the managed connection currently points at. Safe to run on
  * every boot; only creates what is missing.
  */

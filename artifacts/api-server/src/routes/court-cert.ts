@@ -7,7 +7,6 @@ import { logToolError } from "../lib/errorTracker";
 import { logger } from "../lib/logger";
 import { storage } from "../storage";
 import { resolveTier } from "../lib/entitlement";
-import { checkCertUnlockQuota, consumeCertUnlock } from "../lib/certUnlocks";
 import { getUncachableStripeClient } from "../stripeClient";
 import { ensureCustomerOnCurrentAccount } from "../lib/stripeCustomers";
 
@@ -207,8 +206,7 @@ router.get("/court-cert/:certId/status", async (req: Request, res: Response) => 
     }
 
     const tier = await resolveTier(req);
-    const hasIncluded = tier === "monthly" || tier === "node_auditor";
-    const quota = hasIncluded ? checkCertUnlockQuota(user) : null;
+    const hasUnlimitedIncluded = tier === "king" || tier === "node_auditor" || user.isDeveloper;
 
     res.json({
       success: true,
@@ -219,8 +217,8 @@ router.get("/court-cert/:certId/status", async (req: Request, res: Response) => 
       category: stub.category ?? null,
       provenance: stub.provenance ?? null,
       priceCents: CERT_UNLOCK_PRICE_CENTS,
-      includedUnlocks: quota
-        ? { available: quota.allowed, used: quota.used, limit: quota.limit, resetsAt: quota.resetsAt }
+      includedUnlocks: hasUnlimitedIncluded
+        ? { available: true, unlimited: true, used: 0, limit: null, resetsAt: null }
         : null,
     });
   } catch (err) {
@@ -232,9 +230,8 @@ router.get("/court-cert/:certId/status", async (req: Request, res: Response) => 
 /**
  * POST /api/court-cert/:certId/unlock
  *
- * Consume ONE included unlock (monthly/Studio and node_auditor subscribers,
- * 20 per rolling 30 days). Weekly/free users are directed to the $1.99
- * one-time purchase instead — the allowance is a monthly+ benefit only.
+ * King, Node Auditor, and developer users have unlimited included unlocks.
+ * Pro and Free users can always purchase one certificate for $1.99.
  */
 router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) => {
   const certId = Array.isArray(req.params.certId) ? req.params.certId[0] : req.params.certId;
@@ -255,20 +252,19 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
     }
 
     const tier = await resolveTier(req);
-    if (tier !== "monthly" && tier !== "node_auditor" && !user.isDeveloper) {
+    if (tier !== "king" && tier !== "node_auditor" && !user.isDeveloper) {
       res.status(402).json({
         success: false,
         code: "CERT_PURCHASE_REQUIRED",
-        error: "Included unlocks are a Studio benefit. Unlock this certificate for $1.99, or upgrade to Studio.",
+        error: "Included unlocks are a King benefit. Unlock this certificate for $1.99, or upgrade to King.",
         priceCents: CERT_UNLOCK_PRICE_CENTS,
         checkoutUrl: `/api/court-cert/${certId}/checkout`,
       });
       return;
     }
 
-    // Claim the unlock first (conditional on still-locked), then consume the
-    // allowance. If the allowance is exhausted, release the claim — this
-    // ordering means a duplicate concurrent unlock can never double-consume.
+    // Claim conditional on still-locked. King has an unlimited allowance, so
+    // no counter is consumed and concurrent requests cannot exhaust it.
     const claimed = await db
       .update(ipCertStubsTable)
       .set({ unlockedAt: sql`NOW()`, unlockSource: user.isDeveloper ? "admin" : "included" })
@@ -281,30 +277,10 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
       return;
     }
 
-    const quota = await consumeCertUnlock(user);
-    if (!quota.allowed) {
-      // Roll the claim back — allowance exhausted.
-      await db
-        .update(ipCertStubsTable)
-        .set({ unlockedAt: null, unlockSource: null })
-        .where(and(eq(ipCertStubsTable.certId, certId), eq(ipCertStubsTable.unlockSource, "included")));
-      res.status(429).json({
-        success: false,
-        code: "CERT_UNLOCK_LIMIT_REACHED",
-        error: `You've used all ${quota.limit} included certificate unlocks for this 30-day period. You can still unlock this certificate for $1.99.`,
-        used: quota.used,
-        limit: quota.limit,
-        resetsAt: quota.resetsAt,
-        priceCents: CERT_UNLOCK_PRICE_CENTS,
-        checkoutUrl: `/api/court-cert/${certId}/checkout`,
-      });
-      return;
-    }
-
     res.json({
       success: true,
       unlocked: true,
-      includedUnlocks: { used: quota.used, limit: quota.limit, resetsAt: quota.resetsAt },
+      includedUnlocks: { unlimited: true, used: 0, limit: null, resetsAt: null },
     });
   } catch (err) {
     logger.error({ err, certId }, "cert unlock failed");

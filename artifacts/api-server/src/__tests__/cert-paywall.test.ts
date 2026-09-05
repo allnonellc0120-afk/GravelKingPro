@@ -7,11 +7,9 @@
  *   [2]  Non-owner (authenticated, wrong user) → 404 on all five endpoints
  *   [3]  Ownerless legacy stub (ownerUserId IS NULL) → 404 for any authenticated non-developer
  *   [4]  Owner, cert still locked → 402 on JSON and PDF
- *   [5]  Weekly subscriber attempts included unlock → 402 CERT_PURCHASE_REQUIRED
- *   [6]  Monthly subscriber included unlock:
- *          - consumes exactly one allowance
- *          - second call returns alreadyUnlocked:true, counter unchanged (idempotent)
- *   [7]  Concurrent included unlocks → exactly one allowance consumed
+ *   [5]  Pro subscriber attempts included unlock → 402 CERT_PURCHASE_REQUIRED
+ *   [6]  King subscriber included unlock is unlimited and idempotent
+ *   [7]  Concurrent King unlocks leave no allowance counter to consume
  *   [8]  /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
  *        (regression guard for the "/:certId swallows /:certId.pdf" ordering bug)
  *
@@ -27,7 +25,6 @@ import type { AddressInfo } from "node:net";
 
 import app from "../app";
 import { db, usersTable, sessionsTable, ipCertStubsTable } from "@workspace/db";
-import { CERT_UNLOCK_LIMIT } from "../lib/certUnlocks";
 
 // ── Assertion harness ─────────────────────────────────────────────────────────
 
@@ -141,7 +138,7 @@ async function main(): Promise<void> {
     // ── [1] No-auth → 401 on every endpoint ───────────────────────────────────
     console.log("\n[1] No auth → 401 on JSON, PDF, status, unlock, checkout");
     {
-      const owner = await seedUser({ subscriptionTier: "monthly" });
+      const owner = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: owner.userId });
 
       const r1 = await fetch(`${base}/api/court-cert/${certId}`);
@@ -163,8 +160,8 @@ async function main(): Promise<void> {
     // ── [2] Non-owner → 404 on all endpoints ──────────────────────────────────
     console.log("\n[2] Non-owner authenticated user → 404");
     {
-      const owner = await seedUser({ subscriptionTier: "monthly" });
-      const other = await seedUser({ subscriptionTier: "monthly" });
+      const owner = await seedUser({ subscriptionTier: "king" });
+      const other = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: owner.userId });
 
       const r1 = await fetch(`${base}/api/court-cert/${certId}`, {
@@ -198,7 +195,7 @@ async function main(): Promise<void> {
     // ── [3] Ownerless legacy stub → fails closed (404 for any non-developer) ──
     console.log("\n[3] Ownerless legacy stub → 404 for authenticated non-developer");
     {
-      const user = await seedUser({ subscriptionTier: "monthly" });
+      const user = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: null }); // legacy stub, no owner
 
       const r1 = await fetch(`${base}/api/court-cert/${certId}`, {
@@ -232,7 +229,7 @@ async function main(): Promise<void> {
     // ── [4] Owner, cert locked → 402 on JSON and PDF ──────────────────────────
     console.log("\n[4] Owner with locked cert → 402 on JSON and PDF");
     {
-      const owner = await seedUser({ subscriptionTier: "monthly" });
+      const owner = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: owner.userId }); // unlockedAt = NULL
 
       const r1 = await fetch(`${base}/api/court-cert/${certId}`, {
@@ -258,33 +255,33 @@ async function main(): Promise<void> {
       check("4.7 status reports unlocked:false", b3.unlocked === false, JSON.stringify(b3));
     }
 
-    // ── [5] Weekly tier → 402 CERT_PURCHASE_REQUIRED on unlock ───────────────
-    console.log("\n[5] Weekly subscriber included unlock attempt → 402");
+    // ── [5] Pro tier → 402 CERT_PURCHASE_REQUIRED on unlock ──────────────────
+    console.log("\n[5] Pro subscriber included unlock attempt → 402");
     {
-      const owner = await seedUser({ subscriptionTier: "weekly" });
+      const owner = await seedUser({ subscriptionTier: "pro" });
       const certId = await seedCert({ ownerUserId: owner.userId });
 
       const r = await fetch(`${base}/api/court-cert/${certId}/unlock`, {
         method: "POST",
         headers: owner.bearerAuth,
       });
-      check("5.1 weekly tier unlock → 402", r.status === 402, `got ${r.status}`);
+      check("5.1 Pro tier unlock → 402", r.status === 402, `got ${r.status}`);
       const b = await r.json() as Record<string, unknown>;
       check(
-        "5.2 weekly 402 has CERT_PURCHASE_REQUIRED code",
+        "5.2 Pro 402 has CERT_PURCHASE_REQUIRED code",
         b.code === "CERT_PURCHASE_REQUIRED",
         JSON.stringify(b),
       );
-      check("5.3 weekly 402 exposes priceCents", typeof b.priceCents === "number", JSON.stringify(b));
+      check("5.3 Pro 402 exposes priceCents", typeof b.priceCents === "number", JSON.stringify(b));
       // Cert must still be locked in DB
       const row = await readCertRow(certId);
-      check("5.4 cert still locked after weekly rejection", row?.unlockedAt === null, String(row?.unlockedAt));
+      check("5.4 cert remains locked after Pro rejection", row?.unlockedAt === null, String(row?.unlockedAt));
     }
 
-    // ── [6] Monthly included unlock: consumes one allowance, idempotent ────────
-    console.log("\n[6] Monthly subscriber included unlock: one allowance, idempotent");
+    // ── [6] King included unlock: unlimited and idempotent ─────────────────────
+    console.log("\n[6] King subscriber included unlock: unlimited, idempotent");
     {
-      const owner = await seedUser({ subscriptionTier: "monthly" });
+      const owner = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: owner.userId });
 
       // First unlock
@@ -298,8 +295,8 @@ async function main(): Promise<void> {
       check("6.3 first unlock: alreadyUnlocked not set", !b1.alreadyUnlocked, JSON.stringify(b1));
 
       const row1 = await readUserRow(owner.userId);
-      check("6.4 certUnlocks incremented to 1", row1?.certUnlocks === 1, `certUnlocks=${row1?.certUnlocks}`);
-      check("6.5 certUnlockPeriodStart set", !!row1?.certUnlockPeriodStart);
+      check("6.4 King unlock does not consume a counter", row1?.certUnlocks === 0, `certUnlocks=${row1?.certUnlocks}`);
+      check("6.5 King unlock does not start a quota window", !row1?.certUnlockPeriodStart);
 
       // Cert should now be unlocked in DB
       const certRow1 = await readCertRow(certId);
@@ -317,8 +314,8 @@ async function main(): Promise<void> {
 
       const row2 = await readUserRow(owner.userId);
       check(
-        "6.10 certUnlocks NOT double-consumed (still 1)",
-        row2?.certUnlocks === 1,
+        "6.10 King has no counter to double-consume",
+        row2?.certUnlocks === 0,
         `certUnlocks=${row2?.certUnlocks}`,
       );
 
@@ -331,10 +328,10 @@ async function main(): Promise<void> {
       check("6.12 cert JSON has certificate field", !!b3.certificate, JSON.stringify(b3));
     }
 
-    // ── [7] Concurrent unlocks → exactly one allowance consumed ───────────────
-    console.log("\n[7] Concurrent included unlocks → one allowance, one DB write");
+    // ── [7] Concurrent King unlocks → no allowance counter ────────────────────
+    console.log("\n[7] Concurrent King included unlocks → no counter consumption");
     {
-      const owner = await seedUser({ subscriptionTier: "monthly" });
+      const owner = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: owner.userId });
 
       // Fire 5 concurrent POST /unlock requests
@@ -356,8 +353,8 @@ async function main(): Promise<void> {
 
       const row = await readUserRow(owner.userId);
       check(
-        "7.2 certUnlocks exactly 1 (no double-consume)",
-        row?.certUnlocks === 1,
+        "7.2 King counter stays untouched",
+        row?.certUnlocks === 0,
         `certUnlocks=${row?.certUnlocks}`,
       );
 
@@ -368,7 +365,7 @@ async function main(): Promise<void> {
     // ── [8] PDF route registered before JSON route (Express 5 ordering) ────────
     console.log("\n[8] PDF route registers before /:certId (Express 5 ordering regression)");
     {
-      const owner = await seedUser({ subscriptionTier: "monthly" });
+      const owner = await seedUser({ subscriptionTier: "king" });
       // Cert already unlocked so the route returns a PDF response (not 402)
       const certId = await seedCert({ ownerUserId: owner.userId, unlockedAt: new Date(), unlockSource: "admin" });
 

@@ -10,20 +10,85 @@ import type Stripe from 'stripe';
 
 const stripeRouter = Router();
 
+const CHECKOUT_CATALOG = {
+  "GravelKing Weekly": { plan: "pro", unitAmount: 999 },
+  "GravelKing Studio": { plan: "king", unitAmount: 2499 },
+  "Node Auditor": { plan: "node_auditor", unitAmount: 24950 },
+} as const;
+
+/** Never trust a client-selected tier or arbitrary product price. */
+async function canonicalPlanForPrice(stripe: Stripe, priceId: string): Promise<"pro" | "king" | "node_auditor" | null> {
+  const price = await stripe.prices.retrieve(priceId);
+  // Legacy weekly prices remain active only so existing subscriptions continue
+  // billing. They are never valid for a newly-created subscription.
+  if (!price.active || price.currency !== "usd" || price.recurring?.interval !== "month") return null;
+  const productId = typeof price.product === "string" ? price.product : price.product.id;
+  const product = await stripe.products.retrieve(productId);
+  const approved = CHECKOUT_CATALOG[product.name as keyof typeof CHECKOUT_CATALOG];
+  if (!approved || price.unit_amount !== approved.unitAmount) return null;
+  const sameNameProducts: Stripe.Product[] = [];
+  for await (const candidate of stripe.products.search({
+    query: `name:'${product.name}' AND active:'true'`,
+    limit: 100,
+  })) {
+    sameNameProducts.push(candidate);
+  }
+  const canonicalProduct = sameNameProducts.sort(
+    (a, b) => a.created - b.created || a.id.localeCompare(b.id),
+  )[0];
+  if (!canonicalProduct || canonicalProduct.id !== product.id) return null;
+
+  const exactPrices: Stripe.Price[] = [];
+  for await (const candidate of stripe.prices.list({
+    product: canonicalProduct.id,
+    active: true,
+    limit: 100,
+  })) {
+    if (
+      candidate.currency === "usd" &&
+      candidate.unit_amount === approved.unitAmount &&
+      candidate.recurring?.interval === "month"
+    ) exactPrices.push(candidate);
+  }
+  const canonicalPrice = exactPrices.sort(
+    (a, b) => a.created - b.created || a.id.localeCompare(b.id),
+  )[0];
+  if (!canonicalPrice || canonicalPrice.id !== price.id) return null;
+  return approved.plan;
+}
+
 // List products with prices — calls Stripe API directly for reliability
 stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
   try {
     const stripe = await getUncachableStripeClient();
-    const products = await stripe.products.list({ active: true, limit: 20 });
+    const products: Stripe.Product[] = [];
+    for await (const product of stripe.products.list({ active: true, limit: 100 })) {
+      products.push(product);
+    }
+    const canonicalProducts = Object.keys(CHECKOUT_CATALOG)
+      .map((name) => products
+        .filter((product) => product.name === name)
+        .sort((a, b) => a.created - b.created || a.id.localeCompare(b.id))[0])
+      .filter((product): product is Stripe.Product => Boolean(product));
     const result = await Promise.all(
-      products.data.map(async (product) => {
-        const prices = await stripe.prices.list({ product: product.id, active: true });
+      canonicalProducts.map(async (product) => {
+      const prices = await stripe.prices.list({ product: product.id, active: true });
+      const approved = CHECKOUT_CATALOG[product.name as keyof typeof CHECKOUT_CATALOG];
+      // Keep legacy Stripe objects untouched for existing subscribers, but
+      // expose only the exact current catalog price to clients.
+      const visiblePrices = approved
+        ? prices.data.filter((p) =>
+            p.currency === "usd" &&
+            p.unit_amount === approved.unitAmount &&
+            p.recurring?.interval === "month"
+          ).sort((a, b) => a.created - b.created || a.id.localeCompare(b.id)).slice(0, 1)
+        : [];
         return {
           id: product.id,
           name: product.name,
           description: product.description,
           metadata: product.metadata,
-          prices: prices.data.map((p) => ({
+          prices: visiblePrices.map((p) => ({
             id: p.id,
             unit_amount: p.unit_amount,
             currency: p.currency,
@@ -67,7 +132,7 @@ const createSubscriptionIntent = async (req: Request, res: Response) => {
       res.status(401).json({ error: 'Sign in required to subscribe', authRequired: true });
       return;
     }
-    const { priceId, plan } = req.body as { priceId?: string; plan?: string };
+    const { priceId } = req.body as { priceId?: string; plan?: string };
     if (!priceId) {
       res.status(400).json({ error: 'priceId is required' });
       return;
@@ -84,9 +149,13 @@ const createSubscriptionIntent = async (req: Request, res: Response) => {
     }
 
     const price = await stripe.prices.retrieve(priceId);
-    const interval = price.recurring?.interval;
-    const trialDays = dbUser.trialUsed ? 0 : interval === 'month' ? 7 : interval === 'week' ? 3 : 0;
-    const metadata = { userId: dbUser.id, plan: plan ?? '' };
+    const plan = await canonicalPlanForPrice(stripe, priceId);
+    if (!plan) {
+      res.status(400).json({ error: "That price is not a GravelKing subscription plan." });
+      return;
+    }
+    const trialDays = dbUser.trialUsed ? 0 : plan === "king" ? 7 : plan === "pro" ? 3 : 0;
+    const metadata = { userId: dbUser.id, plan };
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
@@ -113,7 +182,7 @@ const createSubscriptionIntent = async (req: Request, res: Response) => {
       visitorId: (req.cookies as Record<string, string>)?.gk_vid ?? null,
       sessionId: dbUser.sessionId ?? dbUser.id,
       path: '/checkout',
-      metadata: { priceId, plan: plan ?? '', embedded: 'true' },
+      metadata: { priceId, plan, embedded: 'true' },
     }).catch(() => {});
 
     res.json({
@@ -153,7 +222,7 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       return;
     }
 
-    const { priceId, plan } = req.body as { priceId?: string; plan?: string };
+    const { priceId } = req.body as { priceId?: string; plan?: string };
 
     if (!priceId) {
       res.status(400).json({ error: 'priceId is required' });
@@ -184,15 +253,19 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
     const openSessions = await stripe.checkout.sessions.list({ customer: customerId, status: 'open', limit: 20 });
     await Promise.all(openSessions.data.map((s) => stripe.checkout.sessions.expire(s.id).catch(() => undefined)));
 
-    // Trial days: monthly = 7 days, weekly = 3 days; only once per account ever.
+    // Trial days are plan-specific and available only once per account ever.
     // Do not mark it consumed here: an open/abandoned Stripe Checkout is not a trial.
     const price = await stripe.prices.retrieve(priceId);
-    const interval = price.recurring?.interval;
+    const plan = await canonicalPlanForPrice(stripe, priceId);
+    if (!plan) {
+      res.status(400).json({ error: "That price is not a GravelKing subscription plan." });
+      return;
+    }
     const trialDays = dbUser.trialUsed
       ? 0
-      : interval === 'month'
+      : plan === "king"
         ? 7
-        : interval === 'week'
+        : plan === "pro"
           ? 3
           : 0;
 
@@ -227,7 +300,7 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
       client_reference_id: dbUser.id,
-      metadata: { userId: dbUser.id, plan: plan ?? "", ...(referralCode && { referralCode }) },
+      metadata: { userId: dbUser.id, plan, ...(referralCode && { referralCode }) },
       success_url: `${baseUrl}/pricing?checkout=success${plan ? `&plan=${encodeURIComponent(plan)}` : ''}`,
       cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
       ...(trialDays > 0 && { subscription_data: { trial_period_days: trialDays } }),
@@ -242,7 +315,7 @@ stripeRouter.post('/checkout', async (req: Request, res: Response) => {
       visitorId,
       sessionId: dbUser.sessionId ?? dbUser.id,
       path: '/checkout',
-      metadata: { priceId, plan: plan ?? "" },
+      metadata: { priceId, plan },
     }).catch(() => { /* ignore analytics failures */ });
 
     res.json({ url: session.url });
@@ -263,7 +336,7 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
         !!req.dbUser.promoExpiresAt &&
         req.dbUser.promoExpiresAt > new Date();
       if (promoActive) {
-        res.json({ isPro: true, plan: "Studio", tier: "monthly", trialEligible: false, promoExpiresAt: req.dbUser.promoExpiresAt });
+        res.json({ isPro: true, plan: "King", tier: "king", trialEligible: false, promoExpiresAt: req.dbUser.promoExpiresAt });
         return;
       }
       res.json({ ...status, trialEligible: !req.dbUser.trialUsed });

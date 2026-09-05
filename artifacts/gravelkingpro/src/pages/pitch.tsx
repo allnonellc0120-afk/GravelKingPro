@@ -119,7 +119,7 @@ export default function PitchPage() {
           </div>
           {!isPro && (
             <p className="text-xs text-muted-foreground">
-              Generation is free · Embed code requires <span className="text-amber-400 font-medium">Studio ($39.99/mo)</span>
+              Generation is free · Embed code requires <span className="text-amber-400 font-medium">King ($24.99/mo)</span>
             </p>
           )}
         </div>

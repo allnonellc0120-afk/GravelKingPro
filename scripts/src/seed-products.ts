@@ -55,21 +55,21 @@ async function createProducts() {
   try {
     const stripe = await getUncachableStripeClient();
 
-    // GravelKing Weekly — $9.99/week
+    // Legacy product name retained; canonical customer plan is Pro — $9.99/month.
     const weekly = await ensureProduct(
       stripe,
       'GravelKing Weekly',
-      'Unlimited 2-stem voice removal and stem splitting with downloadable WAV stems, plus preset mastering (with denoise). No live Studio.',
-      'weekly',
+      'Pro access to mastering and converter, with unlimited MP3 exports and 10 WAV exports per rolling 7 days.',
+      'pro',
     );
-    await ensurePrice(stripe, weekly, 999, 'week');
+    await ensurePrice(stripe, weekly, 999, 'month');
 
-    // GravelKing Studio — $24.99/month
+    // Legacy product name retained; canonical customer plan is King — $24.99/month.
     const studio = await ensureProduct(
       stripe,
       'GravelKing Studio',
-      'Everything in Weekly plus fully adjustable mastering and the live DAW — multitrack mixing, recording, and per-stem live metrics.',
-      'monthly',
+      'Everything in Pro plus King access, 40 WAV exports per rolling 30 days, and unlimited included certificate unlocks.',
+      'king',
     );
     await ensurePrice(stripe, studio, 2499, 'month');
 

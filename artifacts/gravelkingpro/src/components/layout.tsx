@@ -6,8 +6,8 @@ import { useAppState } from "@/lib/context";
 import { useUser } from "@clerk/react";
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
-  weekly:       { label: "Weekly",       className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-  monthly:      { label: "Pro",          className: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  weekly:       { label: "Pro",          className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+  monthly:      { label: "King",         className: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
   node_auditor: { label: "Node Auditor", className: "bg-amber-500/20 text-amber-300 border-amber-400/40" },
 };
 
