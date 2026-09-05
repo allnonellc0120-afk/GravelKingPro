@@ -7,6 +7,14 @@ const jaxRouter = Router();
 const DAILY_FREE_LIMIT = 5;
 const usage = new Map<string, { day: string; count: number }>();
 const STUDIO_REDIRECT = "I'm locked in the booth for songwriting only. Let's get back to the track. What section are we working on next?";
+export const JAX_VOICE_PRESETS = {
+  admin: { label: "Admin Custom Cloned Voice", voiceId: () => process.env.JAX_VOICE_ID?.trim() ?? "" },
+  adam: { label: "JAX Baritone (Deep & Resonant)", voiceId: () => "pNInz6obpgDQGcFmaJgB" },
+  callum: { label: "JAX Gritty Blues / Rough", voiceId: () => "N2lVS1w4EtoT3dr4eOWO" },
+  antoni: { label: "JAX Smooth Studio / Conversational", voiceId: () => "ErXwobaYiN019PkySvjV" },
+  josh: { label: "JAX Heavy Low-End / Narrator", voiceId: () => "TxGEqnHWrfWFTfGW9XjX" },
+  bill: { label: "JAX Classic Vintage", voiceId: () => "pqHfZKP75CvOlQylNhV4" },
+} as const;
 
 function dayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -55,6 +63,47 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
   } catch (error) {
     req.log.error({ error }, "JAX generation failed");
     res.status(502).json({ error: "JAX is between takes right now. Try the prompt again." });
+  }
+});
+
+jaxRouter.post("/jax/tts", async (req: Request, res: Response) => {
+  const adminBypass = isAdminAutomationAuthenticated(req);
+  if (!req.dbUser && !adminBypass) {
+    res.status(401).json({ error: "Sign in to use JAX voice playback." });
+    return;
+  }
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  const requestedVoiceId = typeof req.body?.voiceId === "string" ? req.body.voiceId.trim() : "";
+  const voiceId = requestedVoiceId === "admin" ? JAX_VOICE_PRESETS.admin.voiceId() : requestedVoiceId;
+  const allowedVoiceIds = Object.values(JAX_VOICE_PRESETS).map((preset) => preset.voiceId()).filter(Boolean);
+  if (!text || text.length > 10_000) {
+    res.status(400).json({ error: "Text must be between 1 and 10,000 characters." });
+    return;
+  }
+  if (!voiceId || !allowedVoiceIds.includes(voiceId)) {
+    res.status(400).json({ error: "Select a supported male JAX voice preset." });
+    return;
+  }
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
+  if (!apiKey) {
+    res.status(503).json({ error: "JAX voice playback is not configured on this server." });
+    return;
+  }
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
+      method: "POST",
+      headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({ text, model_id: "eleven_multilingual_v2", output_format: "mp3_44100_128" }),
+    });
+    if (!response.ok) {
+      req.log.warn({ status: response.status, voiceId }, "JAX TTS provider rejected request");
+      res.status(502).json({ error: "JAX voice provider rejected this playback request." });
+      return;
+    }
+    res.type("audio/mpeg").send(Buffer.from(await response.arrayBuffer()));
+  } catch (error) {
+    req.log.error({ error }, "JAX TTS request failed");
+    res.status(502).json({ error: "JAX voice playback is temporarily unavailable." });
   }
 });
 
