@@ -10,6 +10,7 @@ import { getSession, getSessionId, DEMO_USER_ID, DEMO_EMAIL } from "../lib/auth"
 // it survives row re-use (e.g. email-adopted rows from a legacy signup).
 const LIFETIME_GRANTS: Record<string, { tier: string; isDeveloper: boolean }> = {
   "allnonellc0120@gmail.com": { tier: "node_auditor", isDeveloper: true },
+  "ninastar1226@gmail.com": { tier: "node_auditor", isDeveloper: false },
   "kymegky@gmail.com": { tier: "node_auditor", isDeveloper: false },
   "martypodany63@gmail.com": { tier: "node_auditor", isDeveloper: false },
   "marie.gilreath@gmail.com": { tier: "node_auditor", isDeveloper: false },

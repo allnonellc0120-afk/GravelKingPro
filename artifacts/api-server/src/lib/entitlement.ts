@@ -19,6 +19,7 @@ export type Tier = "free" | "pro" | "king" | "node_auditor";
  */
 const LIFETIME_EMAILS = new Set([
   "allnonellc0120@gmail.com",
+  "ninastar1226@gmail.com",
   "kymegky@gmail.com",
   "martypodany63@gmail.com",
   "labordehope3@gmail.com",

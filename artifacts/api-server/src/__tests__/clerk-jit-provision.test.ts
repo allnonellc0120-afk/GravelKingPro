@@ -170,6 +170,14 @@ async function main() {
       .where(sql`lower(${usersTable.email}) = 'hopelaborde66@gmail.com'`);
     check("persisted row keeps node_auditor tier", row?.subscriptionTier === "node_auditor");
   }
+  {
+    const bridgeId = `test-clerk-${run}-nina`;
+    createdIds.push(bridgeId);
+    const user = await jitProvisionUser(bridgeId, "Ninastar1226@gmail.com");
+    check("Nina's account provisions", user !== null);
+    check("Nina's account receives node_auditor tier", user?.subscriptionTier === "node_auditor");
+    check("Nina's account is marked pro", user?.isPro === true);
+  }
 
   // ── Cleanup ─────────────────────────────────────────────────────────────────
   await db.delete(usersTable).where(inArray(usersTable.id, createdIds));
