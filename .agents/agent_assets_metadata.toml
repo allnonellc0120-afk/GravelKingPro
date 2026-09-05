@@ -983,3 +983,17 @@ mtime_ms = 1788555640884
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b33d4649-e970-4cac-9cf7-271b31d333ac/174ae67a-69de-4616-92e1-4d2124f1db9b"
 storage_version_token = "1788555646250543"
 content_type = "text/html"
+
+[[outputs]]
+id = "scWrGDZA6esDeQM5gUQan"
+uri = "file://artifacts/gravelking-promo/public/videos/preview_59s_9x16.mp4"
+type = "video"
+title = "GravelKing Pro — JAX 59-Second Vertical Promo"
+description = "Vertical 9:16 promo export for TikTok, Reels, Shorts, and mobile social posts."
+logical_id = "ddd2ef2f-1cd4-464c-bc20-2121dbd97f80"
+content_hash = "sha256:06ad3dc947a8f5a58f7e81f14c779e55a5a0c214cecb71cd6d3851664d373ae2"
+size = 33057278
+mtime_ms = 1788608895779
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ddd2ef2f-1cd4-464c-bc20-2121dbd97f80/c1e1ac24-d225-4978-b577-8cbd459786bd"
+storage_version_token = "1788609305990436"
+content_type = "video/mp4"
