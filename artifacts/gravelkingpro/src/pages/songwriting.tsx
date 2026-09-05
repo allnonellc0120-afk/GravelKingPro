@@ -4,6 +4,7 @@ import { useUser } from "@clerk/react";
 import { jsPDF } from "jspdf";
 import { useAppState } from "@/lib/context";
 import { Layout } from "@/components/layout";
+import { downloadBlob } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -534,28 +535,64 @@ export default function SongwritingStudio() {
     return data.text.trim();
   };
 
+  const smartFill = async (): Promise<{ lyrics: string; style: string; filled: string[] }> => {
+    let lyrics = generatorLyrics.trim();
+    let style = styleDescriptor.trim();
+    const filled: string[] = [];
+    if (!lyrics) {
+      setGeneratorMessage(style ? "No lyrics entered — JAX is writing them in your style…" : "No lyrics entered — JAX is writing them…");
+      lyrics = await askJax(style
+        ? `Write complete, original song lyrics (with [Verse]/[Chorus] section tags) in this exact style: ${style}. Output lyrics only.`
+        : "Write complete, original song lyrics (with [Verse]/[Chorus] section tags) on any theme you feel. Output lyrics only.");
+      setGeneratorLyrics(lyrics);
+      filled.push("lyrics");
+    }
+    if (!style) {
+      setGeneratorMessage("No style entered — JAX is picking one that fits the lyrics…");
+      style = await askJax(`In one short line, describe the perfect musical style (genre, tempo, mood, instrumentation) for these lyrics. Output the style description only:\n\n${lyrics.slice(0, 2000)}`);
+      setStyleDescriptor(style);
+      filled.push("style");
+    }
+    return { lyrics, style, filled };
+  };
+
+  const generateSongElevenLabs = async () => {
+    if (generatorBusy) return;
+    setGeneratorBusy(true);
+    setGeneratorMessage("");
+    try {
+      const { lyrics, style, filled } = await smartFill();
+      setGeneratorMessage("ElevenLabs is producing your take… this can take a minute or two.");
+      const result = await fetch("/api/jax/generate-music", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ lyrics, style, title: draft.title }),
+      });
+      if (!result.ok) {
+        const data = await result.json().catch(() => ({})) as { error?: string; code?: string };
+        if (result.status === 403) throw new Error(data.error || "ElevenLabs generation is a Pro/King feature.");
+        throw new Error(data.error || "ElevenLabs could not complete this take.");
+      }
+      const blob = await result.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await audio.play().catch(() => undefined);
+      downloadBlob(blob, `${(draft.title || "jax-elevenlabs-take").replace(/[^a-z0-9-_]+/gi, "-")}.mp3`);
+      setGeneratorMessage(`ElevenLabs take ready${filled.length ? ` — JAX supplied the ${filled.join(" and ")}` : ""} — playing now and saved as an MP3 download.`);
+    } catch (error) {
+      setGeneratorMessage(error instanceof Error ? error.message : "ElevenLabs could not complete this take.");
+    } finally {
+      setGeneratorBusy(false);
+    }
+  };
+
   const generateSong = async () => {
     if (generatorBusy) return;
     setGeneratorBusy(true);
     setGeneratorMessage("");
     try {
-      let lyrics = generatorLyrics.trim();
-      let style = styleDescriptor.trim();
-      const filled: string[] = [];
-      if (!lyrics) {
-        setGeneratorMessage(style ? "No lyrics entered — JAX is writing them in your style…" : "No lyrics entered — JAX is writing them…");
-        lyrics = await askJax(style
-          ? `Write complete, original song lyrics (with [Verse]/[Chorus] section tags) in this exact style: ${style}. Output lyrics only.`
-          : "Write complete, original song lyrics (with [Verse]/[Chorus] section tags) on any theme you feel. Output lyrics only.");
-        setGeneratorLyrics(lyrics);
-        filled.push("lyrics");
-      }
-      if (!style) {
-        setGeneratorMessage("No style entered — JAX is picking one that fits the lyrics…");
-        style = await askJax(`In one short line, describe the perfect musical style (genre, tempo, mood, instrumentation) for these lyrics. Output the style description only:\n\n${lyrics.slice(0, 2000)}`);
-        setStyleDescriptor(style);
-        filled.push("style");
-      }
+      const { lyrics, style, filled } = await smartFill();
       setGeneratorMessage("Rendering your take… this can take a couple of minutes.");
       const result = await fetch("/api/mlk/v35/generate-master", {
         method: "POST",
@@ -600,7 +637,10 @@ export default function SongwritingStudio() {
                 <Textarea id="style-descriptor" value={styleDescriptor} onChange={(event) => setStyleDescriptor(event.target.value)} className="min-h-24 border-white/10 bg-black/20" placeholder="Empty? JAX picks a style. Or be exact: sad outlaw grunge, 70 BPM, dark raw acoustic…" />
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <span className="text-xs text-muted-foreground">The take lands in your library when it finishes rendering.</span>
-                  <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
+                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (Pro)"}</Button>
+                  </div>
                 </div>
                 {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
               </section>
@@ -770,7 +810,10 @@ export default function SongwritingStudio() {
                 <Textarea id="style-descriptor" value={styleDescriptor} onChange={(event) => setStyleDescriptor(event.target.value)} className="min-h-24 border-white/10 bg-black/20" placeholder="Warm late-night alt-R&B, close vocal, internal rhymes, natural conversational meter…" />
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <span className="text-xs text-muted-foreground">Arrangement: {draft.blocks.map((block) => block.type).join(" → ")}</span>
-                  <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
+                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (Pro)"}</Button>
+                  </div>
                 </div>
                 {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
               </section>
