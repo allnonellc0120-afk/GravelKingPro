@@ -1235,3 +1235,17 @@ mtime_ms = 1788619608408
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/3cd5ae33-588e-4d0f-a070-044cc32c8b59/7b381429-ac67-4b9e-acd8-ae98b9a60eb6"
 storage_version_token = "1788619625542684"
 content_type = "image/png"
+
+[[outputs]]
+id = "TeDW4NjNBL6XT4vwbOlat"
+uri = "file://GravelKingPro_Angel_Funding_Playbook.pdf"
+type = "pdf"
+title = "GravelKing Pro — Founder Funding & Growth Playbook"
+description = "A 15-page plain-language strategy book covering the product evaluation, moat, angel fundraising, investor outreach scripts, SBA/CDFI loan paths, customer-funded income, data-room preparation, and a 90-day execution plan."
+logical_id = "f75a7e45-0bc5-4d77-91f4-545d97bce4bc"
+content_hash = "sha256:55a68b19cd082ed2dcf658478eddadc27f30f962d7b54ab85735e4977e9df1aa"
+size = 31097
+mtime_ms = 1788627624215
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/f75a7e45-0bc5-4d77-91f4-545d97bce4bc/c353b258-d88d-40d5-a4e0-d8f765d31842"
+storage_version_token = "1788627628349895"
+content_type = "application/pdf"
