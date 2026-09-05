@@ -58,15 +58,15 @@ const MODES: Array<{
   },
   {
     value: "voice_remove",
-    label: "Voice Removal",
-    description: "Neural AI separation — extracts the instrumental track",
+    label: "Vocal Booth Edit",
+    description: "Prepare a vocal or instrumental layer for your Booth session",
     icon: <Mic2 className="w-4 h-4 text-purple-400" />,
     requiresStudio: false,
   },
   {
     value: "stem_split",
-    label: "Stem Splitting",
-    description: "Splits into 5 stems: vocals, drums, bass, other, and a full instrumental",
+    label: "Layer Preparation",
+    description: "Prepare audio layers for Vocal Booth editing",
     icon: <Scissors className="w-4 h-4 text-emerald-400" />,
     requiresStudio: false,
   },
@@ -765,7 +765,7 @@ export default function Studio() {
             {hasSplits && !isPro && (
               <Link href="/pricing">
                 <Badge variant="outline" className="border-amber-500/30 text-amber-500 cursor-pointer hover:bg-amber-500/10 px-3 py-1">
-                  Weekly Plan — Upgrade to Studio
+                  Pro Plan — Upgrade to King
                 </Badge>
               </Link>
             )}
@@ -778,8 +778,8 @@ export default function Studio() {
             className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { icon: <Wand2 className="w-4 h-4 text-sky-400" />, label: "Mastering", tag: "1 Free" },
-              { icon: <Mic2 className="w-4 h-4 text-purple-400" />, label: "Voice Removal", tag: "3 Free" },
-              { icon: <Scissors className="w-4 h-4 text-emerald-400" />, label: "Stem Split", tag: "1 Free" },
+              { icon: <Mic2 className="w-4 h-4 text-purple-400" />, label: "Vocal Booth Edit", tag: "3 Free" },
+              { icon: <Scissors className="w-4 h-4 text-emerald-400" />, label: "Layer Preparation", tag: "1 Free" },
               { icon: <Waves className="w-4 h-4 text-teal-400" />, label: "Denoise", tag: "In Master" },
             ].map((f) => (
               <div key={f.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/30 border border-border/30">
@@ -796,7 +796,7 @@ export default function Studio() {
             className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
             <div className="flex items-center gap-2.5 text-sm">
               <Lock className="w-4 h-4 text-amber-500 shrink-0" />
-              <span className="text-amber-400/90">You're on <strong>GravelKing Weekly</strong> — full MLK v3 mastering + Vocal Booth. Upgrade to Studio (monthly) for the adjustable mastering kernel and full live DAW.</span>
+              <span className="text-amber-400/90">You're on <strong>Pro</strong> — JAX, Vocal Booth, The Foundry, and Converter. Upgrade to King for advanced controls.</span>
             </div>
             <Link href="/pricing">
               <Button size="sm" variant="outline" className="shrink-0 border-amber-500/30 text-amber-500 h-8 text-xs">
@@ -947,7 +947,7 @@ export default function Studio() {
                   {mode === "stem_split" && (
                     <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-secondary/40 rounded-md p-2.5">
                       <Scissors className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-400" />
-                      Returns stems: bass, midrange, highs, and instrumental. Studio path — requires a Studio (monthly) subscription.
+                      Prepares bass, midrange, highs, and instrumental layers. Requires a King subscription.
                     </div>
                   )}
                   {mode === "voice_remove" && !hasSplits && (
@@ -955,14 +955,14 @@ export default function Studio() {
                       <div className="flex items-start gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md p-2.5">
                         <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                         {voiceRemovalsLeft === null
-                          ? <>Free voice removals available.</>
-                          : <>You have <strong className="mx-0.5">{voiceRemovalsLeft} free voice removal{voiceRemovalsLeft === 1 ? "" : "s"}</strong> remaining.</>}
+                          ? <>Free Vocal Booth edits available.</>
+                          : <>You have <strong className="mx-0.5">{voiceRemovalsLeft} free Vocal Booth edit{voiceRemovalsLeft === 1 ? "" : "s"}</strong> remaining.</>}
                       </div>
                     ) : (
                       <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2.5">
                         <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                        Free voice removals used.{" "}
-                        <Link href="/pricing" className="underline font-medium ml-0.5">Subscribe to Weekly</Link> for unlimited use.
+                        Free Vocal Booth edits used.{" "}
+                        <Link href="/pricing" className="underline font-medium ml-0.5">Subscribe to Pro</Link> for unlimited use.
                       </div>
                     )
                   )}
@@ -1513,23 +1513,23 @@ export default function Studio() {
                   <Link href="/pricing">
                     <button className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer text-left">
                       <div>
-                        <div className="text-sm font-bold text-amber-300">GravelKing Weekly</div>
-                        <div className="text-[11px] text-muted-foreground">Full MLK v3 mastering + Vocal Booth + WAV exports</div>
+                        <div className="text-sm font-bold text-amber-300">Pro</div>
+                        <div className="text-[11px] text-muted-foreground">JAX, Vocal Booth, The Foundry, and Converter</div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-bold text-white">$9.99</div>
-                        <div className="text-[10px] text-muted-foreground">/week</div>
+                        <div className="text-[10px] text-muted-foreground">/month</div>
                       </div>
                     </button>
                   </Link>
                   <Link href="/pricing">
                     <button className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 border-sky-500/40 bg-sky-500/5 hover:bg-sky-500/15 transition-colors cursor-pointer text-left">
                       <div>
-                        <div className="text-sm font-bold text-sky-300">GravelKing Studio</div>
-                        <div className="text-[11px] text-muted-foreground">Everything in Weekly + adjustable mastering & live DAW</div>
+                        <div className="text-sm font-bold text-sky-300">King</div>
+                        <div className="text-[11px] text-muted-foreground">Everything in Pro with advanced controls and reports</div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-sm font-bold text-white">$29.99</div>
+                        <div className="text-sm font-bold text-white">$24.99</div>
                         <div className="text-[10px] text-muted-foreground">/month</div>
                       </div>
                     </button>

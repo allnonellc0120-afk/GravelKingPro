@@ -66,7 +66,7 @@ export default function VocalBooth() {
             <h1 className="text-2xl font-bold">Vocal Booth</h1>
             <p className="text-muted-foreground text-sm">
               Sing over any backing track with a scrolling-lyrics teleprompter, record your vocal,
-              and mix it down through the Morris Law kernel — part of the GravelKing Pro Plus (Studio) plan.
+              and mix it down through the Morris Law kernel — part of the King plan.
             </p>
             <a href="/pricing" className="inline-block mt-2">
               <button className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-colors">Upgrade to Pro Plus</button>

@@ -24,9 +24,9 @@ function clampStrength(n: number) {
 
 interface AppState {
   tier: SubscriptionTier;
-  /** weekly+ : unlimited voice removal / stem split + preset masters */
+  /** Pro+ : full Foundry exports, Vocal Booth tools, and JAX provenance */
   hasSplits: boolean;
-  /** monthly+ (Studio) : adjustable mastering + live DAW */
+  /** King+ : advanced Foundry and Vocal Booth controls */
   isStudio: boolean;
   /** Backwards-compatible alias for isStudio (Studio-gated features) */
   isPro: boolean;

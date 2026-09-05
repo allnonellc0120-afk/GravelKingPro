@@ -14,25 +14,25 @@ import { motion } from "framer-motion";
 
 const TIER_META = {
   null: {
-    label: "Starter",
+    label: "Free",
     color: "text-muted-foreground",
     border: "border-border/40",
     icon: <Zap className="w-4 h-4 text-muted-foreground" />,
     description: "Free plan — limited access",
   },
   weekly: {
-    label: "GravelKing Weekly",
+    label: "Pro",
     color: "text-emerald-400",
     border: "border-emerald-500/30",
     icon: <Scissors className="w-4 h-4 text-emerald-400" />,
     description: "Full MLK v3 mastering suite + Vocal Booth + WAV exports",
   },
   monthly: {
-    label: "GravelKing Studio",
+    label: "King",
     color: "text-amber-500",
     border: "border-amber-500/30",
     icon: <Crown className="w-4 h-4 text-amber-500" />,
-    description: "Adjustable mastering kernel + live DAW unlocked",
+    description: "Advanced JAX, Vocal Booth, Foundry, and Converter access",
   },
   node_auditor: {
     label: "Node Auditor",
@@ -51,10 +51,10 @@ const TIER_META = {
 } as const;
 
 const TIER_FEATURES: Record<string, string[]> = {
-  null:         ["Mastering 30s preview", "Vocal Booth access", "Songwriting Studio (basic)", "Live vocal monitoring"],
-  weekly:       ["Everything in Starter", "Full MLK v3 mastering suite", "Unlimited WAV exports", "IP Embed Code + authorship cert", "Vocal Booth + karaoke DAW"],
-  monthly:      ["Everything in Weekly", "Adjustable mastering kernel", "Live DAW + recording", "Waveform + plugin chain", "PDF reports"],
-  node_auditor: ["Everything in Studio", "Enterprise benchmarking", "Custom reports", "SLA guarantee", "Dedicated support"],
+  null:         ["JAX songwriting companion", "Vocal Booth access", "The Foundry 30s preview", "Converter access"],
+  weekly:       ["Everything in Free", "JAX provenance certificates", "Vocal Booth recording and editing", "Full Foundry WAV exports", "Audio format conversion"],
+  monthly:      ["Everything in Pro", "Advanced Foundry controls", "Vocal Booth clip, splice, and layer tools", "JAX creative timeline", "PDF reports"],
+  node_auditor: ["Everything in King", "Enterprise benchmarking", "Custom reports", "SLA guarantee", "Dedicated support"],
   developer:    ["Everything in Node Auditor", "Admin dashboard access", "Analytics & waitlist", "Full admin controls", "Developer tools"],
 };
 
@@ -221,7 +221,7 @@ export default function Account() {
                   <Link href="/pricing" className="flex-1">
                     <Button className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2">
                       <Crown className="w-4 h-4" />
-                      Upgrade to Studio
+                      Upgrade to King
                     </Button>
                   </Link>
                 )}

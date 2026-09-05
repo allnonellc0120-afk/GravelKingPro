@@ -1025,3 +1025,73 @@ mtime_ms = 1788610262856
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b0f997d5-d9ee-440e-a35a-d242180dba6c/029194d2-a46b-422d-8ea3-f794c910cd3c"
 storage_version_token = "1788610279130810"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "1xSeXWfd8cpXD_JADQkrY"
+uri = "file://deliverables/01-GravelKing-Pro-White-Paper.pdf"
+type = "pdf"
+title = "GravelKing Pro — White Paper"
+description = "Product, certificate architecture, market, model, and moat."
+logical_id = "49d69fe9-97e6-4cf4-96ff-1769d5f31cd1"
+content_hash = "sha256:4221e5feea49fde51eae15daccb8e39c6c576ac996ba16708558eba345ed2326"
+size = 70833
+mtime_ms = 1788612552817
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/49d69fe9-97e6-4cf4-96ff-1769d5f31cd1/7a698a0e-457f-4bc3-8701-9a128c81057a"
+storage_version_token = "1788612583995962"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "vcGNljTMrU6rpdh_E8KpB"
+uri = "file://deliverables/02-GravelKing-Pro-Pitch-Deck.pdf"
+type = "pdf"
+title = "GravelKing Pro — Bootstrapped Pitch Deck"
+description = "12-slide deck text, one block per slide."
+logical_id = "45344a90-21a1-4458-9cd8-d49a9e0f7ba2"
+content_hash = "sha256:2967fdf03caeed7ad3f26c5fd9ef70d774deed6620a033682f21d8469bd6f1ed"
+size = 67645
+mtime_ms = 1788612554196
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/45344a90-21a1-4458-9cd8-d49a9e0f7ba2/8997de0f-53ba-4507-bb58-b8f12f99d8ef"
+storage_version_token = "1788612584758565"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "6AnDk2sC8EycyE6XnO_Nz"
+uri = "file://deliverables/03-GravelKing-Pro-Financial-Evaluation.pdf"
+type = "pdf"
+title = "GravelKing Pro — Financial Evaluation"
+description = "Unit economics, break-even, 24-month bootstrapped scenarios."
+logical_id = "072b1ba4-c36c-4156-b896-7281611f74eb"
+content_hash = "sha256:8cd9c7d91f811649c09659519d6556bee621efc5834cae1c0e715817c3d5dfe0"
+size = 83964
+mtime_ms = 1788612555648
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/072b1ba4-c36c-4156-b896-7281611f74eb/779f0ae1-01c9-48e0-9f41-fc0541cef6ea"
+storage_version_token = "1788612585504886"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "VHS5WYeCSQgQ9cKTG4gXk"
+uri = "file://deliverables/04-GravelKing-Pro-Bootstrap-Growth-Workflow.pdf"
+type = "pdf"
+title = "GravelKing Pro — Bootstrap Growth Workflow"
+description = "The 14-day repeating customer-acquisition operating plan."
+logical_id = "2ec894b8-db6f-462c-af78-3081640dcda9"
+content_hash = "sha256:7659653030326341bccad4cd0e528b677e0f5583dfadaacdbb150238c4f4eb03"
+size = 80719
+mtime_ms = 1788612556944
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/2ec894b8-db6f-462c-af78-3081640dcda9/89ebf61e-1c3c-4c78-97be-722997cbd3d7"
+storage_version_token = "1788612586301255"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "14j3vn260aQPqw_PX1Y_3"
+uri = "file://deliverables/05-GravelKing-Pro-14-Day-Social-Pack.pdf"
+type = "pdf"
+title = "GravelKing Pro — 14-Day Social Pack"
+description = "Facebook/TikTok/Reddit posts with Gemini image prompts, ready for Nina."
+logical_id = "7932f915-422a-4d20-8efa-9699dcd4bc4b"
+content_hash = "sha256:6c204b8d5723f22b837ea65e2e13994928cc89daac98b15ef840052566616563"
+size = 89997
+mtime_ms = 1788612557996
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/7932f915-422a-4d20-8efa-9699dcd4bc4b/b72542aa-6e48-49f2-835b-63584ff8fa79"
+storage_version_token = "1788612586990937"
+content_type = "application/pdf"

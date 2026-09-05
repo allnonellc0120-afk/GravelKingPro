@@ -129,7 +129,7 @@ export default function Contact() {
               <CardContent className="p-5 space-y-3">
                 <h3 className="font-semibold text-sm">Licensing & Enterprise</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Interested in licensing the GravelKing kernel (MLK v2/v3) for your own product or DAW integration? We offer commercial licenses for the All N One LLC audio processing stack.
+                  Interested in licensing the GravelKing kernel (MLK v2/v3) for your own product or audio workflow? We offer commercial licenses for the All N One LLC audio processing stack.
                 </p>
               </CardContent>
             </Card>

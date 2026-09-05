@@ -14,16 +14,17 @@ import { usePlanPrices } from "@/lib/usePlanPrices";
 
 const FREE_LOCAL = [
   "Noise reduction (Denoise)",
-  "Voice Changer — 5 effects",
-  "30-second Mastering preview (all presets)",
-  "GravelKing Beat Maker — 30s clips",
-  "Songwriter — full lyric generator",
+  "The Foundry — 30-second mastering preview",
+  "Vocal Booth — record, clip, splice, and layer",
+  "JAX — songwriting companion",
+  "Converter — audio format conversion",
 ];
 
 const PRO_ONLINE = [
-  "Full-length Mastering download (Pro)",
-  "Full Beat Maker — up to 120s (Pro)",
-  "Mix Studio — multi-track (Pro)",
+  "JAX provenance certificates (Pro)",
+  "Full-length Foundry mastering downloads (Pro)",
+  "Vocal Booth recording and editing (Pro)",
+  "Audio format conversion (Pro)",
   "Kernel Dashboard + PDF reports (Pro)",
   "Node Auditor — remote kernel (Node Auditor)",
 ];
@@ -135,7 +136,7 @@ export default function DownloadPage() {
                   step: "2",
                   icon: <Server className="w-5 h-5 text-emerald-400" />,
                   title: "Free Features — Local",
-                  desc: "Denoise, Voice Changer, Songwriter, and 30s Beat Maker run entirely on your machine.",
+                  desc: "JAX, Vocal Booth, The Foundry preview, and Converter are available from one focused toolkit.",
                 },
                 {
                   step: "3",
@@ -189,8 +190,8 @@ export default function DownloadPage() {
               </p>
               <div className="space-y-2">
                 {[
-                  { name: "GravelKing Weekly", price: planPrices.weekly.label, color: "text-emerald-400" },
-                  { name: "GravelKing Pro Plus", price: planPrices.monthly.label, color: "text-amber-400" },
+                  { name: "Pro", price: planPrices.weekly.label, color: "text-emerald-400" },
+                  { name: "King", price: planPrices.monthly.label, color: "text-amber-400" },
                   { name: "Node Auditor", price: planPrices.node_auditor.label, color: "text-purple-400" },
                 ].map((p) => (
                   <div key={p.name} className="flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/30 border border-border/30">

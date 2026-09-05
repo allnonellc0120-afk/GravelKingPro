@@ -155,7 +155,7 @@ function AnalyticsDashboard() {
     {
       key: "twitter1",
       label: "Twitter/X — Feature",
-      text: `🎚️ GravelKing Pro just dropped — pro-level audio mastering, music IP protection & a full live DAW in your browser.\n\nFree trial 👇\nhttps://gravelkingpro.it.com #MusicProduction #AudioMastering #IndieArtist`,
+      text: `🎚️ GravelKing Pro just dropped — JAX songwriting and IP provenance, Vocal Booth recording, Foundry mastering, and audio conversion in your browser.\n\nFree trial 👇\nhttps://gravelkingpro.it.com #MusicProduction #AudioMastering #IndieArtist`,
     },
     {
       key: "twitter2",
@@ -165,17 +165,17 @@ function AnalyticsDashboard() {
     {
       key: "instagram",
       label: "Instagram caption",
-      text: `Stop paying $200+ per track for mastering. GravelKing Pro gives you studio-grade masters, music IP certification, vocal booth, and a live DAW — all for less than a coffee a week. ☕🎛️\n\nLink in bio → https://gravelkingpro.it.com\n\n#GravelKing #AudioMastering #MusicProduction #IndieArtist #BeatMaker #MusicBusiness #VocalBooth #DAW #MusicIP`,
+      text: `Stop paying $200+ per track for mastering. GravelKing Pro brings JAX songwriting and IP provenance, Vocal Booth recording, Foundry mastering, and audio conversion into one focused toolkit. ☕🎛️\n\nLink in bio → https://gravelkingpro.it.com\n\n#GravelKing #AudioMastering #MusicProduction #IndieArtist #MusicBusiness #VocalBooth #MusicIP`,
     },
     {
       key: "reddit",
       label: "Reddit post (r/WeAreTheMusicMakers)",
-      text: `I built GravelKing Pro — a browser-based audio mastering + IP certification tool\n\nHey r/WeAreTheMusicMakers — I've been building GravelKing Pro for the past year and it's finally live.\n\nWhat it does:\n• MLK V3.5 mastering kernel — 6 broadcast-ready presets + full EQ/compression\n• Music IP certification with cryptographic fingerprinting\n• Live multitrack DAW in the browser\n• Vocal booth with LRC lyric sync\n\nFree trial, no install: https://gravelkingpro.it.com\n\nWould love feedback from producers!`,
+      text: `I built GravelKing Pro — a browser-based creative audio toolkit\n\nHey r/WeAreTheMusicMakers — I've been building GravelKing Pro for the past year and it's finally live.\n\nWhat it does:\n• JAX songwriting companion with IP provenance certificates\n• Vocal Booth recording, clipping, splicing, and layering\n• The Foundry with Morris Law Kernel v3.5 mastering\n• Audio format conversion\n\nFree trial, no install: https://gravelkingpro.it.com\n\nWould love feedback from producers!`,
     },
     {
       key: "producthunt",
       label: "Product Hunt tagline",
-      text: `GravelKing Pro — Studio mastering, music IP protection & live DAW in your browser`,
+      text: `GravelKing Pro — songwriting, IP provenance, Vocal Booth recording, mastering, and conversion`,
     },
   ];
 

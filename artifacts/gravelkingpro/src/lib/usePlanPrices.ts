@@ -13,7 +13,7 @@ export interface PlanPrice {
 
 /** Fallbacks shown until (or if) the live Stripe products load. */
 export const FALLBACK_PRICES: Record<PlanTier, PlanPrice> = {
-  weekly: { amount: "$9.99", period: "/week", label: "$9.99/week" },
+  weekly: { amount: "$9.99", period: "/mo", label: "$9.99/mo" },
   monthly: { amount: "$24.99", period: "/mo", label: "$24.99/mo" },
   node_auditor: { amount: "$249.50", period: "/mo", label: "$249.50/mo" },
 };

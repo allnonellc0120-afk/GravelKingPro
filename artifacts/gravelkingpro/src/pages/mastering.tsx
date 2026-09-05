@@ -1094,7 +1094,7 @@ export default function Mastering() {
               to your uploaded audio. The process runs a loudness pass targeting your chosen preset's
               LUFS standard, applies multi-band compression and EQ shaping, optionally runs a
               spectral denoise sweep, and returns a fully processed WAV — all without requiring
-              any plug-ins or a DAW on your device.
+              any plug-ins or additional production software on your device.
             </p>
             <p className="text-muted-foreground leading-relaxed">
               Every preset matches a specific delivery platform or aesthetic. Baseline is a
@@ -1136,7 +1136,7 @@ export default function Mastering() {
               to evaluate the preset before committing.{" "}
               <Link href="/pricing" className="text-sky-400 hover:underline">GravelKing Pro</Link>{" "}
               returns the full-length master as a 16-bit stereo 44.1 kHz WAV, ready for distribution
-              or further editing in any DAW.
+              or further editing in your preferred audio software.
             </p>
           </section>
 
@@ -1171,7 +1171,7 @@ export default function Mastering() {
                 Mastering optimises the final output level, frequency balance, and stereo image of
                 a mix that is already well-balanced. It cannot repair a mix where individual
                 elements clash, where the low end is undefined, or where there is clipping in the
-                source file. If your track needs significant tonal correction, mix it first in a DAW
+                source file. If your track needs significant tonal correction, revise the mix in your preferred audio editor
                 and then master here.
               </p>
             </div>

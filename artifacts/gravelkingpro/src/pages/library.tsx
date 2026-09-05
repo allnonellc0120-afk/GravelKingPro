@@ -556,7 +556,7 @@ export default function LibraryPage() {
               <div className="text-center py-16">
                 <Mic className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                 <h3 className="text-lg font-medium">No processed audio yet</h3>
-                <p className="text-sm text-muted-foreground mt-1">Mastered tracks and DAW sessions appear here after processing.</p>
+                <p className="text-sm text-muted-foreground mt-1">Foundry masters and Vocal Booth sessions appear here after processing.</p>
                 <Link href="/mastering">
                   <Button className="mt-4" variant="outline">Master a Track</Button>
                 </Link>
