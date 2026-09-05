@@ -1,4 +1,4 @@
-import { getAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { type Request, type Response, type NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import type { User } from "@workspace/db";
@@ -119,6 +119,19 @@ async function jitProvisionUser(userId: string, email: string | null): Promise<U
   return dbUser;
 }
 
+async function resolveClerkEmail(userId: string, claimEmail: string | undefined): Promise<string | null> {
+  const fromClaim = claimEmail?.toLowerCase().trim();
+  if (fromClaim) return fromClaim;
+  try {
+    const clerkUser = await clerkClient.users.getUser(userId);
+    return clerkUser.primaryEmailAddress?.emailAddress?.toLowerCase().trim() ?? null;
+  } catch {
+    // A valid Clerk session should still be allowed through if the profile
+    // lookup is temporarily unavailable; the next request can backfill email.
+    return null;
+  }
+}
+
 /** Exported for integration tests only. */
 export { jitProvisionUser as __jitProvisionUserForTest };
 
@@ -138,17 +151,20 @@ export async function loadAuthUser(
     const auth = getAuth(req);
     // sessionClaims.userId = original Replit Auth sub for migrated users;
     // Clerk native ID (user_2abc...) for new users — use as local DB bridge.
-    const userId =
+    const userId: string | null =
       (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
-    const email = auth?.sessionClaims?.email as string | undefined;
-
     if (userId) {
+      const email = await resolveClerkEmail(
+        userId,
+        auth?.sessionClaims?.email as string | undefined,
+      );
+
       const normalizedEmail = email?.toLowerCase().trim();
       if (normalizedEmail && BANNED_EMAILS.has(normalizedEmail)) {
         res.status(403).json({ error: "Account suspended." });
         return;
       }
-      const dbUser = await jitProvisionUser(userId, email ?? null);
+       const dbUser = await jitProvisionUser(userId, email);
       if (dbUser) req.dbUser = dbUser;
     } else {
       // Fallback: server-side session (sid cookie or Bearer <sid> header).
