@@ -7,14 +7,14 @@ export interface PlanPrice {
   amount: string;
   /** Billing period suffix, e.g. "/week" or "/mo" */
   period: string;
-  /** Convenience label, e.g. "$24.99/mo" */
+  /** Convenience label, e.g. "$19.99/mo" */
   label: string;
 }
 
 /** Fallbacks shown until (or if) the live Stripe products load. */
 export const FALLBACK_PRICES: Record<PlanTier, PlanPrice> = {
-  weekly: { amount: "$9.99", period: "/mo", label: "$9.99/mo" },
-  monthly: { amount: "$24.99", period: "/mo", label: "$24.99/mo" },
+  weekly: { amount: "$8.99", period: "/week", label: "$8.99/week" },
+  monthly: { amount: "$19.99", period: "/mo", label: "$19.99/mo" },
   node_auditor: { amount: "$249.50", period: "/mo", label: "$249.50/mo" },
 };
 
@@ -67,10 +67,9 @@ async function fetchPlanPrices(): Promise<Record<PlanTier, PlanPrice>> {
       : rawTier === "king" ? "monthly"
       : (rawTier as PlanTier | undefined) ?? PRODUCT_NAME_TO_TIER[product.name];
     if (!tier || !(tier in FALLBACK_PRICES)) continue;
-    // An old Weekly price can remain active for existing Stripe subscribers;
-    // never display or sell that legacy weekly cadence to a new customer.
     const price = product.prices?.find(
-      (p) => typeof p.unit_amount === "number" && p.recurring?.interval === "month",
+      (p) => typeof p.unit_amount === "number" &&
+        p.recurring?.interval === (tier === "weekly" ? "week" : "month"),
     );
     if (!price || price.unit_amount == null) continue;
     const amount = formatAmount(price.unit_amount, price.currency);

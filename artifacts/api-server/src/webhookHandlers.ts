@@ -12,7 +12,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import type { Request } from 'express';
 import { recordAnalyticsEvent } from './analytics';
-import { grantCredits, MONTHLY_CREDITS } from './lib/credits';
+import { grantCredits, resetCredits, MONTHLY_CREDITS } from './lib/credits';
 
 /**
  * Loads the managed webhook signing secrets from stripe._managed_webhooks.
@@ -272,10 +272,10 @@ export class WebhookHandlers {
                 ? MONTHLY_CREDITS.king
                 : 0;
             if (subscriber && monthlyCredits > 0) {
-              await grantCredits(
+              await resetCredits(
                 subscriber.id,
                 monthlyCredits,
-                'subscription_monthly',
+                'subscription_reset',
                 `stripe-invoice:${invoice.id}`,
               );
             }

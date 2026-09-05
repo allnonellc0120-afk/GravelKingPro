@@ -537,7 +537,7 @@ export default function Mastering() {
             Apply a professional mastering chain with optional denoise. Runs locally with MLK v3 — no upload to third parties.
           </p>
            <p className="mt-2 text-xs text-sky-300">
-             Wallet: {creditsBalance === null ? "sign in to view your balance" : `${creditsBalance} credits`} · Full master: 4 credits · Certificate: +4 credits
+             Wallet: {creditsBalance === null ? "sign in to view your balance" : `${creditsBalance} credits`} · Master + download: 75 credits · Certificate: free with Pro
            </p>
         </div>
 

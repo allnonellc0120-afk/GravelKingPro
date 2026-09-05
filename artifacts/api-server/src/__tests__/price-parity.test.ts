@@ -21,8 +21,8 @@ import { getUncachableStripeClient } from "../stripeClient";
 
 // ── Source of truth: what we advertise ───────────────────────────────────────
 const ADVERTISED = [
-  { product: "GravelKing Weekly", cents: 999, interval: "month", display: "$9.99" },
-  { product: "GravelKing Studio", cents: 2499, interval: "month", display: "$24.99" },
+  { product: "GravelKing Weekly", cents: 899, interval: "week", display: "$8.99" },
+  { product: "GravelKing Studio", cents: 1999, interval: "month", display: "$19.99" },
   { product: "Node Auditor", cents: 24950, interval: "month", display: "$249.50" },
 ] as const;
 

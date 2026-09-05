@@ -70,7 +70,7 @@ const FAQ = [
   },
   {
     q: "Does it work without Pro?",
-    a: "Generation is free. Editing your lines, reaching 25%, and getting the embed code all require a GravelKing Pro subscription ($39.99/mo) — that's where the forensic authorship ledger lives.",
+    a: "Generation uses credits. King Pro is $19.99/month and includes the forensic authorship ledger plus free certificates.",
   },
   {
     q: "What does the embed code look like on my website?",
@@ -119,7 +119,7 @@ export default function PitchPage() {
           </div>
           {!isPro && (
             <p className="text-xs text-muted-foreground">
-              Generation is free · Embed code requires <span className="text-amber-400 font-medium">King ($24.99/mo)</span>
+              Generation uses credits · <span className="text-amber-400 font-medium">King Pro is $19.99/mo</span>
             </p>
           )}
         </div>
@@ -244,7 +244,7 @@ export default function PitchPage() {
                 </Button>
               </Link>
             </div>
-            <p className="text-[10px] text-muted-foreground">$39.99/mo · cancel anytime · 1 free master included on signup</p>
+            <p className="text-[10px] text-muted-foreground">$19.99/mo · 2,500 credits reset monthly · free certificates</p>
           </div>
         )}
 

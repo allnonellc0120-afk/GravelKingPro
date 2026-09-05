@@ -7,7 +7,7 @@
  *   [2]  Non-owner (authenticated, wrong user) → 404 on all five endpoints
  *   [3]  Ownerless legacy stub (ownerUserId IS NULL) → 404 for any authenticated non-developer
  *   [4]  Owner, cert still locked → 402 on JSON and PDF
- *   [5]  Pro subscriber attempts included unlock → 402 CERT_PURCHASE_REQUIRED
+ *   [5]  Pro subscriber receives a free certificate unlock
  *   [6]  King subscriber included unlock is unlimited and idempotent
  *   [7]  Concurrent King unlocks leave no allowance counter to consume
  *   [8]  /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
@@ -255,8 +255,8 @@ async function main(): Promise<void> {
       check("4.7 status reports unlocked:false", b3.unlocked === false, JSON.stringify(b3));
     }
 
-    // ── [5] Pro tier → 402 CERT_PURCHASE_REQUIRED on unlock ──────────────────
-    console.log("\n[5] Pro subscriber included unlock attempt → 402");
+    // ── [5] Certificates are free for every signed-in creator ────────────────
+    console.log("\n[5] Pro subscriber receives a free certificate unlock");
     {
       const owner = await seedUser({ subscriptionTier: "pro" });
       const certId = await seedCert({ ownerUserId: owner.userId });
@@ -265,17 +265,11 @@ async function main(): Promise<void> {
         method: "POST",
         headers: owner.bearerAuth,
       });
-      check("5.1 Pro tier unlock → 402", r.status === 402, `got ${r.status}`);
+      check("5.1 Pro tier unlock → 200", r.status === 200, `got ${r.status}`);
       const b = await r.json() as Record<string, unknown>;
-      check(
-        "5.2 Pro 402 has CERT_PURCHASE_REQUIRED code",
-        b.code === "CERT_PURCHASE_REQUIRED",
-        JSON.stringify(b),
-      );
-      check("5.3 Pro 402 exposes priceCents", typeof b.priceCents === "number", JSON.stringify(b));
-      // Cert must still be locked in DB
+      check("5.2 Pro unlock reports unlocked", b.unlocked === true, JSON.stringify(b));
       const row = await readCertRow(certId);
-      check("5.4 cert remains locked after Pro rejection", row?.unlockedAt === null, String(row?.unlockedAt));
+      check("5.3 cert is unlocked in DB", row?.unlockedAt != null, String(row?.unlockedAt));
     }
 
     // ── [6] King included unlock: unlimited and idempotent ─────────────────────

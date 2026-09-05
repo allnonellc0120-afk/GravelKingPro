@@ -655,8 +655,8 @@ export default function SongwritingStudio() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">The take lands in your library when it finishes rendering.</span>
             <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate with MLK (4 credits)"}</Button>
-                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with JAX (4 credits)"}</Button>
+                    <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate with MLK (20 credits)"}</Button>
+                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with JAX (20 credits)"}</Button>
             </div>
           </div>
           {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
@@ -826,12 +826,12 @@ export default function SongwritingStudio() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <span className="text-xs text-muted-foreground">Arrangement: {draft.blocks.map((block) => block.type).join(" → ")}</span>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song (4 credits)"}</Button>
-                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (4 credits)"}</Button>
+                    <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song (20 credits)"}</Button>
+                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (20 credits)"}</Button>
                   </div>
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Wallet balance: <strong className="text-foreground">{creditsBalance === null ? "sign in to view" : `${creditsBalance} credits`}</strong>. Each finished song uses 4 credits.
+                  Wallet balance: <strong className="text-foreground">{creditsBalance === null ? "sign in to view" : `${creditsBalance} credits`}</strong>. Each finished song uses 20 credits.
                 </p>
                 {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
               </section>
@@ -911,7 +911,7 @@ export default function SongwritingStudio() {
                   <div className="space-y-3 text-xs text-muted-foreground"><p>Document: <span className="text-foreground">{draft.title}</span></p><p>Hash signature: <code className="text-emerald-300">{activeHash ? `${activeHash.slice(0, 18)}…` : "Pending"}</code></p><p>Transcript and timestamp included in the KING certificate layout.</p></div>
                 </div>
                 <p className="text-sm text-muted-foreground">Court-ready IP certificates are available on KING Tier.</p>
-                <Link href="/pricing" onClick={() => setCertificateOpen(false)} className="mt-4 block rounded-md bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-black hover:bg-amber-400">Upgrade to KING — $24.99/mo</Link>
+                <Link href="/pricing" onClick={() => setCertificateOpen(false)} className="mt-4 block rounded-md bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-black hover:bg-amber-400">See Pro plans and free certificates</Link>
               </>
             )}
           </div>
