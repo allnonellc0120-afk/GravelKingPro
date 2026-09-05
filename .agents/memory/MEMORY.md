@@ -81,3 +81,4 @@
 - [Cert document paywall](cert-paywall.md) — stamping free, doc owner-only+unlock-gated; $1.99 or 20/30d Studio allowance; Express 5: register `/:id.pdf` route BEFORE `/:id` or it's dead
 - [API test suite flock + lyric-owner cookie rule](api-test-suite-flock.md) — test script must stay flock-wrapped (dist-test races); legacy lyric rows never grant access via gk_session cookie
 - [JAX route faked responses](jax-route-faked-responses.md) — generation routes must call the live model; never canned placeholder strings
+- [Stripe wallet domain](stripe-wallet-domain.md) — embedded Apple/Google Pay need a validated Payment Method Domain + live .well-known association file; live domain is gravelkingpro.com (.it.com is dead)
