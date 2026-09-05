@@ -35,7 +35,7 @@ import {
 } from "../services/mlkOrchestrator";
 import type { InteractionResponse } from "../services/mlkOrchestrator";
 import { primeLyricVerificationForTest, parseScreeningResponse } from "../services/lyricGuard";
-import { saveObjectWithFallback } from "../lib/objectStorage";
+import { isPrivateFullAudioKey, ObjectStorageService, saveObjectWithFallback } from "../lib/objectStorage";
 import { consumeExport, KING_EXPORT_LIMIT } from "../lib/exportQuota";
 import {
   db,
@@ -215,6 +215,19 @@ async function main(): Promise<void> {
         !fullAudioKeys.some((key) => key.startsWith("tracks/")),
         JSON.stringify(fullAudioKeys),
       );
+      const publicObjectStorage = new ObjectStorageService();
+      for (const key of fullAudioKeys) {
+        let rejected = false;
+        try {
+          await publicObjectStorage.savePublicObject(key, Buffer.from("full-audio"), "audio/mpeg");
+        } catch (error) {
+          rejected =
+            isPrivateFullAudioKey(key) &&
+            error instanceof Error &&
+            error.message.includes("Refusing public object write");
+        }
+        check(`public storage rejects ${key}`, rejected);
+      }
 
       const source = await makeTinyWav(31);
       const preview = `/tmp/gk_preview_test_${randomUUID()}.mp3`;
