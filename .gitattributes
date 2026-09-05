@@ -12,3 +12,6 @@ _recycle-bin/2026-08-15/artifacts/gravelkingpro-promo/public/videos/gravelkingpr
 _recycle-bin/2026-08-15/artifacts/gravelkingpro-promo/public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4 filter=lfs diff=lfs merge=lfs -text
 _recycle-bin/2026-08-15/artifacts/gravelkingpro-promo/public/videos/gravelkingpro_pitch_228.mp4 filter=lfs diff=lfs merge=lfs -text
 _recycle-bin/2026-08-15/artifacts/gravelkingpro-speed-promo/public/videos/gravelkingpro_pitch_228.mp4 filter=lfs diff=lfs merge=lfs -text
+artifacts/gravelking-promo/public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4 filter=lfs diff=lfs merge=lfs -text
+artifacts/gravelking-promo/public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4 filter=lfs diff=lfs merge=lfs -text
+artifacts/gravelking-promo/public/videos/gravelkingpro_pitch_228.mp4 filter=lfs diff=lfs merge=lfs -text
