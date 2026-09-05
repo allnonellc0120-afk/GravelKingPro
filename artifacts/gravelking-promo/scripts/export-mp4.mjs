@@ -15,10 +15,13 @@ const root = path.resolve(__dirname, '..');
 const dist = path.resolve(root, 'dist/public');
 const isVertical = process.argv[3] === 'vertical';
 const isWorkflow = process.argv[3] === 'workflow';
+const isLogo = process.argv[3] === 'logo';
 
 let output = process.argv[2];
 if (!output) {
-  if (isWorkflow) {
+  if (isLogo) {
+    output = 'public/videos/gravelkingpro_logo_4x5.mp4';
+  } else if (isWorkflow) {
     output = 'public/videos/gravelkingpro_workflow_45s_4x5.mp4';
   } else if (isVertical) {
     output = 'public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4';
@@ -38,7 +41,11 @@ let WIDTH = 1920;
 let HEIGHT = 1080;
 let DURATION_MS = 59000;
 
-if (isWorkflow) {
+if (isLogo) {
+  WIDTH = 1080;
+  HEIGHT = 1350;
+  DURATION_MS = 8000;
+} else if (isWorkflow) {
   WIDTH = 1080;
   HEIGHT = 1350;
   DURATION_MS = 45000;
@@ -194,11 +201,16 @@ async function recordVideo() {
   await client.send('Animation.enable');
   await client.send('Animation.setPlaybackRate', { playbackRate: 1 / SLOWDOWN_FACTOR });
 
-  const formatQuery = isWorkflow ? '&video=workflow' : (isVertical ? '&format=vertical' : '');
+  const formatQuery = isLogo ? '&video=default' : (isWorkflow ? '&video=workflow' : (isVertical ? '&format=vertical' : ''));
   page.on('pageerror', error => console.error('Browser page error:', error.message));
   page.on('console', message => {
     if (message.type() === 'error') console.error('Browser console error:', message.text());
   });
+  // Playwright starts recording as soon as the context is created. Paint a
+  // dark pre-roll first so the exported MP4 never begins on the browser's
+  // unpainted white navigation frame.
+  await page.setContent('<!doctype html><html><head><style>html,body{margin:0;width:100%;height:100%;background:#050608}</style></head><body></body></html>');
+  await page.waitForTimeout(250);
   await page.goto(`http://127.0.0.1:${EXPORT_PORT}/?export=1${formatQuery}`, { waitUntil: 'networkidle', timeout: 60000 });
 
   // Wait for the first frame to render.
