@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { storage } from '../storage';
-import { db, promotersTable, referralAttributionsTable } from '@workspace/db';
-import { eq } from 'drizzle-orm';
+import { db, promotersTable, referralAttributionsTable, creditTransactionsTable } from '@workspace/db';
+import { and, eq } from 'drizzle-orm';
 import { getStripePublishableKey, getUncachableStripeClient } from '../stripeClient';
 import { ensureCustomerOnCurrentAccount } from '../lib/stripeCustomers';
 import { recordAnalyticsEvent } from '../analytics';
@@ -119,26 +119,19 @@ stripeRouter.get('/stripe/products', async (_req: Request, res: Response) => {
   }
 });
 
-// Public Stripe.js configuration — publishable keys are safe for browser use.
 stripeRouter.get('/stripe/config', async (_req: Request, res: Response) => {
   try {
     res.json({ publishableKey: await getStripePublishableKey() });
   } catch (err: unknown) {
-    res.status(503).json({ error: err instanceof Error ? err.message : 'Stripe is unavailable.' });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Stripe is unavailable.' });
   }
 });
 
-/** Public catalog for one-time wallet purchases. Prices are server-owned. */
 stripeRouter.get('/stripe/credit-packs', (_req: Request, res: Response) => {
   res.json({
-    data: CREDIT_PACKS.map(({ id, name, credits, bonusCredits, amountCents, description }) => ({
-      id,
-      name,
-      credits,
-      bonusCredits,
-      totalCredits: credits + bonusCredits,
-      amountCents,
-      description,
+    data: CREDIT_PACKS.map((pack) => ({
+      ...pack,
+      totalCredits: pack.credits + pack.bonusCredits,
     })),
   });
 });
@@ -150,10 +143,19 @@ stripeRouter.get('/credits/balance', async (req: Request, res: Response) => {
       res.status(401).json({ error: 'Sign in required', authRequired: true });
       return;
     }
-    res.json({ creditsBalance: await getCreditsBalance(user.id) });
+    res.json({ creditsBalance: await getCreditsBalance(user.id), userId: user.id });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load credits.' });
   }
+});
+
+stripeRouter.get('/credits/purchase-status', async (req: Request, res: Response) => {
+  const user = await resolveCreditUser(req);
+  const paymentIntentId = typeof req.query.paymentIntentId === 'string' ? req.query.paymentIntentId : '';
+  if (!user || !paymentIntentId) { res.status(400).json({ settled: false }); return; }
+  const [grant] = await db.select({ id: creditTransactionsTable.id }).from(creditTransactionsTable)
+    .where(and(eq(creditTransactionsTable.userId, user.id), eq(creditTransactionsTable.stripePaymentIntentId, paymentIntentId)));
+  res.json({ settled: Boolean(grant) });
 });
 
 stripeRouter.get('/credits/history', async (req: Request, res: Response) => {
@@ -212,6 +214,7 @@ stripeRouter.post('/stripe/create-credit-purchase-intent', async (req: Request, 
     }
     res.json({
       clientSecret: intent.client_secret,
+      paymentIntentId: intent.id,
       intentType: 'payment',
       credits: pack.credits + pack.bonusCredits,
       baseCredits: pack.credits,
@@ -347,7 +350,7 @@ stripeRouter.get('/subscription/status', async (req: Request, res: Response) => 
     }
 
     // 2. Anonymous gk_session cookie (legacy path).
-    const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+      const sessionId = (req.cookies as Record<string, string>)?.gk_session;
     if (!sessionId) {
       res.json({ isPro: false, plan: null });
       return;
