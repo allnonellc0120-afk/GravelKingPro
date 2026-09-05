@@ -396,19 +396,19 @@ masterRouter.post(
     const partnerReq = isPartnerRequest(req);
     const adminReq = isAdminAuthenticated(req);
     const mp3Requested = req.path === "/export-mp3";
+    // Resolve paid access before selecting wallet mode. Lifetime/owner and
+    // paid Studio sessions must never be routed into the pay-per-master
+    // credit flow merely because their session row is not developer-flagged.
+    const paidTier = !partnerReq && !adminReq && await hasStudio(req);
     const creditUser = !partnerReq && !adminReq && !mp3Requested
       ? await resolveCreditUser(req)
       : null;
-    const walletMode = !!creditUser && !creditUser.isDeveloper;
+    const walletMode = !!creditUser && !creditUser.isDeveloper && !paidTier;
     // Certification is intentionally free while the provenance workflow is
     // being adopted. A master + its download is one 75-credit action.
     const walletCost = CREDIT_COSTS.master;
     const walletReference = `master:${randomUUID()}`;
     let walletSpent = false;
-    // Mastering is a monthly-subscription feature (owner directive): weekly
-    // no longer counts — only Studio(monthly)/King and above master.
-    const paidTier = !partnerReq && !adminReq && await hasStudio(req);
-
     // The master admin key is an explicit operational override: it bypasses
     // tier, free allowance, and rolling export quota checks for this route.
     // Pro+ users get unlimited MP3 exports; WAV remains tier-quota limited.
