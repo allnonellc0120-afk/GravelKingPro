@@ -14,7 +14,7 @@ const STUDIO_REDIRECT = "I'm locked in the booth for songwriting only. Let's get
 const elevenLabs = new ReplitConnectors();
 const GEORGE_PREMADE_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 
-function configuredAdminVoiceLabel() {
+export function configuredAdminVoiceLabel() {
   return JAX_VOICE_PRESETS.admin.voiceId() === GEORGE_PREMADE_VOICE_ID
     ? "George (Premade)"
     : "Admin Configured Voice";
@@ -29,14 +29,16 @@ export const JAX_VOICE_PRESETS = {
   bill: { label: "JAX Classic Vintage", voiceId: () => "pqHfZKP75CvOlQylNhV4" },
 } as const;
 
+export function getJaxVoiceMetadata() {
+  return Object.entries(JAX_VOICE_PRESETS).map(([key, preset]) => ({
+    key,
+    voiceId: key === "admin" ? "admin" : preset.voiceId(),
+    label: key === "admin" ? JAX_VOICE_PRESETS.admin.label() : String(preset.label),
+  })).filter((preset) => preset.key !== "admin" || Boolean(JAX_VOICE_PRESETS.admin.voiceId()));
+}
+
 jaxRouter.get("/jax/voices", (_req: Request, res: Response) => {
-  res.json({
-    voices: Object.entries(JAX_VOICE_PRESETS).map(([key, preset]) => ({
-      key,
-      voiceId: key === "admin" ? "admin" : preset.voiceId(),
-      label: key === "admin" ? JAX_VOICE_PRESETS.admin.label() : String(preset.label),
-    })).filter((preset) => preset.key !== "admin" || Boolean(JAX_VOICE_PRESETS.admin.voiceId())),
-  });
+  res.json({ voices: getJaxVoiceMetadata() });
 });
 
 function dayKey() {
