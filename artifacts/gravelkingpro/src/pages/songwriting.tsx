@@ -404,7 +404,8 @@ export default function SongwritingStudio() {
     const SpeechRecognition = (window as unknown as { SpeechRecognition?: new () => {
       lang: string; interimResults: boolean; continuous: boolean;
       start: () => void; stop: () => void;
-      onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+      onresult: ((event: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+      onerror: ((event: { error: string }) => void) | null;
       onend: (() => void) | null;
     }; webkitSpeechRecognition?: new () => InstanceType<NonNullable<Window["SpeechRecognition"]>> }).SpeechRecognition
       ?? (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
@@ -420,21 +421,32 @@ export default function SongwritingStudio() {
     }
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
+    const promptPrefix = prompt.trim();
     recognition.lang = "en-US";
     recognition.interimResults = true;
     recognition.continuous = true;
     recognition.onresult = (event) => {
       let currentTranscript = "";
-      const resultIndex = "resultIndex" in event ? Number(event.resultIndex) : 0;
-      for (let index = resultIndex; index < event.results.length; index += 1) {
-        currentTranscript += event.results[index][0].transcript;
+      for (let index = 0; index < event.results.length; index += 1) {
+        currentTranscript += `${event.results[index][0].transcript} `;
       }
+      currentTranscript = currentTranscript.trim();
+      if (!currentTranscript) return;
+      const nextPrompt = `${promptPrefix}${promptPrefix ? " " : ""}${currentTranscript}`;
       const inputField = document.getElementById("chat-input-field") as HTMLTextAreaElement | null;
       if (inputField) {
-        inputField.value = currentTranscript;
-        inputField.dispatchEvent(new Event("input", { bubbles: true }));
+        const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+        nativeSetter?.call(inputField, nextPrompt);
+        inputField.dispatchEvent(new InputEvent("input", { bubbles: true, data: currentTranscript, inputType: "insertText" }));
       }
-      setPrompt(currentTranscript);
+      setPrompt(nextPrompt);
+    };
+    recognition.onerror = (event) => {
+      setGenerationError(event.error === "not-allowed"
+        ? "Microphone access was blocked. Allow microphone access for this site and try again."
+        : `Voice drafting stopped: ${event.error}.`);
+      setListening(false);
+      recognitionRef.current = null;
     };
     recognition.onend = () => {
       recognitionRef.current = null;
