@@ -77,7 +77,7 @@ export function Scene1() {
       {/* 1. Base Image */}
       <div className="absolute inset-0 z-0">
         <img 
-          src={`${import.meta.env.BASE_URL}images/studio_ref.png`} 
+          src={`${import.meta.env.BASE_URL}images/turntable_ref.png`} 
           className="w-full h-full object-cover object-center opacity-70"
           alt="Studio"
         />
@@ -103,7 +103,7 @@ export function Scene1() {
         <div 
           className="absolute inset-0"
           style={{ 
-            backgroundImage: `url(${import.meta.env.BASE_URL}images/studio_ref.png)`,
+            backgroundImage: `url(${import.meta.env.BASE_URL}images/turntable_ref.png)`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             // Isolate a ring. Tuning sizes based on typical midjourney circular composition.
@@ -179,7 +179,7 @@ export function Scene1() {
       {/* 6. "GravelKing Pro" Holographic Wordmark */}
       <div className="absolute top-[22%] left-0 w-full flex justify-center z-30 pointer-events-none">
         <motion.div 
-          className="relative text-[10cqw] font-black tracking-widest uppercase text-transparent bg-clip-text"
+          className="relative whitespace-nowrap text-[6cqw] font-black tracking-[0.08em] text-transparent bg-clip-text"
           style={{ 
             fontFamily: '"Plus Jakarta Sans", sans-serif',
             backgroundImage: 'linear-gradient(to right, #a78bfa, #4ade80, #fcd34d)',
@@ -193,7 +193,7 @@ export function Scene1() {
             transition={{ duration: 1.2, delay: 2.2, ease: [0.16, 1, 0.3, 1] }}
             style={{ textShadow: '0 0 40px rgba(167,139,250,0.6)' }}
           >
-            GRAVELKING PRO
+            GravelKing Pro
           </motion.div>
           
           {/* Overlay solid text that sweeps in */}
@@ -206,7 +206,7 @@ export function Scene1() {
             animate={{ clipPath: ['polygon(0 0, 0 0, 0 100%, 0% 100%)', 'polygon(0 0, 100% 0, 100% 100%, 0% 100%)'] }}
             transition={{ duration: 1.5, delay: 2.8, ease: "easeInOut" }}
           >
-            GRAVELKING PRO
+            GravelKing Pro
           </motion.div>
 
           {/* Sweeping light edge */}

@@ -20,3 +20,7 @@ description: How the promo video artifact maps product/marketing requirements to
 - **In-page preview of finished promos needs lightweight dual-format files.** Pointing `<video>` at the 4K masters (200MB+) stalls forever on spinners, and the preview/test browser lacks H.264 High-profile decode — plays only WebM (VP8/Vorbis). Serve ~1080p preview copies with BOTH `<source>` mp4 + webm children plus a poster frame; keep 4K masters separate for delivery.
 
 - **Never name a bash array `LINES`** — the terminal-height env var silently clobbers it, so every drawtext beat renders empty (video looks fine but has no headlines). Use a name like `BEATTXT`, and QA at least one extracted frame per format before concat.
+
+- **Browser-captured logo exports need a painted pre-roll.** Playwright video recording begins before the navigated page paints, so export pages should paint a dark inline pre-roll before navigating to the animated scene; otherwise frame 0 can be an unintended white flash.
+  **Why:** the recorder attaches at browser-context creation, before the scene page's CSS and assets are available.
+  **How to apply:** use an inline dark `setContent` pre-roll, wait briefly, then navigate to the export route and QA frame 0 plus a mid-scene frame.

@@ -1291,3 +1291,17 @@ mtime_ms = 1788638058879
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/c20c30be-e455-45b4-9480-74ea10c30933/228e1480-09c0-4319-8a5f-a8dba0f0b0da"
 storage_version_token = "1788638078172764"
 content_type = "image/svg+xml"
+
+[[outputs]]
+id = "L40uIFLHCjiuxgr3EWuil"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_logo_4x5.mp4"
+type = "video"
+title = "GravelKing Pro — Orb Logo Animation"
+description = "Final 4:5 Instagram logo identity video: glowing orb, green waveform, turntable beam, reversing gold ring, GravelKing Pro wordmark, and sound design. 1080×1350, 8 seconds."
+logical_id = "433d384b-f234-4be1-bcaa-3fe378abe37b"
+content_hash = "sha256:6947f58329246338ad992f7566edff7d3c790b9cd9b023cf868871610eb8ef59"
+size = 8905209
+mtime_ms = 1788641517202
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/433d384b-f234-4be1-bcaa-3fe378abe37b/d32a5804-7859-47f8-95b3-4ffb0166ce24"
+storage_version_token = "1788641536504064"
+content_type = "video/mp4"
