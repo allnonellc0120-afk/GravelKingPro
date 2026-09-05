@@ -1,0 +1,43 @@
+STOP patching the current layout. We are completely rebuilding the JAX page into a clean, modern chat interface (Gemini/ChatGPT style) and fixing the iOS audio architecture.
+
+### 1. FULL UI REBUILD (Gemini Clean Chat Layout)
+* DELETE the following forms and elements entirely from the view:
+  - The "STUDIO PROMPT" container and separate "JAX RESPONSE" card.
+  - The manual "ARTIST MEMORY" form block (Bio, Core genre, Sub-genre tags, Tempo).
+  - The disjointed "Verse Block 1" canvas beneath it.
+* BUILD a unified, full-height chat window:
+  - Center feed: Scrolling conversation log with user messages on the right, JAX responses on the left (rendering clean Markdown for lyrics).
+  - Collapsible sidebar on the left for past sessions/saved songs.
+  - Bottom pinned dock: Single full-width textarea, an integrated Mic icon button, a Send button, and an Auto-Voice toggle.
+* CONTEXT HANDLING: JAX must extract genre, tempo, and backstories conversationally through chat dialogue and store them in background state—the user should NEVER fill out a form to write a song.
+
+---
+
+### 2. FIX SPEECH-TO-TEXT (iOS / Safari Compatible)
+* The current Web Speech API setup fails in webviews/iframes on iPad/iOS Safari.
+* Implement a robust hook that guarantees state synchronization:
+  ```javascript
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert("Speech recognition is not supported in this browser. Please open directly in Safari/Chrome.");
+  } else {
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false; // Set to false for iOS Safari stability
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      let speechText = '';
+      for (let i = 0; i < event.results.length; i++) {
+        speechText += event.results[i][0].transcript;
+      }
+      // Explicitly update both the controlled state and the textarea element
+      setPrompt(speechText);
+    };
+
+    recognition.onerror = (e) => {
+      console.error("Mic error:", e.error);
+      alert("Microphone error: " + e.error);
+    };
+  }
