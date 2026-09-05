@@ -70,6 +70,46 @@ export interface GenerateAndMasterResult {
   title: string;
 }
 
+export const GENERATED_PREVIEW_SECONDS = 30;
+
+export function buildGeneratedAudioKeys(trackId: string): {
+  audioFullKey: string;
+  audioFullMp3Key: string;
+  audioPreviewKey: string;
+} {
+  return {
+    audioFullKey: `private/tracks/${trackId}/audio_full.wav`,
+    audioFullMp3Key: `private/tracks/${trackId}/audio_full.mp3`,
+    audioPreviewKey: `tracks/${trackId}/audio_preview.mp3`,
+  };
+}
+
+export function buildGeneratedPreviewArgs(inputPath: string, outputPath: string): string[] {
+  return ["-y", "-i", inputPath, "-t", String(GENERATED_PREVIEW_SECONDS), "-b:a", "128k", outputPath];
+}
+
+export async function saveGeneratedAudioArtifacts(
+  args: {
+    bucketId: string;
+    keys: ReturnType<typeof buildGeneratedAudioKeys>;
+    fullWav: Buffer;
+    fullMp3: Buffer;
+    previewMp3: Buffer;
+    coverArt: Buffer;
+  },
+  writers: {
+    savePrivate: (bucketId: string, key: string, body: Buffer, contentType: string) => Promise<unknown>;
+    savePublic: (key: string, body: Buffer, contentType: string) => Promise<unknown>;
+  },
+): Promise<void> {
+  await Promise.all([
+    writers.savePrivate(args.bucketId, args.keys.audioFullKey, args.fullWav, "audio/wav"),
+    writers.savePrivate(args.bucketId, args.keys.audioFullMp3Key, args.fullMp3, "audio/mpeg"),
+    writers.savePublic(args.keys.audioPreviewKey, args.previewMp3, "audio/mpeg"),
+    writers.savePublic(`tracks/${args.keys.audioPreviewKey.split("/")[1]}/cover_art.png`, args.coverArt, "image/png"),
+  ]);
+}
+
 /**
  * Auto-generated album cover (simple/static): a two-tone diagonal gradient
  * deterministically seeded from the track id, with the title drawn on top.
@@ -472,17 +512,13 @@ export async function generateAndMasterTrack(
     // ── Vault: existing tracks + purchased_tracks tables → /api/library ────
     const trackId = randomUUID();
     const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
-    const audioFullKey = `private/tracks/${trackId}/audio_full.wav`;
+    const { audioFullKey, audioFullMp3Key, audioPreviewKey } = buildGeneratedAudioKeys(trackId);
     // Convention: full-length 320 kbps MP3 lives next to the WAV with the same
     // basename — the download route derives this key, so no schema change.
-    const audioFullMp3Key = `private/tracks/${trackId}/audio_full.mp3`;
-    const audioPreviewKey = `tracks/${trackId}/audio_preview.mp3`;
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
 
     // 30-sec public preview + full 320k MP3 + generated cover (plumbing, not DSP).
-    await execFileAsync("ffmpeg", [
-      "-y", "-i", normalizedPath, "-t", "30", "-b:a", "128k", previewPath,
-    ], { timeout: 60_000 });
+    await execFileAsync("ffmpeg", buildGeneratedPreviewArgs(normalizedPath, previewPath), { timeout: 60_000 });
     await execFileAsync("ffmpeg", [
       "-y", "-i", normalizedPath, "-b:a", "320k", mp3Path,
     ], { timeout: 120_000 });
@@ -497,12 +533,20 @@ export async function generateAndMasterTrack(
     // If BOTH backends fail, surface a clean, human-readable error instead of
     // the raw GCS JSON dump — the generation itself succeeded; storage didn't.
     try {
-      await Promise.all([
-        saveObjectWithFallback(bucketId, audioFullKey, finalWav, { contentType: "audio/wav" }),
-        readFile(mp3Path).then((b) => saveObjectWithFallback(bucketId, audioFullMp3Key, b, { contentType: "audio/mpeg" })),
-        readFile(previewPath).then((b) => objectStorage.savePublicObject(audioPreviewKey, b, "audio/mpeg")),
-        readFile(coverPath).then((b) => objectStorage.savePublicObject(coverArtKey, b, "image/png")),
-      ]);
+      await saveGeneratedAudioArtifacts(
+        {
+          bucketId,
+          keys: { audioFullKey, audioFullMp3Key, audioPreviewKey },
+          fullWav: finalWav,
+          fullMp3: await readFile(mp3Path),
+          previewMp3: await readFile(previewPath),
+          coverArt: await readFile(coverPath),
+        },
+        {
+          savePrivate: (id, key, body, contentType) => saveObjectWithFallback(id, key, body, { contentType }),
+          savePublic: (key, body, contentType) => objectStorage.savePublicObject(key, body, contentType),
+        },
+      );
     } catch (storageErr) {
       const reason = String((storageErr as Error)?.message ?? storageErr).slice(0, 200);
       logger.error(
