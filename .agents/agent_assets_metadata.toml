@@ -1263,3 +1263,31 @@ mtime_ms = 1788634041715
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/21036d01-78fb-4815-9994-fef978e0d46a/425740ad-49eb-4412-b559-f527cacac095"
 storage_version_token = "1788634054997328"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "_dGtQ_JIOkd6_ZSrSDIIg"
+uri = "file://attached_assets/generated_images/gravel-king-productions-logo-4k.png"
+type = "image"
+title = "Gravel King Productions — 4K Logo"
+description = "3840×2160 high-resolution PNG, ready for GoDaddy branding and social use."
+logical_id = "8ef2c2cd-5acf-4f78-a7da-e28a78c2fc2a"
+content_hash = "sha256:8117d962141a63642df9398ba0870217e6ac4f46054ba6dcff2dba14df3af754"
+size = 347058
+mtime_ms = 1788638065819
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/8ef2c2cd-5acf-4f78-a7da-e28a78c2fc2a/56b95339-9f08-4990-8386-42a67d9d2b89"
+storage_version_token = "1788638077364443"
+content_type = "image/png"
+
+[[outputs]]
+id = "kHeY_hqBuPjpj7nW0oRIq"
+uri = "file://attached_assets/generated_images/gravel-king-productions-logo-4k.svg"
+type = "image"
+title = "Gravel King Productions — Vector Logo"
+description = "Scalable SVG master for websites, printing, signs, and future exports."
+logical_id = "c20c30be-e455-45b4-9480-74ea10c30933"
+content_hash = "sha256:1c6952c408f0cac8f4ed474af7f181dbc4d1f00cef3a688f38ece12c8d47d0e7"
+size = 2811
+mtime_ms = 1788638058879
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/c20c30be-e455-45b4-9480-74ea10c30933/228e1480-09c0-4319-8a5f-a8dba0f0b0da"
+storage_version_token = "1788638078172764"
+content_type = "image/svg+xml"
