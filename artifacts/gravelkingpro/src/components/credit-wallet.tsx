@@ -7,6 +7,8 @@ export type CreditPack = {
   id: string;
   name: string;
   credits: number;
+  bonusCredits: number;
+  totalCredits: number;
   amountCents: number;
   description: string;
 };
@@ -90,7 +92,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
       });
       const data = await response.json() as { clientSecret?: string; error?: string };
       if (!response.ok || !data.clientSecret) throw new Error(data.error ?? "Could not start credit checkout.");
-      setPayment({ secret: data.clientSecret, credits: pack.credits, amountCents: pack.amountCents, startingBalance: balance });
+      setPayment({ secret: data.clientSecret, credits: pack.totalCredits, amountCents: pack.amountCents, startingBalance: balance });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start credit checkout.");
     } finally {
@@ -139,7 +141,15 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
         {packs.map((pack) => (
           <div key={pack.id} className="rounded-lg border border-border/40 bg-background/30 p-4">
             <p className="font-semibold">{pack.name}</p>
-            <p className="mt-1 text-2xl font-bold">{pack.credits} <span className="text-sm font-normal text-muted-foreground">credits</span></p>
+            <p className="mt-1 text-2xl font-bold">
+              <span className="text-muted-foreground line-through decoration-red-400/80">{pack.credits}</span>
+              <span className="mx-1.5 text-sky-300">+</span>
+              <span>{pack.bonusCredits}</span>
+              <span className="ml-1 text-sm font-normal text-sky-300">bonus</span>
+            </p>
+            <p className="mt-1 text-sm font-semibold text-sky-200">
+              = {pack.totalCredits.toLocaleString()} total credits
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">{pack.description}</p>
             <Button
               className="mt-3 w-full bg-sky-500 text-black hover:bg-sky-400"

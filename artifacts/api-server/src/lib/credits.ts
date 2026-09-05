@@ -11,9 +11,9 @@ export const CREDIT_COSTS = {
 } as const;
 
 export const CREDIT_PACKS = [
-  { id: "starter", name: "Starter", credits: 500, amountCents: 1000, description: "500 credits for trying the workflow" },
-  { id: "artist", name: "Artist", credits: 1250, amountCents: 2000, description: "1,250 credits for a release project" },
-  { id: "studio", name: "Studio", credits: 2500, amountCents: 3000, description: "2,500 credits for a full project" },
+  { id: "starter", name: "Starter", credits: 500, bonusCredits: 250, amountCents: 1000, description: "500 credits + 250 bonus credits" },
+  { id: "artist", name: "Artist", credits: 1250, bonusCredits: 500, amountCents: 2000, description: "1,250 credits + 500 bonus credits" },
+  { id: "studio", name: "Studio", credits: 2500, bonusCredits: 1000, amountCents: 3000, description: "2,500 credits + 1,000 bonus credits" },
 ] as const;
 
 // Subscription credits are a hard reset, not a rollover balance. The webhook
