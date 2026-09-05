@@ -173,7 +173,7 @@ export default function SongwritingStudio() {
   const [prompt, setPrompt] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [autoVoice, setAutoVoice] = useState(false);
+  const [autoVoice, setAutoVoice] = useState(true);
   const [response, setResponse] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState("");
@@ -374,6 +374,7 @@ export default function SongwritingStudio() {
       setResponse(reply);
       setChatMessages((messages) => [...messages, { id: crypto.randomUUID(), role: "jax", content: reply }]);
       setRemaining(data.remaining ?? null);
+      if (autoVoice && reply) void speakText(reply);
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "JAX could not respond.");
     } finally {
@@ -465,8 +466,7 @@ export default function SongwritingStudio() {
     setListening(true);
   };
 
-  const speakResponse = async () => {
-    if (!response) return;
+  const speakText = async (text: string) => {
     if (speaking) {
       window.speechSynthesis?.cancel();
       setSpeaking(false);
@@ -479,7 +479,7 @@ export default function SongwritingStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ text: response, voiceId: selectedVoice }),
+        body: JSON.stringify({ text, voiceId: selectedVoice }),
       });
       if (!result.ok) throw new Error((await result.json() as { error?: string }).error || "Voice playback unavailable.");
       const objectUrl = URL.createObjectURL(await result.blob());
@@ -491,6 +491,11 @@ export default function SongwritingStudio() {
       setVoiceError(error instanceof Error ? error.message : "Voice playback unavailable.");
       setSpeaking(false);
     }
+  };
+
+  const speakResponse = async () => {
+    if (!response) return;
+    await speakText(response);
   };
 
   const pushToCanvas = () => {
