@@ -18,14 +18,21 @@
 import http from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { unlink, readFile } from "node:fs/promises";
+import { unlink, readFile, writeFile } from "node:fs/promises";
 import { randomUUID, randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 
 import { eq } from "drizzle-orm";
 
 import app from "../app";
-import { buildCoverArgs, extractInteractionLyrics } from "../services/mlkOrchestrator";
+import {
+  buildCoverArgs,
+  buildGeneratedAudioKeys,
+  buildGeneratedPreviewArgs,
+  GENERATED_PREVIEW_SECONDS,
+  extractInteractionLyrics,
+  saveGeneratedAudioArtifacts,
+} from "../services/mlkOrchestrator";
 import type { InteractionResponse } from "../services/mlkOrchestrator";
 import { primeLyricVerificationForTest, parseScreeningResponse } from "../services/lyricGuard";
 import { saveObjectWithFallback } from "../lib/objectStorage";
@@ -189,6 +196,65 @@ async function main(): Promise<void> {
       const v = info.streams?.[0];
       check("rendered cover is 600×600", v?.width === 600 && v?.height === 600, JSON.stringify(v));
       await unlink(coverPath).catch(() => {});
+    }
+
+    // ── Generated audio privacy boundary ─────────────────────────────────────
+    console.log("\n[1b] Generated audio: public preview is capped, full take is private");
+    {
+      const keys = buildGeneratedAudioKeys(trackId);
+      const fullAudioKeys = [keys.audioFullKey, keys.audioFullMp3Key];
+      const publicAudioKeys = [keys.audioPreviewKey];
+      check(
+        "full generated audio uses ownership-gated private keys",
+        fullAudioKeys.every((key) => key.startsWith("private/tracks/")) &&
+          fullAudioKeys.every((key) => !publicAudioKeys.includes(key)),
+        JSON.stringify(keys),
+      );
+      check(
+        "full generated audio is never copied into a public path",
+        !fullAudioKeys.some((key) => key.startsWith("tracks/")),
+        JSON.stringify(fullAudioKeys),
+      );
+
+      const source = await makeTinyWav(31);
+      const preview = `/tmp/gk_preview_test_${randomUUID()}.mp3`;
+      const sourcePath = `/tmp/gk_preview_source_${randomUUID()}.wav`;
+      await writeFile(sourcePath, source);
+      await execFileAsync("ffmpeg", buildGeneratedPreviewArgs(sourcePath, preview), { timeout: 30_000 });
+      const { stdout } = await execFileAsync(
+        "ffprobe",
+        ["-v", "quiet", "-print_format", "json", "-show_format", preview],
+        { timeout: 15_000 },
+      );
+      const previewInfo = JSON.parse(stdout) as { format?: { duration?: string } };
+      check(
+        `public preview duration is capped at ${GENERATED_PREVIEW_SECONDS}s`,
+        Number(previewInfo.format?.duration ?? Infinity) <= GENERATED_PREVIEW_SECONDS + 0.25,
+        JSON.stringify(previewInfo.format),
+      );
+      const privateWrites: Array<{ key: string; body: Buffer }> = [];
+      const publicWrites: Array<{ key: string; body: Buffer }> = [];
+      await saveGeneratedAudioArtifacts(
+        {
+          bucketId: "test-bucket",
+          keys,
+          fullWav: Buffer.from("full-wav"),
+          fullMp3: Buffer.from("full-mp3"),
+          previewMp3: Buffer.from("preview"),
+          coverArt: Buffer.from("cover"),
+        },
+        {
+          savePrivate: async (_bucket, key, body) => { privateWrites.push({ key, body }); },
+          savePublic: async (key, body) => { publicWrites.push({ key, body }); },
+        },
+      );
+      check("artifact writer sends full audio only to private storage", privateWrites.length === 2 &&
+        privateWrites.every((write) => write.key.startsWith("private/tracks/")));
+      check("artifact writer sends only preview/cover to public storage", publicWrites.length === 2 &&
+        publicWrites.every((write) => !write.key.includes("audio_full")) &&
+        publicWrites.some((write) => write.key === keys.audioPreviewKey));
+      await unlink(sourcePath).catch(() => {});
+      await unlink(preview).catch(() => {});
     }
 
     // ── Seed an owned generated track with real audio in storage ───────────

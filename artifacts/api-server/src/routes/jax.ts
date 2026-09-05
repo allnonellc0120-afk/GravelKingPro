@@ -7,12 +7,17 @@ import { ReplitConnectors } from "@replit/connectors-sdk";
 import { randomUUID } from "crypto";
 import { execFile as execFileCb } from "child_process";
 import { promisify } from "util";
-import { writeFile, readFile } from "fs/promises";
+import { writeFile, readFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { db, tracksTable, purchasedTracksTable } from "@workspace/db";
 import { ObjectStorageService, saveObjectWithFallback } from "../lib/objectStorage";
-import { buildCoverArgs } from "../services/mlkOrchestrator";
+import {
+  buildCoverArgs,
+  buildGeneratedAudioKeys,
+  buildGeneratedPreviewArgs,
+  saveGeneratedAudioArtifacts,
+} from "../services/mlkOrchestrator";
 import { CREDIT_COSTS, grantCredits, resolveCreditUser, spendCredits } from "../lib/credits";
 
 const execFileAsync = promisify(execFileCb);
@@ -232,25 +237,35 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     // Convention (see mlkOrchestrator): audioFullKey names the WAV slot; the
     // full MP3 sits beside it with the same basename. The stream/download
     // routes derive the .mp3 key from audioFullKey, so no schema change.
-    const audioFullKey = `private/tracks/${trackId}/audio_full.wav`;
-    const audioFullMp3Key = `private/tracks/${trackId}/audio_full.mp3`;
-    const audioPreviewKey = `tracks/${trackId}/audio_preview.mp3`;
+    const { audioFullKey, audioFullMp3Key, audioPreviewKey } = buildGeneratedAudioKeys(trackId);
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
     const coverPath = join(tmpdir(), `jax-cover-${trackId}.png`);
     const fullPath = join(tmpdir(), `jax-take-${trackId}.mp3`);
+    const fullWavPath = join(tmpdir(), `jax-take-${trackId}.wav`);
     const previewPath = join(tmpdir(), `jax-preview-${trackId}.mp3`);
     await writeFile(fullPath, mp3);
     // Public namespace gets ONLY a 30-sec preview (same contract as the MLK
     // path) — the full take stays under the private, ownership-gated key.
     await Promise.all([
-      execFileAsync("ffmpeg", ["-y", "-i", fullPath, "-t", "30", "-b:a", "128k", previewPath], { timeout: 60_000 }),
+      execFileAsync("ffmpeg", buildGeneratedPreviewArgs(fullPath, previewPath), { timeout: 60_000 }),
+      execFileAsync("ffmpeg", ["-y", "-i", fullPath, "-c:a", "pcm_s16le", fullWavPath], { timeout: 60_000 }),
       execFileAsync("ffmpeg", buildCoverArgs(trackId, trackTitle, coverPath), { timeout: 30_000 }),
     ]);
-    await Promise.all([
-      saveObjectWithFallback(bucketId, audioFullMp3Key, mp3, { contentType: "audio/mpeg" }),
-      readFile(previewPath).then((b) => objectStorage.savePublicObject(audioPreviewKey, b, "audio/mpeg")),
-      readFile(coverPath).then((b) => objectStorage.savePublicObject(coverArtKey, b, "image/png")),
-    ]);
+    await saveGeneratedAudioArtifacts(
+      {
+        bucketId,
+        keys: { audioFullKey, audioFullMp3Key, audioPreviewKey },
+        fullWav: await readFile(fullWavPath),
+        fullMp3: mp3,
+        previewMp3: await readFile(previewPath),
+        coverArt: await readFile(coverPath),
+      },
+      {
+        savePrivate: (id, key, body, contentType) => saveObjectWithFallback(id, key, body, { contentType }),
+        savePublic: (key, body, contentType) => objectStorage.savePublicObject(key, body, contentType),
+      },
+    );
+    await Promise.all([unlink(fullPath), unlink(fullWavPath), unlink(previewPath), unlink(coverPath)]).catch(() => {});
     await db.transaction(async (tx) => {
       await tx.insert(tracksTable).values({
         id: trackId,
