@@ -141,14 +141,16 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
         {packs.map((pack) => (
           <div key={pack.id} className="rounded-lg border border-border/40 bg-background/30 p-4">
             <p className="font-semibold">{pack.name}</p>
-            <p className="mt-1 text-2xl font-bold">
-              <span className="text-muted-foreground line-through decoration-red-400/80">{pack.credits}</span>
+            <p className="mt-1 text-2xl font-bold text-foreground">
+              {pack.credits.toLocaleString()}
               <span className="mx-1.5 text-sky-300">+</span>
-              <span>{pack.bonusCredits}</span>
-              <span className="ml-1 text-sm font-normal text-sky-300">bonus</span>
+              <span className="relative -top-1 text-base font-light tracking-wide text-sky-300">
+                {pack.bonusCredits.toLocaleString()} <span className="text-xs">bonus</span>
+              </span>
             </p>
-            <p className="mt-1 text-sm font-semibold text-sky-200">
-              = {pack.totalCredits.toLocaleString()} total credits
+            <p className="mt-1 text-3xl font-extrabold tracking-tight text-sky-100">
+              {pack.totalCredits.toLocaleString()}
+              <span className="ml-1.5 text-sm font-semibold tracking-normal text-sky-200">total credits</span>
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{pack.description}</p>
             <Button
