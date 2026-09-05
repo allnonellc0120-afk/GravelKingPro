@@ -264,6 +264,28 @@ async function main(): Promise<void> {
       const publicCoverBody = Buffer.from("representative cover bytes");
       await publicObjectStorage.savePublicObject(publicPreviewKey, publicPreviewBody, "audio/mpeg");
       await publicObjectStorage.savePublicObject(publicCoverKey, publicCoverBody, "image/png");
+      // Put representative full takes at their actual private object names.
+      // The public route must still deny them even if a future search-path
+      // change would otherwise make the private bucket objects discoverable.
+      const privateFullRouteCases = [
+        {
+          label: "current generated full take",
+          key: buildGeneratedAudioKeys(trackId).audioFullKey,
+        },
+        {
+          label: "release-seed full take",
+          key: "private/releases/tgk-the-gravelking/you-used-to-think-i-was-superman-full.wav",
+        },
+        {
+          label: "demo-seed full take",
+          key: "private/demo/founder/gravel-road-origin-full.wav",
+        },
+      ];
+      for (const { key } of privateFullRouteCases) {
+        await saveObjectWithFallback(bucketId, key, Buffer.from("private full take"), {
+          contentType: "audio/wav",
+        });
+      }
 
       const source = await makeTinyWav(31);
       const preview = `/tmp/gk_preview_test_${randomUUID()}.mp3`;
@@ -358,6 +380,34 @@ async function main(): Promise<void> {
           `got ${response.headers.get("content-type")}`,
         );
         check(`public ${label} route returns the stored bytes`, body.equals(expectedBody));
+      }
+    }
+
+    // ── 1d. Public object route never serves private full takes ─────────────
+    console.log("\n[1d] GET /api/storage/public-objects — private full takes stay unreachable");
+    {
+      const privateFullRouteCases = [
+        {
+          label: "current generated full take",
+          key: buildGeneratedAudioKeys(trackId).audioFullKey,
+        },
+        {
+          label: "release-seed full take",
+          key: "private/releases/tgk-the-gravelking/you-used-to-think-i-was-superman-full.wav",
+        },
+        {
+          label: "demo-seed full take",
+          key: "private/demo/founder/gravel-road-origin-full.wav",
+        },
+      ];
+      for (const { label, key } of privateFullRouteCases) {
+        const response = await fetch(`${base}/api/storage/public-objects/${key}`);
+        await response.arrayBuffer();
+        check(
+          `public route denies ${label}`,
+          response.status === 403 || response.status === 404,
+          `got ${response.status}`,
+        );
       }
     }
 
