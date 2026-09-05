@@ -127,6 +127,78 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
   }
 });
 
+/**
+ * POST /api/jax/generate-music — ElevenLabs music generator, a second engine
+ * alongside the Vertex/Lyria path in /api/mlk/v35/generate-master.
+ * Gated to Pro/King (monthly/node_auditor) tiers with admin bypass.
+ * Client smart-fills missing lyrics/style via /api/jax/generate first; this
+ * route composes the final prompt and streams back an MP3 take.
+ */
+const musicUsage = new Map<string, { day: string; count: number }>();
+const DAILY_MUSIC_LIMIT = 10;
+
+jaxRouter.post("/jax/generate-music", rateLimit({
+  windowMs: 10 * 60_000,
+  max: 5,
+  message: "Too many music generations. Please wait a few minutes and try again.",
+}), async (req: Request, res: Response) => {
+  const adminBypass = isAdminAutomationAuthenticated(req);
+  const user = req.dbUser;
+  if (!user && !adminBypass) {
+    res.status(401).json({ error: "Sign in to generate music with ElevenLabs." });
+    return;
+  }
+  const entitled = adminBypass || user?.isDeveloper === true
+    || user?.subscriptionTier === "monthly" || user?.subscriptionTier === "node_auditor";
+  if (!entitled) {
+    res.status(403).json({ error: "ElevenLabs music generation is a Pro/King feature. Upgrade to unlock this engine.", code: "upgrade_required" });
+    return;
+  }
+
+  const musicKey = adminBypass ? `admin:${req.ip}` : `user:${user?.id}`;
+  const today = dayKey();
+  const priorMusic = musicUsage.get(musicKey);
+  const musicCount = priorMusic?.day === today ? priorMusic.count : 0;
+  if (!adminBypass && user?.isDeveloper !== true && musicCount >= DAILY_MUSIC_LIMIT) {
+    res.status(429).json({ error: "Your daily ElevenLabs generations are used. Try again tomorrow." });
+    return;
+  }
+
+  const lyrics = typeof req.body?.lyrics === "string" ? req.body.lyrics.trim() : "";
+  const style = typeof req.body?.style === "string" ? req.body.style.trim() : "";
+  const title = typeof req.body?.title === "string" ? req.body.title.trim().slice(0, 200) : "";
+  if (!lyrics && !style) {
+    res.status(400).json({ error: "Provide lyrics or a style so ElevenLabs knows what to write." });
+    return;
+  }
+
+  musicUsage.set(musicKey, { day: today, count: musicCount + 1 });
+  try {
+    const promptParts: string[] = [];
+    if (style) promptParts.push(`Musical style: ${style}.`);
+    if (title) promptParts.push(`Song title: ${title}.`);
+    if (lyrics) promptParts.push(`Sing these original lyrics:\n${lyrics.slice(0, 4000)}`);
+    const response = await elevenLabs.proxy("elevenlabs", "/v1/music", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({
+        prompt: promptParts.join("\n\n").slice(0, 6000),
+        music_length_ms: 120_000,
+        model_id: "music_v1",
+      }),
+    });
+    if (!response.ok) {
+      req.log.warn({ status: response.status }, "ElevenLabs music generation rejected request");
+      res.status(502).json({ error: "ElevenLabs could not finish this take. Adjust the lyrics or style and try again." });
+      return;
+    }
+    res.type("audio/mpeg").send(Buffer.from(await response.arrayBuffer()));
+  } catch (error) {
+    req.log.error({ error }, "ElevenLabs music generation failed");
+    res.status(502).json({ error: "ElevenLabs music generation is temporarily unavailable." });
+  }
+});
+
 jaxRouter.post("/jax/tts", rateLimit({
   windowMs: 60_000,
   max: 6,
