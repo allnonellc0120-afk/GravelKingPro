@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db, tracksTable, purchasedTracksTable, usersTable } from "@workspace/db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, asc } from "drizzle-orm";
 import { resolveTier } from "../lib/entitlement";
 import { ObjectStorageService, saveObjectWithFallback, getObjectFileWithFallback } from "../lib/objectStorage";
 import { sanitizeExt } from "../lib/audioGuards";
@@ -71,6 +71,7 @@ const publicTrackCols = {
 const libraryTrackCols = {
   ...publicTrackCols,
   lyricsText: tracksTable.lyricsText,
+  isPinned: purchasedTracksTable.isPinned,
 };
 
 const upload = multer({
@@ -221,13 +222,77 @@ router.get("/library", async (req: Request, res: Response) => {
     const tracks = await db
       .select(libraryTrackCols)
       .from(tracksTable)
-      .where(inArray(tracksTable.id, trackIds));
+      .innerJoin(purchasedTracksTable, and(
+        eq(purchasedTracksTable.trackId, tracksTable.id),
+        eq(purchasedTracksTable.userId, session.userId),
+      ))
+      .where(inArray(tracksTable.id, trackIds))
+      .orderBy(desc(purchasedTracksTable.isPinned), desc(tracksTable.createdAt));
 
     res.json({ tracks });
   } catch (_err) {
     res.status(500).json({ error: "Failed to load library" });
   }
 });
+
+async function resolveLibraryOwner(req: Request): Promise<string | null> {
+  const session = await resolveSessionUser(req);
+  return session?.userId ?? null;
+}
+
+/** Update the current user's library pin state. */
+router.patch("/library/:id/pin", async (req: Request, res: Response): Promise<void> => {
+  const userId = await resolveLibraryOwner(req);
+  if (!userId) { res.status(401).json({ error: "Sign in required" }); return; }
+  const trackId = String(req.params.id);
+  const pinned = Boolean((req.body as { pinned?: unknown }).pinned);
+  const [row] = await db.update(purchasedTracksTable)
+    .set({ isPinned: pinned })
+    .where(and(eq(purchasedTracksTable.userId, userId), eq(purchasedTracksTable.trackId, trackId)))
+    .returning({ isPinned: purchasedTracksTable.isPinned });
+  if (!row) { res.status(404).json({ error: "Track not found in your library" }); return; }
+  res.json(row);
+});
+
+/** Remove a track from the current user's library without deleting shared audio. */
+router.delete("/library/:id", async (req: Request, res: Response): Promise<void> => {
+  const userId = await resolveLibraryOwner(req);
+  if (!userId) { res.status(401).json({ error: "Sign in required" }); return; }
+  const trackId = String(req.params.id);
+  const deleted = await db.delete(purchasedTracksTable)
+    .where(and(eq(purchasedTracksTable.userId, userId), eq(purchasedTracksTable.trackId, trackId)))
+    .returning({ id: purchasedTracksTable.id });
+  if (!deleted.length) { res.status(404).json({ error: "Track not found in your library" }); return; }
+  res.json({ ok: true });
+});
+
+/** Replace a library owner's cover art. */
+router.patch(
+  "/library/:id/cover",
+  upload.single("cover_art"),
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = await resolveLibraryOwner(req);
+    if (!userId) { res.status(401).json({ error: "Sign in required" }); return; }
+    const trackId = String(req.params.id);
+    const file = req.file;
+    if (!file || !file.mimetype.startsWith("image/")) {
+      res.status(400).json({ error: "Choose an image file" }); return;
+    }
+    const [owned] = await db.select({ id: tracksTable.id })
+      .from(tracksTable)
+      .innerJoin(purchasedTracksTable, and(
+        eq(purchasedTracksTable.trackId, tracksTable.id),
+        eq(purchasedTracksTable.userId, userId),
+      ))
+      .where(eq(tracksTable.id, trackId));
+    if (!owned) { res.status(404).json({ error: "Track not found in your library" }); return; }
+    const key = `tracks/${trackId}/cover_art_user_${randomUUID()}.${sanitizeExt(file.originalname)}`;
+    await objectStorageService.savePublicObject(key, file.buffer, file.mimetype);
+    const [updated] = await db.update(tracksTable).set({ coverArtKey: key, updatedAt: new Date() })
+      .where(eq(tracksTable.id, trackId)).returning({ coverArtKey: tracksTable.coverArtKey });
+    res.json(updated);
+  },
+);
 
 /**
  * POST /api/tracks/submit — submit a track via multipart file upload.

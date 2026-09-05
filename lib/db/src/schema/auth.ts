@@ -19,6 +19,7 @@ export const usersTable = pgTable("users", {
   passwordHash: text("password_hash"),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  profileBio: text("profile_bio"),
   profileImageUrl: varchar("profile_image_url"),
   isPro: boolean("is_pro").notNull().default(false),
   subscriptionTier: varchar("subscription_tier"),

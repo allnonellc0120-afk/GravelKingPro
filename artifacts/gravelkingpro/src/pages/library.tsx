@@ -10,6 +10,7 @@ import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
 import {
   Library, Download, Music, ArrowLeft, Loader2, FileText, Mic,
   CheckCircle2, Clock, Play, Pause, Wand2, ChevronLeft, ChevronRight,
+  Pin, Trash2, ImagePlus,
 } from "lucide-react";
 import { Link, useSearch, useLocation } from "wouter";
 
@@ -22,6 +23,7 @@ interface Track {
   price: number;
   lyricsText?: string | null;
   createdAt?: string;
+  isPinned?: boolean;
 }
 
 interface SongDraft {
@@ -282,6 +284,7 @@ export default function LibraryPage() {
   const [studioLoading, setStudioLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [busyTrack, setBusyTrack] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const search = useSearch();
   const [, navigate] = useLocation();
@@ -375,6 +378,46 @@ export default function LibraryPage() {
     }
   };
 
+  const togglePin = async (track: Track) => {
+    setBusyTrack(track.id);
+    try {
+      const r = await fetch(`/api/library/${track.id}/pin`, {
+        method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: !track.isPinned }),
+      });
+      if (!r.ok) throw new Error();
+      await loadLibrary();
+      toast({ title: track.isPinned ? "Unpinned" : "Pinned", description: `${track.title} updated in your library.` });
+    } catch { toast({ title: "Could not update pin", variant: "destructive" }); }
+    finally { setBusyTrack(null); }
+  };
+
+  const deleteTrack = async (track: Track) => {
+    if (!window.confirm(`Remove “${track.title}” from your library?`)) return;
+    setBusyTrack(track.id);
+    try {
+      const r = await fetch(`/api/library/${track.id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error();
+      if (selectedId === track.id) selectTrack(null);
+      await loadLibrary();
+      toast({ title: "Removed from library", description: `${track.title} is no longer in your library.` });
+    } catch { toast({ title: "Could not remove track", variant: "destructive" }); }
+    finally { setBusyTrack(null); }
+  };
+
+  const changeCover = async (track: Track, file: File) => {
+    setBusyTrack(track.id);
+    try {
+      const form = new FormData();
+      form.append("cover_art", file);
+      const r = await fetch(`/api/library/${track.id}/cover`, { method: "PATCH", credentials: "include", body: form });
+      if (!r.ok) throw new Error();
+      await loadLibrary();
+      toast({ title: "Cover updated", description: "Your new cover is now saved." });
+    } catch { toast({ title: "Could not update cover", variant: "destructive" }); }
+    finally { setBusyTrack(null); }
+  };
+
   const selectedIdx = tracks.findIndex((t) => t.id === selectedId);
   const selected = selectedIdx >= 0 ? tracks[selectedIdx] : null;
 
@@ -465,18 +508,30 @@ export default function LibraryPage() {
 
             {!loading && !confirming && tracks.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tracks.map((t) => (
+                  {tracks.map((t) => (
                   <Card
                     key={t.id}
                     className="border-border/40 bg-card/40 overflow-hidden cursor-pointer hover:border-amber-500/40 transition-colors group"
-                    onClick={() => selectTrack(t.id)}
+                      onClick={() => selectTrack(t.id)}
                     data-testid={`card-track-${t.id}`}
                   >
-                    <div className="relative aspect-square bg-secondary/20 overflow-hidden">
+                      <div className="relative aspect-square bg-secondary/20 overflow-hidden">
                       <img src={`/api/storage/public-objects/${t.coverArtKey}`} alt={t.title} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Play className="w-10 h-10 text-white drop-shadow-lg" />
                       </div>
+                        <div className="absolute top-2 right-2 flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <label className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer" title="Change cover">
+                            <ImagePlus className="w-4 h-4" />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void changeCover(t, file); e.currentTarget.value = ""; }} />
+                          </label>
+                          <button className={`w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 ${t.isPinned ? "text-amber-400" : "text-white"}`} title={t.isPinned ? "Unpin" : "Pin"} onClick={() => void togglePin(t)} disabled={busyTrack === t.id}>
+                            <Pin className="w-4 h-4 mx-auto" />
+                          </button>
+                          <button className="w-8 h-8 rounded-full bg-black/60 text-white hover:bg-rose-600" title="Remove from library" onClick={() => void deleteTrack(t)} disabled={busyTrack === t.id}>
+                            <Trash2 className="w-4 h-4 mx-auto" />
+                          </button>
+                        </div>
                     </div>
                     <CardContent className="pt-4 pb-3">
                       <div className="font-semibold text-sm truncate">{t.title}</div>
@@ -485,6 +540,7 @@ export default function LibraryPage() {
                         {t.lyricsText
                           ? <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">Lyrics</Badge>
                           : <span />}
+                        {t.isPinned && <span className="text-[11px] text-amber-400 flex items-center gap-1"><Pin className="w-3 h-3" /> Pinned</span>}
                         <span className="text-[11px] text-amber-400 font-medium">Open player →</span>
                       </div>
                     </CardContent>
