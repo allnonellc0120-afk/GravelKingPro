@@ -1,0 +1,132 @@
+import { and, eq, gte, sql } from "drizzle-orm";
+import type { Request } from "express";
+import { randomUUID } from "node:crypto";
+import { db, creditTransactionsTable, type User, usersTable } from "@workspace/db";
+import { storage } from "../storage";
+
+export const CREDIT_COSTS = {
+  song: 4,
+  master: 4,
+  certificate: 4,
+} as const;
+
+export const CREDIT_PACKS = [
+  { id: "starter", name: "Starter", credits: 10, amountCents: 499, description: "10 credits for occasional takes" },
+  { id: "artist", name: "Artist", credits: 25, amountCents: 999, description: "25 credits for your next release" },
+  { id: "studio", name: "Studio", credits: 60, amountCents: 1999, description: "60 credits for a full project" },
+] as const;
+
+// One monthly allotment covers ten four-credit actions, matching the paid
+// plan's 10-WAV-download promise. King keeps the same predictable baseline;
+// its additional value remains the advanced studio features and certificate
+// access.
+export const MONTHLY_CREDITS = {
+  pro: 40,
+  king: 40,
+} as const;
+
+export type CreditSpendKind = "song" | "master" | "certificate";
+
+export async function resolveCreditUser(req: Request): Promise<User | null> {
+  if (req.dbUser) return req.dbUser;
+  const sessionId = (req.cookies as Record<string, string>)?.gk_session;
+  return sessionId ? storage.getUserBySession(sessionId) : null;
+}
+
+export async function getCreditsBalance(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ creditsBalance: usersTable.creditsBalance })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+  return row?.creditsBalance ?? 0;
+}
+
+/**
+ * Atomically spends credits only when the balance is sufficient, and records
+ * the spend in the same transaction. A reference makes a retried request a
+ * no-op instead of a second charge.
+ */
+export async function spendCredits(
+  userId: string,
+  amount: number,
+  kind: CreditSpendKind,
+  reference = `${kind}:${randomUUID()}`,
+): Promise<{ ok: true; balance: number } | { ok: false; balance: number }> {
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Credit spend amount must be a positive integer.");
+  return db.transaction(async (tx) => {
+    const existing = await tx
+      .select({ delta: creditTransactionsTable.delta })
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.reference, reference));
+    if (existing.length > 0) {
+      const [current] = await tx
+        .select({ creditsBalance: usersTable.creditsBalance })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+      return { ok: true as const, balance: current?.creditsBalance ?? 0 };
+    }
+
+    const updated = await tx
+      .update(usersTable)
+      .set({ creditsBalance: sql`${usersTable.creditsBalance} - ${amount}` })
+      .where(and(eq(usersTable.id, userId), gte(usersTable.creditsBalance, amount)))
+      .returning({ creditsBalance: usersTable.creditsBalance });
+    if (updated.length === 0) {
+      const [current] = await tx
+        .select({ creditsBalance: usersTable.creditsBalance })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+      return { ok: false as const, balance: current?.creditsBalance ?? 0 };
+    }
+
+    await tx.insert(creditTransactionsTable).values({
+      userId,
+      delta: -amount,
+      kind: `spend_${kind}`,
+      reference,
+    });
+    return { ok: true as const, balance: updated[0].creditsBalance };
+  });
+}
+
+/**
+ * Grants credits idempotently. Stripe payment intents and subscription
+ * invoices use stable references, so duplicate webhook delivery is harmless.
+ */
+export async function grantCredits(
+  userId: string,
+  amount: number,
+  kind: string,
+  reference: string,
+  stripePaymentIntentId?: string,
+): Promise<{ granted: boolean; balance: number }> {
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Credit grant amount must be a positive integer.");
+  return db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(creditTransactionsTable)
+      .values({
+        userId,
+        delta: amount,
+        kind,
+        reference,
+        stripePaymentIntentId: stripePaymentIntentId ?? null,
+      })
+      .onConflictDoNothing()
+      .returning({ id: creditTransactionsTable.id });
+
+    if (inserted.length === 0) {
+      const [current] = await tx
+        .select({ creditsBalance: usersTable.creditsBalance })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+      return { granted: false, balance: current?.creditsBalance ?? 0 };
+    }
+
+    const [updated] = await tx
+      .update(usersTable)
+      .set({ creditsBalance: sql`${usersTable.creditsBalance} + ${amount}` })
+      .where(eq(usersTable.id, userId))
+      .returning({ creditsBalance: usersTable.creditsBalance });
+    return { granted: true, balance: updated?.creditsBalance ?? 0 };
+  });
+}

@@ -13,6 +13,7 @@ import { join } from "path";
 import { db, tracksTable, purchasedTracksTable } from "@workspace/db";
 import { ObjectStorageService, saveObjectWithFallback } from "../lib/objectStorage";
 import { buildCoverArgs } from "../services/mlkOrchestrator";
+import { CREDIT_COSTS, grantCredits, resolveCreditUser, spendCredits } from "../lib/credits";
 
 const execFileAsync = promisify(execFileCb);
 const objectStorage = new ObjectStorageService();
@@ -160,12 +161,6 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     res.status(401).json({ error: "Sign in to generate music with ElevenLabs." });
     return;
   }
-  const entitled = adminBypass || user?.isDeveloper === true
-    || user?.subscriptionTier === "monthly" || user?.subscriptionTier === "node_auditor";
-  if (!entitled) {
-    res.status(403).json({ error: "ElevenLabs music generation is a Pro/King feature. Upgrade to unlock this engine.", code: "upgrade_required" });
-    return;
-  }
 
   const musicKey = adminBypass ? `admin:${req.ip}` : `user:${user?.id}`;
   const today = dayKey();
@@ -184,6 +179,24 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     return;
   }
 
+  const creditUser = adminBypass ? null : await resolveCreditUser(req);
+  const creditReference = `song:${randomUUID()}`;
+  let creditsSpent = false;
+  if (!adminBypass && !creditUser?.isDeveloper) {
+    const spent = await spendCredits(creditUser!.id, CREDIT_COSTS.song, "song", creditReference);
+    if (!spent.ok) {
+      res.status(402).json({
+        error: `This song costs ${CREDIT_COSTS.song} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
+        code: "INSUFFICIENT_CREDITS",
+        creditsRequired: CREDIT_COSTS.song,
+        creditsBalance: spent.balance,
+        purchaseUrl: "/pricing#credits",
+      });
+      return;
+    }
+    creditsSpent = true;
+    res.setHeader("X-GK-Credits-Balance", String(spent.balance));
+  }
   musicUsage.set(musicKey, { day: today, count: musicCount + 1 });
   try {
     const promptParts: string[] = [];
@@ -200,6 +213,9 @@ jaxRouter.post("/jax/generate-music", rateLimit({
       }),
     });
     if (!response.ok) {
+      if (creditsSpent && creditUser) {
+        await grantCredits(creditUser.id, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
+      }
       req.log.warn({ status: response.status }, "ElevenLabs music generation rejected request");
       res.status(502).json({ error: "JAX could not finish this take. Adjust the lyrics or style and try again." });
       return;
@@ -259,6 +275,9 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     });
     res.json({ success: true, trackId, title: trackTitle });
   } catch (error) {
+    if (creditsSpent && creditUser) {
+      await grantCredits(creditUser.id, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
+    }
     req.log.error({ error }, "ElevenLabs music generation failed");
     res.status(502).json({ error: "JAX music generation is temporarily unavailable." });
   }

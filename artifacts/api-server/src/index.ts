@@ -132,6 +132,10 @@ async function migrateAppSchema() {
         ADD COLUMN IF NOT EXISTS password_hash text
     `);
     await db.execute(sql`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS credits_balance integer NOT NULL DEFAULT 0
+    `);
+    await db.execute(sql`
       ALTER TABLE lyric_projects
         ADD COLUMN IF NOT EXISTS mode              text        NOT NULL DEFAULT 'simple',
         ADD COLUMN IF NOT EXISTS story_prompt      text,

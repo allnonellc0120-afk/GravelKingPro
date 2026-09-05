@@ -13,6 +13,7 @@ import { usePlanPrices, FALLBACK_PRICES, type PlanPrice } from "@/lib/usePlanPri
 import { trackFunnelEvent } from "@/lib/useAnalytics";
 import { trackEvent } from "@/lib/analytics";
 import { StripePaymentForm } from "@/components/stripe-payment-form";
+import { CreditWallet } from "@/components/credit-wallet";
 import {
   getPlayBillingService,
   purchasePlaySubscription,
@@ -34,6 +35,7 @@ const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
 const WEEKLY_FEATURES = [
   { label: "The Foundry mastering", highlight: "Morris Law Kernel v3.5 presets" },
   { label: "10 WAV exports per rolling week", highlight: "Release-ready 44.1kHz output" },
+  { label: "40 wallet credits each paid month", highlight: "Ten song, master, or certificate actions" },
   { label: "Unlimited MP3 exports", highlight: "No MP3 export cap" },
   { label: "Vocal Booth", highlight: "Record, clip, splice, and layer audio" },
   { label: "JAX certificates", highlight: "$1.99 per permanent certificate unlock" },
@@ -48,6 +50,7 @@ const STUDIO_FEATURES = [
   { label: "JAX songwriting companion", highlight: "Develop lyrics, document co-writers, and preserve your creative timeline" },
   { label: "Unlimited included JAX certificates", highlight: "Shareable authorship and IP records" },
   { label: "40 WAV exports per rolling month", highlight: "Plus unlimited MP3 exports" },
+  { label: "40 wallet credits each paid month", highlight: "Ten song, master, or certificate actions" },
   { label: "Converter", highlight: "Prepare audio in supported delivery formats" },
   { label: "Kernel Dashboard (10 optimizations/day)", highlight: "Before/after waveform comparison on saved Vocal Booth tracks" },
   { label: "PDF export reports", highlight: "Shareable mastering and provenance certificates" },
@@ -436,6 +439,8 @@ export default function Pricing() {
             )}
           </motion.p>
         </div>
+
+        <CreditWallet signedIn={isSignedIn === true} />
 
         {/* Trust badges — social proof above the fold */}
         <motion.div

@@ -9,6 +9,7 @@ import { storage } from "../storage";
 import { resolveTier } from "../lib/entitlement";
 import { getUncachableStripeClient } from "../stripeClient";
 import { ensureCustomerOnCurrentAccount } from "../lib/stripeCustomers";
+import { CREDIT_COSTS, getCreditsBalance, spendCredits, grantCredits } from "../lib/credits";
 
 const router = Router();
 
@@ -217,6 +218,8 @@ router.get("/court-cert/:certId/status", async (req: Request, res: Response) => 
       category: stub.category ?? null,
       provenance: stub.provenance ?? null,
       priceCents: CERT_UNLOCK_PRICE_CENTS,
+      creditsBalance: await getCreditsBalance(user.id),
+      creditCost: CREDIT_COSTS.certificate,
       includedUnlocks: hasUnlimitedIncluded
         ? { available: true, unlimited: true, used: 0, limit: null, resetsAt: null }
         : null,
@@ -252,27 +255,45 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
     }
 
     const tier = await resolveTier(req);
-    if (tier !== "king" && tier !== "node_auditor" && !user.isDeveloper) {
-      res.status(402).json({
-        success: false,
-        code: "CERT_PURCHASE_REQUIRED",
-        error: "Included unlocks are a King benefit. Unlock this certificate for $1.99, or upgrade to King.",
-        priceCents: CERT_UNLOCK_PRICE_CENTS,
-        checkoutUrl: `/api/court-cert/${certId}/checkout`,
-      });
-      return;
+    const includedUnlock = tier === "king" || tier === "node_auditor" || user.isDeveloper;
+    const creditReference = `certificate:${certId}`;
+    let creditsSpent = false;
+    let creditsBalance: number | undefined;
+    if (!includedUnlock) {
+      const spent = await spendCredits(user.id, CREDIT_COSTS.certificate, "certificate", creditReference);
+      if (!spent.ok) {
+        res.status(402).json({
+          success: false,
+          code: "CERT_PURCHASE_REQUIRED",
+          error: `This certificate costs ${CREDIT_COSTS.certificate} credits. You have ${spent.balance}. Buy a credit pack or unlock it for $1.99.`,
+          priceCents: CERT_UNLOCK_PRICE_CENTS,
+          creditsRequired: CREDIT_COSTS.certificate,
+          creditsBalance: spent.balance,
+          checkoutUrl: `/api/court-cert/${certId}/checkout`,
+          purchaseUrl: "/pricing#credits",
+        });
+        return;
+      }
+      creditsSpent = true;
+      creditsBalance = spent.balance;
     }
 
-    // Claim conditional on still-locked. King has an unlimited allowance, so
-    // no counter is consumed and concurrent requests cannot exhaust it.
+    // Claim conditional on still-locked. Included King unlocks are unlimited;
+    // paid wallet unlocks are refunded if a concurrent request wins the claim.
     const claimed = await db
       .update(ipCertStubsTable)
-      .set({ unlockedAt: sql`NOW()`, unlockSource: user.isDeveloper ? "admin" : "included" })
+      .set({
+        unlockedAt: sql`NOW()`,
+        unlockSource: user.isDeveloper ? "admin" : includedUnlock ? "included" : "credits",
+      })
       .where(and(eq(ipCertStubsTable.certId, certId), isNull(ipCertStubsTable.unlockedAt)))
       .returning({ certId: ipCertStubsTable.certId });
 
     if (claimed.length === 0) {
       // Raced with another unlock — it's unlocked now either way.
+      if (creditsSpent) {
+        await grantCredits(user.id, CREDIT_COSTS.certificate, "duplicate_certificate_refund", `refund:${creditReference}`);
+      }
       res.json({ success: true, unlocked: true, alreadyUnlocked: true });
       return;
     }
@@ -280,6 +301,7 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
     res.json({
       success: true,
       unlocked: true,
+      ...(creditsBalance !== undefined ? { creditsBalance, creditCost: CREDIT_COSTS.certificate } : {}),
       includedUnlocks: { unlimited: true, used: 0, limit: null, resetsAt: null },
     });
   } catch (err) {

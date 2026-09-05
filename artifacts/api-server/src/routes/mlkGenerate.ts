@@ -15,6 +15,8 @@ import { verifyLyrics } from "../services/lyricGuard";
 import { isAdminAutomationAuthenticated, ADMIN_AUTOMATION_EMAIL } from "../lib/adminAuth";
 import { db, usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { CREDIT_COSTS, grantCredits, spendCredits } from "../lib/credits";
 
 const mlkGenerateRouter = Router();
 
@@ -88,6 +90,25 @@ mlkGenerateRouter.post(
       }
     }
 
+    const adminBypass = isAdminAutomationAuthenticated(req) || user.isDeveloper;
+    const creditReference = `song:${randomUUID()}`;
+    let creditsSpent = false;
+    if (!adminBypass) {
+      const spent = await spendCredits(userId, CREDIT_COSTS.song, "song", creditReference);
+      if (!spent.ok) {
+        res.status(402).json({
+          error: `This song costs ${CREDIT_COSTS.song} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
+          code: "INSUFFICIENT_CREDITS",
+          creditsRequired: CREDIT_COSTS.song,
+          creditsBalance: spent.balance,
+          purchaseUrl: "/pricing#credits",
+        });
+        return;
+      }
+      creditsSpent = true;
+      res.setHeader("X-GK-Credits-Balance", String(spent.balance));
+    }
+
     try {
       const result = await generateAndMasterTrack(body.lyricId ?? null, text, userId, {
         title: body.title,
@@ -101,6 +122,9 @@ mlkGenerateRouter.post(
       });
       res.json({ success: true, ...result });
     } catch (err) {
+      if (creditsSpent) {
+        await grantCredits(userId, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
+      }
       const message = err instanceof Error ? err.message : String(err);
       // Full raw error (stack, upstream JSON) stays in the server logs ONLY.
       req.log.error({ err }, "MLK v3.5 generate-master failed");
@@ -159,6 +183,25 @@ mlkGenerateRouter.post(
       return;
     }
 
+    const adminBypass = isAdminAutomationAuthenticated(req) || user.isDeveloper;
+    const creditReference = `remix:${randomUUID()}`;
+    let creditsSpent = false;
+    if (!adminBypass) {
+      const spent = await spendCredits(user.id, CREDIT_COSTS.song, "song", creditReference);
+      if (!spent.ok) {
+        res.status(402).json({
+          error: `This remix costs ${CREDIT_COSTS.song} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
+          code: "INSUFFICIENT_CREDITS",
+          creditsRequired: CREDIT_COSTS.song,
+          creditsBalance: spent.balance,
+          purchaseUrl: "/pricing#credits",
+        });
+        return;
+      }
+      creditsSpent = true;
+      res.setHeader("X-GK-Credits-Balance", String(spent.balance));
+    }
+
     const body = req.body as {
       parentTrackId?: string;
       twist?: string;
@@ -179,6 +222,9 @@ mlkGenerateRouter.post(
       });
       res.json({ success: true, ...result });
     } catch (err) {
+      if (creditsSpent) {
+        await grantCredits(user.id, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
+      }
       const message = err instanceof Error ? err.message : String(err);
       // Full raw error (stack, upstream JSON) stays in the server logs ONLY.
       req.log.error({ err }, "MLK v3.5 remix failed");
