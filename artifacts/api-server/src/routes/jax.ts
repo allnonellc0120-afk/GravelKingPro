@@ -2,11 +2,13 @@ import { Router, type Request, type Response } from "express";
 import { generateProxyText } from "../geminiProxy";
 import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAutomationAuthenticated } from "../lib/adminAuth";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 
 const jaxRouter = Router();
 const DAILY_FREE_LIMIT = 5;
 const usage = new Map<string, { day: string; count: number }>();
 const STUDIO_REDIRECT = "I'm locked in the booth for songwriting only. Let's get back to the track. What section are we working on next?";
+const elevenLabs = new ReplitConnectors();
 export const JAX_VOICE_PRESETS = {
   admin: { label: "Admin Custom Cloned Voice", voiceId: () => process.env.JAX_VOICE_ID?.trim() ?? "" },
   adam: { label: "JAX Baritone (Deep & Resonant)", voiceId: () => "pNInz6obpgDQGcFmaJgB" },
@@ -84,15 +86,10 @@ jaxRouter.post("/jax/tts", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Select a supported male JAX voice preset." });
     return;
   }
-  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-  if (!apiKey) {
-    res.status(503).json({ error: "JAX voice playback is not configured on this server." });
-    return;
-  }
   try {
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
+    const response = await elevenLabs.proxy("elevenlabs", `/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
       method: "POST",
-      headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
       body: JSON.stringify({ text, model_id: "eleven_multilingual_v2", output_format: "mp3_44100_128" }),
     });
     if (!response.ok) {
