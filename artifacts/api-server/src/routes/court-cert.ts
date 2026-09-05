@@ -297,12 +297,15 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
           eq(ipCertStubsTable.certId, certId),
           eq(ipCertStubsTable.unlockSource, "included"),
         ));
-      res.status(402).json({
+      res.status(429).json({
         success: false,
-        code: "CERT_PURCHASE_REQUIRED",
+        code: "CERT_UNLOCK_LIMIT_REACHED",
         error: "Your included certificate allowance is exhausted. Unlock this certificate for $1.99, or try again after the allowance resets.",
         priceCents: CERT_UNLOCK_PRICE_CENTS,
         checkoutUrl: `/api/court-cert/${certId}/checkout`,
+        used: quota.used,
+        limit: quota.limit,
+        resetsAt: quota.resetsAt,
         includedUnlocks: { available: false, used: quota.used, limit: quota.limit, resetsAt: quota.resetsAt },
       });
       return;
