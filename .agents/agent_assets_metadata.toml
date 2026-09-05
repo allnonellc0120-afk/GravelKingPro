@@ -1095,3 +1095,143 @@ mtime_ms = 1788612557996
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/7932f915-422a-4d20-8efa-9699dcd4bc4b/b72542aa-6e48-49f2-835b-63584ff8fa79"
 storage_version_token = "1788612586990937"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "Y4bn3A6qnlymuDURHZKqI"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-00.png"
+type = "image"
+title = "GravelKing Pro promo — 0s frame"
+description = "Vertical 9:16 high-definition keyframe for the 0-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "03f9b115-f714-4cc1-8094-0df9e6f22f24"
+content_hash = "sha256:3e02fe712d2b0b1cb57e432929af932f491f1b6bf1a81fd0c264d60e9e64cc7e"
+size = 1223271
+mtime_ms = 1788619601736
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/03f9b115-f714-4cc1-8094-0df9e6f22f24/6af53ecd-a6a0-4756-9d7f-b8e0b3390f14"
+storage_version_token = "1788619616727853"
+content_type = "image/png"
+
+[[outputs]]
+id = "BA1bEi6f3SYfEVkUJJEbD"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-01.png"
+type = "image"
+title = "GravelKing Pro promo — 10s frame"
+description = "Vertical 9:16 high-definition keyframe for the 10-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "fc92b8e6-f637-4d5e-b281-1e7ab6caa8dc"
+content_hash = "sha256:279ae94e00ad3498a5dbd87df574a7f05c5edf529520d3567a948d888a7c90bf"
+size = 1366588
+mtime_ms = 1788619605560
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/fc92b8e6-f637-4d5e-b281-1e7ab6caa8dc/7e7c732f-4c18-4060-8e84-8f9c9f945bb3"
+storage_version_token = "1788619617614797"
+content_type = "image/png"
+
+[[outputs]]
+id = "Ks_hoonQJV5xXwuI0OX8i"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-02.png"
+type = "image"
+title = "GravelKing Pro promo — 20s frame"
+description = "Vertical 9:16 high-definition keyframe for the 20-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "9a515b25-da01-4606-a53b-44544de2abe8"
+content_hash = "sha256:4cf5911dd756ae062819757f147d48063b226a5313d9bd0b1a7ffa919ddea677"
+size = 1265444
+mtime_ms = 1788619605648
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/9a515b25-da01-4606-a53b-44544de2abe8/f56bad6e-038a-4eac-8481-dfbb4c8860eb"
+storage_version_token = "1788619618904751"
+content_type = "image/png"
+
+[[outputs]]
+id = "mcChpHyq-sZ-1rQ_bWviI"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-03.png"
+type = "image"
+title = "GravelKing Pro promo — 30s frame"
+description = "Vertical 9:16 high-definition keyframe for the 30-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "a3d56c1b-9e0e-4519-b24d-fd1483c84b2b"
+content_hash = "sha256:a88d547da8eb3ad6ecfc3b31db2ac23e945f712da95c8ebe7b672632ed488947"
+size = 1590676
+mtime_ms = 1788619606096
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/a3d56c1b-9e0e-4519-b24d-fd1483c84b2b/e1a9a293-8700-4046-8eb8-33bca876cefa"
+storage_version_token = "1788619619847319"
+content_type = "image/png"
+
+[[outputs]]
+id = "_ipkPhSdMxExqtQvUsdn0"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-04.png"
+type = "image"
+title = "GravelKing Pro promo — 40s frame"
+description = "Vertical 9:16 high-definition keyframe for the 40-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "dd66a81c-21b0-41c8-8b23-2ca25330454f"
+content_hash = "sha256:e8d6bc95fa3751d2838b46f7ac3e1074180deae811675d26647f19304ac056e3"
+size = 1326293
+mtime_ms = 1788619603040
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/dd66a81c-21b0-41c8-8b23-2ca25330454f/35e1ef57-78aa-4154-941f-ad1d99bd3695"
+storage_version_token = "1788619620947527"
+content_type = "image/png"
+
+[[outputs]]
+id = "NqBaDSGi7PoHhoe-bs_PP"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-05.png"
+type = "image"
+title = "GravelKing Pro promo — 50s frame"
+description = "Vertical 9:16 high-definition keyframe for the 50-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "17b856f9-fb9e-4f61-9bf0-c1f48fe9b1c6"
+content_hash = "sha256:de8c08888c1a8153937dccc188dacc3ed5a2c5955b282b33e44f830994ee1349"
+size = 1275776
+mtime_ms = 1788619602548
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/17b856f9-fb9e-4f61-9bf0-c1f48fe9b1c6/83112a84-1be6-4024-94d9-7f8c117d461c"
+storage_version_token = "1788619621902492"
+content_type = "image/png"
+
+[[outputs]]
+id = "XqPYkNMV-T9XiilNN5KP0"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-06.png"
+type = "image"
+title = "GravelKing Pro promo — 60s frame"
+description = "Vertical 9:16 high-definition keyframe for the 60-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "b005eeb6-2f56-42d6-88ab-edb2e789bbc9"
+content_hash = "sha256:1d71be6b290c92caf787f90da6795ea053313086a7882caa430041ee5ec19901"
+size = 1480281
+mtime_ms = 1788619606180
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b005eeb6-2f56-42d6-88ab-edb2e789bbc9/0ffdf033-1cbe-45f0-901c-9090e9b18554"
+storage_version_token = "1788619622893432"
+content_type = "image/png"
+
+[[outputs]]
+id = "LpZF65LJ_33w8VGRnFeA-"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-07.png"
+type = "image"
+title = "GravelKing Pro promo — 70s frame"
+description = "Vertical 9:16 high-definition keyframe for the 70-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "e2871d41-ad95-48bb-8a1e-87b499737dc5"
+content_hash = "sha256:1b75c3efb1409fa866b75c9870a9e3cd488e1dab8421492064b031e76a69d4e5"
+size = 1274820
+mtime_ms = 1788619610776
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/e2871d41-ad95-48bb-8a1e-87b499737dc5/3c4dbb55-d3df-4a5a-bc12-98dfca09e1ce"
+storage_version_token = "1788619623714244"
+content_type = "image/png"
+
+[[outputs]]
+id = "Pfne-0hlKmhZVcl28IceM"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-08.png"
+type = "image"
+title = "GravelKing Pro promo — 80s frame"
+description = "Vertical 9:16 high-definition keyframe for the 80-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "e5823bcd-cb48-45d0-94f7-d61d2a2948e1"
+content_hash = "sha256:1463a7766be5623ce1f9cd3fd9b52c7baa2109b61251f9da67dac07780a5366e"
+size = 1487277
+mtime_ms = 1788619602452
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/e5823bcd-cb48-45d0-94f7-d61d2a2948e1/46bde10d-b5a0-4321-be9d-2b89c0295692"
+storage_version_token = "1788619624543631"
+content_type = "image/png"
+
+[[outputs]]
+id = "GrVuN9Hndz2AraSfZESA_"
+uri = "file://attached_assets/generated_images/gravelking-pro-promo-frame-09.png"
+type = "image"
+title = "GravelKing Pro promo — 90s frame"
+description = "Vertical 9:16 high-definition keyframe for the 90-second mark of the 90-second promo. Use as the start/end image for the matching Google Flow segment."
+logical_id = "3cd5ae33-588e-4d0f-a070-044cc32c8b59"
+content_hash = "sha256:a7164d49917552617f186b460dfa223269414721885eb98c1adcb4d02f053664"
+size = 1270942
+mtime_ms = 1788619608408
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/3cd5ae33-588e-4d0f-a070-044cc32c8b59/7b381429-ac67-4b9e-acd8-ae98b9a60eb6"
+storage_version_token = "1788619625542684"
+content_type = "image/png"
