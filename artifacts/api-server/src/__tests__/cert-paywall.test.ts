@@ -7,10 +7,11 @@
  *   [2]  Non-owner (authenticated, wrong user) → 404 on all five endpoints
  *   [3]  Ownerless legacy stub (ownerUserId IS NULL) → 404 for any authenticated non-developer
  *   [4]  Owner, cert still locked → 402 on JSON and PDF
- *   [5]  Pro subscriber receives a free certificate unlock
- *   [6]  King subscriber included unlock is unlimited and idempotent
- *   [7]  Concurrent King unlocks leave no allowance counter to consume
- *   [8]  /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
+ *   [5]  Pro subscriber is directed to the $1.99 purchase
+ *   [6]  King subscriber consumes one included unlock and is idempotent
+ *   [7]  Concurrent King unlocks consume exactly one allowance
+ *   [8]  An expired allowance resets once under concurrent unlock load
+ *   [9]  /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
  *        (regression guard for the "/:certId swallows /:certId.pdf" ordering bug)
  *
  * Webhook cert_unlock idempotency + owner-scoping is covered separately in
@@ -56,15 +57,18 @@ const seededCerts: string[] = [];
 async function seedUser(opts: {
   subscriptionTier?: string;
   isDeveloper?: boolean;
+  isPro?: boolean;
   certUnlocks?: number;
   certUnlockPeriodStart?: Date | null;
 }): Promise<SeededUser> {
   const userId = `test-cpw-${randomUUID()}`;
   const sid = randomBytes(32).toString("hex");
+  const subscriptionTier = opts.subscriptionTier ?? "free";
   await db.insert(usersTable).values({
     id: userId,
     email: `${userId}@example.test`,
-    subscriptionTier: opts.subscriptionTier ?? "free",
+    subscriptionTier,
+    isPro: opts.isPro ?? subscriptionTier !== "free",
     isDeveloper: opts.isDeveloper ?? false,
     certUnlocks: opts.certUnlocks ?? 0,
     certUnlockPeriodStart: opts.certUnlockPeriodStart ?? null,
@@ -72,7 +76,7 @@ async function seedUser(opts: {
   await db.insert(sessionsTable).values({
     sid,
     sess: {
-      user: { id: userId, subscriptionTier: opts.subscriptionTier ?? "free" },
+      user: { id: userId, subscriptionTier },
       access_token: "test-access-token",
     },
     expire: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -255,8 +259,8 @@ async function main(): Promise<void> {
       check("4.7 status reports unlocked:false", b3.unlocked === false, JSON.stringify(b3));
     }
 
-    // ── [5] Certificates are free for every signed-in creator ────────────────
-    console.log("\n[5] Pro subscriber receives a free certificate unlock");
+    // ── [5] Pro tier → 402 CERT_PURCHASE_REQUIRED on unlock ──────────────────
+    console.log("\n[5] Pro subscriber is directed to the $1.99 purchase");
     {
       const owner = await seedUser({ subscriptionTier: "pro" });
       const certId = await seedCert({ ownerUserId: owner.userId });
@@ -265,15 +269,16 @@ async function main(): Promise<void> {
         method: "POST",
         headers: owner.bearerAuth,
       });
-      check("5.1 Pro tier unlock → 200", r.status === 200, `got ${r.status}`);
+      check("5.1 Pro tier unlock → 402", r.status === 402, `got ${r.status}`);
       const b = await r.json() as Record<string, unknown>;
-      check("5.2 Pro unlock reports unlocked", b.unlocked === true, JSON.stringify(b));
+      check("5.2 Pro 402 has CERT_PURCHASE_REQUIRED code", b.code === "CERT_PURCHASE_REQUIRED", JSON.stringify(b));
+      check("5.3 Pro 402 exposes priceCents", typeof b.priceCents === "number", JSON.stringify(b));
       const row = await readCertRow(certId);
-      check("5.3 cert is unlocked in DB", row?.unlockedAt != null, String(row?.unlockedAt));
+      check("5.4 cert remains locked after Pro rejection", row?.unlockedAt === null, String(row?.unlockedAt));
     }
 
-    // ── [6] King included unlock: unlimited and idempotent ─────────────────────
-    console.log("\n[6] King subscriber included unlock: unlimited, idempotent");
+    // ── [6] King included unlock: consumes one allowance, idempotent ────────
+    console.log("\n[6] King subscriber included unlock: one allowance, idempotent");
     {
       const owner = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: owner.userId });
@@ -289,13 +294,13 @@ async function main(): Promise<void> {
       check("6.3 first unlock: alreadyUnlocked not set", !b1.alreadyUnlocked, JSON.stringify(b1));
 
       const row1 = await readUserRow(owner.userId);
-      check("6.4 King unlock does not consume a counter", row1?.certUnlocks === 0, `certUnlocks=${row1?.certUnlocks}`);
-      check("6.5 King unlock does not start a quota window", !row1?.certUnlockPeriodStart);
+      check("6.4 King unlock increments counter to 1", row1?.certUnlocks === 1, `certUnlocks=${row1?.certUnlocks}`);
+      check("6.5 King unlock starts a quota window", !!row1?.certUnlockPeriodStart);
 
       // Cert should now be unlocked in DB
       const certRow1 = await readCertRow(certId);
       check("6.6 cert unlockedAt is set", !!certRow1?.unlockedAt);
-      check("6.7 cert unlockSource is 'free'", certRow1?.unlockSource === "free", `got ${certRow1?.unlockSource}`);
+      check("6.7 cert unlockSource is 'included'", certRow1?.unlockSource === "included", `got ${certRow1?.unlockSource}`);
 
       // Second call (idempotent)
       const r2 = await fetch(`${base}/api/court-cert/${certId}/unlock`, {
@@ -308,8 +313,8 @@ async function main(): Promise<void> {
 
       const row2 = await readUserRow(owner.userId);
       check(
-        "6.10 King has no counter to double-consume",
-        row2?.certUnlocks === 0,
+        "6.10 King allowance is not double-consumed",
+        row2?.certUnlocks === 1,
         `certUnlocks=${row2?.certUnlocks}`,
       );
 
@@ -322,8 +327,8 @@ async function main(): Promise<void> {
       check("6.12 cert JSON has certificate field", !!b3.certificate, JSON.stringify(b3));
     }
 
-    // ── [7] Concurrent King unlocks → no allowance counter ────────────────────
-    console.log("\n[7] Concurrent King included unlocks → no counter consumption");
+    // ── [7] Concurrent King unlocks → exactly one allowance consumed ────────
+    console.log("\n[7] Concurrent King included unlocks → one allowance, one DB write");
     {
       const owner = await seedUser({ subscriptionTier: "king" });
       const certId = await seedCert({ ownerUserId: owner.userId });
@@ -347,17 +352,70 @@ async function main(): Promise<void> {
 
       const row = await readUserRow(owner.userId);
       check(
-        "7.2 King counter stays untouched",
-        row?.certUnlocks === 0,
+        "7.2 King allowance is consumed exactly once",
+        row?.certUnlocks === 1,
         `certUnlocks=${row?.certUnlocks}`,
       );
 
       const certRow = await readCertRow(certId);
-      check("7.3 cert is unlocked exactly once", !!certRow?.unlockedAt);
+      check("7.3 cert is unlocked with included source", !!certRow?.unlockedAt && certRow.unlockSource === "included");
     }
 
-    // ── [8] PDF route registered before JSON route (Express 5 ordering) ────────
-    console.log("\n[8] PDF route registers before /:certId (Express 5 ordering regression)");
+    // ── [8] Expired allowance reset under concurrent load ────────────────────
+    console.log("\n[8] Expired allowance resets once under concurrent unlock load");
+    {
+      const expiredStart = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+      const owner = await seedUser({
+        subscriptionTier: "king",
+        certUnlocks: 20,
+        certUnlockPeriodStart: expiredStart,
+      });
+      const certIds = await Promise.all(
+        Array.from({ length: 6 }, () => seedCert({ ownerUserId: owner.userId })),
+      );
+
+      const requestStartedAt = new Date();
+      const results = await Promise.all(
+        certIds.map((certId) =>
+          fetch(`${base}/api/court-cert/${certId}/unlock`, {
+            method: "POST",
+            headers: owner.bearerAuth,
+          }),
+        ),
+      );
+      const completedAt = new Date();
+      const bodies = await Promise.all(results.map((r) => r.json() as Promise<Record<string, unknown>>));
+      const statuses = results.map((r) => r.status);
+      const successfulUnlocks = statuses.filter((status) => status === 200).length;
+      check(
+        "8.1 all concurrent boundary unlocks succeed without a spurious 429",
+        successfulUnlocks === certIds.length && !statuses.includes(429),
+        `statuses: ${statuses.join(",")}`,
+      );
+      check(
+        "8.2 every boundary response reports an unlocked certificate",
+        bodies.every((body) => body.unlocked === true && !body.alreadyUnlocked),
+        JSON.stringify(bodies),
+      );
+
+      const row = await readUserRow(owner.userId);
+      check(
+        "8.3 final certUnlocks equals successful unlock count",
+        row?.certUnlocks === successfulUnlocks,
+        `certUnlocks=${row?.certUnlocks}, successfulUnlocks=${successfulUnlocks}`,
+      );
+      const refreshedAt = row?.certUnlockPeriodStart?.getTime() ?? 0;
+      check(
+        "8.4 certUnlockPeriodStart is refreshed to the current window",
+        refreshedAt > expiredStart.getTime() &&
+          refreshedAt >= requestStartedAt.getTime() - 2_000 &&
+          refreshedAt <= completedAt.getTime() + 2_000,
+        `periodStart=${row?.certUnlockPeriodStart?.toISOString() ?? "null"}`,
+      );
+    }
+
+    // ── [9] PDF route registered before JSON route (Express 5 ordering) ────────
+    console.log("\n[9] PDF route registers before /:certId (Express 5 ordering regression)");
     {
       const owner = await seedUser({ subscriptionTier: "king" });
       // Cert already unlocked so the route returns a PDF response (not 402)
@@ -370,9 +428,9 @@ async function main(): Promise<void> {
       const r = await fetch(`${base}/api/court-cert/${certId}.pdf`, {
         headers: owner.bearerAuth,
       });
-      check("8.1 /:certId.pdf → 200", r.status === 200, `got ${r.status}`);
+      check("9.1 /:certId.pdf → 200", r.status === 200, `got ${r.status}`);
       const ct = r.headers.get("content-type") ?? "";
-      check("8.2 /:certId.pdf content-type is application/pdf (not JSON)", ct.includes("application/pdf"), `got: ${ct}`);
+      check("9.2 /:certId.pdf content-type is application/pdf (not JSON)", ct.includes("application/pdf"), `got: ${ct}`);
     }
 
   } finally {
