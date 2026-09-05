@@ -17,7 +17,7 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = async () => {
+  const confirm = async (): Promise<void> => {
     if (!stripe || !elements) return;
     setSubmitting(true);
     setError(null);
@@ -49,6 +49,13 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
     }
   };
 
+  const submit = () => void confirm();
+
+  // Apple Pay / Google Pay complete through the Express Checkout element's
+  // own confirmation event — without this handler the wallet buttons render
+  // but can't finish the payment.
+  const onExpressConfirm = () => void confirm();
+
   return (
     <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.04] p-5">
       <div className="flex items-center justify-between mb-4">
@@ -61,6 +68,7 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
         </button>
       </div>
        <ExpressCheckoutElement
+         onConfirm={onExpressConfirm}
          options={{
            buttonType: { applePay: "buy", googlePay: "buy" },
            buttonTheme: { applePay: "black", googlePay: "black" },

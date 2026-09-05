@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { storage } from '../storage';
 import { db, usersTable, promotersTable, referralAttributionsTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
@@ -128,10 +128,21 @@ const createSubscriptionIntent = async (req: Request, res: Response) => {
   }
 };
 
-// Canonical embedded-subscription endpoint. Keep /payment-intent as a
-// backwards-compatible alias for already deployed clients.
+// Canonical embedded-subscription endpoint (Payment Element + Express
+// Checkout). The non-/stripe paths are backwards-compatible aliases for
+// already deployed clients.
+stripeRouter.post('/stripe/create-subscription-intent', createSubscriptionIntent);
 stripeRouter.post('/create-subscription-intent', createSubscriptionIntent);
 stripeRouter.post('/payment-intent', createSubscriptionIntent);
+
+// DEPRECATED: hosted Stripe Checkout is superseded by the embedded Payment
+// Element flow (POST /api/stripe/create-subscription-intent). Kept only so
+// older deployed clients don't break; new clients must not call this.
+stripeRouter.post('/checkout', async (req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Deprecation', 'true');
+  res.setHeader('Link', '</api/stripe/create-subscription-intent>; rel="successor-version"');
+  next();
+});
 
 // Create Stripe Checkout Session — requires OIDC authentication
 stripeRouter.post('/checkout', async (req: Request, res: Response) => {
