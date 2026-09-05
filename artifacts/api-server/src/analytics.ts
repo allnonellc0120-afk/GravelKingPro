@@ -10,7 +10,8 @@ export type AnalyticsEventType =
   | "checkout_started"
   | "checkout_error"
   | "subscription_activated"
-  | "subscription_payment_failed";
+  | "subscription_payment_failed"
+  | "purchase_completed";
 
 export interface RecordEventInput {
   type: AnalyticsEventType;

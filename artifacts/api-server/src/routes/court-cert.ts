@@ -290,10 +290,62 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
 });
 
 /**
+ * POST /api/court-cert/:certId/payment-intent
+ *
+ * Embedded-checkout variant: returns a PaymentIntent client secret so the
+ * buyer pays in-app (card / Apple Pay / Google Pay) instead of being
+ * redirected to hosted Stripe Checkout. The unlock itself is still granted
+ * only by the verified payment_intent.succeeded webhook — never here.
+ */
+router.post("/court-cert/:certId/payment-intent", async (req: Request, res: Response) => {
+  const certId = Array.isArray(req.params.certId) ? req.params.certId[0] : req.params.certId;
+  try {
+    const user = await resolveCertUser(req);
+    if (!user) {
+      res.status(401).json({ success: false, code: "AUTH_REQUIRED", error: "Sign in required." });
+      return;
+    }
+    const [stub] = await db.select().from(ipCertStubsTable).where(eq(ipCertStubsTable.certId, certId));
+    if (!stub || stub.ownerUserId !== user.id) {
+      res.status(404).json({ success: false, error: "Certificate not found." });
+      return;
+    }
+    if (stub.unlockedAt) {
+      res.json({ success: true, alreadyUnlocked: true });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const customerId = await ensureCustomerOnCurrentAccount(stripe, user);
+
+    const intent = await stripe.paymentIntents.create({
+      amount: CERT_UNLOCK_PRICE_CENTS,
+      currency: "usd",
+      customer: customerId,
+      automatic_payment_methods: { enabled: true },
+      description: `IP Certificate unlock — ${certId}`,
+      metadata: { kind: "cert_unlock", cert_id: certId, user_id: user.id },
+    });
+    if (!intent.client_secret) {
+      res.status(502).json({ success: false, error: "Stripe did not return a payment secret." });
+      return;
+    }
+
+    res.json({ success: true, clientSecret: intent.client_secret });
+  } catch (err) {
+    logger.error({ err, certId }, "cert payment-intent failed");
+    void logToolError("Court Certificate", "CERT_CHECKOUT", err);
+    res.status(500).json({ success: false, error: "Failed to start certificate checkout." });
+  }
+});
+
+/**
  * POST /api/court-cert/:certId/checkout
  *
  * $1.99 one-time Stripe Checkout that permanently unlocks ONE certificate.
  * The unlock itself is granted only by the verified webhook — never here.
+ * DEPRECATED: hosted-checkout fallback kept for older app versions; the web
+ * client uses /payment-intent above.
  */
 router.post("/court-cert/:certId/checkout", async (req: Request, res: Response) => {
   const certId = Array.isArray(req.params.certId) ? req.params.certId[0] : req.params.certId;

@@ -16,6 +16,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isAdminAutomationAuthenticated } from "../lib/adminAuth";
+import { recordAnalyticsEvent } from "../analytics";
 
 const execFileAsync = promisify(execFile);
 
@@ -360,9 +361,79 @@ router.post(
 );
 
 /**
+ * Resolve the buyer identity for track purchases. A signed-in user
+ * (req.dbUser — Clerk/OIDC or session-derived) always wins over the anonymous
+ * gk_session row so their purchase lands in THEIR library; /library resolves
+ * identity the same way. Exported for tests.
+ */
+export async function resolveTrackBuyer(req: Request) {
+  const sessionId = (req.cookies as Record<string, string>)?.gk_session ?? randomUUID();
+  const sessionUser = await storage.getOrCreateUser(sessionId);
+  return { buyer: req.dbUser ?? sessionUser, sessionUser };
+}
+
+/**
+ * POST /api/tracks/:id/payment-intent — embedded-checkout variant of /checkout.
+ * Returns a PaymentIntent client secret so the buyer pays in-app (card /
+ * Apple Pay / Google Pay) without a redirect. Fulfillment still comes from
+ * the verified payment_intent.succeeded webhook and /tracks/confirm-purchase.
+ * Identity matches /library: signed-in (Clerk/OIDC) users first, gk_session
+ * fallback for anonymous visitors — so a signed-in buyer's purchase lands in
+ * THEIR library, not a fresh anonymous session row.
+ */
+router.post("/tracks/:id/payment-intent", async (req: Request, res: Response) => {
+  const { buyer: user, sessionUser } = await resolveTrackBuyer(req);
+
+  const trackId = req.params.id as string;
+  const [track] = await db.select().from(tracksTable).where(eq(tracksTable.id, trackId));
+  if (!track) {
+    res.status(404).json({ error: "Track not found" });
+    return;
+  }
+  if (track.status !== "accepted") {
+    res.status(403).json({ error: "Track not yet available for purchase" });
+    return;
+  }
+
+  const stripe = await getUncachableStripeClient();
+
+  const intent = await stripe.paymentIntents.create({
+    amount: 999,
+    currency: "usd",
+    automatic_payment_methods: { enabled: true },
+    description: `${track.artistName} — ${track.title}`,
+    metadata: { type: "track", track_id: track.id, user_id: user.id },
+  });
+  if (!intent.client_secret) {
+    res.status(502).json({ error: "Stripe did not return a payment secret" });
+    return;
+  }
+
+  // Persist gk_session so purchases are attributable to this browser session.
+  res.cookie("gk_session", sessionUser.sessionId ?? sessionUser.id, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+
+  void recordAnalyticsEvent({
+    type: "checkout_started",
+    visitorId: (req.cookies as Record<string, string>)?.gk_vid ?? null,
+    sessionId: user.sessionId ?? user.id,
+    path: "/label",
+    metadata: { trackId: track.id, embedded: "true" },
+  }).catch(() => {});
+
+  res.json({ clientSecret: intent.client_secret, paymentIntentId: intent.id });
+});
+
+/**
  * POST /api/tracks/:id/checkout — Stripe one-time checkout for a track.
  * Identity is gk_session-scoped; no OIDC login required.
  * Origin for success/cancel URLs is derived from REPLIT_DOMAINS (never from request headers).
+ * DEPRECATED: hosted-checkout fallback kept for older app versions; the web
+ * client uses /payment-intent above.
  */
 router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
   const sessionId = (req.cookies as Record<string, string>)?.gk_session ?? randomUUID();
@@ -426,39 +497,58 @@ router.post("/tracks/:id/checkout", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/tracks/confirm-purchase — called by frontend on checkout success redirect.
- * Verifies the Stripe checkout session server-side and records the purchase idempotently.
- * Complements the webhook handler for cases where the webhook fires before the redirect.
+ * POST /api/tracks/confirm-purchase — called by the frontend after payment.
+ * Verifies the Stripe checkout session (hosted redirect flow) or payment
+ * intent (embedded flow) server-side and records the purchase idempotently.
+ * Complements the webhook handler for cases where the webhook fires late.
  */
 router.post("/tracks/confirm-purchase", async (req: Request, res: Response) => {
-  const { checkoutSessionId } = req.body as { checkoutSessionId?: string };
-  if (!checkoutSessionId) {
-    res.status(400).json({ error: "checkoutSessionId required" });
+  const { checkoutSessionId, paymentIntentId } = req.body as {
+    checkoutSessionId?: string;
+    paymentIntentId?: string;
+  };
+  if (!checkoutSessionId && !paymentIntentId) {
+    res.status(400).json({ error: "checkoutSessionId or paymentIntentId required" });
     return;
   }
 
   try {
     const stripe = await getUncachableStripeClient();
-    const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
 
-    const meta = session.metadata ?? {};
-    if (
-      meta.type !== "track" ||
-      !meta.track_id ||
-      !meta.user_id ||
-      !(session.payment_status === "paid" || session.status === "complete")
-    ) {
-      res.status(400).json({ error: "Session is not a completed track purchase" });
-      return;
+    let userId: string;
+    let trackId: string;
+    let refId: string;
+
+    if (paymentIntentId) {
+      const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const meta = intent.metadata ?? {};
+      if (meta.type !== "track" || !meta.track_id || !meta.user_id || intent.status !== "succeeded") {
+        res.status(400).json({ error: "Payment is not a completed track purchase" });
+        return;
+      }
+      userId = meta.user_id;
+      trackId = meta.track_id;
+      refId = intent.id;
+    } else {
+      const session = await stripe.checkout.sessions.retrieve(checkoutSessionId as string);
+      const meta = session.metadata ?? {};
+      if (
+        meta.type !== "track" ||
+        !meta.track_id ||
+        !meta.user_id ||
+        !(session.payment_status === "paid" || session.status === "complete")
+      ) {
+        res.status(400).json({ error: "Session is not a completed track purchase" });
+        return;
+      }
+      userId = meta.user_id;
+      trackId = meta.track_id;
+      refId = session.id;
     }
 
     await db
       .insert(purchasedTracksTable)
-      .values({
-        userId: meta.user_id,
-        trackId: meta.track_id,
-        stripeCheckoutSessionId: session.id,
-      })
+      .values({ userId, trackId, stripeCheckoutSessionId: refId })
       .onConflictDoNothing();
 
     res.json({ ok: true });

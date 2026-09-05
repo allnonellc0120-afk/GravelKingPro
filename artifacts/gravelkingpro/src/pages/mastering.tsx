@@ -17,6 +17,7 @@ import { trackEvent } from "@/lib/analytics";
 import { downloadUrl } from "@/lib/download";
 import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
 import { EmailGate, useEmailGate } from "@/components/email-gate";
+import { StripePaymentForm } from "@/components/stripe-payment-form";
 import { ExportQuotaBadge } from "@/components/export-quota-badge";
 import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
 import { Link } from "wouter";
@@ -69,6 +70,7 @@ function CertUnlockCard({ certId }: { certId: string }) {
   const [status, setStatus] = useState<CertStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [paymentSecret, setPaymentSecret] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -102,16 +104,37 @@ function CertUnlockCard({ certId }: { certId: string }) {
   const buyUnlock = async () => {
     setBusy(true);
     try {
-      const res = await fetch(`/api/court-cert/${encodeURIComponent(certId)}/checkout`, { method: "POST", credentials: "include" });
-      const data = await res.json().catch(() => ({})) as { url?: string; error?: string; alreadyUnlocked?: boolean };
+      const res = await fetch(`/api/court-cert/${encodeURIComponent(certId)}/payment-intent`, { method: "POST", credentials: "include" });
+      const data = await res.json().catch(() => ({})) as { clientSecret?: string; error?: string; alreadyUnlocked?: boolean };
       if (data.alreadyUnlocked) { await loadStatus(); return; }
-      if (!res.ok || !data.url) throw new Error(data.error ?? "Could not start checkout.");
-      window.location.href = data.url;
+      if (!res.ok || !data.clientSecret) throw new Error(data.error ?? "Could not start checkout.");
+      // Keep the buyer on the page — the embedded Stripe form handles card,
+      // Apple Pay, and Google Pay without a redirect.
+      setPaymentSecret(data.clientSecret);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not start checkout.";
       toast({ title: "Checkout failed", description: msg, variant: "destructive" });
+    } finally {
       setBusy(false);
     }
+  };
+
+  // Payment confirmed in-app; the webhook grants the unlock server-side, so
+  // poll the status briefly until it flips to unlocked.
+  const onPaid = async () => {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await loadStatus();
+      const res = await fetch(`/api/court-cert/${encodeURIComponent(certId)}/status`, { credentials: "include" });
+      const fresh = res.ok ? await res.json() as CertStatus : null;
+      if (fresh?.unlocked) {
+        setPaymentSecret(null);
+        toast({ title: "Certificate unlocked", description: "Your court document is ready to download." });
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+    setPaymentSecret(null);
+    toast({ title: "Payment received — still syncing", description: "Your certificate unlock is being finalized. It will appear here shortly." });
   };
 
   if (error) return <p className="text-xs text-amber-400">{error}</p>;
@@ -145,6 +168,15 @@ function CertUnlockCard({ certId }: { certId: string }) {
         Your track is stamped and the server record is sealed. Unlock the court-ready certificate
         document (JSON + PDF) whenever you need it — the unlock is permanent for this certificate.
       </p>
+      {paymentSecret ? (
+        <StripePaymentForm
+          clientSecret={paymentSecret}
+          intentType="payment"
+          submitLabel={`Pay ${(status.priceCents / 100).toFixed(2)} USD`}
+          onSuccess={onPaid}
+          onCancel={() => setPaymentSecret(null)}
+        />
+      ) : (
       <div className="flex gap-2">
         {inc && (
           <Button size="sm" disabled={busy || !inc.available} onClick={useIncluded}
@@ -162,6 +194,7 @@ function CertUnlockCard({ certId }: { certId: string }) {
           Unlock for ${(status.priceCents / 100).toFixed(2)}
         </Button>
       </div>
+      )}
     </div>
   );
 }

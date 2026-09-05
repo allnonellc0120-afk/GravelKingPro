@@ -76,6 +76,33 @@ function makeCertUnlockEvent(opts: {
   });
 }
 
+/** Embedded-checkout variant: payment_intent.succeeded with the same metadata contract. */
+function makeCertUnlockPaymentIntentEvent(opts: {
+  intentId: string;
+  userId: string;
+  certId: string;
+}): string {
+  return JSON.stringify({
+    id: `evt_test_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
+    object: "event",
+    type: "payment_intent.succeeded",
+    livemode: false,
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object: {
+        id: opts.intentId,
+        object: "payment_intent",
+        status: "succeeded",
+        metadata: {
+          kind: "cert_unlock",
+          cert_id: opts.certId,
+          user_id: opts.userId,
+        },
+      },
+    },
+  });
+}
+
 // ── Test constants ────────────────────────────────────────────────────────────
 
 const TEST_USER_ID   = `cu_test_owner_${randomUUID()}`;
@@ -281,12 +308,51 @@ async function testWrongOwnerNoUnlock(): Promise<void> {
   }
 }
 
+// ── Scenario F: embedded PaymentIntent unlock ─────────────────────────────────
+
+async function testCertUnlockViaPaymentIntent(): Promise<void> {
+  console.log("\nCert-unlock F: payment_intent.succeeded (embedded checkout) unlocks the certificate");
+
+  const certId = `cert-pi-${randomUUID()}`;
+  await insertTestUser(TEST_USER_ID);
+  await insertLockedCert(certId, TEST_USER_ID);
+  try {
+    const piId = `pi_test_cert_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+    const payload = makeCertUnlockPaymentIntentEvent({ intentId: piId, userId: TEST_USER_ID, certId });
+    const payloadBuf = Buffer.from(payload, "utf8");
+    const signature = makeStripeSignature(payload, TEST_SECRET);
+
+    let threw = false;
+    try {
+      await WebhookHandlers.processWebhook(payloadBuf, signature, undefined, testSecretsLoader);
+    } catch {
+      threw = true;
+    }
+    check("F1. processWebhook resolves without error", !threw);
+
+    const row = await getCertRow(certId);
+    check("F2. cert is unlocked by the payment_intent.succeeded event",
+      row?.unlockedAt !== null && row?.unlockedAt !== undefined,
+      `got unlockedAt=${String(row?.unlockedAt)}`);
+    check("F3. unlockSource is 'purchase'", row?.unlockSource === "purchase", `got: ${row?.unlockSource}`);
+
+    // Replay is a no-op (unlockedAt IS NULL guard)
+    await WebhookHandlers.processWebhook(payloadBuf, signature, undefined, testSecretsLoader).catch(() => {});
+    const after = await getCertRow(certId);
+    check("F4. replay keeps a single unlock timestamp", after?.unlockedAt !== null && after?.unlockedAt !== undefined);
+  } finally {
+    await db.execute(sql`DELETE FROM ip_cert_stubs WHERE cert_id = ${certId}`);
+    await db.execute(sql`DELETE FROM users WHERE id = ${TEST_USER_ID}`);
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   await testCertUnlock();        // A + B + E
   await testWrongSecretNoUnlock(); // C
   await testWrongOwnerNoUnlock();  // D
+  await testCertUnlockViaPaymentIntent(); // F
 
   console.log(`\nResults: ${passed} passed, ${failures.length} failed`);
   if (failures.length > 0) {

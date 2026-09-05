@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrackCard, type LabelTrack } from "@/components/track-card";
+import { useTrackPurchase } from "@/hooks/use-track-purchase";
 import { useAppState } from "@/lib/context";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -24,23 +25,6 @@ function useTracks() {
       .finally(() => setLoading(false));
   }, []);
   return { tracks, loading };
-}
-
-function useBuy() {
-  const { toast } = useToast();
-  const [buying, setBuying] = useState<string | null>(null);
-  const buy = async (trackId: string) => {
-    setBuying(trackId);
-    try {
-      const r = await fetch(`/api/tracks/${trackId}/checkout`, { method: "POST", credentials: "include" });
-      const data = await r.json() as { url?: string; error?: string };
-      if (data.url) { window.location.href = data.url; return; }
-      toast({ title: "Purchase failed", description: data.error || "Please try again.", variant: "destructive" });
-    } catch {
-      toast({ title: "Error", description: "Could not start checkout.", variant: "destructive" });
-    } finally { setBuying(null); }
-  };
-  return { buy, buying };
 }
 
 const LABEL_VALUES = [
@@ -68,7 +52,7 @@ const LABEL_VALUES = [
 
 export default function LabelPage() {
   const { tracks, loading } = useTracks();
-  const { buy, buying } = useBuy();
+  const { buy, buying, checkoutElement } = useTrackPurchase();
   const { isPro } = useAppState();
 
   const byArtist = tracks.reduce((acc, t) => {
@@ -79,6 +63,7 @@ export default function LabelPage() {
 
   return (
     <Layout>
+      {checkoutElement}
       <div className="max-w-5xl mx-auto space-y-16">
 
         {/* ── Label Hero ── */}

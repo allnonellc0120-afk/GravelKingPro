@@ -87,6 +87,33 @@ function makeCheckoutSessionEvent(opts: {
   });
 }
 
+/** Build a minimal payment_intent.succeeded event JSON string (embedded checkout flow). */
+function makePaymentIntentEvent(opts: {
+  intentId: string;
+  userId: string;
+  trackId: string;
+}): string {
+  return JSON.stringify({
+    id: `evt_test_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
+    object: "event",
+    type: "payment_intent.succeeded",
+    livemode: false,
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object: {
+        id: opts.intentId,
+        object: "payment_intent",
+        status: "succeeded",
+        metadata: {
+          type: "track",
+          user_id: opts.userId,
+          track_id: opts.trackId,
+        },
+      },
+    },
+  });
+}
+
 // ── Test IDs (isolated to this run) ──────────────────────────────────────────
 const TEST_USER_ID = `wh_test_user_${randomUUID()}`;
 const TEST_TRACK_ID = randomUUID();
@@ -294,10 +321,59 @@ async function testStripeSyncOmitsWebhookSecret(): Promise<void> {
   );
 }
 
+// ── Scenario E: embedded PaymentIntent purchase is recorded ──────────────────
+
+async function testPaymentIntentPurchase(): Promise<void> {
+  console.log("\nWebhook E: payment_intent.succeeded (embedded checkout) records the purchase");
+
+  await setup();
+  try {
+    const piId = `pi_test_wh_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+    const payload = makePaymentIntentEvent({
+      intentId: piId,
+      userId: TEST_USER_ID,
+      trackId: TEST_TRACK_ID,
+    });
+    const payloadBuf = Buffer.from(payload, "utf8");
+    const signature = makeStripeSignature(payload, TEST_SECRET);
+
+    let threw = false;
+    try {
+      await WebhookHandlers.processWebhook(payloadBuf, signature, undefined, testSecretsLoader);
+    } catch {
+      threw = true;
+    }
+    check("E1. processWebhook resolves without error", !threw);
+
+    const rows = await db.execute(sql`
+      SELECT stripe_checkout_session_id FROM purchased_tracks
+      WHERE user_id = ${TEST_USER_ID} AND track_id = ${TEST_TRACK_ID}::uuid
+    `);
+    const inserted = rows.rows as Array<Record<string, unknown>>;
+    check("E2. purchased_tracks row inserted for the payment intent", inserted.length === 1, `found ${inserted.length}`);
+    check(
+      "E3. stored reference is the payment intent id",
+      inserted[0]?.stripe_checkout_session_id === piId,
+      `got: ${inserted[0]?.stripe_checkout_session_id}`,
+    );
+
+    // Idempotent replay
+    await WebhookHandlers.processWebhook(payloadBuf, signature, undefined, testSecretsLoader).catch(() => {});
+    const afterReplay = await db.execute(sql`
+      SELECT id FROM purchased_tracks
+      WHERE user_id = ${TEST_USER_ID} AND track_id = ${TEST_TRACK_ID}::uuid
+    `);
+    check("E4. replay does not create a duplicate row", (afterReplay.rows as unknown[]).length === 1);
+  } finally {
+    await teardown();
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   await testTrackPurchase();
+  await testPaymentIntentPurchase();
   await testWrongSecret();
   await testStripeSyncOmitsWebhookSecret();
 

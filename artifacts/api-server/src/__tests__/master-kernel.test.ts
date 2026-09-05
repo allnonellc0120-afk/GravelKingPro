@@ -221,7 +221,7 @@ async function main(): Promise<void> {
       check("no audio file: HTTP 400", res.status === 400, `got ${res.status}`);
     }
 
-    // ── 3. ACRCloud outage falls back to the local signature stamp ───────────
+    // ── 3. ACRCloud outage: seal locally, never block mastering ────────────
     console.log("\n[5] certify=true with fingerprint service unavailable");
     {
       delete process.env.FINGERPRINT_SERVICE_URL;
@@ -239,11 +239,14 @@ async function main(): Promise<void> {
       });
       check("ACR unavailable: mastering still HTTP 200", res.status === 200, `got ${res.status}`);
       check(
-        "ACR unavailable: response explicitly identifies local fallback",
+        "ACR unavailable: cert sealed with local signature (fail-open)",
         res.headers.get("x-gk-certification") === "sealed-local",
         String(res.headers.get("x-gk-certification")),
       );
-      check("ACR unavailable: local cert hash emitted", Boolean(res.headers.get("x-gk-cert-hash")));
+      check(
+        "ACR unavailable: local-signature cert hash is emitted",
+        typeof res.headers.get("x-gk-cert-hash") === "string" && (res.headers.get("x-gk-cert-hash") ?? "").length > 0,
+      );
       const buf = Buffer.from(await res.arrayBuffer());
       await assertDecodableWav("ACR unavailable fallback", buf);
     }

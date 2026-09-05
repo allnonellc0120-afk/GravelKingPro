@@ -9,9 +9,11 @@ type Props = {
   intentType: "payment" | "setup";
   onSuccess: () => Promise<void> | void;
   onCancel: () => void;
+  /** Optional override for the submit button (e.g. "Pay $1.99"). */
+  submitLabel?: string;
 };
 
-function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSecret">) {
+function PaymentForm({ intentType, onSuccess, onCancel, submitLabel }: Omit<Props, "clientSecret">) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -83,7 +85,7 @@ function PaymentForm({ intentType, onSuccess, onCancel }: Omit<Props, "clientSec
        <PaymentElement options={{ layout: "tabs" }} />
       {error && <p className="mt-3 text-sm text-red-400" role="alert">{error}</p>}
       <Button onClick={submit} disabled={!stripe || !elements || submitting} className="w-full mt-5 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold">
-        {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirming securely…</> : intentType === "setup" ? "Save payment method securely" : "Confirm subscription"}
+        {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirming securely…</> : submitLabel ?? (intentType === "setup" ? "Save payment method securely" : "Confirm subscription")}
       </Button>
       <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Payment details are handled by Stripe
@@ -115,7 +117,7 @@ export function StripePaymentForm(props: Props) {
 
   return (
     <Elements stripe={stripePromise} options={{ clientSecret: props.clientSecret, appearance: { theme: "night", variables: { colorPrimary: "#10b981", borderRadius: "8px" } } }}>
-      <PaymentForm intentType={props.intentType} onSuccess={props.onSuccess} onCancel={props.onCancel} />
+      <PaymentForm intentType={props.intentType} onSuccess={props.onSuccess} onCancel={props.onCancel} submitLabel={props.submitLabel} />
     </Elements>
   );
 }
