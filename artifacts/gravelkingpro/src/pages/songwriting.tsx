@@ -5,6 +5,7 @@ import { jsPDF } from "jspdf";
 import { useAppState } from "@/lib/context";
 import { Layout } from "@/components/layout";
 import { downloadBlob } from "@/lib/download";
+import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -327,6 +328,7 @@ export default function SongwritingStudio() {
         y += 5;
       }
       doc.save(`${(draft.title || "song").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-provenance-certificate.pdf`);
+      trackEvent("certificate_downloaded", { location: "songwriting" });
     } finally {
       setCertificateBusy(false);
     }
@@ -562,7 +564,8 @@ export default function SongwritingStudio() {
     setGeneratorMessage("");
     try {
       const { lyrics, style, filled } = await smartFill();
-      setGeneratorMessage("ElevenLabs is producing your take… this can take a minute or two.");
+      trackEvent("song_generate_clicked", { engine: "jax" });
+      setGeneratorMessage("JAX is producing your take… this can take a minute or two.");
       const result = await fetch("/api/jax/generate-music", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -571,17 +574,20 @@ export default function SongwritingStudio() {
       });
       if (!result.ok) {
         const data = await result.json().catch(() => ({})) as { error?: string; code?: string };
-        if (result.status === 403) throw new Error(data.error || "ElevenLabs generation is a Pro/King feature.");
-        throw new Error(data.error || "ElevenLabs could not complete this take.");
+        if (result.status === 403) throw new Error(data.error || "JAX generation is a Pro/King feature.");
+        throw new Error(data.error || "JAX could not complete this take.");
       }
-      const blob = await result.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      await audio.play().catch(() => undefined);
-      downloadBlob(blob, `${(draft.title || "jax-elevenlabs-take").replace(/[^a-z0-9-_]+/gi, "-")}.mp3`);
-      setGeneratorMessage(`ElevenLabs take ready${filled.length ? ` — JAX supplied the ${filled.join(" and ")}` : ""} — playing now and saved as an MP3 download.`);
+      const data = await result.json() as { trackId?: string; title?: string };
+      // Take is saved to the vault server-side — play it in-app from the
+      // library stream (no forced download, no bouncing to an external app).
+      if (data.trackId) {
+        const audio = new Audio(`/api/tracks/${encodeURIComponent(data.trackId)}/stream`);
+        await audio.play().catch(() => undefined);
+      }
+      setGeneratorMessage(`JAX take ready${filled.length ? ` — JAX supplied the ${filled.join(" and ")}` : ""} — playing now and saved to your library. Open it in the Mastering Tool to polish it.`);
+      trackEvent("song_generated", { engine: "jax", auto_filled: filled.join("+") || "none" });
     } catch (error) {
-      setGeneratorMessage(error instanceof Error ? error.message : "ElevenLabs could not complete this take.");
+      setGeneratorMessage(error instanceof Error ? error.message : "JAX could not complete this take.");
     } finally {
       setGeneratorBusy(false);
     }
@@ -593,6 +599,7 @@ export default function SongwritingStudio() {
     setGeneratorMessage("");
     try {
       const { lyrics, style, filled } = await smartFill();
+      trackEvent("song_generate_clicked", { engine: "mlk" });
       setGeneratorMessage("Rendering your take… this can take a couple of minutes.");
       const result = await fetch("/api/mlk/v35/generate-master", {
         method: "POST",
@@ -605,6 +612,7 @@ export default function SongwritingStudio() {
       const binding = JSON.stringify({ trackId: data.trackId, audioFullKey: data.audioFullKey, previewUrl: data.previewUrl, lyricsHash: activeHash, styleHash: stage2Hash });
       setStage3Hash(bytesToHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(binding))));
       setGeneratorMessage(`Render complete${filled.length ? ` — JAX supplied the ${filled.join(" and ")}` : ""}. The take is in your library, ready to certify when you are.`);
+      trackEvent("song_generated", { engine: "mlk", auto_filled: filled.join("+") || "none" });
     } catch (error) {
       setGeneratorMessage(error instanceof Error ? error.message : "Generator could not complete this take.");
     } finally {
@@ -645,8 +653,8 @@ export default function SongwritingStudio() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">The take lands in your library when it finishes rendering.</span>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song"}</Button>
-              <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (Pro)"}</Button>
+              <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate with MLK"}</Button>
+              <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with JAX (Pro)"}</Button>
             </div>
           </div>
           {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}

@@ -13,6 +13,7 @@ import { RemixModal } from "@/components/remix-modal";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
+import { trackEvent } from "@/lib/analytics";
 import { downloadUrl } from "@/lib/download";
 import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
 import { EmailGate, useEmailGate } from "@/components/email-gate";
@@ -430,6 +431,7 @@ export default function Mastering() {
   };
 
   const startMastering = () => {
+    trackEvent("mastering_started", { preset, certified: certifyOn, source: fileName ? "upload" : "library" });
     if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn, intensity, sidechainFilter, sidechainFreq, stereoLink, adaptiveMode, autoThreshold, autoThresholdOffset, { ipi: ipiNumber, iswc, isrc });
   };
 

@@ -12,7 +12,7 @@ import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAuthenticated } from "../lib/adminAuth";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
-import { hasUnlimitedMasters } from "../lib/entitlement";
+import { hasStudio } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
 import { checkExportQuota, consumeExport, exportLimitPayload } from "../lib/exportQuota";
 import type { User } from "@workspace/db";
@@ -390,7 +390,9 @@ masterRouter.post(
     const partnerReq = isPartnerRequest(req);
     const adminReq = isAdminAuthenticated(req);
     const mp3Requested = req.path === "/export-mp3";
-    const paidTier = !partnerReq && !adminReq && await hasUnlimitedMasters(req);
+    // Mastering is a monthly-subscription feature (owner directive): weekly
+    // no longer counts — only Studio(monthly)/King and above master.
+    const paidTier = !partnerReq && !adminReq && await hasStudio(req);
 
     // The master admin key is an explicit operational override: it bypasses
     // tier, free allowance, and rolling export quota checks for this route.
