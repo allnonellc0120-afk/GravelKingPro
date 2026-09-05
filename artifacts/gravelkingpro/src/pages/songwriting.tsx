@@ -177,6 +177,7 @@ export default function SongwritingStudio() {
   const [speaking, setSpeaking] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem(JAX_VOICE_STORAGE_KEY) || "pNInz6obpgDQGcFmaJgB");
   const [voiceError, setVoiceError] = useState("");
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
     try {
       const saved = localStorage.getItem(ARTIST_PROFILE_KEY);
@@ -392,18 +393,33 @@ export default function SongwritingStudio() {
       return;
     }
     if (listening) {
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
       setListening(false);
       return;
     }
     const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
     recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.continuous = true;
     recognition.onresult = (event) => {
-      const transcript = Array.from(event.results).map((result) => result[0].transcript).join(" ");
-      setPrompt((current) => `${current}${current ? " " : ""}${transcript}`);
+      let currentTranscript = "";
+      const resultIndex = "resultIndex" in event ? Number(event.resultIndex) : 0;
+      for (let index = resultIndex; index < event.results.length; index += 1) {
+        currentTranscript += event.results[index][0].transcript;
+      }
+      const inputField = document.getElementById("chat-input-field") as HTMLTextAreaElement | null;
+      if (inputField) {
+        inputField.value = currentTranscript;
+        inputField.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      setPrompt(currentTranscript);
     };
-    recognition.onend = () => setListening(false);
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setListening(false);
+    };
     recognition.start();
     setListening(true);
   };
@@ -501,7 +517,7 @@ export default function SongwritingStudio() {
                   {remaining !== null && <span className="text-xs text-muted-foreground">{remaining} free prompts left today</span>}
                 </div>
                 <div className="flex items-end gap-2">
-                  <Textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void generate(); }} placeholder="Try: Write a vulnerable pre-chorus about leaving the porch light on…" className="min-h-20 resize-none border-white/10 bg-black/20 focus-visible:ring-violet-400" />
+                  <Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void generate(); }} placeholder="Try: Write a vulnerable pre-chorus about leaving the porch light on…" className="min-h-20 resize-none border-white/10 bg-black/20 focus-visible:ring-violet-400" />
                   <Button type="button" variant="outline" onClick={toggleListening} className={listening ? "border-rose-400 text-rose-300" : "border-white/10"} aria-label={listening ? "Stop voice drafting" : "Start voice drafting"}>{listening ? "●" : "Mic"}</Button>
                   <Button type="button" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white hover:bg-violet-400">{generating ? "Writing…" : "Write"}</Button>
                 </div>
