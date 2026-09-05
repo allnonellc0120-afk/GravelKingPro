@@ -131,10 +131,12 @@ stripeRouter.get('/stripe/config', async (_req: Request, res: Response) => {
 /** Public catalog for one-time wallet purchases. Prices are server-owned. */
 stripeRouter.get('/stripe/credit-packs', (_req: Request, res: Response) => {
   res.json({
-    data: CREDIT_PACKS.map(({ id, name, credits, amountCents, description }) => ({
+    data: CREDIT_PACKS.map(({ id, name, credits, bonusCredits, amountCents, description }) => ({
       id,
       name,
       credits,
+      bonusCredits,
+      totalCredits: credits + bonusCredits,
       amountCents,
       description,
     })),
@@ -199,7 +201,9 @@ stripeRouter.post('/stripe/create-credit-purchase-intent', async (req: Request, 
         kind: 'credits_purchase',
         user_id: user.id,
         pack_id: pack.id,
-        credits: String(pack.credits),
+        credits: String(pack.credits + pack.bonusCredits),
+        base_credits: String(pack.credits),
+        bonus_credits: String(pack.bonusCredits),
       },
     });
     if (!intent.client_secret) {
@@ -209,7 +213,9 @@ stripeRouter.post('/stripe/create-credit-purchase-intent', async (req: Request, 
     res.json({
       clientSecret: intent.client_secret,
       intentType: 'payment',
-      credits: pack.credits,
+      credits: pack.credits + pack.bonusCredits,
+      baseCredits: pack.credits,
+      bonusCredits: pack.bonusCredits,
       amountCents: pack.amountCents,
     });
   } catch (err: unknown) {
