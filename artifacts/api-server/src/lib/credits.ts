@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { Request } from "express";
 import { randomUUID } from "node:crypto";
 import { db, creditTransactionsTable, type User, usersTable } from "@workspace/db";
@@ -37,6 +37,31 @@ export async function getCreditsBalance(userId: string): Promise<number> {
     .from(usersTable)
     .where(eq(usersTable.id, userId));
   return row?.creditsBalance ?? 0;
+}
+
+export async function getCreditTransactionHistory(userId: string, page: number, pageSize: number) {
+  const safePage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.min(50, Math.max(1, Math.floor(pageSize)));
+  const rows = await db
+    .select({
+      id: creditTransactionsTable.id,
+      delta: creditTransactionsTable.delta,
+      kind: creditTransactionsTable.kind,
+      reference: creditTransactionsTable.reference,
+      createdAt: creditTransactionsTable.createdAt,
+    })
+    .from(creditTransactionsTable)
+    .where(eq(creditTransactionsTable.userId, userId))
+    .orderBy(desc(creditTransactionsTable.createdAt), desc(creditTransactionsTable.id))
+    .limit(safePageSize + 1)
+    .offset((safePage - 1) * safePageSize);
+  const hasMore = rows.length > safePageSize;
+  return {
+    data: rows.slice(0, safePageSize),
+    page: safePage,
+    pageSize: safePageSize,
+    hasMore,
+  };
 }
 
 /**

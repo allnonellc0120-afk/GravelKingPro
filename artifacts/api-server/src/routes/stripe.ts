@@ -9,6 +9,7 @@ import { recordAnalyticsEvent } from '../analytics';
 import {
   CREDIT_PACKS,
   getCreditsBalance,
+  getCreditTransactionHistory,
   resolveCreditUser,
 } from '../lib/credits';
 import type Stripe from 'stripe';
@@ -150,6 +151,25 @@ stripeRouter.get('/credits/balance', async (req: Request, res: Response) => {
     res.json({ creditsBalance: await getCreditsBalance(user.id) });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load credits.' });
+  }
+});
+
+stripeRouter.get('/credits/history', async (req: Request, res: Response) => {
+  try {
+    const user = await resolveCreditUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Sign in required', authRequired: true });
+      return;
+    }
+    const page = Number.parseInt(String(req.query.page ?? '1'), 10);
+    const pageSize = Number.parseInt(String(req.query.pageSize ?? '10'), 10);
+    res.json(await getCreditTransactionHistory(
+      user.id,
+      Number.isFinite(page) ? page : 1,
+      Number.isFinite(pageSize) ? pageSize : 10,
+    ));
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load credit history.' });
   }
 });
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Coins, Loader2, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, Coins, History, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StripePaymentForm } from "@/components/stripe-payment-form";
 
@@ -10,6 +10,8 @@ export type CreditPack = {
   amountCents: number;
   description: string;
 };
+
+type CreditTransaction = { id: string; delta: number; kind: string; createdAt: string };
 
 export function useCredits() {
   const [balance, setBalance] = useState<number | null>(null);
@@ -44,6 +46,25 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
   const [busyPack, setBusyPack] = useState<string | null>(null);
   const [payment, setPayment] = useState<{ secret: string; credits: number; amountCents: number; startingBalance: number | null } | null>(null);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<CreditTransaction[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const loadHistory = useCallback(async (page: number) => {
+    if (!signedIn) return;
+    setHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/credits/history?page=${page}&pageSize=8`, { credentials: "include" });
+      if (!response.ok) return;
+      const data = await response.json() as { data?: CreditTransaction[]; page?: number; hasMore?: boolean };
+      setHistory(Array.isArray(data.data) ? data.data : []);
+      setHistoryPage(data.page ?? page);
+      setHistoryHasMore(data.hasMore === true);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [signedIn]);
 
   useEffect(() => {
     fetch("/api/stripe/credit-packs", { credentials: "include" })
@@ -51,6 +72,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
       .then((data) => setPacks(Array.isArray(data.data) ? data.data : []))
       .catch(() => setPacks([]));
   }, []);
+  useEffect(() => { void loadHistory(1); }, [loadHistory]);
 
   const buy = async (pack: CreditPack) => {
     if (!signedIn) {
@@ -80,6 +102,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const next = await refresh();
       if (next !== null && (payment?.startingBalance === null || next > payment!.startingBalance)) {
+        void loadHistory(1);
         setPayment(null);
         return;
       }
@@ -87,6 +110,9 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
     }
     setPayment(null);
   };
+
+  const formatKind = (kind: string) => kind.replace(/^spend_/, "").replace(/^credits_/, "")
+    .replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
   return (
     <section id="credits" className="mt-10 rounded-xl border border-sky-500/30 bg-sky-500/[0.04] p-5 sm:p-6">
@@ -141,6 +167,29 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
           onCancel={() => setPayment(null)}
           onSuccess={confirmPurchase}
         />
+      )}
+      {signedIn && (
+        <div className="mt-6 border-t border-border/40 pt-5" id="credit-history">
+          <h3 className="flex items-center gap-2 text-sm font-semibold"><History className="h-4 w-4 text-sky-300" /> Credit history</h3>
+          {historyLoading ? <p className="mt-3 text-xs text-muted-foreground">Loading history…</p> : history.length === 0 ? (
+            <p className="mt-3 text-xs text-muted-foreground">No credit purchases or spending yet.</p>
+          ) : (
+            <>
+              <div className="mt-3 divide-y divide-border/30 rounded-lg border border-border/30">
+                {history.map((entry) => (
+                  <div key={entry.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-xs">
+                    <div className="min-w-0"><p className="truncate font-medium">{formatKind(entry.kind)}</p><p className="text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</p></div>
+                    <span className={entry.delta > 0 ? "shrink-0 font-semibold text-emerald-400" : "shrink-0 font-semibold text-amber-300"}>{entry.delta > 0 ? "+" : ""}{entry.delta} credits</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => void loadHistory(historyPage - 1)} disabled={historyPage <= 1 || historyLoading}><ChevronLeft /> Previous</Button>
+                <Button variant="outline" size="sm" onClick={() => void loadHistory(historyPage + 1)} disabled={!historyHasMore || historyLoading}>Next <ChevronRight /></Button>
+              </div>
+            </>
+          )}
+        </div>
       )}
       {error && <p className="mt-3 text-sm text-red-400" role="alert">{error}</p>}
       <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
