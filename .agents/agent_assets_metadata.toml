@@ -1305,3 +1305,31 @@ mtime_ms = 1788641517202
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/433d384b-f234-4be1-bcaa-3fe378abe37b/d32a5804-7859-47f8-95b3-4ffb0166ce24"
 storage_version_token = "1788641536504064"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "mQzJpmHvPFToFZXnQM_Ex"
+uri = "file://GravelKingPro_Simple_PitchDeck.md"
+type = "text"
+title = "GravelKing Pro — Simple Pitch Deck"
+description = "Plain-English creator and investor walkthrough covering the four tools, end-to-end workflow, current pricing, credits, and certificate meaning."
+logical_id = "33f6f6f0-728d-4d07-a731-d774bad2b684"
+content_hash = "sha256:bd20029bc247800099c84037b00f52a97e420adcf636be08024fbc735c10db2a"
+size = 10953
+mtime_ms = 1788643727478
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/33f6f6f0-728d-4d07-a731-d774bad2b684/349e2837-c828-465c-beff-f81b0e3a1595"
+storage_version_token = "1788643802265453"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "85zBYkLSR6mhDHzP22fvD"
+uri = "file://GravelKingPro_Technical_WhitePaper.md"
+type = "text"
+title = "GravelKing Pro — Technical White Paper"
+description = "Code-derived architecture, MLK mastering targets, JAX providers, credits, cryptographic chain of custody, verification, security controls, and legal limitations."
+logical_id = "b9f76ff7-c71e-4e07-bda9-8600b043b198"
+content_hash = "sha256:c7ee6e7b9291c1577a55d0ac36f6cb334e63c7513a7a768361ae7cd4a5dda6ba"
+size = 21356
+mtime_ms = 1788643793038
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b9f76ff7-c71e-4e07-bda9-8600b043b198/89987e90-3ba8-4f40-8436-cefb0c44048b"
+storage_version_token = "1788643802968751"
+content_type = "text/markdown"
