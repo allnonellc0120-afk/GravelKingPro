@@ -99,6 +99,7 @@ export default function Studio() {
   const [remaining, setRemaining] = useState<UsageRemaining | null>(null);
   const [paywall, setPaywall] = useState<PaywallInfo | null>(null);
   const { quota: exportQuota, refresh: refreshExportQuota } = useExportQuota();
+  const exportLimitReached = Boolean(exportQuota && !exportQuota.unlimited && exportQuota.remaining <= 0);
 
   const refreshUsage = useCallback(async () => {
     try {
@@ -1147,19 +1148,19 @@ export default function Studio() {
                 <div className="flex justify-center">
                   <ExportQuotaBadge quota={exportQuota} />
                 </div>
-                {exportQuota && exportQuota.remaining <= 0 && (
+                {exportQuota && exportLimitReached && (
                   <p className="text-xs text-rose-400 text-center" data-testid="text-export-limit">
                     Export limit reached ({exportQuota.limit} per 30 days) — resets{" "}
                     {formatResetDate(exportQuota.resetsAt)}
                   </p>
                 )}
                 <Button
-                  className={`w-full font-semibold h-11 ${canProcess && !(exportQuota && exportQuota.remaining <= 0) ? "bg-amber-500 hover:bg-amber-600 text-black" : "opacity-60 cursor-not-allowed"}`}
+                  className={`w-full font-semibold h-11 ${canProcess && !exportLimitReached ? "bg-amber-500 hover:bg-amber-600 text-black" : "opacity-60 cursor-not-allowed"}`}
                   onClick={handleProcess}
-                  disabled={state === "processing" || state === "compressing" || state === "loading" || !canProcess || Boolean(exportQuota && exportQuota.remaining <= 0)}
+                  disabled={state === "processing" || state === "compressing" || state === "loading" || !canProcess || exportLimitReached}
                   data-testid="button-process"
                 >
-                  {exportQuota && exportQuota.remaining <= 0
+                  {exportQuota && exportLimitReached
                     ? <>Export limit reached — resets {formatResetDate(exportQuota.resetsAt)}</>
                     : state === "compressing"
                     ? `Compressing... ${progress}%`

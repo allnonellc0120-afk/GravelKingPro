@@ -254,6 +254,7 @@ export default function Mastering() {
 
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
   const { quota, refresh: refreshQuota } = useExportQuota();
+  const exportLimitReached = Boolean(quota && !quota.unlimited && quota.remaining <= 0);
 
   const processFile = useCallback(async (
     file: File, selectedPreset: PresetId, denoise: boolean,
@@ -990,7 +991,7 @@ export default function Mastering() {
 
             {/* At 0 exports left the server would 429 the mastering run itself, so the
                 start action explains the reset date instead of failing on click. */}
-            {quota && quota.remaining <= 0 ? (
+            {quota && exportLimitReached ? (
               <Button disabled variant="outline" className="w-full border-rose-500/30 text-rose-400 font-semibold" data-testid="button-export-limit">
                 Export limit reached — resets {formatResetDate(quota.resetsAt)}
               </Button>

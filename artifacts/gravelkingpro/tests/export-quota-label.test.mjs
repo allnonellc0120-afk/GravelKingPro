@@ -31,6 +31,18 @@ test("exhausted (0) — explains the reset date instead of failing", () => {
   assert.equal(text, `Export limit reached — resets ${formatResetDate(RESET)}`);
 });
 
+test("unlimited owner quota — never appears exhausted", () => {
+  const { text, tone } = exportQuotaLabel({
+    used: 0,
+    limit: 0,
+    remaining: -1,
+    unlimited: true,
+    resetsAt: null,
+  });
+  assert.equal(tone, "normal");
+  assert.equal(text, "Unlimited WAV exports");
+});
+
 test("completing a run with one credit remaining → post-run refresh reads 0", () => {
   // Before the run: 1 left (low emphasis warns the user)
   const before = exportQuotaLabel({ used: 19, limit: 20, remaining: 1, resetsAt: RESET });
