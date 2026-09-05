@@ -182,6 +182,41 @@ export async function getObjectFileWithFallback(
 }
 
 /**
+ * List objects from the Replit-managed bucket under one exact configured
+ * prefix. This is deliberately primary-only: privacy audits must not turn a
+ * managed-bucket permission failure into a fallback result and then report
+ * the managed bucket as empty.
+ */
+export async function listPrimaryObjectsUnderPrefix(
+  bucketName: string,
+  objectPrefix: string,
+  maxResults?: number,
+): Promise<File[]> {
+  const [files] = await objectStorageClient.bucket(bucketName).getFiles({
+    prefix: objectPrefix,
+    autoPaginate: false,
+    ...(maxResults ? { maxResults } : {}),
+  });
+  return files;
+}
+
+/**
+ * Read metadata through the managed bucket identity. Keeping this separate
+ * from getObjectFileWithFallback lets privacy audits verify both the managed
+ * object and its private counterpart without silently switching backends.
+ */
+export async function getPrimaryObjectMetadata(
+  bucketName: string,
+  objectName: string,
+): Promise<Record<string, unknown>> {
+  const [metadata] = await objectStorageClient
+    .bucket(bucketName)
+    .file(objectName)
+    .getMetadata();
+  return metadata as Record<string, unknown>;
+}
+
+/**
  * Signed GET URL that works for BOTH backends: sidecar signing for the
  * primary bucket, service-account V4 signing for the fallback bucket.
  */
@@ -242,6 +277,32 @@ export class ObjectStorageService {
       );
     }
     return dir;
+  }
+
+  /**
+   * Inventory every configured public prefix using the authenticated managed
+   * storage identity. The prefix is parsed from configuration, so callers
+   * cannot accidentally list an unrelated bucket or project-wide namespace.
+   *
+   * Each returned file has had metadata fetched through the same identity.
+   * A 403 therefore remains visible to the caller and must be repaired at the
+   * bucket IAM layer rather than being interpreted as an empty inventory.
+   */
+  async listPrimaryPublicObjects(maxResults?: number): Promise<File[]> {
+    const files: File[] = [];
+    for (const searchPath of this.getPublicObjectSearchPaths()) {
+      const { bucketName, objectName } = parseObjectPath(searchPath);
+      const listed = await listPrimaryObjectsUnderPrefix(
+        bucketName,
+        objectName.replace(/\/+$/, "") + "/",
+        maxResults,
+      );
+      for (const file of listed) {
+        await getPrimaryObjectMetadata(bucketName, file.name);
+        files.push(file);
+      }
+    }
+    return files;
   }
 
   async searchPublicObject(filePath: string): Promise<File | null> {
