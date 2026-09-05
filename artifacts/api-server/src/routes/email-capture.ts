@@ -90,11 +90,37 @@ emailRouter.get("/email-capture/status", async (req: Request, res: Response) => 
 emailRouter.get("/admin/email-list", async (req: Request, res: Response) => {
   if (!await requireAdmin(req, res)) return;
   try {
-    const rows = await db
+    const [capturedRows, registeredUsers] = await Promise.all([
+      db
       .select()
       .from(emailCaptureTable)
       .orderBy(desc(emailCaptureTable.createdAt))
-      .limit(1000);
+      .limit(1000),
+      db
+        .select({
+          email: usersTable.email,
+          createdAt: usersTable.createdAt,
+          source: usersTable.id,
+        })
+        .from(usersTable),
+    ]);
+    const byEmail = new Map<string, typeof capturedRows[number]>();
+    for (const row of capturedRows) byEmail.set(row.email, row);
+    for (const user of registeredUsers) {
+      const email = user.email?.trim().toLowerCase();
+      if (email && !byEmail.has(email)) {
+        byEmail.set(email, {
+          id: 0,
+          email,
+          source: "registered-user",
+          referrer: null,
+          userAgent: null,
+          ipHash: null,
+          createdAt: user.createdAt,
+        });
+      }
+    }
+    const rows = [...byEmail.values()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     res.json({ ok: true, total: rows.length, emails: rows });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
