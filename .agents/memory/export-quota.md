@@ -12,3 +12,9 @@ Owner directive (2026-08-14): WAV/MP3 exports are capped at **20 per rolling 30 
 **How to apply:** check quota before expensive processing (cheap read), consume only after success right before streaming bytes — never on both a POST and its result-fetch GET (double-count). Free-tier FREE_LIMITS counters stay layered on top, untouched.
 
 Bearer-sid test auth requires a row in the `sessions` table (`sess = {"user":{"id":...}}`), not just `users.session_id`. `process-audio` requests also need `author_assertion=true` or ingestion validation 422s.
+
+Unlimited quota responses use `remaining: -1`; every UI gate must check `unlimited` before treating `remaining <= 0` as exhausted.
+
+**Why:** A lifetime/developer account was incorrectly shown a payment-style export wall because the UI interpreted the unlimited sentinel as zero-or-less remaining.
+
+**How to apply:** Use the explicit `unlimited` flag for badges, disabled states, and limit messaging; never infer unlimited status from the numeric remaining value.
