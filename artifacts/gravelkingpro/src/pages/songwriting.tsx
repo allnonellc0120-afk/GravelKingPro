@@ -198,7 +198,8 @@ export default function SongwritingStudio() {
   const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem(JAX_VOICE_STORAGE_KEY) || "pNInz6obpgDQGcFmaJgB");
   const [jaxVoicePresets, setJaxVoicePresets] = useState<JaxVoicePreset[]>(DEFAULT_JAX_VOICE_PRESETS);
   const [voiceError, setVoiceError] = useState("");
-  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const recognitionRef = useRef<{ stop: () => void; sessionId: number } | null>(null);
+  const speechSessionRef = useRef(0);
   const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
     try {
       const saved = localStorage.getItem(ARTIST_PROFILE_KEY);
@@ -378,6 +379,7 @@ export default function SongwritingStudio() {
   const generate = async () => {
     if (!prompt.trim() || generating) return;
     const submittedPrompt = prompt.trim();
+    speechSessionRef.current += 1;
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     setListening(false);
@@ -448,18 +450,22 @@ export default function SongwritingStudio() {
       return;
     }
     if (listening) {
+      speechSessionRef.current += 1;
       recognitionRef.current?.stop();
       recognitionRef.current = null;
       setListening(false);
       return;
     }
     const recognition = new SpeechRecognition();
-    recognitionRef.current = recognition;
+    const sessionId = speechSessionRef.current + 1;
+    speechSessionRef.current = sessionId;
+    recognitionRef.current = { stop: () => recognition.stop(), sessionId };
     const promptPrefix = prompt.trim();
     recognition.lang = "en-US";
     recognition.interimResults = true;
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.onresult = (event) => {
+      if (speechSessionRef.current !== sessionId) return;
       let currentTranscript = "";
       for (let index = 0; index < event.results.length; index += 1) {
         currentTranscript += `${event.results[index][0].transcript} `;
@@ -476,6 +482,7 @@ export default function SongwritingStudio() {
       setPrompt(nextPrompt);
     };
     recognition.onerror = (event) => {
+      if (speechSessionRef.current !== sessionId) return;
       setGenerationError(event.error === "not-allowed"
         ? "Microphone access was blocked. Allow microphone access for this site and try again."
         : `Voice drafting stopped: ${event.error}.`);
@@ -483,6 +490,7 @@ export default function SongwritingStudio() {
       recognitionRef.current = null;
     };
     recognition.onend = () => {
+      if (speechSessionRef.current !== sessionId) return;
       recognitionRef.current = null;
       setListening(false);
     };
