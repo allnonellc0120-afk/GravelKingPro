@@ -43,6 +43,15 @@ const HMAC_KEY_STORAGE = "gk:songwriting:hmac-key:v1";
 const BLOCK_TYPES: BlockType[] = ["Verse", "Chorus", "Bridge", "Hook", "Outro"];
 const ARTIST_PROFILE_KEY = "mlk_artist_profile";
 const DEFAULT_RULES = "Avoid simple AABB nursery rhymes. Use internal and slant rhymes, authentic flow, and natural meter.";
+const JAX_VOICE_STORAGE_KEY = "mlk_jax_selected_voice";
+const JAX_VOICE_PRESETS = [
+  ["admin", "Admin Custom Cloned Voice"],
+  ["pNInz6obpgDQGcFmaJgB", "JAX Baritone (Deep & Resonant)"],
+  ["N2lVS1w4EtoT3dr4eOWO", "JAX Gritty Blues / Rough"],
+  ["ErXwobaYiN019PkySvjV", "JAX Smooth Studio / Conversational"],
+  ["TxGEqnHWrfWFTfGW9XjX", "JAX Heavy Low-End / Narrator"],
+  ["pqHfZKP75CvOlQylNhV4", "JAX Classic Vintage"],
+] as const;
 
 function newBlock(type: BlockType = "Verse"): SongBlock {
   return { id: crypto.randomUUID(), type, content: "" };
@@ -166,6 +175,8 @@ export default function SongwritingStudio() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem(JAX_VOICE_STORAGE_KEY) || "pNInz6obpgDQGcFmaJgB");
+  const [voiceError, setVoiceError] = useState("");
   const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
     try {
       const saved = localStorage.getItem(ARTIST_PROFILE_KEY);
@@ -197,6 +208,10 @@ export default function SongwritingStudio() {
     const timer = window.setTimeout(() => localStorage.setItem(ARTIST_PROFILE_KEY, JSON.stringify(artistProfile)), 500);
     return () => window.clearTimeout(timer);
   }, [artistProfile]);
+
+  useEffect(() => {
+    localStorage.setItem(JAX_VOICE_STORAGE_KEY, selectedVoice);
+  }, [selectedVoice]);
 
   useEffect(() => {
     const payload = JSON.stringify({ styleDescriptor, bpm: draft.bpm, key: draft.key, arrangement: draft.blocks.map((block) => block.type) });
@@ -393,17 +408,32 @@ export default function SongwritingStudio() {
     setListening(true);
   };
 
-  const speakResponse = () => {
-    if (!response || !("speechSynthesis" in window)) return;
+  const speakResponse = async () => {
+    if (!response) return;
     if (speaking) {
-      window.speechSynthesis.cancel();
+      window.speechSynthesis?.cancel();
       setSpeaking(false);
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(response);
-    utterance.onend = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    setVoiceError("");
     setSpeaking(true);
+    try {
+      const result = await fetch("/api/jax/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: response, voiceId: selectedVoice === "admin" ? "" : selectedVoice }),
+      });
+      if (!result.ok) throw new Error((await result.json() as { error?: string }).error || "Voice playback unavailable.");
+      const objectUrl = URL.createObjectURL(await result.blob());
+      const audio = new Audio(objectUrl);
+      audio.onended = () => { URL.revokeObjectURL(objectUrl); setSpeaking(false); };
+      audio.onerror = () => { setVoiceError("The selected voice could not be played."); setSpeaking(false); };
+      await audio.play();
+    } catch (error) {
+      setVoiceError(error instanceof Error ? error.message : "Voice playback unavailable.");
+      setSpeaking(false);
+    }
   };
 
   const pushToCanvas = () => {
@@ -481,11 +511,18 @@ export default function SongwritingStudio() {
                     <div className="mb-3 flex items-center justify-between">
                       <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300">JAX response</span>
                       <div className="flex gap-2">
-                        <Button type="button" size="sm" variant="outline" onClick={speakResponse} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <label htmlFor="jax-voice-model" className="sr-only">JAX Voice Model</label>
+                          <select id="jax-voice-model" value={selectedVoice} onChange={(event) => setSelectedVoice(event.target.value)} className="h-9 max-w-[220px] rounded-md border border-white/10 bg-black/30 px-2 text-xs text-foreground outline-none focus:border-violet-400">
+                            {JAX_VOICE_PRESETS.map(([voiceId, label]) => <option key={voiceId} value={voiceId}>{label}</option>)}
+                          </select>
+                          <Button type="button" size="sm" variant="outline" onClick={() => void speakResponse()} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button>
+                        </div>
                         <Button type="button" size="sm" onClick={pushToCanvas} className="bg-emerald-500 text-black hover:bg-emerald-400">Push to Canvas</Button>
                       </div>
                     </div>
                     <p className="whitespace-pre-wrap text-sm leading-7 text-foreground/90">{response}</p>
+                    {voiceError && <p className="mt-3 text-xs text-rose-300">{voiceError}</p>}
                   </div>
                 )}
               </section>
