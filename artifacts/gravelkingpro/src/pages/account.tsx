@@ -63,6 +63,35 @@ export default function Account() {
   const { signOut } = useClerk();
   const { tier, isDeveloper, activePromo } = useAppState();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileBio, setProfileBio] = useState("");
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) setProfileName([user.firstName, user.lastName].filter(Boolean).join(" "));
+  }, [user]);
+
+  const saveProfile = async () => {
+    if (!user) return;
+    setProfileSaving(true);
+    try {
+      const [firstName, ...rest] = profileName.trim().split(/\s+/);
+      await user.update({ firstName: firstName || "", lastName: rest.join(" ") || "" });
+      setProfileEditing(false);
+    } finally { setProfileSaving(false); }
+  };
+
+  const changeAvatar = async (file: File) => {
+    if (!user) return;
+    setAvatarSaving(true);
+    try {
+      await user.setProfileImage({ file });
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
 
   const tierKey = (isDeveloper ? "developer" : tier) ?? "null";
   const meta = TIER_META[tierKey as keyof typeof TIER_META] ?? TIER_META["null"];
@@ -134,19 +163,35 @@ export default function Account() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex items-center gap-4">
-              {user.imageUrl ? (
-                <img src={user.imageUrl} alt={displayName} className="w-14 h-14 rounded-full object-cover border border-border/40" />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-lg">
-                  {initials}
-                </div>
-              )}
-              <div>
+              <label className="relative group shrink-0 cursor-pointer" title="Change profile picture">
+                {user.imageUrl ? (
+                  <img src={user.imageUrl} alt={displayName} className="w-14 h-14 rounded-full object-cover border border-border/40" />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-lg">
+                    {initials}
+                  </div>
+                )}
+                <span className="absolute inset-0 rounded-full bg-black/60 text-[9px] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  {avatarSaving ? "Saving…" : "Change"}
+                </span>
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={avatarSaving} onChange={(e) => { const file = e.target.files?.[0]; if (file) void changeAvatar(file); e.currentTarget.value = ""; }} />
+              </label>
+              <div className="flex-1">
                 <p className="font-semibold text-base">{displayName}</p>
                 {email && <p className="text-sm text-muted-foreground mt-0.5">{email}</p>}
                 <p className="text-xs text-muted-foreground mt-1 font-mono opacity-60">{user.externalId ?? user.id}</p>
+                {profileEditing && (
+                  <div className="mt-3 space-y-2">
+                    <input value={profileName} onChange={(e) => setProfileName(e.target.value)} placeholder="Display name" className="w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm" />
+                    <textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} placeholder="Short artist bio (optional)" className="w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm min-h-20" />
+                    <div className="flex gap-2"><Button size="sm" onClick={() => void saveProfile()} disabled={profileSaving}>{profileSaving ? "Saving…" : "Save profile"}</Button><Button size="sm" variant="ghost" onClick={() => setProfileEditing(false)}>Cancel</Button></div>
+                  </div>
+                )}
               </div>
               <div className="ml-auto">
+                <Button variant="outline" size="sm" className="text-xs mr-2" onClick={() => setProfileEditing((v) => !v)}>
+                  Edit profile
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

@@ -165,6 +165,16 @@ async function migrateAppSchema() {
     `);
 
     await db.execute(sql`
+      ALTER TABLE purchased_tracks
+        ADD COLUMN IF NOT EXISTS is_pinned boolean NOT NULL DEFAULT false
+    `);
+
+    await db.execute(sql`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS profile_bio text
+    `);
+
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS lyric_timeline_blocks (
         id             text        PRIMARY KEY,
         project_id     text        NOT NULL REFERENCES lyric_projects(id) ON DELETE CASCADE,

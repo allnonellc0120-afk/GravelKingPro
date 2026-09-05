@@ -41,6 +41,7 @@ export const purchasedTracksTable = pgTable(
       .notNull()
       .references(() => tracksTable.id, { onDelete: "cascade" }),
     stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+    isPinned: boolean("is_pinned").notNull().default(false),
     purchasedAt: timestamp("purchased_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
