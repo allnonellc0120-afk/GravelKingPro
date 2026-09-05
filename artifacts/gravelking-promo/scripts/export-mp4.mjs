@@ -14,21 +14,42 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const dist = path.resolve(root, 'dist/public');
 const isVertical = process.argv[3] === 'vertical';
-const output = path.resolve(root, process.argv[2] || (isVertical
-  ? 'public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4'
-  : 'public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4'));
+const isWorkflow = process.argv[3] === 'workflow';
+
+let output = process.argv[2];
+if (!output) {
+  if (isWorkflow) {
+    output = 'public/videos/gravelkingpro_workflow_45s_4x5.mp4';
+  } else if (isVertical) {
+    output = 'public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4';
+  } else {
+    output = 'public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4';
+  }
+}
+output = path.resolve(root, output);
+
 const tmpDir = path.resolve(root, '.tmp-export');
 fs.mkdirSync(tmpDir, { recursive: true });
 for (const entry of fs.readdirSync(tmpDir)) {
   fs.rmSync(path.join(tmpDir, entry), { recursive: true, force: true });
 }
 
-const WIDTH = isVertical ? 1080 : 1920;
-const HEIGHT = isVertical ? 1920 : 1080;
+let WIDTH = 1920;
+let HEIGHT = 1080;
+let DURATION_MS = 59000;
+
+if (isWorkflow) {
+  WIDTH = 1080;
+  HEIGHT = 1350;
+  DURATION_MS = 45000;
+} else if (isVertical) {
+  WIDTH = 1080;
+  HEIGHT = 1920;
+}
+
 const SCALED_WIDTH = WIDTH;
 const SCALED_HEIGHT = HEIGHT;
 const FPS = 30;
-const DURATION_MS = 59000; // matches SCENE_DURATIONS total
 const SLOWDOWN_FACTOR = 1.05;
 const RECORD_DURATION_MS = DURATION_MS * SLOWDOWN_FACTOR;
 const EXPORT_PORT = Number(process.env.EXPORT_PORT || 5001);
@@ -97,29 +118,43 @@ async function startStaticServer() {
 async function mixAudio() {
   const audioPath = path.join(tmpDir, 'audio.m4a');
   const soundtrack = path.join(root, 'public/audio/gravelking_pro_soundtrack_warm.mp3');
-  execFileSync('ffmpeg', [
-    '-y', '-stream_loop', '-1', '-i', soundtrack, 
-    '-i', path.join(root, 'public/audio/jax_vo1.mp3'),
-    '-i', path.join(root, 'public/audio/jax_vo2.mp3'),
-    '-i', path.join(root, 'public/audio/jax_vo3.mp3'),
-    '-i', path.join(root, 'public/audio/jax_vo4.mp3'),
-    '-i', path.join(root, 'public/audio/jax_vo5.mp3'),
-    '-i', path.join(root, 'public/audio/jax_vo6.mp3'),
-    '-t', '59',
-    '-filter_complex', `
-      [0:a]volume=0.15,afade=t=in:st=0:d=0.5,afade=t=out:st=57.5:d=1.5[music];
-      [1:a]adelay=0|0,volume=1.0[v1];
-      [2:a]adelay=7000|7000,volume=1.0[v2];
-      [3:a]adelay=17000|17000,volume=1.0[v3];
-      [4:a]adelay=26000|26000,volume=1.0[v4];
-      [5:a]adelay=42000|42000,volume=1.0[v5];
-      [6:a]adelay=51000|51000,volume=1.0[v6];
-      [music][v1][v2][v3][v4][v5][v6]amix=inputs=7:duration=first:dropout_transition=2[aout]
-    `,
-    '-map', '[aout]',
-    '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
-    audioPath,
-  ], { stdio: 'inherit' });
+  
+  if (isWorkflow) {
+    execFileSync('ffmpeg', [
+      '-y', '-stream_loop', '-1', '-i', soundtrack,
+      '-t', '45',
+      '-filter_complex', `
+        [0:a]volume=0.15,afade=t=in:st=0:d=0.5,afade=t=out:st=43.5:d=1.5[aout]
+      `,
+      '-map', '[aout]',
+      '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
+      audioPath,
+    ], { stdio: 'inherit' });
+  } else {
+    execFileSync('ffmpeg', [
+      '-y', '-stream_loop', '-1', '-i', soundtrack, 
+      '-i', path.join(root, 'public/audio/jax_vo1.mp3'),
+      '-i', path.join(root, 'public/audio/jax_vo2.mp3'),
+      '-i', path.join(root, 'public/audio/jax_vo3.mp3'),
+      '-i', path.join(root, 'public/audio/jax_vo4.mp3'),
+      '-i', path.join(root, 'public/audio/jax_vo5.mp3'),
+      '-i', path.join(root, 'public/audio/jax_vo6.mp3'),
+      '-t', '59',
+      '-filter_complex', `
+        [0:a]volume=0.15,afade=t=in:st=0:d=0.5,afade=t=out:st=57.5:d=1.5[music];
+        [1:a]adelay=0|0,volume=1.0[v1];
+        [2:a]adelay=7000|7000,volume=1.0[v2];
+        [3:a]adelay=17000|17000,volume=1.0[v3];
+        [4:a]adelay=26000|26000,volume=1.0[v4];
+        [5:a]adelay=42000|42000,volume=1.0[v5];
+        [6:a]adelay=51000|51000,volume=1.0[v6];
+        [music][v1][v2][v3][v4][v5][v6]amix=inputs=7:duration=first:dropout_transition=2[aout]
+      `,
+      '-map', '[aout]',
+      '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
+      audioPath,
+    ], { stdio: 'inherit' });
+  }
   return audioPath;
 }
 
@@ -153,7 +188,7 @@ async function recordVideo() {
   await client.send('Animation.enable');
   await client.send('Animation.setPlaybackRate', { playbackRate: 1 / SLOWDOWN_FACTOR });
 
-  const formatQuery = isVertical ? '&format=vertical' : '';
+  const formatQuery = isWorkflow ? '&video=workflow' : (isVertical ? '&format=vertical' : '');
   page.on('pageerror', error => console.error('Browser page error:', error.message));
   page.on('console', message => {
     if (message.type() === 'error') console.error('Browser console error:', message.text());
@@ -192,6 +227,7 @@ async function recordVideo() {
 }
 
 async function combine(videoPath, audioPath) {
+  const durationArg = String(DURATION_MS / 1000);
   execFileSync('ffmpeg', [
     '-y', '-i', videoPath, '-i', audioPath,
     '-filter_complex', `[0:v]setpts=(1/${SLOWDOWN_FACTOR})*PTS,scale=${SCALED_WIDTH}:${SCALED_HEIGHT}:flags=lanczos[v]`,
@@ -200,7 +236,7 @@ async function combine(videoPath, audioPath) {
     '-threads', '4',
     '-profile:v', 'high', '-level', '4.2',
     '-c:a', 'aac', '-b:a', '320k', '-ar', '48000',
-    '-t', '59',
+    '-t', durationArg,
     '-movflags', '+faststart',
     output,
   ], { stdio: 'inherit' });

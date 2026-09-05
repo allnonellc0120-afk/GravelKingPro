@@ -1,12 +1,47 @@
 import VideoTemplate from "@/components/video/VideoTemplate";
-import { Switch, Route, Router } from "wouter";
+import WorkflowTemplate from "@/components/video/WorkflowTemplate";
+import { Switch, Route, Router, Link } from "wouter";
 
 function VideoPlayer() {
+  const isWorkflow = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("video") === "workflow";
+
+  if (isWorkflow) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 gap-8 font-sans">
+        <div className="flex flex-col items-center gap-4 w-full max-w-[540px] shrink-0">
+          <h2 className="text-white/80 font-mono text-sm tracking-widest uppercase flex items-center justify-between w-full">
+            <span>4:5 Workflow Promo</span>
+            <Link href="?video=default" className="text-violet-400 hover:text-violet-300 underline">View Original</Link>
+          </h2>
+          <div className="w-full aspect-[4/5] rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0a]">
+            <video 
+              className="w-full h-full object-contain"
+              controls
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+            >
+              <source src={`${import.meta.env.BASE_URL}videos/gravelkingpro_workflow_45s_4x5.mp4`} type="video/mp4" />
+            </video>
+          </div>
+        </div>
+        <div className="mt-12 text-white/40 text-xs font-mono">
+          GravelKing Pro • Workflow Promo
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 gap-8 font-sans">
       <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-12 items-center justify-center">
         <div className="flex flex-col items-center gap-4 w-full lg:w-2/3 max-w-4xl">
-          <h2 className="text-white/80 font-mono text-sm tracking-widest uppercase">16:9 Landscape</h2>
+          <h2 className="text-white/80 font-mono text-sm tracking-widest uppercase flex justify-between w-full">
+            <span>16:9 Landscape</span>
+            <Link href="?video=workflow" className="text-violet-400 hover:text-violet-300 underline text-right">View New 4:5 Workflow</Link>
+          </h2>
           <div className="w-full aspect-video rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0a]">
             <video 
               poster={`${import.meta.env.BASE_URL}posters/poster_16x9.jpg`}
@@ -54,8 +89,12 @@ function VideoPlayer() {
 export default function App() {
   const isExport = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("export") === "1";
   const format = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("format") === "vertical" ? "vertical" : "landscape";
+  const isWorkflow = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("video") === "workflow";
   
   if (isExport) {
+    if (isWorkflow) {
+      return <WorkflowTemplate loop={false} muted={false} />;
+    }
     return <VideoTemplate format={format} loop={false} muted={false} />;
   }
 
