@@ -1529,7 +1529,7 @@ export default function Studio() {
                         <div className="text-[11px] text-muted-foreground">Everything in Pro with advanced controls and reports</div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-sm font-bold text-white">$19.99</div>
+                        <div className="text-sm font-bold text-white">$24.99</div>
                         <div className="text-[10px] text-muted-foreground">/month</div>
                       </div>
                     </button>

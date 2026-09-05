@@ -7,14 +7,14 @@ export interface PlanPrice {
   amount: string;
   /** Billing period suffix, e.g. "/week" or "/mo" */
   period: string;
-  /** Convenience label, e.g. "$19.99/mo" */
+  /** Convenience label, e.g. "$24.99/mo" */
   label: string;
 }
 
 /** Fallbacks shown until (or if) the live Stripe products load. */
 export const FALLBACK_PRICES: Record<PlanTier, PlanPrice> = {
-  weekly: { amount: "$8.99", period: "/week", label: "$8.99/week" },
-  monthly: { amount: "$19.99", period: "/mo", label: "$19.99/mo" },
+  weekly: { amount: "$6.99", period: "/week", label: "$6.99/week" },
+  monthly: { amount: "$24.99", period: "/mo", label: "$24.99/mo" },
   node_auditor: { amount: "$249.50", period: "/mo", label: "$249.50/mo" },
 };
 

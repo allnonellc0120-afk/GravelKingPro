@@ -16,7 +16,7 @@ Free features process audio locally. Paid features route to gravelkingpro.com au
 
 ## Paid Features (Connects to gravelkingpro.com)
 - GravelKing Weekly ($9.99/week): unlimited voice removal + stem splitting, preset mastering with denoise
-- GravelKing King Pro ($19.99/mo): everything in Weekly plus fully adjustable mastering and the live DAW (multitrack mixing, recording, per-stem live metrics)
+- GravelKing King Pro ($24.99/mo): everything in Weekly plus fully adjustable mastering and the live DAW (multitrack mixing, recording, per-stem live metrics)
 - Node Auditor ($249.50/mo): Kernel Dashboard, remote endpoint access, raw telemetry
 
 ## Setup Instructions

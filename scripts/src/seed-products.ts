@@ -55,23 +55,23 @@ async function createProducts() {
   try {
     const stripe = await getUncachableStripeClient();
 
-    // Pro is a weekly plan: $8.99/week and 800 credits per renewal.
+    // Pro is a weekly plan: $6.99/week and 800 credits per renewal.
     const weekly = await ensureProduct(
       stripe,
       'GravelKing Weekly',
       'Pro access with 800 credits per week, Vocal Booth access, free certificates, mastering, and song generation.',
       'pro',
     );
-    await ensurePrice(stripe, weekly, 899, 'week');
+    await ensurePrice(stripe, weekly, 699, 'week');
 
-    // King Pro is the monthly value plan: $19.99/month and 2,500 credits.
+    // King Pro is the monthly value plan: $24.99/month and 2,500 credits.
     const studio = await ensureProduct(
       stripe,
       'GravelKing Studio',
       'King Pro with 2,500 credits per month, advanced studio features, Vocal Booth, and unlimited free certificates.',
       'king',
     );
-    await ensurePrice(stripe, studio, 1999, 'month');
+    await ensurePrice(stripe, studio, 2499, 'month');
 
     // Node Auditor — $249.50/month
     const auditor = await ensureProduct(

@@ -17,8 +17,8 @@ import type Stripe from 'stripe';
 const stripeRouter = Router();
 
 const CHECKOUT_CATALOG = {
-  "GravelKing Weekly": { plan: "pro", unitAmount: 899, interval: "week" },
-  "GravelKing Studio": { plan: "king", unitAmount: 1999, interval: "month" },
+  "GravelKing Weekly": { plan: "pro", unitAmount: 699, interval: "week" },
+  "GravelKing Studio": { plan: "king", unitAmount: 2499, interval: "month" },
   "Node Auditor": { plan: "node_auditor", unitAmount: 24950, interval: "month" },
 } as const;
 
