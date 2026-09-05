@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { storage } from '../storage';
-import { db, usersTable, promotersTable, referralAttributionsTable } from '@workspace/db';
+import { db, promotersTable, referralAttributionsTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
 import { getStripePublishableKey, getUncachableStripeClient } from '../stripeClient';
 import { ensureCustomerOnCurrentAccount } from '../lib/stripeCustomers';
@@ -155,7 +155,33 @@ const createSubscriptionIntent = async (req: Request, res: Response) => {
       return;
     }
     const trialDays = dbUser.trialUsed ? 0 : plan === "king" ? 7 : plan === "pro" ? 3 : 0;
-    const metadata = { userId: dbUser.id, plan };
+
+    // Referral attribution — read the httpOnly gk_ref cookie (set server-side
+    // on tracked-link clicks), validate the promoter, and record first-touch
+    // attribution in our DB. Commission accrual happens only on the verified
+    // invoice.paid webhook, never from client claims.
+    let referralCode = '';
+    const refCookie = (req.cookies as Record<string, string>)?.gk_ref;
+    if (refCookie) {
+      try {
+        const [promoter] = await db
+          .select()
+          .from(promotersTable)
+          .where(eq(promotersTable.code, refCookie.toUpperCase()));
+        // Fraud basics: promoter must be approved and cannot refer themselves.
+        if (promoter && promoter.status === 'approved' && promoter.userId !== dbUser.id) {
+          await db
+            .insert(referralAttributionsTable)
+            .values({ userId: dbUser.id, promoterId: promoter.id })
+            .onConflictDoNothing(); // first-touch wins
+          referralCode = promoter.code;
+        }
+      } catch (refErr) {
+        console.error('Referral attribution failed (non-blocking):', refErr);
+      }
+    }
+
+    const metadata = { userId: dbUser.id, plan, ...(referralCode && { referralCode }) };
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
@@ -198,132 +224,9 @@ const createSubscriptionIntent = async (req: Request, res: Response) => {
 };
 
 // Canonical embedded-subscription endpoint (Payment Element + Express
-// Checkout). The non-/stripe paths are backwards-compatible aliases for
-// already deployed clients.
+// Checkout). The legacy hosted-Checkout endpoint and the pre-/stripe aliases
+// were removed after analytics confirmed zero traffic from old clients.
 stripeRouter.post('/stripe/create-subscription-intent', createSubscriptionIntent);
-stripeRouter.post('/create-subscription-intent', createSubscriptionIntent);
-stripeRouter.post('/payment-intent', createSubscriptionIntent);
-
-// DEPRECATED: hosted Stripe Checkout is superseded by the embedded Payment
-// Element flow (POST /api/stripe/create-subscription-intent). Kept only so
-// older deployed clients don't break; new clients must not call this.
-stripeRouter.post('/checkout', async (req: Request, res: Response, next: NextFunction) => {
-  res.setHeader('Deprecation', 'true');
-  res.setHeader('Link', '</api/stripe/create-subscription-intent>; rel="successor-version"');
-  next();
-});
-
-// Create Stripe Checkout Session — requires OIDC authentication
-stripeRouter.post('/checkout', async (req: Request, res: Response) => {
-  try {
-    // Auth required — trial eligibility is tracked per account
-    if (!req.dbUser) {
-      res.status(401).json({ error: 'Sign in required to subscribe', authRequired: true });
-      return;
-    }
-
-    const { priceId } = req.body as { priceId?: string; plan?: string };
-
-    if (!priceId) {
-      res.status(400).json({ error: 'priceId is required' });
-      return;
-    }
-
-    const dbUser = req.dbUser;
-    const stripe = await getUncachableStripeClient();
-    // Self-heal customers minted on a previously connected Stripe account
-    // (e.g. the dev sandbox before the live account was attached at publish
-    // time) — their IDs don't exist on the current account and would fail
-    // checkout forever for exactly the oldest accounts.
-    const customerId = await ensureCustomerOnCurrentAccount(stripe, dbUser);
-
-    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] ?? 'localhost:80';
-    const baseUrl = `https://${domain}`;
-
-    // One subscription per account — creating a second one would double-bill.
-    const existingSubs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 20 });
-    const blocking = existingSubs.data.find((s) => ['active', 'trialing', 'past_due', 'unpaid'].includes(s.status));
-    if (blocking) {
-      res.status(409).json({ error: 'You already have an active subscription. Manage it from your Account page.' });
-      return;
-    }
-
-    // One OPEN checkout at a time — multiple open sessions created while the
-    // trial is still unconsumed would each carry a free trial (trial farming).
-    const openSessions = await stripe.checkout.sessions.list({ customer: customerId, status: 'open', limit: 20 });
-    await Promise.all(openSessions.data.map((s) => stripe.checkout.sessions.expire(s.id).catch(() => undefined)));
-
-    // Trial days are plan-specific and available only once per account ever.
-    // Do not mark it consumed here: an open/abandoned Stripe Checkout is not a trial.
-    const price = await stripe.prices.retrieve(priceId);
-    const plan = await canonicalPlanForPrice(stripe, priceId);
-    if (!plan) {
-      res.status(400).json({ error: "That price is not a GravelKing subscription plan." });
-      return;
-    }
-    const trialDays = dbUser.trialUsed
-      ? 0
-      : plan === "king"
-        ? 7
-        : plan === "pro"
-          ? 3
-          : 0;
-
-    // Referral attribution — read the httpOnly gk_ref cookie (set server-side
-    // on tracked-link clicks), validate the promoter, and record first-touch
-    // attribution in our DB. Commission accrual happens only on the verified
-    // invoice.paid webhook, never from client claims.
-    let referralCode = '';
-    const refCookie = (req.cookies as Record<string, string>)?.gk_ref;
-    if (refCookie) {
-      try {
-        const [promoter] = await db
-          .select()
-          .from(promotersTable)
-          .where(eq(promotersTable.code, refCookie.toUpperCase()));
-        // Fraud basics: promoter must be approved and cannot refer themselves.
-        if (promoter && promoter.status === 'approved' && promoter.userId !== dbUser.id) {
-          await db
-            .insert(referralAttributionsTable)
-            .values({ userId: dbUser.id, promoterId: promoter.id })
-            .onConflictDoNothing(); // first-touch wins
-          referralCode = promoter.code;
-        }
-      } catch (refErr) {
-        console.error('Referral attribution failed (non-blocking):', refErr);
-      }
-    }
-
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: 'subscription',
-      client_reference_id: dbUser.id,
-      metadata: { userId: dbUser.id, plan, ...(referralCode && { referralCode }) },
-      success_url: `${baseUrl}/pricing?checkout=success${plan ? `&plan=${encodeURIComponent(plan)}` : ''}`,
-      cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
-      ...(trialDays > 0 && { subscription_data: { trial_period_days: trialDays } }),
-    };
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
-
-    // Funnel event — best-effort, must never block checkout
-    const visitorId = (req.cookies as Record<string, string>)?.gk_vid ?? null;
-    void recordAnalyticsEvent({
-      type: 'checkout_started',
-      visitorId,
-      sessionId: dbUser.sessionId ?? dbUser.id,
-      path: '/checkout',
-      metadata: { priceId, plan },
-    }).catch(() => { /* ignore analytics failures */ });
-
-    res.json({ url: session.url });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: message });
-  }
-});
 
 // Get subscription status for the current session cookie
 stripeRouter.get('/subscription/status', async (req: Request, res: Response) => {
