@@ -384,9 +384,9 @@ masterRouter.post(
         ? "vocal_recording"
         : "external_upload";
 
-    // weekly+ tiers get full-length masters, capped by the rolling 30-day
-    // export quota (paid is limited, not unlimited — owner directive
-    // 2026-08-14). Free users get one full download, then 30-sec previews.
+    // Pro+ tiers get full-length masters. WAV uses the tier-aware quota (Pro:
+    // 10/7d; King: 40/30d); MP3 is unlimited. Free users get one full
+    // download, then 30-sec previews.
     const partnerReq = isPartnerRequest(req);
     const adminReq = isAdminAuthenticated(req);
     const mp3Requested = req.path === "/export-mp3";
@@ -396,8 +396,7 @@ masterRouter.post(
 
     // The master admin key is an explicit operational override: it bypasses
     // tier, free allowance, and rolling export quota checks for this route.
-    // Pro users get unlimited MP3 exports, while WAV exports remain capped by
-    // the rolling 20-export ledger below.
+    // Pro+ users get unlimited MP3 exports; WAV remains tier-quota limited.
     const unlimited = partnerReq || adminReq || paidTier;
     const wavQuotaEligible = paidTier && !mp3Requested;
 
@@ -572,7 +571,7 @@ masterRouter.post(
             feature: "master",
             limit: FREE_LIMITS.totalDownloads,
             used: usedTotalDownloads,
-            error: "You've used your free download. Subscribe to GravelKing Weekly for unlimited masters.",
+            error: "You've used your free download. Subscribe to GravelKing Pro for unlimited masters.",
             fallback: { action: "subscribe", url: "/pricing" },
           });
           return;
@@ -636,7 +635,7 @@ masterRouter.post(
 
         // Store denominator stub on the server — the primary court record.
         // The document itself stays LOCKED until unlocked (one-time $1.99
-        // purchase, or a monthly+ included unlock) — stamping is free.
+        // purchase, or a King+ included unlock) — stamping is free.
         await db.insert(ipCertStubsTable).values({
           certId,
           denominator,

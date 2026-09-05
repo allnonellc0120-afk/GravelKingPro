@@ -14,9 +14,9 @@ import { GoogleAuth } from "google-auth-library";
 export const PLAY_PACKAGE_NAME = "com.gravelkingpro.app";
 
 /** Play productId → canonical subscription tier (matches Stripe tiers). */
-export const PLAY_PRODUCT_TIERS: Record<string, "weekly" | "monthly" | "node_auditor"> = {
-  gk_weekly: "weekly",
-  gk_studio: "monthly",
+export const PLAY_PRODUCT_TIERS: Record<string, "pro" | "king" | "node_auditor"> = {
+  gk_weekly: "pro",
+  gk_studio: "king",
   gk_node_auditor: "node_auditor",
 };
 
@@ -56,7 +56,7 @@ export interface PlayVerification {
   /** True when the user should currently have access (active, in grace, or canceled-but-not-yet-expired). */
   entitled: boolean;
   productId: string | null;
-  tier: "weekly" | "monthly" | "node_auditor" | null;
+  tier: "pro" | "king" | "node_auditor" | null;
   /** Normalized: active | grace | canceled | expired | on_hold | paused | pending | unknown */
   state: string;
   expiryTime: Date | null;

@@ -21,12 +21,15 @@ import { getUncachableStripeClient } from "../stripeClient";
 
 // ── Source of truth: what we advertise ───────────────────────────────────────
 const ADVERTISED = [
-  { product: "GravelKing Weekly", cents: 999, interval: "week", display: "$9.99" },
+  { product: "GravelKing Weekly", cents: 999, interval: "month", display: "$9.99" },
   { product: "GravelKing Studio", cents: 2499, interval: "month", display: "$24.99" },
   { product: "Node Auditor", cents: 24950, interval: "month", display: "$249.50" },
 ] as const;
 
-const ALLOWED_TOKENS = new Set<string>(ADVERTISED.map((a) => a.display));
+const ALLOWED_TOKENS = new Set<string>([
+  ...ADVERTISED.map((a) => a.display),
+  "$1.99", // Per-certificate impulse unlock, not a subscription price.
+]);
 
 // UI files that show plan prices, relative to the workspace root.
 const UI_FILES = [

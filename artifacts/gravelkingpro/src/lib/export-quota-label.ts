@@ -5,6 +5,7 @@ export interface ExportQuota {
   used: number;
   limit: number;
   remaining: number;
+  unlimited?: boolean;
   /** null until the first export of the current window has been consumed */
   resetsAt: string | null;
 }
@@ -24,7 +25,8 @@ export type QuotaTone = "normal" | "low" | "exhausted";
 /** Badge text + emphasis for a quota snapshot. Low (≤3) gets amber emphasis;
  *  0 gets rose and spells out the reset date. */
 export function exportQuotaLabel(quota: ExportQuota): { text: string; tone: QuotaTone } {
-  const { remaining, limit, resetsAt } = quota;
+  const { remaining, limit, resetsAt, unlimited } = quota;
+  if (unlimited) return { text: "Unlimited WAV exports", tone: "normal" };
   const resetDate = formatResetDate(resetsAt);
   if (remaining <= 0) {
     return { text: `Export limit reached — resets ${resetDate}`.trimEnd(), tone: "exhausted" };

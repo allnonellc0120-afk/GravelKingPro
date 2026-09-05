@@ -146,7 +146,7 @@ router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
  * Response shape:
  *  { eligible: true,  tier }
  *  { eligible: false, tier: "free",            reason: "free_tier" }
- *  { eligible: false, tier: "weekly"|"monthly", reason: "cooldown",
+ *  { eligible: false, tier: "pro"|"king", reason: "cooldown",
  *    cooldownDaysLeft: number, nextSubmissionDate: string }
  */
 router.get("/tracks/submit-eligibility", async (req: Request, res: Response) => {
@@ -170,7 +170,7 @@ router.get("/tracks/submit-eligibility", async (req: Request, res: Response) => 
     return;
   }
 
-  // weekly / monthly — check 7-day cooldown
+  // Pro / King — check 7-day cooldown
   let userId: string | null = null;
   if (req.dbUser) {
     userId = req.dbUser.id;
@@ -230,7 +230,7 @@ router.get("/library", async (req: Request, res: Response) => {
 
 /**
  * POST /api/tracks/submit — submit a track via multipart file upload.
- * Requires any paid subscription tier (weekly, monthly, node_auditor).
+ * Requires any paid subscription tier (Pro, King, Node Auditor).
  * Rate-limited to once per 7 days — except node_auditor which is unlimited.
  */
 router.post(
@@ -300,7 +300,7 @@ router.post(
     }
     const submittedByUserId = userId ?? "admin";
 
-    // node_auditor has unlimited submissions; weekly/monthly tiers are rate-limited
+    // Node Auditor has unlimited submissions; Pro/King tiers are rate-limited.
     // to once per 7 days. Admins and node_auditor are exempt.
     if (!isAdmin && tier !== "node_auditor" && user) {
       const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
@@ -615,12 +615,12 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
     return;
   }
 
-  // Rolling 30-day export quota — applies to paid tiers too (capped, not
-  // unlimited). Consumed only once the file is confirmed available.
+  // MP3 downloads are unlimited for paid plans; only WAV consumes the
+  // tier-aware quota. Consume only once the file is confirmed available.
   const [dlUser] = session
     ? await db.select().from(usersTable).where(eq(usersTable.id, session.userId))
     : [];
-  if (dlUser && !adminBypass) {
+  if (dlUser && !adminBypass && contentType === "audio/wav") {
     const quota = await consumeExport(dlUser);
     if (!quota.allowed) {
       res.status(429).json(exportLimitPayload(quota));

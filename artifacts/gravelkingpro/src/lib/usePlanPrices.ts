@@ -60,9 +60,18 @@ async function fetchPlanPrices(): Promise<Record<PlanTier, PlanPrice>> {
   const body = await res.json() as { data?: StripeProduct[] };
   const result: Record<PlanTier, PlanPrice> = { ...FALLBACK_PRICES };
   for (const product of body.data ?? []) {
-    const tier = (product.metadata?.tier as PlanTier | undefined) ?? PRODUCT_NAME_TO_TIER[product.name];
+    const rawTier = product.metadata?.tier;
+    // Stripe product names remain stable for subscriber compatibility while
+    // their canonical entitlement metadata is now Pro/King.
+    const tier = rawTier === "pro" ? "weekly"
+      : rawTier === "king" ? "monthly"
+      : (rawTier as PlanTier | undefined) ?? PRODUCT_NAME_TO_TIER[product.name];
     if (!tier || !(tier in FALLBACK_PRICES)) continue;
-    const price = product.prices?.find((p) => typeof p.unit_amount === "number");
+    // An old Weekly price can remain active for existing Stripe subscribers;
+    // never display or sell that legacy weekly cadence to a new customer.
+    const price = product.prices?.find(
+      (p) => typeof p.unit_amount === "number" && p.recurring?.interval === "month",
+    );
     if (!price || price.unit_amount == null) continue;
     const amount = formatAmount(price.unit_amount, price.currency);
     const period = periodForInterval(price.recurring?.interval);

@@ -865,7 +865,7 @@ function VocalBoothInner() {
       form.append("arrangement", "layer");
       const r = await fetch("/api/kernel/studio-mix", { method: "POST", body: form, credentials: "include" });
       if (r.status === 403) {
-        toast({ title: "Studio subscription required", description: "Mix-down requires a Studio (monthly) plan. Upgrade at /pricing.", variant: "destructive" });
+        toast({ title: "King subscription required", description: "Mix-down requires the King plan. Upgrade at /pricing.", variant: "destructive" });
         return;
       }
       if (!r.ok) {

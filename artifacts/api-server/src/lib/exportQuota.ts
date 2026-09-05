@@ -2,7 +2,8 @@ import { db, usersTable, type User } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 /**
- * Rolling 30-day WAV export quota.
+ * Tier-aware rolling WAV export quota: Pro gets 10 per 7 days; King gets 40
+ * per 30 days. MP3 exports are unlimited for paid tiers.
  *
  * Applies to paid WAV exports. Pro MP3 exports are intentionally unlimited;
  * the master route does not call this module for MP3 requests.
@@ -10,36 +11,51 @@ import { eq, sql } from "drizzle-orm";
  * Bypasses: developer/owner accounts (isDeveloper) and partner-API requests
  * (callers never reach this module for those).
  */
-export const EXPORT_LIMIT = 20;
-export const EXPORT_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+export const PRO_EXPORT_LIMIT = 10;
+export const PRO_EXPORT_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+export const KING_EXPORT_LIMIT = 40;
+export const KING_EXPORT_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+/** Legacy aliases retained for integrations importing the old constants. */
+export const EXPORT_LIMIT = KING_EXPORT_LIMIT;
+export const EXPORT_PERIOD_MS = KING_EXPORT_PERIOD_MS;
 
 export interface ExportQuotaStatus {
   allowed: boolean;
   used: number;
   limit: number;
+  unlimited?: boolean;
   /** When the current 30-day window ends (null = window not started yet). */
   resetsAt: string | null;
 }
 
-function windowExpired(user: User, now: Date): boolean {
+function quotaFor(user: User) {
+  if (user.isDeveloper || user.subscriptionTier === "node_auditor") return null;
+  if (user.subscriptionTier === "king" || user.subscriptionTier === "monthly") {
+    return { limit: KING_EXPORT_LIMIT, periodMs: KING_EXPORT_PERIOD_MS, interval: "30 days", label: "30 days" };
+  }
+  return { limit: PRO_EXPORT_LIMIT, periodMs: PRO_EXPORT_PERIOD_MS, interval: "7 days", label: "7 days" };
+}
+
+function windowExpired(user: User, now: Date, periodMs: number): boolean {
   return !user.exportPeriodStart ||
-    now.getTime() - user.exportPeriodStart.getTime() >= EXPORT_PERIOD_MS;
+    now.getTime() - user.exportPeriodStart.getTime() >= periodMs;
 }
 
 /** Read-only check — never mutates counters. Call before expensive work. */
 export function checkExportQuota(user: User, now = new Date()): ExportQuotaStatus {
-  if (user.isDeveloper) {
-    return { allowed: true, used: 0, limit: EXPORT_LIMIT, resetsAt: null };
+  const policy = quotaFor(user);
+  if (!policy) {
+    return { allowed: true, used: 0, limit: 0, unlimited: true, resetsAt: null };
   }
-  if (windowExpired(user, now)) {
-    return { allowed: true, used: 0, limit: EXPORT_LIMIT, resetsAt: null };
+  if (windowExpired(user, now, policy.periodMs)) {
+    return { allowed: true, used: 0, limit: policy.limit, resetsAt: null };
   }
   const used = user.monthlyExports ?? 0;
   return {
-    allowed: used < EXPORT_LIMIT,
+    allowed: used < policy.limit,
     used,
-    limit: EXPORT_LIMIT,
-    resetsAt: new Date(user.exportPeriodStart!.getTime() + EXPORT_PERIOD_MS).toISOString(),
+    limit: policy.limit,
+    resetsAt: new Date(user.exportPeriodStart!.getTime() + policy.periodMs).toISOString(),
   };
 }
 
@@ -57,11 +73,12 @@ export function checkExportQuota(user: User, now = new Date()): ExportQuotaStatu
  * EXPORT_PERIOD_MS above.
  */
 export async function consumeExport(user: User): Promise<ExportQuotaStatus> {
-  if (user.isDeveloper) {
-    return { allowed: true, used: 0, limit: EXPORT_LIMIT, resetsAt: null };
+  const policy = quotaFor(user);
+  if (!policy) {
+    return { allowed: true, used: 0, limit: 0, unlimited: true, resetsAt: null };
   }
 
-  const expired = sql`(${usersTable.exportPeriodStart} IS NULL OR ${usersTable.exportPeriodStart} <= NOW() - INTERVAL '30 days')`;
+  const expired = sql`(${usersTable.exportPeriodStart} IS NULL OR ${usersTable.exportPeriodStart} <= NOW() - INTERVAL '${sql.raw(policy.interval)}')`;
 
   const updated = await db
     .update(usersTable)
@@ -69,7 +86,7 @@ export async function consumeExport(user: User): Promise<ExportQuotaStatus> {
       monthlyExports: sql`CASE WHEN ${expired} THEN 1 ELSE ${usersTable.monthlyExports} + 1 END`,
       exportPeriodStart: sql`CASE WHEN ${expired} THEN NOW() ELSE ${usersTable.exportPeriodStart} END`,
     })
-    .where(sql`${usersTable.id} = ${user.id} AND (${expired} OR ${usersTable.monthlyExports} < ${EXPORT_LIMIT})`)
+    .where(sql`${usersTable.id} = ${user.id} AND (${expired} OR ${usersTable.monthlyExports} < ${policy.limit})`)
     .returning({
       monthlyExports: usersTable.monthlyExports,
       exportPeriodStart: usersTable.exportPeriodStart,
@@ -80,9 +97,9 @@ export async function consumeExport(user: User): Promise<ExportQuotaStatus> {
     return {
       allowed: true,
       used: row.monthlyExports,
-      limit: EXPORT_LIMIT,
+      limit: policy.limit,
       resetsAt: row.exportPeriodStart
-        ? new Date(row.exportPeriodStart.getTime() + EXPORT_PERIOD_MS).toISOString()
+        ? new Date(row.exportPeriodStart.getTime() + policy.periodMs).toISOString()
         : null,
     };
   }
@@ -97,10 +114,10 @@ export async function consumeExport(user: User): Promise<ExportQuotaStatus> {
     .where(eq(usersTable.id, user.id));
   return {
     allowed: false,
-    used: row?.monthlyExports ?? EXPORT_LIMIT,
-    limit: EXPORT_LIMIT,
+    used: row?.monthlyExports ?? policy.limit,
+    limit: policy.limit,
     resetsAt: row?.exportPeriodStart
-      ? new Date(row.exportPeriodStart.getTime() + EXPORT_PERIOD_MS).toISOString()
+      ? new Date(row.exportPeriodStart.getTime() + policy.periodMs).toISOString()
       : null,
   };
 }
@@ -113,7 +130,7 @@ export function exportLimitPayload(q: ExportQuotaStatus) {
     limit: q.limit,
     used: q.used,
     resetsAt: q.resetsAt,
-    error: `You've reached your WAV export limit (${q.limit} exports per 30 days). ` +
+    error: `You've reached your WAV export limit (${q.limit} exports in this rolling window). ` +
       (q.resetsAt ? `Your quota resets on ${new Date(q.resetsAt).toLocaleDateString("en-US", { month: "long", day: "numeric" })}.` : "Try again later."),
   };
 }

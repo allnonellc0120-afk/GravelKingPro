@@ -6,11 +6,11 @@ import { storage } from "../storage";
 /**
  * Canonical subscription tiers.
  *   free          — no paid plan
- *   weekly        — $9.99/week: unlimited voice remover / stem split + preset masters (with denoise); 3-day trial
- *   monthly       — $24.99/month (Studio): everything in weekly PLUS Studio (adjustable mastering + live DAW); 7-day trial
+ *   pro           — $9.99/month: mastering and converter
+ *   king          — $24.99/month: Pro plus included unlimited certificate unlocks
  *   node_auditor  — $249.50/month enterprise tier (superset of everything)
  */
-export type Tier = "free" | "weekly" | "monthly" | "node_auditor";
+export type Tier = "free" | "pro" | "king" | "node_auditor";
 
 /**
  * Lifetime-access emails. Any authenticated user whose verified OIDC email
@@ -30,25 +30,24 @@ const BANNED_EMAILS = new Set<string>();
 
 const TIER_RANK: Record<Tier, number> = {
   free: 0,
-  weekly: 1,
-  monthly: 2,
+  pro: 1,
+  king: 2,
   node_auditor: 3,
 };
 
 /** Normalize any stored/legacy tier string into a canonical Tier. */
 export function normalizeTier(raw: string | null | undefined): Tier {
   switch (raw) {
-    case "weekly":
-      return "weekly";
-    case "monthly":
-      return "monthly";
+    case "pro":
+    case "weekly": // Existing Weekly subscribers retain the lower paid tier.
+    case "splits":
+      return "pro";
+    case "king":
+    case "monthly": // Existing Studio subscribers retain their higher tier.
+      return "king";
     case "node_auditor":
       return "node_auditor";
     // Legacy values from the previous pricing structure.
-    case "splits":
-      return "weekly";
-    case "pro":
-      return "monthly";
     default:
       return "free";
   }
@@ -75,6 +74,7 @@ export async function resolveTier(req: Request): Promise<Tier> {
     if (dbUser.email && LIFETIME_EMAILS.has(dbUser.email.toLowerCase().trim())) {
       return "node_auditor";
     }
+    if (dbUser.isDeveloper) return "node_auditor";
 
     const t = normalizeTier(dbUser.subscriptionTier);
     if (TIER_RANK[t] > TIER_RANK[best]) best = t;
@@ -92,6 +92,7 @@ export async function resolveTier(req: Request): Promise<Tier> {
       if (user.email && LIFETIME_EMAILS.has(user.email.toLowerCase().trim())) {
         return "node_auditor";
       }
+      if (user.isDeveloper) return "node_auditor";
       const status = await storage.getUserSubscriptionStatus(user);
       const t = normalizeTier(status.tier);
       if (TIER_RANK[t] > TIER_RANK[best]) best = t;
@@ -106,17 +107,17 @@ export async function hasPaidSubscription(req: Request): Promise<boolean> {
   return (await resolveTier(req)) !== "free";
 }
 
-/** Weekly and above: unlimited voice removal, stem split, and preset masters. */
+/** Pro and above: unlimited voice removal, stem split, and preset masters. */
 export async function hasUnlimitedSplits(req: Request): Promise<boolean> {
-  return TIER_RANK[await resolveTier(req)] >= TIER_RANK.weekly;
+  return TIER_RANK[await resolveTier(req)] >= TIER_RANK.pro;
 }
 
-/** Weekly and above: unlimited preset mastering full downloads. */
+/** Pro and above: unlimited preset mastering full downloads. */
 export async function hasUnlimitedMasters(req: Request): Promise<boolean> {
-  return TIER_RANK[await resolveTier(req)] >= TIER_RANK.weekly;
+  return TIER_RANK[await resolveTier(req)] >= TIER_RANK.pro;
 }
 
-/** Monthly (Studio) and above: adjustable mastering + live DAW. */
+/** King and above: adjustable mastering + live DAW. */
 export async function hasStudio(req: Request): Promise<boolean> {
-  return TIER_RANK[await resolveTier(req)] >= TIER_RANK.monthly;
+  return TIER_RANK[await resolveTier(req)] >= TIER_RANK.king;
 }

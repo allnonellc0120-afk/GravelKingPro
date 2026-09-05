@@ -9,18 +9,22 @@ function deriveTier(
   metaTier: string | null,
   interval: string | null,
   unitAmount: number | null,
-): 'free' | 'weekly' | 'monthly' | 'node_auditor' {
-  if (metaTier === 'weekly' || metaTier === 'monthly' || metaTier === 'node_auditor') {
-    return metaTier;
+  productName: string | null = null,
+): 'free' | 'pro' | 'king' | 'node_auditor' {
+  if (metaTier === 'king' || metaTier === 'node_auditor') return metaTier;
+  if (metaTier === 'pro') {
+    // Historical `pro` metadata represented the higher legacy entitlement.
+    // Only this retained product identity denotes the new $9.99 Pro plan.
+    return productName === 'GravelKing Weekly' ? 'pro' : 'king';
   }
   // Legacy metadata values from the previous pricing structure.
-  if (metaTier === 'splits') return 'weekly';
-  if (metaTier === 'pro') return 'monthly';
+  if (metaTier === 'weekly' || metaTier === 'splits') return 'pro';
+  if (metaTier === 'monthly') return 'king';
 
   // Fall back to deriving from the price shape.
   if ((unitAmount ?? 0) >= 40000) return 'node_auditor';
-  if (interval === 'week') return 'weekly';
-  if (interval === 'month') return 'monthly';
+  if (interval === 'week') return 'pro';
+  if (interval === 'month') return (unitAmount ?? 0) >= 2000 ? 'king' : 'pro';
   return 'free';
 }
 
@@ -42,6 +46,10 @@ export class Storage {
   async getUserSubscriptionStatus(
     user: User,
   ): Promise<{ isPro: boolean; plan: string | null; tier: string | null; isDeveloper?: boolean }> {
+    if (user.isDeveloper) {
+      return { isPro: true, plan: 'Node Auditor', tier: 'node_auditor', isDeveloper: true };
+    }
+
     // Lifetime / manually-granted access: honour the tier stored directly on the
     // user row.  Any row with is_pro=true and a subscription_tier set bypasses
     // Stripe entirely — this covers gifted / admin-granted access.
@@ -49,8 +57,8 @@ export class Storage {
       const t = user.subscriptionTier as string;
       const plan =
         t === 'node_auditor' ? 'Node Auditor'
-        : t === 'monthly'    ? 'Studio'
-        : t === 'weekly'     ? 'Weekly'
+        : t === 'king' || t === 'monthly' ? 'King'
+        : t === 'pro' || t === 'weekly' ? 'Pro'
         : null;
       return { isPro: true, plan, tier: t, isDeveloper: user.isDeveloper ?? false };
     }
@@ -75,6 +83,7 @@ export class Storage {
     // Prefer explicit product metadata.tier; fall back to price shape.
     const result = await db.execute(
       sql`SELECT p.metadata->>'tier' AS tier_meta,
+                 p.name AS product_name,
                  pr.recurring->>'interval' AS interval,
                  pr.unit_amount AS unit_amount
           FROM stripe.subscriptions s
@@ -105,13 +114,14 @@ export class Storage {
             const item = sub.items.data[0];
             const price    = item?.price as any;
             const tierMeta = (price?.product as any)?.metadata?.tier ?? null;
+            const productName = (price?.product as any)?.name ?? null;
             const interval = price?.recurring?.interval ?? null;
             const amount   = price?.unit_amount ?? null;
-            const tier     = deriveTier(tierMeta, interval, amount);
+            const tier     = deriveTier(tierMeta, interval, amount, productName);
             const plan =
               tier === 'node_auditor' ? 'Node Auditor'
-              : tier === 'monthly'    ? 'Studio'
-              : tier === 'weekly'     ? 'Weekly'
+              : tier === 'king'       ? 'King'
+              : tier === 'pro'        ? 'Pro'
               : null;
             return { isPro: tier !== 'free', plan, tier };
           }
@@ -125,15 +135,16 @@ export class Storage {
       row.tier_meta as string | null,
       row.interval as string | null,
       row.unit_amount as number | null,
+      row.product_name as string | null,
     );
 
     const plan =
       tier === 'node_auditor'
         ? 'Node Auditor'
-        : tier === 'monthly'
-          ? 'Studio'
-          : tier === 'weekly'
-            ? 'Weekly'
+        : tier === 'king'
+          ? 'King'
+          : tier === 'pro'
+            ? 'Pro'
             : null;
 
     return { isPro: tier !== 'free', plan, tier };
@@ -223,8 +234,8 @@ export class Storage {
   private playTierStatus(tier: string): { isPro: boolean; plan: string | null; tier: string } {
     const plan =
       tier === 'node_auditor' ? 'Node Auditor'
-      : tier === 'monthly'    ? 'Studio'
-      : tier === 'weekly'     ? 'Weekly'
+      : tier === 'king'       ? 'King'
+      : tier === 'pro'        ? 'Pro'
       : null;
     return { isPro: plan !== null, plan, tier };
   }

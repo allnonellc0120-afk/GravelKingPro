@@ -230,6 +230,21 @@ async function migrateAppSchema() {
         ADD COLUMN IF NOT EXISTS cert_unlocks             integer NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS cert_unlock_period_start timestamptz
     `);
+    // `pro` historically meant the higher Studio entitlement. Migrate those
+    // rows before `pro` is reused for the new $9.99 plan, preventing an
+    // existing lifetime/manual grant from being silently downgraded.
+    await db.execute(sql`
+      WITH migration_marker AS (
+        INSERT INTO admin_settings (key, value)
+        VALUES ('migration.legacy_pro_to_king', 'complete')
+        ON CONFLICT (key) DO NOTHING
+        RETURNING key
+      )
+      UPDATE users
+      SET subscription_tier = 'king'
+      WHERE subscription_tier = 'pro'
+        AND EXISTS (SELECT 1 FROM migration_marker)
+    `);
 
     // Investor outreach tracker (admin-only).
     await db.execute(sql`

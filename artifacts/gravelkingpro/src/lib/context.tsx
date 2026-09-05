@@ -58,17 +58,16 @@ function normalizePlan(plan?: string | null): SubscriptionTier {
   const p = plan.toLowerCase().trim().replace(/\s+/g, "_");
   switch (p) {
     case "weekly":
+    case "pro":
       return "weekly";
     case "monthly":
     case "studio":
+    case "king":
       return "monthly";
     case "node_auditor":
       return "node_auditor";
-    // Legacy values from the previous pricing structure.
     case "splits":
       return "weekly";
-    case "pro":
-      return "monthly";
     default:
       return null;
   }

@@ -40,7 +40,7 @@ async function requireStudio(req: Request, res: Response, next: NextFunction): P
   if (!await hasStudio(req)) {
     res.status(403).json({
       success: false,
-      error: "The live DAW and Mix Studio export require a GravelKing Studio (monthly) subscription.",
+      error: "The live DAW and Mix Studio export require a King subscription.",
       code: "STUDIO_REQUIRED",
     });
     return;
