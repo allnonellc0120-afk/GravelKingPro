@@ -392,7 +392,11 @@ export default function SongwritingStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ prompt: submittedPrompt, artistProfile }),
+        body: JSON.stringify({
+          prompt: submittedPrompt,
+          artistProfile,
+          history: chatMessages.slice(-12).map((m) => ({ role: m.role, content: m.content })),
+        }),
       });
       const data = await result.json() as { text?: string; error?: string; remaining?: number | null };
       if (!result.ok) throw new Error(data.error || "JAX could not respond.");

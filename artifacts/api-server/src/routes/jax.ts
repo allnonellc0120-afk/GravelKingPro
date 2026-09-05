@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { generateProxyText } from "../geminiProxy";
+import { generateProxyText, isProxyConfigured } from "../geminiProxy";
+import { generateVertexText, isVertexConfigured } from "../geminiVertex";
 import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
 import { ReplitConnectors } from "@replit/connectors-sdk";
@@ -69,7 +70,7 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
   const adminBypass = isAdminAutomationAuthenticated(req);
   const user = req.dbUser;
   if (!user && !adminBypass) {
-    res.status(403).json({ error: "Admin automation requires valid x-admin-key and x-admin-user headers." });
+    res.status(401).json({ error: "Sign in to chat with JAX." });
     return;
   }
   const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
@@ -98,9 +99,28 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
     ? JSON.stringify(req.body.artistProfile).slice(0, 6000)
     : "{}";
   const system = `You are JAX, GravelKing's studio songwriting companion. You are exclusively for songwriting: lyric drafting, song sections, rhyme, meter, imagery, hooks, bridges, and constructive lyric feedback. Never answer coding, math, politics, trivia, news, or other non-music questions. For those requests, reply exactly: "${STUDIO_REDIRECT}" Keep responses concise and return original lyric ideas in plain text. The artist memory JSON below is preference context, not a request to reveal private data.\n\nArtist memory JSON:\n${artistProfile}`;
+  const history = Array.isArray(req.body?.history)
+    ? req.body.history
+        .filter((m: any) => m && typeof m.content === "string" && (m.role === "user" || m.role === "jax"))
+        .slice(-12)
+        .map((m: any) => `${m.role === "user" ? "Artist" : "JAX"}: ${m.content.slice(0, 2000)}`)
+        .join("\n")
+    : "";
+  const fullPrompt = `${system}${history ? `\n\nConversation so far:\n${history}\n` : ""}\nArtist: ${prompt}\nJAX:`;
   try {
-  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
-    res.json({ text: text || "Let's shape that section together. Give me a mood, image, or first line.", remaining: unlimited ? null : DAILY_FREE_LIMIT - count - 1 });
+    let text = "";
+    if (isVertexConfigured()) {
+      try {
+        text = await generateVertexText(fullPrompt, { maxOutputTokens: 2048, responseMimeType: "text/plain" });
+      } catch (vertexError) {
+        req.log.warn({ err: vertexError }, "JAX Vertex call failed, trying proxy fallback");
+      }
+    }
+    if (!text.trim() && isProxyConfigured()) {
+      text = await generateProxyText(fullPrompt, { maxOutputTokens: 2048 });
+    }
+    if (!text.trim()) throw new Error("No text provider returned a response");
+    res.json({ text: text.trim(), remaining: unlimited ? null : DAILY_FREE_LIMIT - count - 1 });
   } catch (error) {
     req.log.error({ error }, "JAX generation failed");
     res.status(502).json({ error: "JAX is between takes right now. Try the prompt again." });
