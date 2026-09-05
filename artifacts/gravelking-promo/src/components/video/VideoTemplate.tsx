@@ -43,6 +43,16 @@ export default function VideoTemplate({
   const { currentSceneKey, currentScene, hasEnded } = useVideoPlayer({ durations, loop });
   const SceneComponent = SCENE_COMPONENTS[currentSceneKey.replace(/_r[12]$/, '')];
   const musicRef = useRef<HTMLAudioElement | null>(null);
+  const voRef = useRef<HTMLAudioElement | null>(null);
+
+  const SCENE_VO: Record<string, string> = {
+    s1_prompt: 'audio/jax_vo1.mp3',
+    s2_lyrics: 'audio/jax_vo2.mp3',
+    s3_compose: 'audio/jax_vo3.mp3',
+    s4_booth: 'audio/jax_vo4.mp3',
+    s5_master: 'audio/jax_vo5.mp3',
+    s6_finish: 'audio/jax_vo6.mp3',
+  };
 
   useEffect(() => onSceneChange?.(currentSceneKey), [currentSceneKey, onSceneChange]);
   useEffect(() => {
@@ -52,9 +62,19 @@ export default function VideoTemplate({
     const music = musicRef.current;
     if (!music || hasEnded) return;
     music.muted = muted;
-    music.volume = 0.12;
+    music.volume = 0.10;
     music.play().catch(() => {});
   }, [hasEnded, muted]);
+  useEffect(() => {
+    const key = currentSceneKey.replace(/_r[12]$/, '');
+    const src = SCENE_VO[key];
+    if (!src || hasEnded) return;
+    const vo = new Audio(`${import.meta.env.BASE_URL}${src}`);
+    voRef.current = vo;
+    vo.volume = 1.0;
+    vo.play().catch(() => {});
+    return () => { vo.pause(); };
+  }, [currentSceneKey, hasEnded]);
 
   return (
     <div className="video-root w-screen h-screen flex items-center justify-center overflow-hidden bg-[#08090c]">
@@ -85,6 +105,8 @@ export default function VideoTemplate({
           <span className="h-[1.5vw] w-[1.5vw] rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,.7)]" />
           GravelKing Pro
         </div>
+
+        <audio ref={musicRef} src={`${import.meta.env.BASE_URL}audio/gravelking_pro_soundtrack_warm.mp3`} loop={false} preload="auto" />
 
         <AnimatePresence mode="sync">
           {SceneComponent && <SceneComponent key={currentSceneKey} vertical={true} />}
