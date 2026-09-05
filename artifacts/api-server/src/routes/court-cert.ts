@@ -7,6 +7,7 @@ import { logToolError } from "../lib/errorTracker";
 import { logger } from "../lib/logger";
 import { storage } from "../storage";
 import { resolveTier } from "../lib/entitlement";
+import { checkCertUnlockQuota, consumeCertUnlock } from "../lib/certUnlocks";
 import { getUncachableStripeClient } from "../stripeClient";
 import { ensureCustomerOnCurrentAccount } from "../lib/stripeCustomers";
 import { CREDIT_COSTS, getCreditsBalance, spendCredits, grantCredits } from "../lib/credits";
@@ -206,9 +207,9 @@ router.get("/court-cert/:certId/status", async (req: Request, res: Response) => 
       return;
     }
 
-    // Certificates are free while the provenance workflow is being adopted.
-    // Do not put a credit or dollar gate in front of certification.
-    const hasUnlimitedIncluded = true;
+    const tier = await resolveTier(req);
+    const hasIncluded = tier === "king" || tier === "node_auditor" || user.isDeveloper;
+    const quota = hasIncluded ? checkCertUnlockQuota(user) : null;
 
     res.json({
       success: true,
@@ -221,8 +222,8 @@ router.get("/court-cert/:certId/status", async (req: Request, res: Response) => 
       priceCents: CERT_UNLOCK_PRICE_CENTS,
       creditsBalance: await getCreditsBalance(user.id),
       creditCost: CREDIT_COSTS.certificate,
-      includedUnlocks: hasUnlimitedIncluded
-        ? { available: true, unlimited: true, used: 0, limit: null, resetsAt: null }
+      includedUnlocks: quota
+        ? { available: quota.allowed, used: quota.used, limit: quota.limit, resetsAt: quota.resetsAt }
         : null,
     });
   } catch (err) {
@@ -255,16 +256,26 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
       return;
     }
 
-    const includedUnlock = true;
-    let creditsBalance: number | undefined;
+    const tier = await resolveTier(req);
+    const includedUnlock = tier === "king" || tier === "node_auditor" || user.isDeveloper;
+    if (!includedUnlock) {
+      res.status(402).json({
+        success: false,
+        code: "CERT_PURCHASE_REQUIRED",
+        error: "Included unlocks are a King benefit. Unlock this certificate for $1.99, or upgrade to King.",
+        priceCents: CERT_UNLOCK_PRICE_CENTS,
+        checkoutUrl: `/api/court-cert/${certId}/checkout`,
+      });
+      return;
+    }
 
-    // Claim conditional on still-locked. Included King unlocks are unlimited;
-    // paid wallet unlocks are refunded if a concurrent request wins the claim.
+    // Claim conditional on still-locked, then consume one included allowance.
+    // The quota update itself is atomic against the current database row.
     const claimed = await db
       .update(ipCertStubsTable)
       .set({
         unlockedAt: sql`NOW()`,
-        unlockSource: user.isDeveloper ? "admin" : "free",
+        unlockSource: user.isDeveloper ? "admin" : "included",
       })
       .where(and(eq(ipCertStubsTable.certId, certId), isNull(ipCertStubsTable.unlockedAt)))
       .returning({ certId: ipCertStubsTable.certId });
@@ -275,11 +286,32 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
       return;
     }
 
+    const quota = await consumeCertUnlock(user);
+    if (!quota.allowed) {
+      // The claim must not survive an exhausted allowance. The conditional
+      // predicate avoids clearing a claim that a separate request replaced.
+      await db
+        .update(ipCertStubsTable)
+        .set({ unlockedAt: null, unlockSource: null })
+        .where(and(
+          eq(ipCertStubsTable.certId, certId),
+          eq(ipCertStubsTable.unlockSource, "included"),
+        ));
+      res.status(402).json({
+        success: false,
+        code: "CERT_PURCHASE_REQUIRED",
+        error: "Your included certificate allowance is exhausted. Unlock this certificate for $1.99, or try again after the allowance resets.",
+        priceCents: CERT_UNLOCK_PRICE_CENTS,
+        checkoutUrl: `/api/court-cert/${certId}/checkout`,
+        includedUnlocks: { available: false, used: quota.used, limit: quota.limit, resetsAt: quota.resetsAt },
+      });
+      return;
+    }
+
     res.json({
       success: true,
       unlocked: true,
-      ...(creditsBalance !== undefined ? { creditsBalance, creditCost: CREDIT_COSTS.certificate } : {}),
-      includedUnlocks: { unlimited: true, used: 0, limit: null, resetsAt: null },
+      includedUnlocks: { available: true, used: quota.used, limit: quota.limit, resetsAt: quota.resetsAt },
     });
   } catch (err) {
     logger.error({ err, certId }, "cert unlock failed");
