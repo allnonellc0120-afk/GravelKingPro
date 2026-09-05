@@ -221,10 +221,18 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     const audioPreviewKey = `tracks/${trackId}/audio_preview.mp3`;
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
     const coverPath = join(tmpdir(), `jax-cover-${trackId}.png`);
-    await execFileAsync("ffmpeg", buildCoverArgs(trackId, trackTitle, coverPath), { timeout: 30_000 });
+    const fullPath = join(tmpdir(), `jax-take-${trackId}.mp3`);
+    const previewPath = join(tmpdir(), `jax-preview-${trackId}.mp3`);
+    await writeFile(fullPath, mp3);
+    // Public namespace gets ONLY a 30-sec preview (same contract as the MLK
+    // path) — the full take stays under the private, ownership-gated key.
+    await Promise.all([
+      execFileAsync("ffmpeg", ["-y", "-i", fullPath, "-t", "30", "-b:a", "128k", previewPath], { timeout: 60_000 }),
+      execFileAsync("ffmpeg", buildCoverArgs(trackId, trackTitle, coverPath), { timeout: 30_000 }),
+    ]);
     await Promise.all([
       saveObjectWithFallback(bucketId, audioFullMp3Key, mp3, { contentType: "audio/mpeg" }),
-      objectStorage.savePublicObject(audioPreviewKey, mp3, "audio/mpeg"),
+      readFile(previewPath).then((b) => objectStorage.savePublicObject(audioPreviewKey, b, "audio/mpeg")),
       readFile(coverPath).then((b) => objectStorage.savePublicObject(coverArtKey, b, "image/png")),
     ]);
     await db.transaction(async (tx) => {
