@@ -105,6 +105,17 @@ export async function primaryWriteHealthy(): Promise<boolean> {
   return primaryWriteHealth.ok;
 }
 
+const PRIVATE_FULL_AUDIO_KEY_PATTERN = /^private\/tracks\/[^/]+\/audio_full\.(?:wav|mp3)$/i;
+
+/**
+ * Generated full-length audio is always stored under the private tracks
+ * namespace. Keep this check at the public writer boundary so a future route
+ * cannot accidentally make a full take reachable through public storage.
+ */
+export function isPrivateFullAudioKey(key: string): boolean {
+  return PRIVATE_FULL_AUDIO_KEY_PATTERN.test(key);
+}
+
 export async function saveObjectWithFallback(
   bucketName: string,
   objectName: string,
@@ -442,6 +453,9 @@ export class ObjectStorageService {
    * bucket.file(key).save would) leaves the asset unreachable by the public route.
    */
   async savePublicObject(key: string, buffer: Buffer, contentType: string): Promise<void> {
+    if (isPrivateFullAudioKey(key)) {
+      throw new Error(`Refusing public object write for private full-audio key: ${key}`);
+    }
     const searchPath = this.getPublicObjectSearchPaths()[0];
     const fullPath = `${searchPath}/${key}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
