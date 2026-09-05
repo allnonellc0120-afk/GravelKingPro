@@ -124,7 +124,13 @@ async function mixAudio() {
       '-y', '-stream_loop', '-1', '-i', soundtrack,
       '-t', '45',
       '-filter_complex', `
-        [0:a]volume=0.15,afade=t=in:st=0:d=0.5,afade=t=out:st=43.5:d=1.5[aout]
+        [0:a]volume=0.15,
+        bass=g=4:f=115:w=0.8,
+        equalizer=f=3200:t=q:w=1.0:g=1.5,
+        treble=g=2:f=9000:w=0.7,
+        acompressor=threshold=-18dB:ratio=2.4:attack=8:release=120:makeup=2,
+        loudnorm=I=-16:TP=-1.5:LRA=9,
+        afade=t=in:st=0:d=0.5,afade=t=out:st=43.5:d=1.5[aout]
       `,
       '-map', '[aout]',
       '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
