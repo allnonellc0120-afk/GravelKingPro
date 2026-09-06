@@ -21,6 +21,20 @@ object URL after ~10s), `downloadUrl(url, name)` for URLs that stay alive elsewh
 (e.g. a `resultUrl` bound to an `<audio>` element — do NOT revoke those). Never
 reintroduce `window.open` for a download.
 
+## Long browser audio exports must yield while encoding
+Full-length fine-tuned WAVs can require enough decode/render/PCM work that a single
+synchronous encoding loop makes mobile browsers look frozen. Export helpers should
+report loading, decoding, rendering, encoding, and saving stages; chunk WAV encoding
+with event-loop yields; and keep a non-destructive original-master fallback available
+when allocation fails.
+
+**Why:** mobile users need visible progress and a recoverable path when the device
+cannot hold the decoded and rendered buffers at the same time.
+
+**How to apply:** keep the export action guarded by an in-flight ref as well as a
+disabled button, classify allocation/memory failures separately from network errors,
+and preserve the current EQ settings so retry does not lose the user's work.
+
 ## Web Audio playback needs ctx.resume() inside the user gesture
 The Studio page plays via Web Audio (`AudioContext` + `AudioBufferSourceNode`),
 not `<audio>`. iOS (and Chrome autoplay policy) start the context **suspended**;
