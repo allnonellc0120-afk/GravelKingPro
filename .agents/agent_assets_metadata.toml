@@ -1403,3 +1403,17 @@ mtime_ms = 1788731421379
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/f826a82b-a118-42dd-bb31-d8fdd6bcd525/9933f2f9-9073-4933-a0c3-5e61b3757043"
 storage_version_token = "1788731425684969"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "-hSb6_Qjk5UTun3dlIkXd"
+uri = "file://GravelKingProApp_Backup_2026-09-06.zip"
+type = "unspecified"
+title = "GravelKing Pro backup — fresh download"
+description = "Freshly reposted, verified ZIP archive. SHA-256: c12ba5eb9311b565d9df80d201b5a6a41dae048d1cab5c91fb52266e73cecbdd. Contains the signed AAB and sanitized recovery specification."
+logical_id = "2e004b07-5b9d-4731-9a4e-3d0a597fe0a3"
+content_hash = "sha256:c12ba5eb9311b565d9df80d201b5a6a41dae048d1cab5c91fb52266e73cecbdd"
+size = 1646891
+mtime_ms = 1788732335531
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/2e004b07-5b9d-4731-9a4e-3d0a597fe0a3/c08f47e3-76a4-4b78-90a8-f4ce847c7972"
+storage_version_token = "1788732339933694"
+content_type = "application/octet-stream"
