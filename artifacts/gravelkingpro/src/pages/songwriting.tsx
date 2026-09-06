@@ -11,6 +11,8 @@ import { authorshipLedger as buildAuthorshipLedger, authorshipScore as computeAu
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   ChevronDown,
   ChevronLeft,
@@ -23,6 +25,9 @@ import {
   LockKeyhole,
   Copy,
   Check,
+  Play,
+  Settings2,
+  Square,
 } from "lucide-react";
 
 type BlockType = "Verse" | "Chorus" | "Bridge" | "Hook" | "Outro";
@@ -162,6 +167,12 @@ function initialDraft(): SongDraft {
   };
 }
 
+function sessionTitleFromPrompt(prompt: string): string {
+  const title = prompt.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+  if (!title) return "Untitled song";
+  return title.length > 64 ? `${title.slice(0, 61).trimEnd()}…` : title;
+}
+
 function countSyllables(text: string): number {
   return text
     .toLowerCase()
@@ -266,6 +277,9 @@ export default function SongwritingStudio() {
   const [sessions, setSessions] = useState<JaxSessionSummary[]>([]);
   const [sessionsBusy, setSessionsBusy] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sessionMenuId, setSessionMenuId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ sessionId: string; title: string } | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [autoVoice, setAutoVoice] = useState(true);
   const [response, setResponse] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -285,6 +299,8 @@ export default function SongwritingStudio() {
   const voiceObjectUrlRef = useRef<string | null>(null);
   const ttsAbortRef = useRef<AbortController | null>(null);
   const voicePlaybackRef = useRef(0);
+  const sessionPressTimerRef = useRef<number | null>(null);
+  const longPressedSessionRef = useRef(false);
   const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
     try {
       const saved = localStorage.getItem(ARTIST_PROFILE_KEY);
@@ -328,6 +344,31 @@ export default function SongwritingStudio() {
   }, []);
 
   useEffect(() => () => stopSpeaking(), [stopSpeaking]);
+
+  const saveSessionSnapshot = useCallback((id: string, snapshot: {
+    title: string;
+    messages: ChatMessage[];
+    aiDraft: string;
+    finalText: string;
+    authorshipScore: number;
+    authorshipLedger: AuthorshipLedgerEntry[];
+  }) => {
+    void fetch(`/api/jax/sessions/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ sessionId: id, ...snapshot }),
+    }).then((result) => {
+      if (!result.ok) return;
+      setSessions((current) => [{
+        sessionId: id,
+        title: snapshot.title || "Untitled song",
+        updatedAt: new Date().toISOString(),
+        authorshipScore: snapshot.authorshipScore,
+        messages: snapshot.messages,
+      }, ...current.filter((session) => session.sessionId !== id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -390,31 +431,17 @@ export default function SongwritingStudio() {
         chatMessages.flatMap((message) => message.explicitHumanText ?? []),
       );
       setAuthorshipLedger(nextLedger);
-      void fetch(`/api/jax/sessions/${encodeURIComponent(sessionId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          sessionId,
-          title: draft.title,
-          messages: chatMessages,
-          aiDraft,
-          finalText,
-          authorshipScore,
-          authorshipLedger: nextLedger,
-        }),
-      }).then(() => {
-        setSessions((current) => [{
-          sessionId,
-          title: draft.title || "Untitled song",
-          updatedAt: new Date().toISOString(),
-          authorshipScore,
-          messages: chatMessages,
-        }, ...current.filter((session) => session.sessionId !== sessionId)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
-      }).catch(() => {});
+      saveSessionSnapshot(sessionId, {
+        title: draft.title,
+        messages: chatMessages,
+        aiDraft,
+        finalText,
+        authorshipScore,
+        authorshipLedger: nextLedger,
+      });
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [aiDraft, authorshipScore, chatMessages, draft.blocks, draft.title, sessionId]);
+  }, [aiDraft, authorshipScore, chatMessages, draft.blocks, draft.title, saveSessionSnapshot, sessionId]);
 
   useEffect(() => {
     if (!jaxVoicePresets.some(([voiceId]) => voiceId === selectedVoice)) {
@@ -580,6 +607,7 @@ export default function SongwritingStudio() {
 
   const startNewSession = () => {
     stopSpeaking();
+    setSessionMenuId(null);
     setSessionId(crypto.randomUUID());
     setChatMessages([]);
     setResponse("");
@@ -589,10 +617,61 @@ export default function SongwritingStudio() {
     setDraft(initialDraft());
   };
 
+  const clearSessionPressTimer = useCallback(() => {
+    if (sessionPressTimerRef.current !== null) {
+      window.clearTimeout(sessionPressTimerRef.current);
+      sessionPressTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearSessionPressTimer(), [clearSessionPressTimer]);
+
+  const beginSessionPress = (id: string) => {
+    clearSessionPressTimer();
+    longPressedSessionRef.current = false;
+    sessionPressTimerRef.current = window.setTimeout(() => {
+      longPressedSessionRef.current = true;
+      setSessionMenuId(id);
+    }, 550);
+  };
+
+  const finishSessionPress = () => {
+    clearSessionPressTimer();
+  };
+
+  const openSession = (id: string) => {
+    if (longPressedSessionRef.current) {
+      longPressedSessionRef.current = false;
+      return;
+    }
+    setSessionMenuId(null);
+    void loadJaxSession(id);
+  };
+
+  const deleteSession = async (id: string) => {
+    setDeleteBusy(true);
+    try {
+      const result = await fetch(`/api/jax/sessions/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!result.ok && result.status !== 404) throw new Error("This session could not be deleted.");
+      setSessions((current) => current.filter((session) => session.sessionId !== id));
+      setDeleteTarget(null);
+      setSessionMenuId(null);
+      if (id === sessionId) startNewSession();
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : "This session could not be deleted.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const generate = async () => {
     stopSpeaking();
     if (!prompt.trim() || generating) return;
     const submittedPrompt = prompt.trim();
+    const nextTitle = draft.title === "Untitled song" ? sessionTitleFromPrompt(submittedPrompt) : draft.title;
     speechSessionRef.current += 1;
     recognitionRef.current?.stop();
     recognitionRef.current = null;
@@ -605,6 +684,18 @@ export default function SongwritingStudio() {
       explicitHumanText: explicitHumanTextFromPrompt(submittedPrompt),
     };
     setChatMessages((messages) => [...messages, userMessage]);
+    if (draft.title === "Untitled song") {
+      setDraft((current) => ({ ...current, title: nextTitle }));
+    }
+    const nextMessages = [...chatMessages, userMessage];
+    saveSessionSnapshot(sessionId, {
+      title: nextTitle,
+      messages: nextMessages,
+      aiDraft,
+      finalText: draft.blocks.map((block) => block.content).filter(Boolean).join("\n\n"),
+      authorshipScore,
+      authorshipLedger,
+    });
     setPrompt("");
     setGenerating(true);
     setGenerationError("");
@@ -711,11 +802,12 @@ export default function SongwritingStudio() {
     setListening(true);
   };
 
-  const speakText = async (text: string) => {
-    if (speaking || voiceAudioRef.current || ttsAbortRef.current) {
+  const speakText = async (text: string, force = false) => {
+    if (!force && (speaking || voiceAudioRef.current || ttsAbortRef.current)) {
       stopSpeaking();
       return;
     }
+    if (force) stopSpeaking();
     setVoiceError("");
     setSpeaking(true);
     const playbackId = voicePlaybackRef.current + 1;
@@ -773,6 +865,17 @@ export default function SongwritingStudio() {
   const speakResponse = async () => {
     if (!response) return;
     await speakText(response);
+  };
+
+  const toggleAutoVoice = () => {
+    if (autoVoice) {
+      stopSpeaking();
+      setAutoVoice(false);
+      return;
+    }
+    setAutoVoice(true);
+    const latest = [...chatMessages].reverse().find((message) => message.role === "jax");
+    if (latest) void speakText(extractLyrics(latest.content) || latest.content, true);
   };
 
   const pushToCanvas = (messageContent = response) => {
@@ -880,6 +983,43 @@ export default function SongwritingStudio() {
     }
   };
 
+  const renderSessionCard = (session: JaxSessionSummary, current = false) => (
+    <div key={session.sessionId} className="relative">
+      <button
+        type="button"
+        onClick={() => openSession(session.sessionId)}
+        onPointerDown={() => beginSessionPress(session.sessionId)}
+        onPointerUp={finishSessionPress}
+        onPointerLeave={finishSessionPress}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          clearSessionPressTimer();
+          setSessionMenuId(session.sessionId);
+        }}
+        className={`w-full rounded-lg border px-3 py-3 text-left text-sm transition ${current ? "border-violet-400/30 bg-violet-400/10 text-violet-100" : "border-white/5 text-foreground/90 hover:border-violet-400/30 hover:bg-white/[0.04]"}`}
+      >
+        <span className="block truncate">{session.title || "Untitled song"}</span>
+        <span className={`mt-1 block text-xs ${current ? "text-violet-200/70" : "text-muted-foreground"}`}>
+          {current ? "Current session" : new Date(session.updatedAt).toLocaleDateString()} · {session.authorshipScore}% human
+        </span>
+      </button>
+      {sessionMenuId === session.sessionId && (
+        <div className="absolute right-2 top-2 z-10 rounded-lg border border-white/10 bg-[#171820] p-1 shadow-xl">
+          <button
+            type="button"
+            onClick={() => {
+              setSessionMenuId(null);
+              setDeleteTarget({ sessionId: session.sessionId, title: session.title || "Untitled song" });
+            }}
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-rose-300 hover:bg-rose-400/10"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete session
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <Layout hideChrome>
       <div className="bg-[#08090c] text-foreground">
@@ -889,34 +1029,58 @@ export default function SongwritingStudio() {
           <div className="flex items-center gap-2"><span className="hidden text-xs text-muted-foreground sm:inline">{savedAt ? `Saved ${new Date(savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Local session"}</span><Button size="sm" onClick={() => setCertificateOpen(true)} className="bg-violet-500 text-white hover:bg-violet-400"><ShieldCheck className="mr-1.5 h-4 w-4" />Certificate</Button></div>
         </header>
         <div className="flex min-h-0 flex-1">
-           {sidebarOpen && <aside className="hidden w-72 shrink-0 border-r border-white/10 bg-white/[0.02] p-4 md:flex md:flex-col">
-             <Button variant="outline" className="mb-5 w-full justify-start border-white/10" onClick={startNewSession}>+ New song session</Button>
+             {sidebarOpen && <aside className="hidden w-72 shrink-0 border-r border-white/10 bg-white/[0.02] p-4 md:flex md:flex-col">
+              <Button variant="outline" className="mb-5 w-full justify-start border-white/10" onClick={startNewSession}><Plus className="mr-2 h-4 w-4" /> Start a new session</Button>
              <div className="mb-3 flex items-center justify-between px-2">
-               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Recent sessions</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Past sessions</p>
                {sessionsBusy && <span className="text-[10px] text-muted-foreground">Loading…</span>}
              </div>
              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-               <button type="button" onClick={() => void loadJaxSession(sessionId)} className="w-full rounded-lg border border-violet-400/30 bg-violet-400/10 px-3 py-3 text-left text-sm text-violet-100">
-                 {draft.title || "Untitled song"}<span className="mt-1 block text-xs text-violet-200/70">Current session · {authorshipScore}% human</span>
-               </button>
-               {sessions.filter((session) => session.sessionId !== sessionId).map((session) => (
-                 <button key={session.sessionId} type="button" onClick={() => void loadJaxSession(session.sessionId)} className="w-full rounded-lg border border-white/5 px-3 py-3 text-left text-sm text-foreground/90 transition hover:border-violet-400/30 hover:bg-white/[0.04]">
-                   <span className="block truncate">{session.title || "Untitled song"}</span>
-                   <span className="mt-1 block text-xs text-muted-foreground">{new Date(session.updatedAt).toLocaleDateString()} · {session.authorshipScore}% human</span>
-                 </button>
-               ))}
+                {renderSessionCard({ sessionId, title: draft.title || "Untitled song", updatedAt: savedAt || new Date().toISOString(), authorshipScore, messages: chatMessages }, true)}
+                {sessions.filter((session) => session.sessionId !== sessionId).map((session) => renderSessionCard(session))}
                {!sessionsBusy && sessions.length === 0 && <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-xs leading-5 text-muted-foreground">Your saved song conversations will appear here.</p>}
              </div>
              <div className="mt-5 rounded-xl border border-white/10 p-3 text-xs leading-5 text-muted-foreground">
                <p className="font-semibold text-foreground">JAX remembers as you chat</p>
-               <p className="mt-1">Your story, revisions, and authorship ledger travel with each session.</p>
+                <p className="mt-1">Your first question names the session. Long-press a past session to delete it.</p>
              </div>
            </aside>}
           <main className="flex min-w-0 flex-1 flex-col">
+             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-8">
+               <div className="min-w-0">
+                 <p className="text-xs font-semibold text-foreground">JAX voice</p>
+                 <p className="truncate text-xs text-muted-foreground">{autoVoice ? "Auto-play is on — every new reply will be read aloud." : "Auto-play is paused — tap Play responses to hear JAX."}</p>
+               </div>
+               <div className="flex shrink-0 items-center gap-2">
+                 <Popover>
+                   <PopoverTrigger asChild>
+                     <Button type="button" size="sm" variant="outline" className="border-white/10" aria-label="Open JAX voice settings">
+                       <Settings2 className="mr-1.5 h-4 w-4" /> <span className="hidden sm:inline">Voice settings</span><span className="sm:hidden">Settings</span>
+                     </Button>
+                   </PopoverTrigger>
+                   <PopoverContent align="end" className="w-80 border-white/10 bg-[#171820] text-foreground">
+                     <p className="font-semibold">JAX voice settings</p>
+                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose how JAX sounds. The setting is remembered on this device.</p>
+                     <label htmlFor="jax-voice-settings" className="mt-4 block text-xs font-medium text-muted-foreground">Voice</label>
+                     <select id="jax-voice-settings" value={selectedVoice} onChange={(event) => { stopSpeaking(); setSelectedVoice(event.target.value); }} className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm text-foreground outline-none focus:border-violet-400">
+                       {jaxVoicePresets.map(([voiceId, label]) => <option key={voiceId} value={voiceId}>{label}</option>)}
+                     </select>
+                     <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-5 text-muted-foreground">
+                       <span className="font-medium text-foreground">{autoVoice ? "Auto-play on" : "Auto-play paused"}</span>
+                       <br />Use the {autoVoice ? "stop" : "play"} button above to {autoVoice ? "pause" : "hear"} future JAX replies.
+                     </div>
+                   </PopoverContent>
+                 </Popover>
+                 <Button type="button" size="sm" onClick={toggleAutoVoice} variant={autoVoice ? "default" : "outline"} className={autoVoice ? "bg-violet-500 text-white hover:bg-violet-400" : "border-violet-400/40 text-violet-200"} aria-pressed={autoVoice} aria-label={autoVoice ? "Stop automatic JAX voice playback" : "Play JAX responses automatically"}>
+                   {autoVoice ? <Square className="mr-1.5 h-3.5 w-3.5 fill-current" /> : <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />}
+                   <span>{autoVoice ? "Stop auto-play" : "Play responses"}</span>
+                 </Button>
+               </div>
+             </div>
             <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto px-4 py-8 sm:px-8">
               {chatMessages.length === 0 ? <div className="m-auto max-w-xl text-center"><div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/15 text-xl font-bold text-violet-300">J</div><h1 className="text-3xl font-bold tracking-tight">What are we writing today?</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Tell JAX the story, mood, genre, or lyric you have in mind. We’ll shape it together.</p></div> : <div className="space-y-6">{chatMessages.map((message) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-violet-500 text-white" : "border border-white/10 bg-white/[0.04]"}`}>{message.role === "jax" ? <JaxMessageView content={message.content} /> : <p className="whitespace-pre-wrap">{message.content}</p>}{message.role === "jax" && <div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => void speakText(extractLyrics(message.content) || message.content)} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button>{extractLyrics(message.content) && <Button size="sm" variant="outline" onClick={() => pushToCanvas(message.content)} className="border-white/10">Save to song</Button>}</div>}</div></div>)}{generating && <div className="text-sm text-muted-foreground">JAX is writing…</div>}{generationError && <p className="text-sm text-rose-300">{generationError}</p>}</div>}
             </div>
-             <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-1 pt-2 text-xs text-muted-foreground"><span>{remaining !== null ? `${remaining} prompts left today` : "JAX learns from this conversation"}</span><div className="flex flex-wrap items-center gap-2"><label htmlFor="jax-voice-model" className="sr-only">JAX voice</label><select id="jax-voice-model" value={selectedVoice} onChange={(event) => { stopSpeaking(); setSelectedVoice(event.target.value); }} className="max-w-[190px] rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-xs text-foreground outline-none focus:border-violet-400">{jaxVoicePresets.map(([voiceId, label]) => <option key={voiceId} value={voiceId}>{label}</option>)}</select><button type="button" onClick={() => setAutoVoice((enabled) => !enabled)} className={`rounded-full px-2.5 py-1 ${autoVoice ? "bg-violet-400/20 text-violet-200" : "bg-white/5"}`}>Auto-Voice {autoVoice ? "On" : "Off"}</button></div></div></div>{voiceError && <p className="mt-2 text-xs text-rose-300">{voiceError}</p>}</div></div>
+             <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-1 pt-2 text-xs text-muted-foreground"><span>{remaining !== null ? `${remaining} prompts left today` : "Send a question to interrupt JAX playback."}</span><span>{autoVoice ? "Auto-play is on · Change voice in Settings" : "Auto-play is paused · Change voice in Settings"}</span></div></div>{voiceError && <p className="mt-2 text-xs text-rose-300">{voiceError}</p>}</div></div>
           </main>
         </div>
       </div>
@@ -945,6 +1109,29 @@ export default function SongwritingStudio() {
       </div>
 
       {certificateOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"><div className="w-full max-w-lg rounded-2xl border border-violet-400/30 bg-[#121318] p-6"><div className="flex items-start justify-between"><div><p className="text-[10px] uppercase tracking-[0.2em] text-violet-300">JAX / PROVENANCE</p><h2 className="mt-1 text-xl font-bold">Provenance Certificate</h2></div><button type="button" onClick={() => setCertificateOpen(false)} aria-label="Close certificate dialog"><X className="h-5 w-5" /></button></div><p className="my-6 text-sm leading-6 text-muted-foreground">The certificate includes your transcript, edit history, timestamp, and active HMAC signature.</p><Button className="w-full bg-violet-500 text-white" onClick={() => void generateCertificate()} disabled={certificateBusy || !activeHash}>{certificateBusy ? "Compiling certificate…" : "Download certificate PDF"}</Button></div></div>}
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open && !deleteBusy) setDeleteTarget(null); }}>
+        <AlertDialogContent className="border-white/10 bg-[#171820] text-foreground">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this JAX session?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              “{deleteTarget?.title || "Untitled song"}” and its conversation history will be removed from your saved sessions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Keep session</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              className="bg-rose-500 text-white hover:bg-rose-400"
+              onClick={(event) => {
+                event.preventDefault();
+                if (deleteTarget) void deleteSession(deleteTarget.sessionId);
+              }}
+            >
+              {deleteBusy ? "Deleting…" : "Delete session"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/*
     <Layout hideChrome>
       <div className="min-h-screen bg-[#090a0c] text-foreground">
