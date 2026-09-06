@@ -80,6 +80,50 @@ async function main(): Promise<void> {
       );
     }
 
+    for (const status of ["requires_payment_method", "canceled"] as const) {
+      const failedPaymentIntentId = `pi_${status}_${randomUUID()}`;
+      const failedPaymentIntent = {
+        id: failedPaymentIntentId,
+        status,
+        metadata: {
+          kind: "credits_purchase",
+          user_id: userId,
+          credits: "2500",
+        },
+      };
+      const failedStatusResponse = await fetch(
+        `${base}/api/credits/purchase-status?paymentIntentId=${encodeURIComponent(failedPaymentIntent.id)}`,
+        { headers: auth },
+      );
+      const failedStatusBody = await failedStatusResponse.json() as { settled?: boolean };
+      if (failedStatusResponse.status !== 200 || failedStatusBody.settled !== false) {
+        throw new Error(
+          `expected ${status} purchase to remain unsettled, got ${failedStatusResponse.status} ${JSON.stringify(failedStatusBody)}`,
+        );
+      }
+
+      const failedBalanceResponse = await fetch(`${base}/api/credits/balance`, { headers: auth });
+      const failedBalanceBody = await failedBalanceResponse.json() as { creditsBalance?: number };
+      if (failedBalanceResponse.status !== 200 || failedBalanceBody.creditsBalance !== 40) {
+        throw new Error(
+          `expected ${status} purchase not to unlock credits, got ${failedBalanceResponse.status} ${JSON.stringify(failedBalanceBody)}`,
+        );
+      }
+
+      const failedHistoryResponse = await fetch(`${base}/api/credits/history`, { headers: auth });
+      const failedHistoryBody = await failedHistoryResponse.json() as {
+        data?: Array<{ stripePaymentIntentId?: string; delta?: number }>;
+      };
+      if (
+        failedHistoryResponse.status !== 200 ||
+        failedHistoryBody.data?.some((entry) => entry.stripePaymentIntentId === failedPaymentIntentId || entry.delta === 2500)
+      ) {
+        throw new Error(
+          `expected ${status} purchase not to appear in credit history, got ${failedHistoryResponse.status} ${JSON.stringify(failedHistoryBody)}`,
+        );
+      }
+    }
+
     const otherPaymentIntentId = `pi_other_user_${randomUUID()}`;
     await grantCredits(otherUserId, 10, "stripe_purchase", `stripe-payment-intent:${otherPaymentIntentId}`, otherPaymentIntentId);
     const otherUserResponse = await fetch(
@@ -113,7 +157,7 @@ async function main(): Promise<void> {
       );
     }
 
-    console.log("credits wallet concurrency/payment-idempotency/settlement checks passed");
+    console.log("credits wallet concurrency/payment-idempotency/failed-payment/settlement checks passed");
   } finally {
     await new Promise<void>((resolve) => appServer.close(() => resolve()));
     await db.delete(creditTransactionsTable).where(eq(creditTransactionsTable.userId, userId));
