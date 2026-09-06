@@ -7,7 +7,10 @@
   <body>
     <pre id="result">running</pre>
     <script type="module">
-      import { renderMasteringEqWav } from "/src/lib/mastering-eq.ts";
+      import {
+        isMasteringEqResourceError,
+        renderMasteringEqWav,
+      } from "/src/lib/mastering-eq.ts";
 
       const SAMPLE_RATE = 44_100;
       const DURATION_SECONDS = 2;
@@ -142,12 +145,19 @@
       async function run() {
         const fixture = createFixtureWav();
         const originalFetch = window.fetch;
+        const originalDecodeAudioData = AudioContext.prototype.decodeAudioData;
+        const progress = [];
         window.fetch = async () => new Response(fixture, {
           status: 200,
           headers: { "Content-Type": "audio/wav" },
         });
         try {
-          const rendered = await renderMasteringEqWav("/fixtures/multi-tone.wav", BAND_GAINS, POST_EQ_GAIN);
+          const rendered = await renderMasteringEqWav(
+            "/fixtures/multi-tone.wav",
+            BAND_GAINS,
+            POST_EQ_GAIN,
+            (update) => progress.push(update),
+          );
           const parsed = parseRenderedWav(await rendered.arrayBuffer());
           const inputAmplitude = TEST_TONE_AMPLITUDE;
           const measuredResponses = TEST_FREQUENCIES.map((frequency) =>
@@ -157,6 +167,35 @@
           const responseErrors = measuredResponses.map((measured, index) =>
             Math.abs(measured / expectedResponses[index] - 1)
           );
+          const progressStages = [...new Set(progress.map((update) => update.stage))];
+
+          AudioContext.prototype.decodeAudioData = async () => {
+            throw new RangeError("Array buffer allocation failed");
+          };
+          let allocationError;
+          try {
+            await renderMasteringEqWav("/fixtures/multi-tone.wav", BAND_GAINS, POST_EQ_GAIN);
+          } catch (error) {
+            allocationError = {
+              isResourceError: isMasteringEqResourceError(error),
+              code: error?.code,
+            };
+          }
+
+          window.fetch = async () => {
+            throw new TypeError("Failed to fetch");
+          };
+          let networkError;
+          try {
+            await renderMasteringEqWav("/fixtures/multi-tone.wav", BAND_GAINS, POST_EQ_GAIN);
+          } catch (error) {
+            networkError = {
+              isResourceError: isMasteringEqResourceError(error),
+              name: error?.name,
+              message: error?.message,
+            };
+          }
+
           return {
             ok: parsed.riff === "RIFF"
               && parsed.wave === "WAVE"
@@ -166,7 +205,17 @@
               && parsed.bitsPerSample === 16
               && parsed.frameCount === FRAME_COUNT
               && parsed.duration === DURATION_SECONDS
-              && responseErrors.every((error) => error < 0.025),
+              && responseErrors.every((error) => error < 0.025)
+              && JSON.stringify(progressStages) === JSON.stringify([
+                "loading",
+                "decoding",
+                "rendering",
+                "encoding",
+              ])
+              && allocationError?.isResourceError === true
+              && allocationError.code === "INSUFFICIENT_RESOURCES"
+              && networkError?.isResourceError === false
+              && networkError.name === "TypeError",
             header: {
               type: rendered.type,
               size: rendered.size,
@@ -179,6 +228,13 @@
               duration: parsed.duration,
               dataSize: parsed.dataSize,
             },
+            progress: progress.map((update) => ({
+              stage: update.stage,
+              progress: update.progress,
+            })),
+            progressStages,
+            allocationError,
+            networkError,
             frequencies: TEST_FREQUENCIES,
             measuredResponses,
             expectedResponses,
@@ -186,6 +242,7 @@
           };
         } finally {
           window.fetch = originalFetch;
+          AudioContext.prototype.decodeAudioData = originalDecodeAudioData;
         }
       }
 
