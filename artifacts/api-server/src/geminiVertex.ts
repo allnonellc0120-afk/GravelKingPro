@@ -78,6 +78,7 @@ interface GenerationConfig {
   temperature?: number;
   topP?: number;
   responseMimeType?: string;
+  tools?: Array<{ googleSearch?: Record<string, never> }>;
   /** gemini-2.5-* models think by default and thinking tokens count against
    * maxOutputTokens; pass { thinkingBudget: 0 } when a tight token cap must go
    * entirely to the answer. */
@@ -111,6 +112,7 @@ export async function generateVertexContent(
     body: JSON.stringify({
       contents: [{ role: "user", parts }],
       generationConfig: { maxOutputTokens: 8192, ...generationConfig },
+      ...(generationConfig.tools ? { tools: generationConfig.tools } : {}),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });

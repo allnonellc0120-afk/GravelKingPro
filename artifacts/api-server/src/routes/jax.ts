@@ -1,5 +1,4 @@
 import { Router, type Request, type Response } from "express";
-import { generateProxyText, isProxyConfigured } from "../geminiProxy";
 import { generateVertexText, isVertexConfigured } from "../geminiVertex";
 import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
@@ -19,6 +18,14 @@ import {
   saveGeneratedAudioArtifacts,
 } from "../services/mlkOrchestrator";
 import { CREDIT_COSTS, grantCredits, resolveCreditUser, spendCredits } from "../lib/credits";
+import {
+  getJaxSession,
+  listJaxSessions,
+  saveJaxSession,
+  type JaxAuthorshipEntry,
+  type JaxSessionMessage,
+} from "../lib/firestore";
+import { authorshipScore } from "@workspace/authorship";
 
 const execFileAsync = promisify(execFileCb);
 const objectStorage = new ObjectStorageService();
@@ -29,7 +36,6 @@ const DAILY_FREE_LIMIT = 5;
 const DAILY_TTS_LIMIT = 30;
 const usage = new Map<string, { day: string; count: number }>();
 const ttsUsage = new Map<string, { day: string; count: number }>();
-const STUDIO_REDIRECT = "I'm locked in the booth for songwriting only. Let's get back to the track. What section are we working on next?";
 const elevenLabs = new ReplitConnectors();
 const GEORGE_PREMADE_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 
@@ -80,9 +86,102 @@ function dayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function isNonMusicPrompt(prompt: string) {
-  return /\b(code|coding|javascript|typescript|python|math|equation|politic|president|trivia|weather|recipe|stock|news)\b/i.test(prompt);
+function currentUserId(req: Request): string | null {
+  return req.dbUser?.id ?? null;
 }
+
+function cleanMessages(value: unknown): JaxSessionMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((message: any) => message && (message.role === "user" || message.role === "jax") && typeof message.content === "string")
+    .slice(-80)
+    .map((message: any) => ({
+      id: typeof message.id === "string" ? message.id : randomUUID(),
+      role: message.role,
+      content: message.content.slice(0, 12_000),
+      createdAt: typeof message.createdAt === "string" ? message.createdAt : new Date().toISOString(),
+      ...(Array.isArray(message.explicitHumanText)
+        ? {
+            explicitHumanText: message.explicitHumanText
+              .filter((text: unknown): text is string => typeof text === "string")
+              .slice(0, 20),
+          }
+        : {}),
+    }));
+}
+
+function cleanLedger(value: unknown): JaxAuthorshipEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry: any) => entry && (entry.source === "human" || entry.source === "ai") && typeof entry.text === "string")
+    .slice(0, 500)
+    .map((entry: any) => ({
+      text: entry.text.slice(0, 4_000),
+      source: entry.source,
+      start: Number.isFinite(entry.start) ? entry.start : 0,
+      end: Number.isFinite(entry.end) ? entry.end : 0,
+      rationale: entry.rationale === "explicit-dictation" || entry.rationale === "human-edit"
+        ? entry.rationale
+        : "ai-generation",
+    }));
+}
+
+function sessionPayload(req: Request) {
+  const body = req.body ?? {};
+  const messages = cleanMessages(body.messages);
+  const finalText = typeof body.finalText === "string" ? body.finalText.slice(0, 30_000) : "";
+  const aiDraft = typeof body.aiDraft === "string" ? body.aiDraft.slice(0, 30_000) : "";
+  return {
+    userId: currentUserId(req) as string,
+    title: typeof body.title === "string" && body.title.trim() ? body.title.trim().slice(0, 200) : "Untitled song",
+    messages,
+    aiDraft,
+    finalText,
+    authorshipScore: Math.max(0, Math.min(100, Number(body.authorshipScore) || authorshipScore(aiDraft, finalText))),
+    authorshipLedger: cleanLedger(body.authorshipLedger),
+  };
+}
+
+jaxRouter.get("/jax/sessions", async (req: Request, res: Response) => {
+  const userId = currentUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to view JAX sessions." });
+    return;
+  }
+  res.json({ sessions: await listJaxSessions(userId) });
+});
+
+jaxRouter.get("/jax/sessions/:sessionId", async (req: Request, res: Response) => {
+  const userId = currentUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to view this JAX session." });
+    return;
+  }
+  const sessionId = String(req.params.sessionId);
+  const session = await getJaxSession(userId, sessionId);
+  if (!session) {
+    res.status(404).json({ error: "JAX session not found." });
+    return;
+  }
+  res.json({ session });
+});
+
+jaxRouter.put("/jax/sessions/:sessionId", async (req: Request, res: Response) => {
+  const userId = currentUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to save JAX sessions." });
+    return;
+  }
+  const sessionId = String(req.params.sessionId);
+  const existing = await getJaxSession(userId, sessionId);
+  if (!existing && req.body?.sessionId !== sessionId) {
+    res.status(404).json({ error: "JAX session not found." });
+    return;
+  }
+  const payload = sessionPayload(req);
+  saveJaxSession(payload, sessionId);
+  res.json({ ok: true, sessionId });
+});
 
 jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async (req: Request, res: Response) => {
   const adminBypass = isAdminAutomationAuthenticated(req);
@@ -108,15 +207,19 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
   }
   if (!unlimited) usage.set(key, { day: today, count: count + 1 });
 
-  if (isNonMusicPrompt(prompt)) {
-    res.json({ text: STUDIO_REDIRECT, remaining: unlimited ? null : DAILY_FREE_LIMIT - count - 1, redirected: true });
-    return;
-  }
-
   const artistProfile = req.body?.artistProfile && typeof req.body.artistProfile === "object"
     ? JSON.stringify(req.body.artistProfile).slice(0, 6000)
     : "{}";
-  const system = `You are JAX, GravelKing's studio songwriting companion. You are exclusively for songwriting: lyric drafting, song sections, rhyme, meter, imagery, hooks, bridges, and constructive lyric feedback. Never answer coding, math, politics, trivia, news, or other non-music questions. For those requests, reply exactly: "${STUDIO_REDIRECT}" Keep responses concise and return original lyric ideas in plain text. The artist memory JSON below is preference context, not a request to reveal private data.\n\nArtist memory JSON:\n${artistProfile}`;
+  const system = `You are JAX, GravelKing's conversational songwriting companion. Be warm, empathetic, grounded, and direct. Remember the artist's story and respond like a trusted studio partner. You can answer brief questions about rhymes, facts, references, and song context, using web grounding when current or factual information would help.
+
+Keep normal conversation and life talk outside lyric blocks. Whenever you write or revise lyrics, put ONLY the lyric lines inside one clean Markdown block labeled lyrics:
+\`\`\`lyrics
+lyric lines here
+\`\`\`
+Never put lyric lines in surrounding prose, and never use raw multi-line lyrics outside a code block. If the artist dictates exact words or asks to change a specific line, preserve those words exactly and treat them as human-authored. The artist memory JSON below is preference context, not a request to reveal private data.
+
+Artist memory JSON:
+${artistProfile}`;
   const history = Array.isArray(req.body?.history)
     ? req.body.history
         .filter((m: any) => m && typeof m.content === "string" && (m.role === "user" || m.role === "jax"))
@@ -129,13 +232,14 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
     let text = "";
     if (isVertexConfigured()) {
       try {
-        text = await generateVertexText(fullPrompt, { maxOutputTokens: 2048, responseMimeType: "text/plain" });
+        text = await generateVertexText(fullPrompt, {
+          maxOutputTokens: 2048,
+          responseMimeType: "text/plain",
+          tools: [{ googleSearch: {} }],
+        });
       } catch (vertexError) {
-        req.log.warn({ err: vertexError }, "JAX Vertex call failed, trying proxy fallback");
+        req.log.warn({ err: vertexError }, "JAX Vertex call failed");
       }
-    }
-    if (!text.trim() && isProxyConfigured()) {
-      text = await generateProxyText(fullPrompt, { maxOutputTokens: 2048 });
     }
     if (!text.trim()) throw new Error("No text provider returned a response");
     res.json({ text: text.trim(), remaining: unlimited ? null : DAILY_FREE_LIMIT - count - 1 });
