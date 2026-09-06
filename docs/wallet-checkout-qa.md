@@ -8,8 +8,7 @@ Method Domain (`pmd_1UCKnWCxsQjjsZPGbAEsuCv6`) with `apple_pay: active` and
 The association URL currently returns HTTP 200 with the SPA fallback HTML on the
 deployed site; republish the web artifact, then run `pnpm wallet:verify` before
 considering the live wallet path healthy.
-(The legacy `gravelkingpro.it.com` domain is dead — it 404s; the live domain is
-`gravelkingpro.com`.)
+(The legacy domain is retired; the live domain is `gravelkingpro.com`.)
 
 **Card path (Payment Element).** Verified end-to-end in dev against Stripe test
 mode: created a subscription SetupIntent via `POST /api/stripe/create-subscription-intent`,
