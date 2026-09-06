@@ -1,5 +1,7 @@
 // Create + activate Google Play subscription products for GravelKing Pro.
-// Mirrors the Stripe tiers (weekly $9.99, studio $24.99/mo, node auditor $249.50/mo).
+// Creates the current monthly Pro and King products. The old gk_weekly and
+// gk_studio products are intentionally retained as legacy verification aliases
+// for subscribers who purchased before the plan sheet changed.
 // Idempotent: existing products are left alone; activation errors on an
 // already-active base plan are reported but not fatal.
 // Run from artifacts/api-server: node scripts/create-play-subscriptions.mjs
@@ -11,8 +13,8 @@ const PKG = "com.gravelkingpro.app";
 const REGIONS_VERSION = "2025/03"; // latest per Google's API error message
 
 const PRODUCTS = [
-  { productId: "gk_weekly", title: "GravelKing Weekly", basePlanId: "p1w", period: "P1W", usd: { units: "9", nanos: 990000000 } },
-  { productId: "gk_studio", title: "GravelKing Studio", basePlanId: "p1m", period: "P1M", usd: { units: "24", nanos: 990000000 } },
+  { productId: "gk_pro", title: "GravelKing Pro", basePlanId: "p1m", period: "P1M", usd: { units: "9", nanos: 990000000 } },
+  { productId: "gk_king", title: "GravelKing King", basePlanId: "p1m", period: "P1M", usd: { units: "24", nanos: 990000000 } },
   { productId: "gk_node_auditor", title: "Node Auditor", basePlanId: "p1m", period: "P1M", usd: { units: "249", nanos: 500000000 } },
 ];
 

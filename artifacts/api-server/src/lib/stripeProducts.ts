@@ -29,10 +29,10 @@ const CATALOG: Array<{
   {
     name: "GravelKing Weekly",
     description:
-      "Pro access to mastering and converter, with unlimited MP3 exports and 10 WAV exports per rolling 7 days.",
+      "Pro access to mastering and converter, with 800 credits per monthly billing period, unlimited MP3 exports, and 10 WAV exports per rolling 7 days.",
     tier: "pro",
-    unitAmount: 699,
-    interval: "week",
+    unitAmount: 999,
+    interval: "month",
   },
   {
     name: "GravelKing Studio",
@@ -66,10 +66,15 @@ async function ensureProduct(
     const product = [...existing.data].sort(
       (a, b) => a.created - b.created || a.id.localeCompare(b.id)
     )[0];
+    const updates: Stripe.ProductUpdateParams = {};
     if (product.metadata?.tier !== item.tier) {
-      await stripe.products.update(product.id, {
-        metadata: { ...product.metadata, tier: item.tier },
-      });
+      updates.metadata = { ...product.metadata, tier: item.tier };
+    }
+    if (product.description !== item.description) {
+      updates.description = item.description;
+    }
+    if (Object.keys(updates).length > 0) {
+      await stripe.products.update(product.id, updates);
     }
     return { product, created: false };
   }

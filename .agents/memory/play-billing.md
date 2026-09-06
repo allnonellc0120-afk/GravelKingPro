@@ -7,11 +7,13 @@ description: Dual payment rails (Stripe web / Play Billing in TWA), verification
 
 ## Invariants (don't regress)
 - Stripe on web; Play Billing inside the Play-installed TWA (Play policy — opening Stripe checkout in the app risks rejection). The signed-in account is the cross-platform unlock; either rail entitles the same user.
+- New Play purchases use monthly `gk_pro` and `gk_king`; `gk_weekly` and `gk_studio` remain server-recognized legacy aliases for existing subscribers.
 - Google is source of truth: client sends ONLY purchaseToken; server verifies via subscriptionsv2. Entitled = expiry in future + state in {active, grace, canceled}.
 - Token claim must be atomic: insert with onConflictDoNothing on the unique token index inside a transaction — same user idempotent, different user 409. Retire a linkedPurchaseToken predecessor only when owned by the SAME user.
 - Transient Google outages must not revoke: bounded fail-open (~48h past last confirmed expiry) and the verify-attempt throttle is recorded on FAILURE too; Play-path errors never block Stripe evaluation. Renewals are lazy re-verifies (no RTDN pipeline).
 - Acknowledge within 3 days (else Google auto-refunds); "already acknowledged" 400 = success; acknowledge only after the claim is secured.
 - Client: play mode only when Digital Goods API exists AND getDetails returns ALL plan SKUs (partial catalog → stay on Stripe); trial copy hidden in play mode (no Play trial offers configured).
+- Client pricing must use Play's localized `price` and returned ISO `subscriptionPeriod`; never infer cadence from a legacy SKU name.
 
 ## Play Developer API quirks
 **Why:** these cost real debugging time; the error messages are the only documentation.

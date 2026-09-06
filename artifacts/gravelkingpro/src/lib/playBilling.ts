@@ -7,10 +7,10 @@
 
 export const PLAY_BILLING_METHOD = "https://play.google.com/billing";
 
-/** Plan id (client) → Play productId. Must match PLAY_PRODUCT_TIERS on the server. */
+/** Plan id (client) → current monthly Play productId. */
 export const PLAN_PLAY_SKUS: Record<"weekly" | "monthly" | "node_auditor", string> = {
-  weekly: "gk_weekly",
-  monthly: "gk_studio",
+  weekly: "gk_pro",
+  monthly: "gk_king",
   node_auditor: "gk_node_auditor",
 };
 
@@ -19,6 +19,8 @@ export interface PlayItemDetails {
   title: string;
   description?: string;
   price: { currency: string; value: string };
+  /** ISO-8601 subscription duration returned by the Digital Goods API. */
+  subscriptionPeriod?: string;
 }
 
 interface DigitalGoodsService {
@@ -55,6 +57,27 @@ export function formatPlayPrice(d: PlayItemDetails): string {
   } catch {
     return `${d.price.value} ${d.price.currency}`;
   }
+}
+
+/** Convert Play's ISO-8601 billing duration into a customer-facing suffix. */
+export function formatPlayBillingPeriod(subscriptionPeriod?: string): string {
+  if (!subscriptionPeriod) return "";
+
+  const match = /^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?$/.exec(subscriptionPeriod);
+  if (!match) return "";
+
+  const parts: Array<[string | undefined, string, string]> = [
+    [match[1], "year", "years"],
+    [match[2], "month", "months"],
+    [match[3], "week", "weeks"],
+    [match[4], "day", "days"],
+  ].filter(([value]) => value !== undefined) as Array<[string, string, string]>;
+  if (parts.length !== 1) return "";
+
+  const [value, singular, plural] = parts[0];
+  const count = Number(value);
+  if (!Number.isInteger(count) || count < 1) return "";
+  return count === 1 ? `/${singular}` : `/${count} ${plural}`;
 }
 
 /**

@@ -15,6 +15,10 @@ export const PLAY_PACKAGE_NAME = "com.gravelkingpro.app";
 
 /** Play productId → canonical subscription tier (matches Stripe tiers). */
 export const PLAY_PRODUCT_TIERS: Record<string, "pro" | "king" | "node_auditor"> = {
+  // Current monthly plan products.
+  gk_pro: "pro",
+  gk_king: "king",
+  // Legacy product IDs remain valid for existing subscribers.
   gk_weekly: "pro",
   gk_studio: "king",
   gk_node_auditor: "node_auditor",

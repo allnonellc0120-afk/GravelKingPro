@@ -128,8 +128,8 @@ async function createPitchDeckV2() {
   heading("Pricing", dark);
   const plans = [
     ["Starter", "Free", "Core tools, limited runs"],
-    ["Weekly", "$9.99/week", "Unlimited removal, splitting & preset masters"],
-    ["Pro Plus", "$24.99/mo", "Studio tools + MLK V3.5 optimizer + 7-day trial"],
+    ["Pro", "$9.99/mo", "Unlimited removal, splitting & preset masters"],
+    ["King", "$24.99/mo", "Studio tools + MLK V3.5 optimizer + 7-day trial"],
     ["Node Auditor", "$499/mo", "Enterprise optimization, API access, label hub"],
   ];
   for (const [name, price, desc] of plans) {

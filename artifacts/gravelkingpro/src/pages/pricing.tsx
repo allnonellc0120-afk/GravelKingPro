@@ -19,6 +19,7 @@ import {
   purchasePlaySubscription,
   restorePlayPurchases,
   formatPlayPrice,
+  formatPlayBillingPeriod,
   PLAN_PLAY_SKUS,
   type PlayItemDetails,
 } from "@/lib/playBilling";
@@ -32,10 +33,10 @@ const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
   node_auditor: "Node Auditor",
 };
 
-const WEEKLY_FEATURES = [
+const PRO_FEATURES = [
   { label: "The Foundry mastering", highlight: "Morris Law Kernel v3.5 presets" },
   { label: "10 WAV exports per rolling week", highlight: "Release-ready 44.1kHz output" },
-  { label: "800 credits each paid week", highlight: "40 generated songs, or 10 masters, or a mix" },
+  { label: "800 credits each paid billing period", highlight: "40 generated songs, or 10 masters, or a mix" },
   { label: "Unlimited MP3 exports", highlight: "No MP3 export cap" },
   { label: "Vocal Booth", highlight: "Record, clip, splice, and layer audio" },
   { label: "Free certificates", highlight: "Certify your eligible songs while you build trust" },
@@ -122,9 +123,13 @@ export default function Pricing() {
           const d = details.find((x) => x.itemId === sku);
           if (d) byPlan[planId] = d;
         });
-        // Require the FULL catalog: with a partial result we'd render some
-        // cards with Stripe prices whose buttons buy unavailable Play SKUs.
-        const allPresent = (Object.keys(PLAN_PLAY_SKUS) as PlanId[]).every((p) => byPlan[p]);
+        // Require the FULL catalog and a real Play billing period: with a
+        // partial result or missing period we'd render a card with the wrong
+        // price cadence or a button for an unavailable Play SKU.
+        const allPresent = (Object.keys(PLAN_PLAY_SKUS) as PlanId[]).every((p) => {
+          const d = byPlan[p];
+          return Boolean(d && formatPlayBillingPeriod(d.subscriptionPeriod));
+        });
         if (!allPresent) return; // stay on Stripe
         setPlayPrices(byPlan);
       } catch {
@@ -159,15 +164,25 @@ export default function Pricing() {
   const planPrices: Record<PlanId, PlanPrice> = playMode
     ? {
         weekly: playPrices?.weekly
-          // Digital Goods details do not expose a billing interval. Do not
-          // infer one from the old SKU name; Play is the pricing authority.
-          ? { amount: formatPlayPrice(playPrices.weekly), period: "", label: formatPlayPrice(playPrices.weekly) }
+          ? (() => {
+              const amount = formatPlayPrice(playPrices.weekly);
+              const period = formatPlayBillingPeriod(playPrices.weekly.subscriptionPeriod);
+              return { amount, period, label: `${amount}${period}` };
+            })()
           : FALLBACK_PRICES.weekly,
         monthly: playPrices?.monthly
-          ? { amount: formatPlayPrice(playPrices.monthly), period: "/mo", label: `${formatPlayPrice(playPrices.monthly)}/mo` }
+          ? (() => {
+              const amount = formatPlayPrice(playPrices.monthly);
+              const period = formatPlayBillingPeriod(playPrices.monthly.subscriptionPeriod);
+              return { amount, period, label: `${amount}${period}` };
+            })()
           : FALLBACK_PRICES.monthly,
         node_auditor: playPrices?.node_auditor
-          ? { amount: formatPlayPrice(playPrices.node_auditor), period: "/mo", label: `${formatPlayPrice(playPrices.node_auditor)}/mo` }
+          ? (() => {
+              const amount = formatPlayPrice(playPrices.node_auditor);
+              const period = formatPlayBillingPeriod(playPrices.node_auditor.subscriptionPeriod);
+              return { amount, period, label: `${amount}${period}` };
+            })()
           : FALLBACK_PRICES.node_auditor,
       }
     : stripePlanPrices;
@@ -273,7 +288,7 @@ export default function Pricing() {
         return;
       }
 
-      const expectedInterval = planId === "weekly" ? "week" : "month";
+      const expectedInterval = "month";
       const priceId = product.prices.find((p) => p.recurring?.interval === expectedInterval)?.id;
       if (!priceId) throw new Error(`The selected plan has no ${expectedInterval} Stripe price.`);
 
@@ -559,7 +574,7 @@ export default function Pricing() {
               <CardContent className="flex-1">
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Everything in Free, plus:</li>
-                  {WEEKLY_FEATURES.map((f) => (
+                  {PRO_FEATURES.map((f) => (
                     <li key={f.label} className="flex items-start gap-2.5">
                       <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                       <div>
