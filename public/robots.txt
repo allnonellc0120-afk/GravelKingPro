@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Block private/authenticated and user-specific routes from indexing
+Disallow: /admin
+Disallow: /kernel
+Disallow: /account
+Disallow: /api/
+Disallow: /pitch
+Disallow: /library
+Disallow: /report
+Disallow: /protected-lyrics
+Disallow: /weekend-special
+Disallow: /mix
+Disallow: /demo
+
+Sitemap: https://gravelkingpro.com/sitemap.xml
