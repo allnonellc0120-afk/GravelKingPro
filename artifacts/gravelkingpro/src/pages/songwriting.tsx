@@ -50,12 +50,25 @@ type ArtistProfile = {
 };
 type ChatMessage = { id: string; role: "user" | "jax"; content: string; createdAt?: string; explicitHumanText?: string[] };
 type JaxSessionSummary = { sessionId: string; title: string; updatedAt: string; authorshipScore: number; messages: ChatMessage[] };
+type LocalJaxSessionSnapshot = {
+  sessionId: string;
+  title: string;
+  prompt: string;
+  messages: ChatMessage[];
+  draft?: SongDraft;
+  aiDraft: string;
+  finalText: string;
+  authorshipScore: number;
+  authorshipLedger: AuthorshipLedgerEntry[];
+  savedAt: string;
+};
 
 const STORAGE_KEY = "gk:songwriting:canvas:v1";
 const JAX_SESSION_KEY = "gk:songwriting:active-session:v1";
 const HMAC_KEY_STORAGE = "gk:songwriting:hmac-key:v1";
 const BLOCK_TYPES: BlockType[] = ["Verse", "Chorus", "Bridge", "Hook", "Outro"];
 const ARTIST_PROFILE_KEY = "mlk_artist_profile";
+const JAX_SESSION_CACHE_PREFIX = "gk:jax-session:v1:";
 const DEFAULT_RULES = "Avoid simple AABB nursery rhymes. Use internal and slant rhymes, authentic flow, and natural meter.";
 const JAX_VOICE_STORAGE_KEY = "mlk_jax_selected_voice";
 const DEFAULT_JAX_VOICE_ID = "ErXwobaYiN019PkySvjV";
@@ -173,6 +186,37 @@ function sessionTitleFromPrompt(prompt: string): string {
   return title.length > 64 ? `${title.slice(0, 61).trimEnd()}…` : title;
 }
 
+function readLocalJaxSnapshot(sessionId: string): LocalJaxSessionSnapshot | null {
+  try {
+    const raw = localStorage.getItem(`${JAX_SESSION_CACHE_PREFIX}${sessionId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalJaxSessionSnapshot>;
+    if (parsed.sessionId !== sessionId || !Array.isArray(parsed.messages)) return null;
+    return {
+      sessionId,
+      title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title : "Untitled song",
+      prompt: typeof parsed.prompt === "string" ? parsed.prompt : "",
+      messages: parsed.messages as ChatMessage[],
+      draft: parsed.draft && Array.isArray(parsed.draft.blocks) ? parsed.draft as SongDraft : undefined,
+      aiDraft: typeof parsed.aiDraft === "string" ? parsed.aiDraft : "",
+      finalText: typeof parsed.finalText === "string" ? parsed.finalText : "",
+      authorshipScore: Math.max(0, Math.min(100, Number(parsed.authorshipScore) || 0)),
+      authorshipLedger: Array.isArray(parsed.authorshipLedger) ? parsed.authorshipLedger as AuthorshipLedgerEntry[] : [],
+      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalJaxSnapshot(snapshot: LocalJaxSessionSnapshot): void {
+  try {
+    localStorage.setItem(`${JAX_SESSION_CACHE_PREFIX}${snapshot.sessionId}`, JSON.stringify(snapshot));
+  } catch {
+    // The server copy remains authoritative when browser storage is unavailable.
+  }
+}
+
 function countSyllables(text: string): number {
   return text
     .toLowerCase()
@@ -250,7 +294,23 @@ function AutoTextarea({
 export default function SongwritingStudio() {
   const { tier, isDeveloper } = useAppState();
   const { user } = useUser();
+  const [initialJax] = useState(() => {
+    const activeSessionId = localStorage.getItem(JAX_SESSION_KEY) || crypto.randomUUID();
+    return { sessionId: activeSessionId, snapshot: readLocalJaxSnapshot(activeSessionId) };
+  });
   const [draft, setDraft] = useState<SongDraft>(() => {
+    if (initialJax.snapshot) {
+      if (initialJax.snapshot.draft) return initialJax.snapshot.draft;
+      const initial = initialDraft();
+      return {
+        ...initial,
+        title: initialJax.snapshot.title,
+        blocks: initialJax.snapshot.finalText
+          ? [{ id: crypto.randomUUID(), type: "Verse", content: initialJax.snapshot.finalText }]
+          : initial.blocks,
+        modifiedAt: initialJax.snapshot.savedAt,
+      };
+    }
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -271,9 +331,9 @@ export default function SongwritingStudio() {
   const [certificateOpen, setCertificateOpen] = useState(false);
   const [certificateBusy, setCertificateBusy] = useState(false);
   const canCertify = tier === "node_auditor" || isDeveloper;
-  const [prompt, setPrompt] = useState("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [sessionId, setSessionId] = useState(() => localStorage.getItem(JAX_SESSION_KEY) || crypto.randomUUID());
+  const [prompt, setPrompt] = useState(initialJax.snapshot?.prompt ?? "");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => initialJax.snapshot?.messages ?? []);
+  const [sessionId, setSessionId] = useState(initialJax.sessionId);
   const [sessions, setSessions] = useState<JaxSessionSummary[]>([]);
   const [sessionsBusy, setSessionsBusy] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -281,7 +341,7 @@ export default function SongwritingStudio() {
   const [deleteTarget, setDeleteTarget] = useState<{ sessionId: string; title: string } | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [autoVoice, setAutoVoice] = useState(true);
-  const [response, setResponse] = useState("");
+  const [response, setResponse] = useState(() => [...(initialJax.snapshot?.messages ?? [])].reverse().find((message) => message.role === "jax")?.content ?? "");
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState("");
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -301,6 +361,7 @@ export default function SongwritingStudio() {
   const voicePlaybackRef = useRef(0);
   const sessionPressTimerRef = useRef<number | null>(null);
   const longPressedSessionRef = useRef(false);
+  const latestJaxSnapshotRef = useRef<LocalJaxSessionSnapshot | null>(initialJax.snapshot);
   const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
     try {
       const saved = localStorage.getItem(ARTIST_PROFILE_KEY);
@@ -313,8 +374,8 @@ export default function SongwritingStudio() {
   const [generatorMessage, setGeneratorMessage] = useState("");
   const [stage2Hash, setStage2Hash] = useState("");
   const [stage3Hash, setStage3Hash] = useState("");
-  const [aiDraft, setAiDraft] = useState("");
-  const [authorshipLedger, setAuthorshipLedger] = useState<AuthorshipLedgerEntry[]>([]);
+  const [aiDraft, setAiDraft] = useState(initialJax.snapshot?.aiDraft ?? "");
+  const [authorshipLedger, setAuthorshipLedger] = useState<AuthorshipLedgerEntry[]>(() => initialJax.snapshot?.authorshipLedger ?? []);
   const [profileOpen, setProfileOpen] = useState(false);
   const { balance: creditsBalance } = useCredits();
   const authorshipScore = useMemo(
@@ -395,6 +456,39 @@ export default function SongwritingStudio() {
   useEffect(() => {
     localStorage.setItem(JAX_SESSION_KEY, sessionId);
   }, [sessionId]);
+
+  useEffect(() => {
+    const snapshot: LocalJaxSessionSnapshot = {
+      sessionId,
+      title: draft.title || "Untitled song",
+      prompt,
+      messages: chatMessages,
+      draft,
+      aiDraft,
+      finalText: draft.blocks.map((block) => block.content).filter(Boolean).join("\n\n"),
+      authorshipScore,
+      authorshipLedger,
+      savedAt: new Date().toISOString(),
+    };
+    latestJaxSnapshotRef.current = snapshot;
+    writeLocalJaxSnapshot(snapshot);
+  }, [aiDraft, authorshipLedger, authorshipScore, chatMessages, draft, prompt, sessionId]);
+
+  useEffect(() => {
+    const flushLatestSession = () => {
+      if (latestJaxSnapshotRef.current) writeLocalJaxSnapshot(latestJaxSnapshotRef.current);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") flushLatestSession();
+    };
+    window.addEventListener("pagehide", flushLatestSession);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      flushLatestSession();
+      window.removeEventListener("pagehide", flushLatestSession);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -657,6 +751,7 @@ export default function SongwritingStudio() {
       });
       if (!result.ok && result.status !== 404) throw new Error("This session could not be deleted.");
       setSessions((current) => current.filter((session) => session.sessionId !== id));
+      localStorage.removeItem(`${JAX_SESSION_CACHE_PREFIX}${id}`);
       setDeleteTarget(null);
       setSessionMenuId(null);
       if (id === sessionId) startNewSession();

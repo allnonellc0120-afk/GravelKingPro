@@ -30,6 +30,7 @@ import { Link } from "wouter";
 import { useCredits } from "@/components/credit-wallet";
 
 type State = "idle" | "compressing" | "processing" | "done" | "error";
+const ACTIVE_MASTER_JOB_KEY = "gk:active-master-job:v1";
 
 const PRESETS = [
   { id: "baseline",   label: "Baseline",    desc: "Balanced +10% low end, YouTube loudness",   free: true,  accent: "#38bdf8" },
@@ -262,6 +263,65 @@ export default function Mastering() {
   const [exportingEq, setExportingEq] = useState(false);
   const { balance: creditsBalance } = useCredits();
 
+  const hydrateMasterJob = useCallback(async (jobId: string): Promise<boolean> => {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, { credentials: "include" });
+    if (!response.ok) {
+      if (response.status === 404) localStorage.removeItem(ACTIVE_MASTER_JOB_KEY);
+      return false;
+    }
+    const payload = await response.json() as {
+      job?: { status?: string; progress?: number; originalFilename?: string; downloadFilename?: string; error?: string };
+      downloadUrl?: string | null;
+    };
+    const job = payload.job;
+    if (!job) return false;
+    setFileName(job.originalFilename ?? "");
+    setProgress(Number(job.progress ?? 0));
+    if (job.status === "failed") {
+      setState("error");
+      setErrorMsg(job.error ?? "Mastering failed.");
+      localStorage.removeItem(ACTIVE_MASTER_JOB_KEY);
+      return true;
+    }
+    if (job.status !== "completed") {
+      setState("processing");
+      return false;
+    }
+    const download = payload.downloadUrl ?? `/api/jobs/${encodeURIComponent(jobId)}/download`;
+    setDownloadHref(download);
+    const audioResponse = await fetch(download, { credentials: "include" });
+    if (!audioResponse.ok) return false;
+    const blob = await audioResponse.blob();
+    setResultUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(blob);
+    });
+    setProgress(100);
+    setState("done");
+    localStorage.removeItem(ACTIVE_MASTER_JOB_KEY);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const jobId = localStorage.getItem(ACTIVE_MASTER_JOB_KEY);
+    if (!jobId) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const finished = await hydrateMasterJob(jobId);
+        if (!cancelled && !finished) timer = window.setTimeout(poll, 1500);
+      } catch {
+        if (!cancelled) timer = window.setTimeout(poll, 3000);
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [hydrateMasterJob]);
+
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
   const { quota, refresh: refreshQuota } = useExportQuota();
   const exportLimitReached = Boolean(quota && !quota.unlimited && quota.remaining <= 0);
@@ -376,6 +436,8 @@ export default function Mastering() {
       const rem = resp.headers.get("X-GK-Free-Remaining");
       if (rem !== null) setRemaining(parseInt(rem));
       const certificationStatus = resp.headers.get("X-GK-Certification");
+      const serverJobId = resp.headers.get("X-GK-Master-Job-Id");
+      if (serverJobId) localStorage.setItem(ACTIVE_MASTER_JOB_KEY, serverJobId);
       if (certify && certificationStatus === "sealed-local") {
         toast({
           title: "Master complete — local scan certificate sealed",
@@ -403,6 +465,7 @@ export default function Mastering() {
       setResultUrl(URL.createObjectURL(blob));
       setState("done");
       setProgress(100);
+      if (serverJobId) localStorage.removeItem(ACTIVE_MASTER_JOB_KEY);
       void refreshQuota();
     } catch (err: any) {
       clearInterval(crawlId);
