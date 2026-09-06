@@ -131,15 +131,29 @@ logical_id = "4ea15c5e-9547-45bd-96c2-20512e781cdc"
 id = "vvVM7oCbNVzHzxiFFgthg"
 uri = "file://artifacts/gravelkingpro/public/gkpro_ad.mp4"
 type = "video"
-title = "GK Pro Ad — 20s Cinematic Duet"
+title = "GravelKing Pro — ad cut"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "48d1f516-bc91-492f-b3c7-feb11b96de1b"
+content_hash = "sha256:29163cdfd9c65e40aeab149f44118bcbb8b9d4efc07217627f0f5371fee21962"
+size = 8658657
+mtime_ms = 1783138365475
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/48d1f516-bc91-492f-b3c7-feb11b96de1b/7268bee7-b87f-476f-957d-c8b10c42b06e"
+storage_version_token = "1788734294866680"
+content_type = "video/mp4"
 
 [[outputs]]
 id = "cANszSLCYlbIn9bKbJAuq"
 uri = "file://artifacts/gravelkingpro/public/gkpro_ad_full.mp4"
 type = "video"
-title = "GK Pro Ad — 52s Full Music Video"
+title = "GravelKing Pro — full ad"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "dc6a45fa-3027-475e-8cf1-ba082c981b14"
+content_hash = "sha256:b9637492b8fd82fbce6c2954dbbe9a0a4af6c76e01fb91986d7fdb1cdc0ce3db"
+size = 9944149
+mtime_ms = 1783146701262
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/dc6a45fa-3027-475e-8cf1-ba082c981b14/5a5b05cd-65c1-4215-9f3a-74a93fb71469"
+storage_version_token = "1788734293234777"
+content_type = "video/mp4"
 
 [[outputs]]
 id = "Jr9uNyHF39Cu0uJdfq2rL"
@@ -629,9 +643,15 @@ logical_id = "353989d3-7673-4f0d-a6ae-5a290969b89a"
 id = "rQLOTFCVwQn8tXhvNuAX-"
 uri = "file://attached_assets/generated/gravelking-play-promo-90s.mp4"
 type = "video"
-title = "GravelKing Pro — Google Play Promo (97s)"
-description = "Vertical 1080x1920 promo cut from your real footage: music video hook, Kevin reaction, sub-second speed demo, export flow, Google Play download CTA, and music video outro. Loudness-normalized for social."
+title = "GravelKing Pro — Play promo 90s"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "5698872d-3fc8-46a3-91fa-834c6f9a9ac0"
+content_hash = "sha256:4c819d9d9e557a32365f271bcb47dd2ead6b9f26eded6a2856d378886ddf2497"
+size = 23429602
+mtime_ms = 1786361428705
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/5698872d-3fc8-46a3-91fa-834c6f9a9ac0/95cd06f3-6434-4159-b9cf-07c80f01b046"
+storage_version_token = "1788734307807146"
+content_type = "video/mp4"
 
 [[outputs]]
 id = "J3GBKkWQg5uUdnK2KY_ad"
@@ -645,9 +665,15 @@ logical_id = "c146d417-abbc-4835-af78-63d4ba1600b6"
 id = "O9NbgO-_0LN9ybGPP4Yqy"
 uri = "file://attached_assets/gkpro_google_play_promo.mp4"
 type = "video"
-title = "GravelKing Pro — Google Play Promo Video"
-description = "84-second vertical (1080×1920, 30fps) promo. Couch-to-studio story with AI fill shots, real app footage, music-video clips, DAW screen recording, and a Google Play end card. AI-generated narration (labeled)."
+title = "GravelKing Pro — Google Play promo"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "39279192-dcc4-4e8c-8c56-782334e23282"
+content_hash = "sha256:97b0c9ba5f092cdc0b80aac88411f3033928c819c9359099843792de2abfdc6a"
+size = 42193278
+mtime_ms = 1786401410298
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/39279192-dcc4-4e8c-8c56-782334e23282/c9515a56-853c-41bb-a034-7328f6e84906"
+storage_version_token = "1788734302456426"
+content_type = "video/mp4"
 
 [[outputs]]
 id = "IZW3zZE_Elo91UV6V0gnd"
@@ -988,42 +1014,42 @@ content_type = "text/html"
 id = "scWrGDZA6esDeQM5gUQan"
 uri = "file://artifacts/gravelking-promo/public/videos/preview_59s_9x16.mp4"
 type = "video"
-title = "GravelKing Pro — JAX 59-Second Vertical Promo"
-description = "Vertical 9:16 promo export for TikTok, Reels, Shorts, and mobile social posts."
+title = "GravelKing Pro — preview 59s vertical"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "ddd2ef2f-1cd4-464c-bc20-2121dbd97f80"
 content_hash = "sha256:06ad3dc947a8f5a58f7e81f14c779e55a5a0c214cecb71cd6d3851664d373ae2"
 size = 33057278
 mtime_ms = 1788608895779
-storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ddd2ef2f-1cd4-464c-bc20-2121dbd97f80/c1e1ac24-d225-4978-b577-8cbd459786bd"
-storage_version_token = "1788609305990436"
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ddd2ef2f-1cd4-464c-bc20-2121dbd97f80/dda02d87-f8fb-457b-9d9f-239140c7e83b"
+storage_version_token = "1788734274157161"
 content_type = "video/mp4"
 
 [[outputs]]
 id = "LeYogrE1cnV-GLTZqQVDk"
 uri = "file://artifacts/gravelking-promo/public/videos/jax_studio_companion_59s_9x16.mp4"
 type = "video"
-title = "JAX Studio Companion — 59s Vertical Promo"
-description = "New 59-second 9:16 promo for the JAX Songwriting Companion: prompt, write, compose, Vocal Booth, master, release with proof. ElevenLabs voiceover, no people."
+title = "GravelKing Pro — JAX Studio companion"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "97c34ce1-5ba9-44d2-9737-72334c2d3fc4"
 content_hash = "sha256:d50aa3b182133d5c8e8234d660bc4ce9d1d2c61e3175a8cd9595e7d962952fa2"
 size = 2713753
 mtime_ms = 1788610027323
-storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/97c34ce1-5ba9-44d2-9737-72334c2d3fc4/6bb3f13e-bf64-4b7c-82f1-4abc61221fe3"
-storage_version_token = "1788610048492744"
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/97c34ce1-5ba9-44d2-9737-72334c2d3fc4/66c7bb09-3972-43ba-8017-c585befa091e"
+storage_version_token = "1788734290163091"
 content_type = "video/mp4"
 
 [[outputs]]
 id = "NYvjZL2SnIpODFOZi1Ec9"
 uri = "file://artifacts/gravelking-promo/public/videos/jax_studio_companion_visual_59s_9x16.mp4"
 type = "video"
-title = "JAX Studio Companion — 59s Vertical Promo (verified visuals)"
-description = "New 59-second 9:16 JAX promo with animated scenes and ElevenLabs voiceover. Frames verified visually before delivery."
+title = "GravelKing Pro — JAX Studio companion visual"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "b0f997d5-d9ee-440e-a35a-d242180dba6c"
 content_hash = "sha256:82ed714955e31efdd9b217fdeaa9515a8766c1bcf2ba66f5be372073e73d90cf"
 size = 11465823
 mtime_ms = 1788610262856
-storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b0f997d5-d9ee-440e-a35a-d242180dba6c/029194d2-a46b-422d-8ea3-f794c910cd3c"
-storage_version_token = "1788610279130810"
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b0f997d5-d9ee-440e-a35a-d242180dba6c/85a8b9fa-81a3-4361-81f2-7147c28078d9"
+storage_version_token = "1788734288961941"
 content_type = "video/mp4"
 
 [[outputs]]
@@ -1254,14 +1280,14 @@ content_type = "application/pdf"
 id = "VsyZfJfF6fg66x-if_mj8"
 uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_workflow_45s_4x5.mp4"
 type = "video"
-title = "GravelKing Pro — 45s Workflow Promo"
-description = "Final 4:5 Instagram-format MP4, 1080×1350, 45 seconds."
+title = "GravelKing Pro — workflow promo 45s 4:5"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "21036d01-78fb-4815-9994-fef978e0d46a"
 content_hash = "sha256:032db602fd1c7dad322ff5ff01af4b71473ddd13e5648cf7b5e0605c53762adc"
 size = 18071640
 mtime_ms = 1788634041715
-storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/21036d01-78fb-4815-9994-fef978e0d46a/baa2b4ea-bf70-420f-8873-930d22b149ca"
-storage_version_token = "1788639615633555"
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/21036d01-78fb-4815-9994-fef978e0d46a/631dcded-9603-482b-8afd-98c9a479f198"
+storage_version_token = "1788734258035329"
 content_type = "video/mp4"
 
 [[outputs]]
@@ -1380,14 +1406,14 @@ content_type = "application/pdf"
 id = "ynNOuGZQLrFL8-Uf3NYsk"
 uri = "file://GravelKingPro_3_Minute_Vertical_Walkthrough.mp4"
 type = "video"
-title = "GravelKing Pro — Vertical Walkthrough (fixed sync + HD)"
-description = "Video speed now matches the JAX narration exactly (no dead tail), re-encoded at near-lossless quality (CRF 14, sharpened 1080×1920)."
+title = "GravelKing Pro — 3-minute vertical walkthrough"
+description = "MP4 promo export ready to import into iMovie."
 logical_id = "0b5755b2-cd7c-48b9-b3e7-b06150b64b53"
 content_hash = "sha256:d25e7538db0cd8387a0c656f0b0949e3e0e2fd4bfc5ff0561a28bfa7ad0b81b3"
 size = 18370510
 mtime_ms = 1788645814556
-storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/0b5755b2-cd7c-48b9-b3e7-b06150b64b53/b96f481b-3978-4cce-b87b-cc0443b0a26c"
-storage_version_token = "1788645831984200"
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/0b5755b2-cd7c-48b9-b3e7-b06150b64b53/315bc714-0573-42a0-be61-5ccc4b6fda3b"
+storage_version_token = "1788734314759712"
 content_type = "video/mp4"
 
 [[outputs]]
@@ -1417,3 +1443,171 @@ mtime_ms = 1788732335531
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/2e004b07-5b9d-4731-9a4e-3d0a597fe0a3/c08f47e3-76a4-4b78-90a8-f4ce847c7972"
 storage_version_token = "1788732339933694"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "eZCw5Z8gGAhfFNcIsvrTK"
+uri = "file://attached_assets/for-imovie/gravelkingpro_promo_59s_16x9_imovie.mp4"
+type = "video"
+title = "GravelKing Pro — final promo 59s landscape (iMovie copy)"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "2fef0449-283d-4b5c-8754-bbcdd96bad5a"
+content_hash = "sha256:c788eeef160455ff481903b6c680cfda0402522c72e919c35c598ac981b9ad0f"
+size = 38358131
+mtime_ms = 1788734167959
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/2fef0449-283d-4b5c-8754-bbcdd96bad5a/3f435d5f-4e0a-43d5-827a-dbcfb1095a3b"
+storage_version_token = "1788734251996322"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "oiTBp-uK2e9nhJvCNySAg"
+uri = "file://attached_assets/for-imovie/gravelkingpro_promo_59s_9x16_imovie.mp4"
+type = "video"
+title = "GravelKing Pro — final promo 59s vertical (iMovie copy)"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "ddb9636e-6e7f-459a-8842-bf50d4481e41"
+content_hash = "sha256:76081d7128e3cd00b74d4c0e3f0e91184ef5da044e2a68c021dddce1e5bee9d8"
+size = 37330626
+mtime_ms = 1788734229970
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ddb9636e-6e7f-459a-8842-bf50d4481e41/f71b9904-3dbd-470c-b7db-0812cb75afbd"
+storage_version_token = "1788734255862518"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "vJ5Ca5cidHUlEPVDV8lXD"
+uri = "file://artifacts/gravelking-promo/public/videos/preview_59s_16x9.mp4"
+type = "video"
+title = "GravelKing Pro — preview 59s landscape"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "0256d16c-4b87-48ff-8cdb-e55fcfcaf881"
+content_hash = "sha256:bb4d417368e0a4b34586b5a488ed27e744039712881ec1e5c52cf02de4adb376"
+size = 34146969
+mtime_ms = 1788608895777
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/0256d16c-4b87-48ff-8cdb-e55fcfcaf881/f35b0f30-746b-4258-9bf4-322e213392a1"
+storage_version_token = "1788734265265453"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "1yyBNdJIocNIE4EaE_sla"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_lyrics_generator_30s.mp4"
+type = "video"
+title = "GravelKing Pro — lyrics generator 30s"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "87967bab-4f0c-45ec-a2a7-b842e486de68"
+content_hash = "sha256:e68babe27f724b48784d5ede69d9a8335d7ef2ef18d038479e81025434f3bbf5"
+size = 10414339
+mtime_ms = 1788608895776
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/87967bab-4f0c-45ec-a2a7-b842e486de68/e7671e39-c07c-4b6a-a2a3-3eec41005661"
+storage_version_token = "1788734276381972"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "rhgqW_9IyN_mmvo9YFRMb"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_lyrics_generator_30s_16x9.mp4"
+type = "video"
+title = "GravelKing Pro — lyrics generator 30s landscape"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "06437550-e090-4118-af1d-0784bfbb5359"
+content_hash = "sha256:022c55531f6fc55fbe5c128ac34faa6a7a6e96ee83b4f9affe4078e061583201"
+size = 11842500
+mtime_ms = 1788608895776
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/06437550-e090-4118-af1d-0784bfbb5359/8c80ea68-16a7-4ba9-aab6-c8d569d7dbda"
+storage_version_token = "1788734278194203"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "3zsnKB0_idrUlEpyHG6TZ"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_promo_youtube.mp4"
+type = "video"
+title = "GravelKing Pro — YouTube promo"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "56fa4991-6278-4c2c-96f1-4b8fbe0bd057"
+content_hash = "sha256:09cc46ab0bb942260300412204b25e030ebfc721584619c3e6c817a528343ec9"
+size = 4440045
+mtime_ms = 1788608895774
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/56fa4991-6278-4c2c-96f1-4b8fbe0bd057/084097d9-b414-4c5d-911e-94420ffd0f49"
+storage_version_token = "1788734280469955"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "3MdDGvfI-B3KFPk--d69C"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_pitch_228.mp4"
+type = "video"
+title = "GravelKing Pro — pitch video"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "de833489-5318-4779-acd3-41be4bad9007"
+content_hash = "sha256:f7ab0d1e075ecc14a1b77ab26c0851789d328b5e7ba281c24902e18d2bdf0b6e"
+size = 52465193
+mtime_ms = 1788609137704
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/de833489-5318-4779-acd3-41be4bad9007/55a1f4b4-0515-4179-97a7-2507c3c3d2b8"
+storage_version_token = "1788734284894570"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "Sp10y6GASokIjUoJy71x7"
+uri = "file://attached_assets/GravelKing_Pro_app_promo_video_202608081251_1786299151935.mp4"
+type = "video"
+title = "GravelKing Pro — app promo video"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "3b1e834c-ada1-4a08-8673-263fee2b9558"
+content_hash = "sha256:6edcee6eda19eee5466c70c604ff640c13ca7f6133abe6f55a1fdc4cb187a403"
+size = 2727977
+mtime_ms = 1786299206498
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/3b1e834c-ada1-4a08-8673-263fee2b9558/892257f4-6b66-4ad0-aba8-6de4472f4f6d"
+storage_version_token = "1788734316213106"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "V8zhFxh4GR59u3S8okjqi"
+uri = "file://artifacts/gravelking-promo/public/videos/walkthrough.mp4"
+type = "video"
+title = "GravelKing Pro — walkthrough"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "f6c70db4-4931-409b-abcd-53f8ae6d40be"
+content_hash = "sha256:0c47d9f29d739bf66aa0cc460d5c96bc655c32510de2178fc239a3cfb7cb1bc2"
+size = 3829098
+mtime_ms = 1788608895773
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/f6c70db4-4931-409b-abcd-53f8ae6d40be/e954352c-622a-44b4-b554-3d52c79616dd"
+storage_version_token = "1788734317820983"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "HCam3nxbkwlxq9XDqgX2P"
+uri = "file://artifacts/gravelking-promo/public/videos/studio_screens.mp4"
+type = "video"
+title = "GravelKing Pro — studio screens"
+description = "MP4 promo export ready to import into iMovie."
+logical_id = "b8c9b01d-15b1-47d0-b99c-e1e7066fea76"
+content_hash = "sha256:1558c5a1a69c48d57d10547f9a38329a1a49e6aeed1c59935d2277959e56491b"
+size = 8241770
+mtime_ms = 1788608895772
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b8c9b01d-15b1-47d0-b99c-e1e7066fea76/1bd986e9-e527-435b-b8c0-986f0f32d6d2"
+storage_version_token = "1788734320185212"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "__GPLseMJNrVDDfwbJ_ix"
+uri = "file://attached_assets/for-imovie/gravelkingpro_lyrics_generator_59s_16x9_imovie.mp4"
+type = "video"
+title = "GravelKing Pro — lyrics generator 59s landscape (iMovie copy)"
+description = "Compressed H.264 MP4 copy ready to import into iMovie."
+logical_id = "ade81dab-6f74-46c9-97e8-a2919e38cb26"
+content_hash = "sha256:c788eeef160455ff481903b6c680cfda0402522c72e919c35c598ac981b9ad0f"
+size = 38358131
+mtime_ms = 1788734400334
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ade81dab-6f74-46c9-97e8-a2919e38cb26/46cfc634-135b-470e-8a32-dcd7ff42cb5e"
+storage_version_token = "1788734500401519"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "GhVFa7MGbtjRfdq1MeSl1"
+uri = "file://attached_assets/for-imovie/gravelkingpro_lyrics_generator_59s_9x16_imovie.mp4"
+type = "video"
+title = "GravelKing Pro — lyrics generator 59s vertical (iMovie copy)"
+description = "Compressed H.264 MP4 copy ready to import into iMovie."
+logical_id = "a75d4763-7769-4e01-9b69-0d8c8ddfdeb3"
+content_hash = "sha256:76081d7128e3cd00b74d4c0e3f0e91184ef5da044e2a68c021dddce1e5bee9d8"
+size = 37330626
+mtime_ms = 1788734462474
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/a75d4763-7769-4e01-9b69-0d8c8ddfdeb3/1fb4b1e6-f350-4d23-b268-59a7456f30e7"
+storage_version_token = "1788734534594409"
+content_type = "video/mp4"
