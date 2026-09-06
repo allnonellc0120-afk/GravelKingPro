@@ -4,7 +4,7 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck, X } from "lucide-react";
 
-type Props = {
+export type StripePaymentFormProps = {
   clientSecret: string;
   intentType: "payment" | "setup";
   onSuccess: () => Promise<void> | void;
@@ -13,7 +13,7 @@ type Props = {
   submitLabel?: string;
 };
 
-function PaymentForm({ intentType, onSuccess, onCancel, submitLabel }: Omit<Props, "clientSecret">) {
+function PaymentForm({ intentType, onSuccess, onCancel, submitLabel }: Omit<StripePaymentFormProps, "clientSecret">) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -94,7 +94,7 @@ function PaymentForm({ intentType, onSuccess, onCancel, submitLabel }: Omit<Prop
   );
 }
 
-export function StripePaymentForm(props: Props) {
+export function StripePaymentForm(props: StripePaymentFormProps) {
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   useEffect(() => {

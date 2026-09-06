@@ -29,6 +29,28 @@ async function defaultSecretsLoader(): Promise<string[]> {
   return (result.rows ?? []).map((r) => r.secret).filter(Boolean);
 }
 
+/**
+ * Fulfill a verified credits PaymentIntent without making another Stripe call.
+ * Keeping this small, deterministic operation separate lets integration tests
+ * replay the same webhook payload without live payment credentials.
+ */
+export async function fulfillCreditPurchasePaymentIntent(
+  intent: Pick<Stripe.PaymentIntent, "id" | "metadata">,
+): Promise<{ granted: boolean; balance: number }> {
+  const meta = intent.metadata ?? {};
+  const credits = Number(meta.credits);
+  if (meta.kind !== "credits_purchase" || !meta.user_id || !Number.isInteger(credits) || credits <= 0) {
+    throw new Error(`Invalid credits purchase metadata for ${intent.id}`);
+  }
+  return grantCredits(
+    meta.user_id,
+    credits,
+    "stripe_purchase",
+    `stripe-payment-intent:${intent.id}`,
+    intent.id,
+  );
+}
+
 export class WebhookHandlers {
   /**
    * @param payload   Raw request body Buffer (must NOT be parsed by express.json()).
@@ -123,16 +145,7 @@ export class WebhookHandlers {
           const meta = intent.metadata ?? {};
           if (meta.kind === 'credits_purchase' && meta.user_id && meta.credits) {
             const credits = Number(meta.credits);
-            if (!Number.isInteger(credits) || credits <= 0) {
-              throw new Error(`Invalid credits purchase metadata for ${intent.id}`);
-            }
-            const grant = await grantCredits(
-              meta.user_id,
-              credits,
-              'stripe_purchase',
-              `stripe-payment-intent:${intent.id}`,
-              intent.id,
-            );
+            const grant = await fulfillCreditPurchasePaymentIntent(intent);
             void recordAnalyticsEvent({
               type: "purchase_completed",
               sessionId: meta.user_id,
