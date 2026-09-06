@@ -11,9 +11,11 @@
  *   [6]  King subscriber consumes one included unlock and is idempotent
  *   [7]  Concurrent King unlocks consume exactly one allowance
  *   [8]  An expired allowance resets once under concurrent unlock load
- *   [9]  An exhausted monthly allowance still offers the $1.99 purchase
- *   [10] Concurrent exhausted allowance requests never observe a rolled-back claim
- *   [11] /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
+ *   [9]  A 19/20 allowance only grants the remaining concurrent unlock slot
+ *   [10] A full 20/20 allowance denies every concurrent unlock
+ *   [11] An exhausted monthly allowance still offers the $1.99 purchase
+ *   [12] Concurrent exhausted allowance requests never observe a rolled-back claim
+ *   [13] /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
  *        (regression guard for the "/:certId swallows /:certId.pdf" ordering bug)
  *
  * Webhook cert_unlock idempotency + owner-scoping is covered separately in
@@ -416,8 +418,115 @@ async function main(): Promise<void> {
       );
     }
 
-    // ── [9] Exhausted allowance still offers one-time purchase ────────────────
-    console.log("\n[9] Exhausted monthly allowance → 429 with $1.99 purchase details");
+    // ── [9] Cap boundary: one remaining slot across distinct certificates ─────
+    console.log("\n[9] Allowance at 19/20 → exactly one distinct certificate unlocks");
+    {
+      const periodStart = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+      const owner = await seedUser({
+        subscriptionTier: "king",
+        certUnlocks: 19,
+        certUnlockPeriodStart: periodStart,
+      });
+      const certIds = await Promise.all(
+        Array.from({ length: 6 }, () => seedCert({ ownerUserId: owner.userId })),
+      );
+
+      const results = await Promise.all(
+        certIds.map((certId) =>
+          fetch(`${base}/api/court-cert/${certId}/unlock`, {
+            method: "POST",
+            headers: owner.bearerAuth,
+          }),
+        ),
+      );
+      const bodies = await Promise.all(results.map((r) => r.json() as Promise<Record<string, unknown>>));
+      const successfulIndexes = results
+        .map((result, index) => (result.status === 200 ? index : -1))
+        .filter((index) => index >= 0);
+      const deniedIndexes = results
+        .map((result, index) => (result.status === 429 ? index : -1))
+        .filter((index) => index >= 0);
+
+      check(
+        "9.1 exactly one concurrent distinct-certificate unlock succeeds",
+        successfulIndexes.length === 1 && deniedIndexes.length === certIds.length - 1,
+        `statuses: ${results.map((r) => r.status).join(",")}`,
+      );
+      check(
+        "9.2 successful final allowance is 20",
+        (await readUserRow(owner.userId))?.certUnlocks === 20,
+      );
+      check(
+        "9.3 every denied certificate exposes the $1.99 checkout path",
+        deniedIndexes.every((index) =>
+          bodies[index].code === "CERT_UNLOCK_LIMIT_REACHED" &&
+          bodies[index].priceCents === 199 &&
+          bodies[index].checkoutUrl === `/api/court-cert/${certIds[index]}/checkout`,
+        ),
+        JSON.stringify(bodies),
+      );
+
+      const certRows = await Promise.all(certIds.map((certId) => readCertRow(certId)));
+      check(
+        "9.4 exactly one certificate is unlocked and every denial remains locked",
+        certRows.filter((row) => !!row?.unlockedAt && row.unlockSource === "included").length === 1 &&
+          certRows.filter((row) => row?.unlockedAt === null).length === certIds.length - 1,
+        JSON.stringify(certRows),
+      );
+    }
+
+    // ── [10] Cap boundary: no slots across distinct certificates ──────────────
+    console.log("\n[10] Allowance at 20/20 → no distinct certificate unlocks succeed");
+    {
+      const periodStart = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+      const owner = await seedUser({
+        subscriptionTier: "king",
+        certUnlocks: 20,
+        certUnlockPeriodStart: periodStart,
+      });
+      const certIds = await Promise.all(
+        Array.from({ length: 6 }, () => seedCert({ ownerUserId: owner.userId })),
+      );
+
+      const results = await Promise.all(
+        certIds.map((certId) =>
+          fetch(`${base}/api/court-cert/${certId}/unlock`, {
+            method: "POST",
+            headers: owner.bearerAuth,
+          }),
+        ),
+      );
+      const bodies = await Promise.all(results.map((r) => r.json() as Promise<Record<string, unknown>>));
+
+      check(
+        "10.1 every concurrent distinct-certificate unlock is denied",
+        results.every((result) => result.status === 429),
+        `statuses: ${results.map((r) => r.status).join(",")}`,
+      );
+      check(
+        "10.2 every denial exposes the $1.99 checkout path",
+        bodies.every((body, index) =>
+          body.code === "CERT_UNLOCK_LIMIT_REACHED" &&
+          body.priceCents === 199 &&
+          body.checkoutUrl === `/api/court-cert/${certIds[index]}/checkout`,
+        ),
+        JSON.stringify(bodies),
+      );
+      check(
+        "10.3 full allowance remains at 20",
+        (await readUserRow(owner.userId))?.certUnlocks === 20,
+      );
+
+      const certRows = await Promise.all(certIds.map((certId) => readCertRow(certId)));
+      check(
+        "10.4 every denied certificate remains locked",
+        certRows.every((row) => row?.unlockedAt === null),
+        JSON.stringify(certRows),
+      );
+    }
+
+    // ── [11] Exhausted allowance still offers one-time purchase ───────────────
+    console.log("\n[11] Exhausted monthly allowance → 429 with $1.99 purchase details");
     {
       const periodStart = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
       const owner = await seedUser({
@@ -431,19 +540,19 @@ async function main(): Promise<void> {
         method: "POST",
         headers: owner.bearerAuth,
       });
-      check("9.1 exhausted allowance unlock → 429", r.status === 429, `got ${r.status}`);
+      check("11.1 exhausted allowance unlock → 429", r.status === 429, `got ${r.status}`);
       const b = await r.json() as Record<string, unknown>;
-      check("9.2 exhausted allowance has CERT_UNLOCK_LIMIT_REACHED code", b.code === "CERT_UNLOCK_LIMIT_REACHED", JSON.stringify(b));
-      check("9.3 exhausted allowance exposes $1.99 price", b.priceCents === 199, JSON.stringify(b));
+      check("11.2 exhausted allowance has CERT_UNLOCK_LIMIT_REACHED code", b.code === "CERT_UNLOCK_LIMIT_REACHED", JSON.stringify(b));
+      check("11.3 exhausted allowance exposes $1.99 price", b.priceCents === 199, JSON.stringify(b));
       check(
-        "9.4 exhausted allowance exposes checkout URL",
+        "11.4 exhausted allowance exposes checkout URL",
         b.checkoutUrl === `/api/court-cert/${certId}/checkout`,
         JSON.stringify(b),
       );
-      check("9.5 exhausted allowance reports used=20", b.used === 20, JSON.stringify(b));
-      check("9.6 exhausted allowance reports limit=20", b.limit === 20, JSON.stringify(b));
+      check("11.5 exhausted allowance reports used=20", b.used === 20, JSON.stringify(b));
+      check("11.6 exhausted allowance reports limit=20", b.limit === 20, JSON.stringify(b));
       check(
-        "9.7 exhausted allowance reports an ISO reset date",
+        "11.7 exhausted allowance reports an ISO reset date",
         typeof b.resetsAt === "string" &&
           !Number.isNaN(Date.parse(b.resetsAt)) &&
           new Date(b.resetsAt).toISOString() === b.resetsAt,
@@ -451,13 +560,13 @@ async function main(): Promise<void> {
       );
 
       const row = await readUserRow(owner.userId);
-      check("9.8 exhausted allowance remains at 20", row?.certUnlocks === 20, `certUnlocks=${row?.certUnlocks}`);
+      check("11.8 exhausted allowance remains at 20", row?.certUnlocks === 20, `certUnlocks=${row?.certUnlocks}`);
       const certRow = await readCertRow(certId);
-      check("9.9 cert remains locked after exhausted allowance", certRow?.unlockedAt === null, String(certRow?.unlockedAt));
+      check("11.9 cert remains locked after exhausted allowance", certRow?.unlockedAt === null, String(certRow?.unlockedAt));
     }
 
-    // ── [10] PDF route registered before JSON route (Express 5 ordering) ───────
-    console.log("\n[10] Concurrent exhausted allowance requests never observe a rolled-back claim");
+    // ── [12] Exhausted allowance concurrent rollback safety ───────────────────
+    console.log("\n[12] Concurrent exhausted allowance requests never observe a rolled-back claim");
     {
       const periodStart = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
       const owner = await seedUser({
@@ -477,12 +586,12 @@ async function main(): Promise<void> {
       );
       const bodies = await Promise.all(results.map((r) => r.json() as Promise<Record<string, unknown>>));
       check(
-        "10.1 every exhausted concurrent request returns 429",
+        "12.1 every exhausted concurrent request returns 429",
         results.every((r) => r.status === 429),
         `statuses: ${results.map((r) => r.status).join(",")}`,
       );
       check(
-        "10.2 every exhausted concurrent response offers the $1.99 purchase",
+        "12.2 every exhausted concurrent response offers the $1.99 purchase",
         bodies.every((body) =>
           body.code === "CERT_UNLOCK_LIMIT_REACHED" &&
           body.priceCents === 199 &&
@@ -492,13 +601,13 @@ async function main(): Promise<void> {
       );
 
       const row = await readUserRow(owner.userId);
-      check("10.3 concurrent exhausted requests never exceed the allowance", row?.certUnlocks === 20, `certUnlocks=${row?.certUnlocks}`);
+      check("12.3 concurrent exhausted requests never exceed the allowance", row?.certUnlocks === 20, `certUnlocks=${row?.certUnlocks}`);
       const certRow = await readCertRow(certId);
-      check("10.4 certificate remains locked after every denied request", certRow?.unlockedAt === null, String(certRow?.unlockedAt));
+      check("12.4 certificate remains locked after every denied request", certRow?.unlockedAt === null, String(certRow?.unlockedAt));
     }
 
-    // ── [11] PDF route registered before JSON route (Express 5 ordering) ───────
-    console.log("\n[11] PDF route registers before /:certId (Express 5 ordering regression)");
+    // ── [13] PDF route registered before JSON route (Express 5 ordering) ───────
+    console.log("\n[13] PDF route registers before /:certId (Express 5 ordering regression)");
     {
       const owner = await seedUser({ subscriptionTier: "king" });
       // Cert already unlocked so the route returns a PDF response (not 402)
@@ -511,9 +620,9 @@ async function main(): Promise<void> {
       const r = await fetch(`${base}/api/court-cert/${certId}.pdf`, {
         headers: owner.bearerAuth,
       });
-      check("11.1 /:certId.pdf → 200", r.status === 200, `got ${r.status}`);
+      check("13.1 /:certId.pdf → 200", r.status === 200, `got ${r.status}`);
       const ct = r.headers.get("content-type") ?? "";
-      check("11.2 /:certId.pdf content-type is application/pdf (not JSON)", ct.includes("application/pdf"), `got: ${ct}`);
+      check("13.2 /:certId.pdf content-type is application/pdf (not JSON)", ct.includes("application/pdf"), `got: ${ct}`);
     }
 
   } finally {
