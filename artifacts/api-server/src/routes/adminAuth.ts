@@ -7,8 +7,16 @@ import {
   isDeveloperAuthenticated,
   requireAdmin,
 } from "../lib/adminAuth";
-import { db, usersTable, tracksTable, toolErrorsTable, ipCertStubsTable, lyricImportsTable } from "@workspace/db";
-import { eq, inArray, desc } from "drizzle-orm";
+import {
+  db,
+  usersTable,
+  tracksTable,
+  toolErrorsTable,
+  ipCertStubsTable,
+  lyricImportsTable,
+  creditTransactionsTable,
+} from "@workspace/db";
+import { eq, inArray, desc, sql } from "drizzle-orm";
 import { getObjectFileWithFallback, saveObjectWithFallback } from "../lib/objectStorage";
 import { embedLsbPayload } from "../kernel-v3";
 import { logger } from "../lib/logger";
@@ -152,6 +160,83 @@ adminAuthRouter.post("/admin/grant-access", async (req: Request, res: Response) 
 });
 
 /**
+ * POST /api/admin/credits/set
+ * Sets one user's wallet to an exact balance and records the adjustment in the
+ * immutable credit ledger. This changes no entitlement or feature gate.
+ */
+adminAuthRouter.post("/admin/credits/set", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+
+  const body = (req.body ?? {}) as { email?: unknown; balance?: unknown };
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const balance = typeof body.balance === "number" ? body.balance : Number(body.balance);
+
+  if (!email || !email.includes("@")) {
+    res.status(400).json({ error: "valid email required" });
+    return;
+  }
+  if (!Number.isSafeInteger(balance) || balance < 0 || balance > 10_000_000) {
+    res.status(400).json({ error: "balance must be a non-negative integer" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({
+        id: usersTable.id,
+        email: usersTable.email,
+        creditsBalance: usersTable.creditsBalance,
+      })
+      .from(usersTable)
+      .where(sql`lower(${usersTable.email}) = ${email}`)
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "user not found" });
+      return;
+    }
+
+    const previousBalance = user.creditsBalance;
+    const delta = balance - previousBalance;
+    if (delta === 0) {
+      res.json({
+        ok: true,
+        changed: false,
+        user: { email: user.email, creditsBalance: balance },
+      });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(usersTable)
+        .set({ creditsBalance: balance })
+        .where(eq(usersTable.id, user.id));
+
+      await tx.insert(creditTransactionsTable).values({
+        userId: user.id,
+        delta,
+        kind: "admin_balance_set",
+        reference: `admin-balance:${user.id}:${randomUUID()}`,
+      });
+    });
+
+    logger.info(
+      { userId: user.id, previousBalance, creditsBalance: balance, delta },
+      "admin set credit balance",
+    );
+    res.json({
+      ok: true,
+      changed: true,
+      user: { email: user.email, previousBalance, creditsBalance: balance, delta },
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, "admin credit balance update failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
+  }
+});
+
+/**
  * POST /api/admin/purge-user
  * Hard-delete a user and all their associated data (tracks, process_runs, purchased_tracks).
  * Body: { email: string }
@@ -187,7 +272,6 @@ adminAuthRouter.post("/admin/purge-user", async (req: Request, res: Response) =>
     const ownedIds = ownedTracks.map((t) => t.id);
 
     // Delete in FK-safe order
-    const { sql } = await import("drizzle-orm");
     await db.execute(sql`DELETE FROM process_runs WHERE user_id = ${userId}`);
 
     if (ownedIds.length > 0) {

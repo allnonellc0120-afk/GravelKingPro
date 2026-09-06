@@ -15,9 +15,16 @@ import { AdminNav } from "@/components/admin-nav";
 import { useLocation } from "wouter";
 
 interface Summary {
+  generatedAt: string;
   rangeDays: number;
   totals: { pageviews: number; uniqueVisitors: number; externalVisitors: number; checkoutStarts: number };
   accounts: { localRecords: number; verifiedEmailAccounts: number; anonymousRecords: number };
+  ownerAccount: {
+    creditsBalance: number;
+    isPro: boolean;
+    isDeveloper: boolean;
+    subscriptionTier: string | null;
+  };
   subscriptions: {
     active: number; trialing: number; pastDue: number; total: number;
     mrr: number; recentRevenue: number; lifetimeRevenue: number; stripeOk: boolean;
@@ -130,6 +137,7 @@ function AnalyticsDashboard() {
     try {
       const res = await fetch(`/api/analytics/summary?days=${range}`, {
         credentials: "include",
+        cache: "no-store",
       });
       if (res.status === 401 || res.status === 403) {
         logout();
@@ -149,6 +157,13 @@ function AnalyticsDashboard() {
   }, [logout]);
 
   useEffect(() => { void load(days); }, [days, load]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load(days);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [days, load]);
 
   const [location] = useLocation();
 
@@ -221,6 +236,11 @@ function AnalyticsDashboard() {
             <p className="text-sm text-muted-foreground mt-0.5">
               {activeTab === "grow" ? "SEO checklist, social posts & submission directories" : "Traffic & conversion funnel · live revenue snapshot"}
             </p>
+            {activeTab === "analytics" && data?.generatedAt && (
+              <p className="mt-1 text-[10px] text-muted-foreground/70">
+                Live data · refreshed {new Date(data.generatedAt).toLocaleTimeString()}
+              </p>
+            )}
           </div>
           {activeTab === "analytics" && (
             <div className="flex items-center gap-2">
@@ -465,6 +485,13 @@ function AnalyticsDashboard() {
               <StatCard icon={<Crown className="w-4 h-4 text-amber-500" />} label="Active Paid Subs" value={fmt(data.subscriptions.active)} sub={data.subscriptions.pastDue > 0 ? `+ ${data.subscriptions.pastDue} past due` : "live Stripe subscriptions"} accent="text-amber-500" />
               <StatCard icon={<Users className="w-4 h-4 text-emerald-400" />} label="Verified Email Accounts" value={fmt(data.accounts.verifiedEmailAccounts)} sub="registered users with an email on file" accent="text-emerald-400" />
               <StatCard icon={<Eye className="w-4 h-4 text-muted-foreground" />} label="Anonymous Local Records" value={fmt(data.accounts.anonymousRecords)} sub="visitors or partial sessions — not sign-ups" />
+              <StatCard
+                icon={<Wallet className="w-4 h-4 text-sky-400" />}
+                label="Owner Credits"
+                value={fmt(data.ownerAccount.creditsBalance)}
+                sub={data.ownerAccount.isDeveloper ? "developer · all gates unchanged" : (data.ownerAccount.subscriptionTier ?? "no tier")}
+                accent="text-sky-400"
+              />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               <StatCard icon={<Clock className="w-4 h-4" />} label="Live Trials" value={fmt(data.subscriptions.trialing)} sub="not counted as MRR" />
