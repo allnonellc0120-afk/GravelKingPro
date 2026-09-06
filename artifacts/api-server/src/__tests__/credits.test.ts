@@ -80,6 +80,28 @@ async function main(): Promise<void> {
       );
     }
 
+    const paymentReference = `stripe-payment-intent:${paymentIntentId}`;
+    const beforeBalanceResponse = await fetch(`${base}/api/credits/balance`, { headers: auth });
+    const beforeBalanceBody = await beforeBalanceResponse.json() as { creditsBalance?: number };
+    if (beforeBalanceResponse.status !== 200 || beforeBalanceBody.creditsBalance !== 40) {
+      throw new Error(
+        `expected delayed purchase not to change authenticated balance, got ${beforeBalanceResponse.status} ${JSON.stringify(beforeBalanceBody)}`,
+      );
+    }
+
+    const beforeHistoryResponse = await fetch(`${base}/api/credits/history`, { headers: auth });
+    const beforeHistoryBody = await beforeHistoryResponse.json() as {
+      data?: Array<{ reference?: string; delta?: number }>;
+    };
+    if (
+      beforeHistoryResponse.status !== 200 ||
+      beforeHistoryBody.data?.some((entry) => entry.reference === paymentReference)
+    ) {
+      throw new Error(
+        `expected delayed purchase to be absent from authenticated history, got ${beforeHistoryResponse.status} ${JSON.stringify(beforeHistoryBody)}`,
+      );
+    }
+
     for (const status of ["requires_payment_method", "canceled"] as const) {
       const failedPaymentIntentId = `pi_${status}_${randomUUID()}`;
       const failedPaymentIntent = {
@@ -157,7 +179,33 @@ async function main(): Promise<void> {
       );
     }
 
-    console.log("credits wallet concurrency/payment-idempotency/failed-payment/settlement checks passed");
+    const afterBalanceResponse = await fetch(`${base}/api/credits/balance`, { headers: auth });
+    const afterBalanceBody = await afterBalanceResponse.json() as { creditsBalance?: number };
+    if (afterBalanceResponse.status !== 200 || afterBalanceBody.creditsBalance !== 50) {
+      throw new Error(
+        `expected settled purchase to add 10 credits to authenticated balance, got ${afterBalanceResponse.status} ${JSON.stringify(afterBalanceBody)}`,
+      );
+    }
+
+    const afterHistoryResponse = await fetch(`${base}/api/credits/history`, { headers: auth });
+    const afterHistoryBody = await afterHistoryResponse.json() as {
+      data?: Array<{ reference?: string; delta?: number; kind?: string }>;
+    };
+    const matchingPurchaseEntries = afterHistoryBody.data?.filter(
+      (entry) => entry.reference === paymentReference,
+    ) ?? [];
+    if (
+      afterHistoryResponse.status !== 200 ||
+      matchingPurchaseEntries.length !== 1 ||
+      matchingPurchaseEntries[0].delta !== 10 ||
+      matchingPurchaseEntries[0].kind !== "stripe_purchase"
+    ) {
+      throw new Error(
+        `expected settled purchase to appear once in authenticated history, got ${afterHistoryResponse.status} ${JSON.stringify(afterHistoryBody)}`,
+      );
+    }
+
+    console.log("credits wallet concurrency/payment-idempotency/failed-payment/settlement consistency checks passed");
   } finally {
     await new Promise<void>((resolve) => appServer.close(() => resolve()));
     await db.delete(creditTransactionsTable).where(eq(creditTransactionsTable.userId, userId));
