@@ -29,6 +29,19 @@ type CreditHistoryResponse = {
   pendingPurchase?: PendingPurchase | null;
 };
 
+async function isPurchaseSettled(paymentIntentId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/credits/purchase-status?paymentIntentId=${encodeURIComponent(paymentIntentId)}`, {
+      credentials: "include",
+    });
+    if (!response.ok) return false;
+    const data = await response.json() as { settled?: unknown };
+    return data.settled === true;
+  } catch {
+    return false;
+  }
+}
+
 function parsePendingPurchase(value: unknown): PendingPurchase | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
@@ -168,8 +181,7 @@ export function CreditWallet({
     setSettling(true);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       await refresh();
-      const status = await fetch(`/api/credits/purchase-status?paymentIntentId=${encodeURIComponent(paymentIntentId)}`, { credentials: "include" }).then((r) => r.ok ? r.json() as Promise<{ settled?: boolean }> : { settled: false }).catch(() => ({ settled: false }));
-      if (status.settled) {
+      if (await isPurchaseSettled(paymentIntentId)) {
         await loadHistory(1);
         setPayment(null);
         setSettling(false);
@@ -187,8 +199,7 @@ export function CreditWallet({
     setSettling(true);
     for (let attempt = 0; attempt < 12; attempt += 1) {
       await refresh();
-      const status = await fetch(`/api/credits/purchase-status?paymentIntentId=${encodeURIComponent(pendingPurchase.paymentIntentId)}`, { credentials: "include" }).then((r) => r.ok ? r.json() as Promise<{ settled?: boolean }> : { settled: false }).catch(() => ({ settled: false }));
-      if (status.settled) {
+      if (await isPurchaseSettled(pendingPurchase.paymentIntentId)) {
         await loadHistory(1);
         setSettling(false);
         return;
@@ -242,7 +253,7 @@ export function CreditWallet({
               data-testid={`credit-buy-${pack.id}`}
               className="mt-3 w-full bg-sky-500 text-black hover:bg-sky-400"
               onClick={() => void buy(pack)}
-              disabled={busyPack !== null || !!payment || !!pendingPurchase}
+              disabled={busyPack !== null || !!payment || !!pendingPurchase || settling}
             >
               {busyPack === pack.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Buy ${(pack.amountCents / 100).toFixed(2)}
