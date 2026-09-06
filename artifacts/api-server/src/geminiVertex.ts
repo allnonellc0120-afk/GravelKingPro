@@ -102,6 +102,7 @@ export async function generateVertexContent(
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
   const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
+  const { tools, ...vertexGenerationConfig } = generationConfig;
 
   const res = await fetch(url, {
     method: "POST",
@@ -111,8 +112,8 @@ export async function generateVertexContent(
     },
     body: JSON.stringify({
       contents: [{ role: "user", parts }],
-      generationConfig: { maxOutputTokens: 8192, ...generationConfig },
-      ...(generationConfig.tools ? { tools: generationConfig.tools } : {}),
+      generationConfig: { maxOutputTokens: 8192, ...vertexGenerationConfig },
+      ...(tools ? { tools } : {}),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
