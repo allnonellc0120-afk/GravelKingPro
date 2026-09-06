@@ -101,6 +101,22 @@ const blockRe = new RegExp(`${START}[\\s\\S]*?${END}`);
 const rootRe = /<div id="root"><\/div>/;
 
 function crawlerSummary(route) {
+  if (route.path === "/data-deletion") {
+    return [
+      '    <div id="root">',
+      "      <main>",
+      `        <h1>${esc(route.title)}</h1>`,
+      "        <p>You can request deletion of your GravelKing Pro account and associated personal data without signing in.</p>",
+      "        <h2>How to request deletion</h2>",
+      '        <p>Email <a href="mailto:support@gravelkingpro.com?subject=Account%20Deletion%20Request">support@gravelkingpro.com</a> from the address connected to your account, or include another account identifier so we can locate your records.</p>',
+      "        <h2>Data we remove</h2>",
+      "        <ul><li>User credentials and account information</li><li>Saved lyrics and song drafts</li><li>Uploaded audio and generated audio stems</li><li>Session logs and active sessions</li></ul>",
+      "        <p>After we verify the request, we remove the applicable account and data within 30 days. We will explain any legally required retention or third-party record that cannot be removed.</p>",
+      `        <p><a href="${canonicalFor(route.path)}">Open the full ${esc(config.siteName)} deletion instructions</a></p>`,
+      "      </main>",
+      "    </div>",
+    ].join("\n");
+  }
   return [
     '    <div id="root">',
     "      <noscript>",
