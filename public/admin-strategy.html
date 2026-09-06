@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GravelKing Pro — Admin Strategy Brief</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#fff;color:#111;font-family:'Inter',sans-serif;line-height:1.7;font-size:16px}
+  /* COVER */
+  .cover{background:#080808;color:#f0f0f0;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;position:relative;overflow:hidden}
+  .cover::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,#c9a22718,transparent 70%)}
+  .logo-text{font-size:clamp(72px,12vw,140px);font-weight:900;color:#c9a227;letter-spacing:-5px;font-style:italic;line-height:1;text-shadow:0 0 80px #c9a22730;position:relative;z-index:1}
+  .cover-label{font-size:11px;font-weight:700;letter-spacing:6px;text-transform:uppercase;color:#c9a227;margin-bottom:10px;position:relative;z-index:1}
+  .cover-tagline{font-size:clamp(14px,2vw,22px);font-weight:700;color:#f0f0f0;letter-spacing:3px;text-transform:uppercase;margin:14px 0 6px;position:relative;z-index:1}
+  .cover-subtitle{font-size:13px;color:#666;letter-spacing:5px;text-transform:uppercase;margin-bottom:50px;position:relative;z-index:1}
+  .cover-badge{display:inline-block;border:1px solid #c9a22740;color:#c9a227;font-weight:700;font-size:11px;letter-spacing:4px;text-transform:uppercase;padding:10px 28px;border-radius:100px;position:relative;z-index:1}
+  .confidential{position:absolute;top:30px;right:40px;font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:#444;z-index:2;border:1px solid #333;padding:6px 14px;border-radius:4px}
+  /* PAGE */
+  .page{max-width:880px;margin:0 auto;padding:70px 40px}
+  .page-break{page-break-before:always}
+  /* TYPOGRAPHY */
+  .eyebrow{font-size:10px;font-weight:700;letter-spacing:5px;text-transform:uppercase;color:#c9a227;margin-bottom:12px}
+  h2{font-size:clamp(26px,3.5vw,40px);font-weight:900;color:#080808;line-height:1.1;margin-bottom:22px}
+  h2 em{color:#c9a227;font-style:normal}
+  h3{font-size:20px;font-weight:800;color:#080808;margin:36px 0 14px}
+  p{font-size:15px;line-height:1.85;color:#444;margin-bottom:14px}
+  p.lead{font-size:18px;font-weight:600;color:#111;line-height:1.6;margin-bottom:22px}
+  .divider{border:none;border-top:2px solid #f0f0f0;margin:60px 0}
+  /* HOOK BOX */
+  .hook{background:#080808;color:#f0f0f0;border-radius:16px;padding:44px;margin:36px 0;position:relative;overflow:hidden}
+  .hook::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#c9a227,#e8c84a)}
+  .hook p{color:#bbb;font-size:16px;line-height:1.85;margin:0 0 12px}
+  .hook p:last-child{margin:0}
+  .hook p strong{color:#c9a227}
+  .hook h4{color:#f0f0f0;font-size:16px;font-weight:800;letter-spacing:1px;margin-bottom:10px;text-transform:uppercase;font-size:11px;letter-spacing:4px;color:#c9a227}
+  /* PILLAR CARDS */
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:32px 0}
+  .pillar{background:#fafafa;border:1.5px solid #e8e8e8;border-radius:14px;padding:28px 22px;position:relative}
+  .pillar-num{font-size:40px;font-weight:900;color:#f0f0f0;position:absolute;top:16px;right:20px}
+  .pillar-icon{font-size:28px;margin-bottom:10px}
+  .pillar h4{font-size:15px;font-weight:900;color:#080808;margin-bottom:6px}
+  .pillar p{font-size:13px;color:#666;line-height:1.6;margin:0}
+  .pillar .pillar-tag{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#c9a227;margin-bottom:8px}
+  /* REVENUE TIERS */
+  .tier-table{width:100%;border-collapse:collapse;margin:28px 0;font-size:14px}
+  .tier-table th{background:#080808;color:#c9a227;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:14px 18px;text-align:left}
+  .tier-table td{padding:14px 18px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+  .tier-table tr:last-child td{border-bottom:none}
+  .tier-table tr:nth-child(even) td{background:#fafafa}
+  .tier-table td:first-child{font-weight:700;color:#080808}
+  .tier-table .gold{color:#c9a227;font-weight:800}
+  /* STRATEGY ROWS */
+  .strat-list{margin:24px 0;display:flex;flex-direction:column;gap:14px}
+  .strat-item{display:flex;gap:20px;align-items:flex-start;padding:20px 24px;border:1px solid #e8e8e8;border-radius:12px}
+  .strat-num{width:36px;height:36px;border-radius:50%;background:#080808;color:#c9a227;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+  .strat-body h4{font-size:15px;font-weight:800;color:#080808;margin-bottom:4px}
+  .strat-body p{font-size:13px;color:#555;line-height:1.65;margin:0}
+  /* CALENDAR */
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin:28px 0}
+  .cal-day{background:#fafafa;border:1px solid #e8e8e8;border-radius:10px;padding:14px 12px}
+  .cal-day-label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#c9a227;margin-bottom:6px}
+  .cal-day-title{font-size:12px;font-weight:800;color:#080808;margin-bottom:6px;line-height:1.3}
+  .cal-day-copy{font-size:11px;color:#666;line-height:1.5}
+  /* INVESTOR */
+  .investor-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:28px 0}
+  .investor{background:#fafafa;border:1px solid #e8e8e8;border-radius:12px;padding:22px}
+  .investor h4{font-size:14px;font-weight:900;color:#080808;margin-bottom:4px}
+  .investor .inv-type{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#c9a227;margin-bottom:8px}
+  .investor p{font-size:12px;color:#666;line-height:1.6;margin:0}
+  .investor .inv-angle{font-size:11px;color:#080808;font-weight:600;margin-top:8px}
+  /* QUOTE */
+  .quote{border-left:4px solid #c9a227;padding:22px 28px;background:#fffdf0;margin:28px 0;border-radius:0 12px 12px 0}
+  .quote p{font-size:17px;font-style:italic;color:#333;margin:0;line-height:1.7}
+  .quote cite{display:block;font-size:11px;font-weight:700;color:#c9a227;text-transform:uppercase;letter-spacing:3px;margin-top:10px;font-style:normal}
+  /* NUMBERS */
+  .numbers{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:#f0f0f0;border:1px solid #f0f0f0;border-radius:16px;overflow:hidden;margin:28px 0}
+  .num-box{background:#fff;padding:28px 16px;text-align:center}
+  .num{font-size:clamp(24px,3.5vw,40px);font-weight:900;color:#c9a227;line-height:1}
+  .num-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:3px;color:#999;margin-top:5px}
+  /* WARNING BOX */
+  .warning{background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:22px 28px;margin:24px 0}
+  .warning p{font-size:14px;color:#78350f;margin:0;line-height:1.7}
+  .warning strong{color:#92400e}
+  /* PRINT */
+  @media print{.cover{min-height:auto;padding:40px;page-break-after:always}.page{padding:50px 40px}body{font-size:13px}}
+  @media(max-width:700px){.pillars{grid-template-columns:1fr}.cal-grid{grid-template-columns:repeat(4,1fr)}.investor-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="confidential">Confidential · Admin Only</div>
+  <div class="logo-text">GK™</div>
+  <div class="cover-label">Corporate Strategy Brief</div>
+  <div class="cover-tagline">GravelKing Pro — Admin &amp; Pipeline Strategy</div>
+  <div class="cover-subtitle">MLK V3.5 · Clean Room Architecture · Revenue Moat · July 2026</div>
+  <div class="cover-badge">All N One LLC · Internal Use</div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<div class="page">
+  <div class="eyebrow">Executive Summary</div>
+  <h2>The Engine Is the <em>Financial Moat</em></h2>
+
+  <p class="lead">GravelKing Pro is positioned correctly as a music production platform. The critical reframe for this strategy document: the MLK V3.5 engine is not a feature. It is a credentialing infrastructure — the same category of asset as a credit bureau, a title insurer, or a certification body. The financial model that flows from that reframe is significantly more scalable than a simple SaaS subscription.</p>
+
+  <div class="hook">
+    <h4>The Core Thesis</h4>
+    <p>Every mastered track that leaves our servers carries a <strong>cryptographic Clean Room certificate</strong> — a two-part handshake split between the audio file and our server. The file half (the nominator) is permanently embedded in the PCM signal. The server half (the denominator + HMAC) is dual-backed to Postgres and Google Cloud Firestore. <strong>Neither half validates anything alone.</strong></p>
+    <p>This creates a verification monopoly. The only entity that can confirm a GravelKing Pro master is authentic is GravelKing Pro. That is not a technical implementation detail — it is the entire business model at scale.</p>
+    <p>When an independent distributor, a label, or a sync licensing clearinghouse wants to guarantee chain-of-title on AI-assisted tracks in their catalog, <strong>they cannot build this themselves</strong>. They need our API. That is the high-margin enterprise revenue driver that the SaaS subscription model alone cannot capture.</p>
+  </div>
+
+  <div class="numbers">
+    <div class="num-box"><div class="num">~95%</div><div class="num-label">Gross margin (cloud infra)</div></div>
+    <div class="num-box"><div class="num">$0</div><div class="num-label">Marginal cost per cert issued</div></div>
+    <div class="num-box"><div class="num">∞</div><div class="num-label">Certs possible per server</div></div>
+    <div class="num-box"><div class="num">1</div><div class="num-label">Company that can verify them</div></div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- THREE REVENUE PILLARS -->
+<div class="page">
+  <div class="eyebrow">Revenue Architecture</div>
+  <h2>Three <em>Revenue Pillars</em> — Structured for Scale</h2>
+
+  <p class="lead">The financial model is built around three distinct drivers that compound on each other. Each new mastered track increases the value of the verification network. Each enterprise verification call validates the network's authority. Each Pro subscriber grows the catalog that makes the network valuable.</p>
+
+  <div class="pillars">
+    <div class="pillar">
+      <div class="pillar-num">01</div>
+      <div class="pillar-icon">🎚️</div>
+      <div class="pillar-tag">Volume Driver</div>
+      <h4>Automated Mastering Fees</h4>
+      <p>Per-track mastering accessed via the Pro subscription. High-volume, recurring, low-friction. Gateway drug to the certification ecosystem.</p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-num">02</div>
+      <div class="pillar-icon">🏢</div>
+      <div class="pillar-tag">Margin Driver</div>
+      <h4>Enterprise Catalog Audit Tiers</h4>
+      <p>Labels and distributors auditing AI-assisted catalogs at scale. $499/mo base, custom pricing above 5,000 tracks/mo. Highest LTV segment.</p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-num">03</div>
+      <div class="pillar-icon">🔌</div>
+      <div class="pillar-tag">Network Driver</div>
+      <h4>Verification API Call Volumes</h4>
+      <p>Third-party platforms, DSPs, and attorneys pinging our endpoint to verify chain-of-title. Per-call pricing creates a usage-based revenue floor.</p>
+    </div>
+  </div>
+
+  <table class="tier-table">
+    <thead>
+      <tr><th>Tier</th><th>Who It Serves</th><th>Price</th><th>Core Value</th><th>Est. LTV</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Free</td>
+        <td>Casual creators, trial</td>
+        <td>$0</td>
+        <td>1 free master, limited tools</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Pro</td>
+        <td>Active indie artists</td>
+        <td class="gold">$9.99/mo</td>
+        <td>Unlimited mastering, IP certs, full DAW, Vocal Booth</td>
+        <td>~$180</td>
+      </tr>
+      <tr>
+        <td>Enterprise Starter</td>
+        <td>Small labels, distributors</td>
+        <td class="gold">$499/mo</td>
+        <td>500 track audits/mo, API access, bulk cert export</td>
+        <td>~$12K</td>
+      </tr>
+      <tr>
+        <td>Enterprise Pro</td>
+        <td>Mid-size labels, DSPs</td>
+        <td class="gold">$2,499/mo</td>
+        <td>5,000 track audits/mo, dedicated endpoint, SLA</td>
+        <td>~$60K</td>
+      </tr>
+      <tr>
+        <td>Chain-of-Title License</td>
+        <td>Major distributors, publishers</td>
+        <td class="gold">$25K–$100K/yr</td>
+        <td>White-label verification integration, annual verification capacity</td>
+        <td>$25K–$100K</td>
+      </tr>
+      <tr>
+        <td>Verify API</td>
+        <td>Attorneys, platforms, A&amp;Rs</td>
+        <td class="gold">$0.10/call</td>
+        <td>Single-track cert verification, returns full chain-of-custody JSON</td>
+        <td>Usage-based</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="divider"/>
+
+<!-- CHAIN-OF-TITLE LICENSING STRATEGY -->
+<div class="page">
+  <div class="eyebrow">Enterprise Go-to-Market</div>
+  <h2>Licensing the <em>Chain-of-Title Credential</em></h2>
+
+  <p class="lead">The highest-value near-term enterprise play is not selling to individual artists — it is selling to the entities that need to guarantee undisputed chain-of-title across their catalogs. This includes independent distributors (DistroKid, TuneCore, CD Baby tier), sync licensing agencies, and publishing administrators.</p>
+
+  <div class="hook">
+    <h4>The Distributor Problem We Solve</h4>
+    <p>As of 2025, every major distributor faces the same liability question: <strong>"Is this AI-assisted track actually owned by the person submitting it?"</strong> Their current answer is self-attestation. Our answer is a cryptographic certificate backed by a Firestore record they can subpoena.</p>
+    <p>A distributor that integrates our verify API into their upload intake flow can legitimately market themselves as offering <strong>"AI chain-of-title verification"</strong> — a product differentiator no other distributor can match without licensing our infrastructure. We charge for that verification on a per-call basis or as an annual capacity license. <strong>Their catalog growth directly grows our API revenue.</strong></p>
+  </div>
+
+  <h3>The Pitch to a Distributor</h3>
+  <div class="strat-list">
+    <div class="strat-item">
+      <div class="strat-num">1</div>
+      <div class="strat-body">
+        <h4>Their exposure is growing</h4>
+        <p>DSPs are beginning to require chain-of-title documentation for AI-assisted tracks. A distributor without a verification system is one Spotify policy update away from a liability crisis.</p>
+      </div>
+    </div>
+    <div class="strat-item">
+      <div class="strat-num">2</div>
+      <div class="strat-body">
+        <h4>We are the only infrastructure that exists</h4>
+        <p>No other platform has a live, subpoenable, dual-backed cryptographic verification system for AI-assisted music. They cannot build it themselves without years of catalog accumulation.</p>
+      </div>
+    </div>
+    <div class="strat-item">
+      <div class="strat-num">3</div>
+      <div class="strat-body">
+        <h4>Integration is a single API call</h4>
+        <p><code>POST /api/kernel/verify-cert</code> with the WAV file returns a JSON chain-of-custody record in under 2 seconds. Their engineering team can integrate this in a sprint.</p>
+      </div>
+    </div>
+    <div class="strat-item">
+      <div class="strat-num">4</div>
+      <div class="strat-body">
+        <h4>The price is a rounding error vs. their liability</h4>
+        <p>A $25K/yr annual capacity license against a distributor doing 500K track submissions/year is $0.05 per track — cheaper than a Spotify-triggered takedown on a single viral song.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Target Distributor Profile</h3>
+  <div class="investor-grid">
+    <div class="investor">
+      <div class="inv-type">Primary Target</div>
+      <h4>Mid-Tier Independent Distributors</h4>
+      <p>50K–500K active artists. AI-assisted submissions 20–40% of catalog. No internal verification capability. Legal team actively worried about liability.</p>
+      <div class="inv-angle">→ Annual capacity license. 6–12 month sales cycle.</div>
+    </div>
+    <div class="investor">
+      <div class="inv-type">Secondary Target</div>
+      <h4>Sync Licensing Agencies</h4>
+      <p>Film/TV/ad sync clearinghouses. Chain-of-title is contractually mandatory. A single disputed sync deal costs 10× what our annual license costs.</p>
+      <div class="inv-angle">→ Per-verification billing. Fast close. Legal dept owns the decision.</div>
+    </div>
+    <div class="investor">
+      <div class="inv-type">Tertiary Target</div>
+      <h4>Music Publishing Administrators</h4>
+      <p>Administering catalogs with AI-assisted works. Need documentation for PRO registration and licensing. Our cert is the only forensic document that exists.</p>
+      <div class="inv-angle">→ Per-call API. Volume-based. Long retention.</div>
+    </div>
+    <div class="investor">
+      <div class="inv-type">Future Target (Y2+)</div>
+      <h4>Major DSPs &amp; Streaming Platforms</h4>
+      <p>Spotify/Apple Music tier. Would require them to build AI-track verification into their submission pipeline. Requires regulatory pressure first.</p>
+      <div class="inv-angle">→ Enterprise license. $100K+ ACV. 18–24 month sales cycle.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- BOOTSTRAP &amp; ANGEL STRATEGY -->
+<div class="page">
+  <div class="eyebrow">Fundraising &amp; Bootstrap Path</div>
+  <h2>Capital Strategy: <em>Proof Before Ask</em></h2>
+
+  <p class="lead">The bootstrap path to enterprise conversations does not require external capital — it requires a working product with verifiable certs in the wild. Every Pro subscriber who generates a real cert on a real track is a proof-of-concept for the enterprise pitch. The strategy is to accumulate that proof over 90 days, then approach angels.</p>
+
+  <div class="hook">
+    <h4>The 90-Day Bootstrap Priority Stack</h4>
+    <p><strong>Month 1:</strong> Maximize organic cert generation. 500+ real certs in the Postgres/Firestore database = live proof that the verification network exists and is being used.</p>
+    <p><strong>Month 2:</strong> First outbound to 3–5 independent distributors. Position as "we have 1,000+ certs in our network — here's why you need to integrate before your competitor does."</p>
+    <p><strong>Month 3:</strong> First angel conversations. Bring MRR data, cert count, and at minimum one distributor in conversation. The ask is $150K–$300K for a 6–12 month runway extension, not a VC raise.</p>
+  </div>
+
+  <h3>Angel Investor Profile — Who to Target</h3>
+  <p>The right angel for this company is not a generic tech investor. It is someone at the intersection of music industry + IP law + AI platform business models. These profiles are the target archetype:</p>
+
+  <div class="investor-grid">
+    <div class="investor">
+      <div class="inv-type">Profile 1 · Music Tech</div>
+      <h4>Former Music Exec Turned Angel</h4>
+      <p>Exited from a label, publisher, or distributor. Understands the chain-of-title liability problem from the inside. Likely has LP relationships with mid-tier distributors.</p>
+      <div class="inv-angle">LinkedIn angle: "I built the infrastructure you've been waiting for since the Thaler ruling."</div>
+    </div>
+    <div class="investor">
+      <div class="inv-type">Profile 2 · IP Attorney</div>
+      <h4>Entertainment Law Partner / IP Specialist</h4>
+      <p>Practices music IP. Has clients asking the AI-authorship question every week. Understands the cert's courtroom value better than any tech investor.</p>
+      <div class="inv-angle">LinkedIn angle: "Your clients will ask you about this. You should own part of it."</div>
+    </div>
+    <div class="investor">
+      <div class="inv-type">Profile 3 · AI Tools Investor</div>
+      <h4>Seed-Stage AI Tools Fund</h4>
+      <p>Funds like Conviction, AIX, or solo GPs who led rounds in Jasper/Runway/Eleven Labs. Understand the "AI output verification" category is massive.</p>
+      <div class="inv-angle">LinkedIn angle: "We're the only platform with a live, subpoenable AI-output audit trail in production."</div>
+    </div>
+    <div class="investor">
+      <div class="inv-type">Profile 4 · Music Creator Economy</div>
+      <h4>Creator Economy Fund Partner</h4>
+      <p>Invested in Patreon, Substack, or similar. Sees the creator rights crisis coming. The "artist owns their AI-assisted work" narrative is core to this segment.</p>
+      <div class="inv-angle">LinkedIn angle: "200 million unprotected AI tracks in 2024. We're the only fix."</div>
+    </div>
+  </div>
+
+  <h3>Reddit &amp; Community Outreach Targets</h3>
+  <table class="tier-table">
+    <thead>
+      <tr><th>Community</th><th>Platform</th><th>Angle</th><th>Priority</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>r/WeAreTheMusicMakers</td><td>Reddit</td><td>Lead with the mastering tool. Cert is a bonus. No corporate voice.</td><td class="gold">High</td></tr>
+      <tr><td>r/hiphopheads</td><td>Reddit</td><td>AI-assisted production is most active here. "Can you prove you made this beat?" resonates immediately.</td><td class="gold">High</td></tr>
+      <tr><td>r/musicproduction</td><td>Reddit</td><td>Show the mastering quality. Let the cert discovery happen organically.</td><td class="gold">High</td></tr>
+      <tr><td>r/copyright</td><td>Reddit</td><td>Post the Clean Room Protocol technical brief. This community understands the Thaler ruling and will amplify correctly.</td><td class="gold">High</td></tr>
+      <tr><td>r/edmproduction</td><td>Reddit</td><td>Club preset mastering demo. Lead with sound quality, not IP.</td><td>Medium</td></tr>
+      <tr><td>IndieHackers</td><td>Web</td><td>Full product story. Show MRR. The bootstrapped music-IP angle is unusual and will feature.</td><td class="gold">High</td></tr>
+      <tr><td>Music Producer Discord servers</td><td>Discord</td><td>Drop the product in #tools channels. Offer 3 free masters for feedback. Do not spam.</td><td>Medium</td></tr>
+      <tr><td>LinkedIn Music Industry Group</td><td>LinkedIn</td><td>Distributor/label angle. Chain-of-title post. Tag music attorneys.</td><td class="gold">High</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="divider"/>
+
+<!-- 7-DAY SOCIAL CALENDAR -->
+<div class="page">
+  <div class="eyebrow">Content &amp; Launch Calendar</div>
+  <h2>7-Day <em>Copy-Paste</em> Social Calendar</h2>
+  <p>Posts are written to be used as-is or lightly edited. Each day targets a different angle and a different platform. Do not post all of these on the same platform — rotate LinkedIn / Reddit / X / Instagram Reels.</p>
+
+  <div class="cal-grid">
+    <div class="cal-day">
+      <div class="cal-day-label">Day 1 · Mon</div>
+      <div class="cal-day-title">The Problem Statement</div>
+      <div class="cal-day-copy">Platform: LinkedIn / r/copyright<br/><br/>"200 million AI-generated tracks were uploaded to streaming platforms in 2024. The U.S. Copyright Office rejected protection on all of them — unless the human can prove meaningful creative contribution. We built the only tool that creates that proof. gravelkingpro.com"</div>
+    </div>
+    <div class="cal-day">
+      <div class="cal-day-label">Day 2 · Tue</div>
+      <div class="cal-day-title">Product Demo Hook</div>
+      <div class="cal-day-copy">Platform: X / Instagram<br/><br/>"Drop a track. Get a broadcast-ready master in 60 seconds. Get a cryptographic cert that proves you made it. One browser tab. No downloads. $9.99/mo. [link]"</div>
+    </div>
+    <div class="cal-day">
+      <div class="cal-day-label">Day 3 · Wed</div>
+      <div class="cal-day-title">Technical Credibility</div>
+      <div class="cal-day-copy">Platform: r/WeAreTheMusicMakers<br/><br/>"I built a music mastering platform with cryptographic IP certification baked into every export. The cert is split — half lives in the audio file's PCM signal, half lives on our server. Neither validates alone. Curious what the production community thinks about this approach."</div>
+    </div>
+    <div class="cal-day">
+      <div class="cal-day-label">Day 4 · Thu</div>
+      <div class="cal-day-title">Creator Rights Angle</div>
+      <div class="cal-day-copy">Platform: Instagram / TikTok<br/><br/>"You wrote that song. You edited every line. You mixed it for 3 hours. Do you have proof? If someone disputes it, 'I made it' isn't enough anymore. We give you the receipt. [link in bio]"</div>
+    </div>
+    <div class="cal-day">
+      <div class="cal-day-label">Day 5 · Fri</div>
+      <div class="cal-day-title">Competitor Contrast</div>
+      <div class="cal-day-copy">Platform: LinkedIn<br/><br/>"Every other mastering tool gives you a file. GravelKing Pro gives you a file + a forensic cert + a verification endpoint your attorney can cite in a dispute. That's the difference between a finished master and an owned master."</div>
+    </div>
+    <div class="cal-day">
+      <div class="cal-day-label">Day 6 · Sat</div>
+      <div class="cal-day-title">IndieHackers Story</div>
+      <div class="cal-day-copy">Platform: IndieHackers<br/><br/>"Show HN / IH: I bootstrapped a music IP certification platform in [X weeks]. Here's the architecture, here's the MRR, here's what I'd do differently." [Full writeup with cert architecture, unit economics, early traction numbers.]</div>
+    </div>
+    <div class="cal-day">
+      <div class="cal-day-label">Day 7 · Sun</div>
+      <div class="cal-day-title">Distributor DM Template</div>
+      <div class="cal-day-copy">LinkedIn DM:<br/><br/>"Hey [Name] — I built cryptographic chain-of-title verification for AI-assisted music. Every track gets a cert split between the audio file and our server — DSP-ready documentation. Integrates via one API call. Would love 15 min if this is relevant to [Company]."</div>
+    </div>
+  </div>
+
+  <div class="warning">
+    <p><strong>Brand voice rule:</strong> Never use the words "disruptive," "revolutionary," or "game-changer." Never claim legal advice. Use the word "forensic" sparingly — let the architecture speak. Always link to the live product. The strongest social proof is a working demo, not a description of one.</p>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- 90-DAY MILESTONES -->
+<div class="page">
+  <div class="eyebrow">Execution Timeline</div>
+  <h2>90-Day <em>Priority Stack</em></h2>
+
+  <div class="strat-list">
+    <div class="strat-item">
+      <div class="strat-num">W1</div>
+      <div class="strat-body">
+        <h4>Ship &amp; Publish</h4>
+        <p>Deploy the current build to production. Confirm the cert pipeline is live: mastering → LSB stamp → Postgres → Firestore, verified end-to-end. The system needs real certs in the wild before any sales conversation.</p>
+      </div>
+    </div>
+    <div class="strat-item">
+      <div class="strat-num">W2–3</div>
+      <div class="strat-body">
+        <h4>Execute the 7-Day Social Calendar (3 Cycles)</h4>
+        <p>Run the calendar above three times across three weeks. Measure which angle drives signups vs. which drives cert generation. Cert generation = the right audience.</p>
+      </div>
+    </div>
+    <div class="strat-item">
+      <div class="strat-num">W4–6</div>
+      <div class="strat-body">
+        <h4>First Distributor Outreach</h4>
+        <p>Identify 10 independent distributors with LinkedIn profiles. Send the DM template above to decision-makers (usually Head of Product or VP Legal). Goal: 2 demo conversations in 6 weeks.</p>
+      </div>
+    </div>
+    <div class="strat-item">
+      <div class="strat-num">W7–9</div>
+      <div class="strat-body">
+        <h4>Angel Outreach (Profile 1 &amp; 2 First)</h4>
+        <p>Bring real metrics: cert count, MRR, distributor pipeline status. The ask is $150K–$300K at a $1.5M–$3M pre-money valuation. This is seed/pre-seed positioning, not a Series A.</p>
+      </div>
+    </div>
+    <div class="strat-item">
+      <div class="strat-num">W10–13</div>
+      <div class="strat-body">
+        <h4>First Enterprise Close or Angel Close (Whichever Comes First)</h4>
+        <p>Either path validates the thesis. An Enterprise Starter close at $499/mo is proof the B2B motion works. An angel check is proof the equity story works. Either gives 6+ months of additional runway to pursue the other.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="quote">
+    <p>"The Clean Room Protocol is not just a feature — it's a credentialing business. The question is not whether to license it. The question is how fast to sign the first distributor before someone else tries to replicate it."</p>
+    <cite>Internal Architecture Brief · All N One LLC · 2026</cite>
+  </div>
+</div>
+
+<hr class="divider"/>
+<div class="page" style="text-align:center;padding-bottom:80px">
+  <div class="eyebrow" style="text-align:center">Classification</div>
+  <h2 style="max-width:600px;margin:0 auto 20px">Confidential · <em>Do Not Distribute</em></h2>
+  <p style="max-width:520px;margin:0 auto;color:#888;font-size:14px">This document contains unpublished financial projections, product architecture details, and go-to-market strategy. Distribution outside All N One LLC requires written approval.</p>
+  <div style="margin-top:30px;font-size:12px;color:#bbb;letter-spacing:3px;text-transform:uppercase">All N One LLC · GravelKing Pro · gravelkingpro.com</div>
+</div>
+
+</body>
+</html>
