@@ -238,14 +238,27 @@ ${artistProfile}`;
           tools: [{ googleSearch: {} }],
         });
       } catch (vertexError) {
-        req.log.warn({ err: vertexError }, "JAX Vertex call failed");
+        req.log.warn({ err: vertexError }, "JAX grounded Vertex call failed; retrying without search");
+      }
+      if (!text.trim()) {
+        try {
+          // A grounded request can occasionally fail independently of the text
+          // model. Retrying the same live prompt keeps JAX useful without ever
+          // substituting a canned answer.
+          text = await generateVertexText(fullPrompt, {
+            maxOutputTokens: 2048,
+            responseMimeType: "text/plain",
+          });
+        } catch (retryError) {
+          req.log.warn({ err: retryError }, "JAX fallback Vertex call failed");
+        }
       }
     }
     if (!text.trim()) throw new Error("No text provider returned a response");
     res.json({ text: text.trim(), remaining: unlimited ? null : DAILY_FREE_LIMIT - count - 1 });
   } catch (error) {
     req.log.error({ error }, "JAX generation failed");
-    res.status(502).json({ error: "JAX is between takes right now. Try the prompt again." });
+    res.status(503).json({ error: "JAX could not reach the writing service right now. Your prompt and draft are still safe; please try again shortly." });
   }
 });
 
