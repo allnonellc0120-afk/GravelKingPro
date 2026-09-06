@@ -5,6 +5,8 @@ import {
   getMasteringDownloadPath,
   isMasteringEqActive,
   isMasteringEqExportCancelled,
+  isMasteringEqResourceError,
+  MasteringEqResourceError,
   MasteringEqExportCancelledError,
 } from "../src/lib/mastering-eq.ts";
 
@@ -22,4 +24,13 @@ test("cancelled fine-tune exports have a distinct, non-error-toast signal", () =
   assert.equal(isMasteringEqExportCancelled(new MasteringEqExportCancelledError()), true);
   assert.equal(isMasteringEqExportCancelled({ name: "AbortError" }), true);
   assert.equal(isMasteringEqExportCancelled(new Error("render failed")), false);
+});
+
+test("resource failures stay distinct from network failures", () => {
+  const allocationFailure = new MasteringEqResourceError();
+  const networkFailure = new TypeError("Failed to fetch");
+
+  assert.equal(isMasteringEqResourceError(allocationFailure), true);
+  assert.equal(allocationFailure.code, "INSUFFICIENT_RESOURCES");
+  assert.equal(isMasteringEqResourceError(networkFailure), false);
 });

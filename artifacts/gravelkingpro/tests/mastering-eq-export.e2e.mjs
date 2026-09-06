@@ -57,7 +57,19 @@ async function run() {
     assert(result.header.channels === 2, "rendered WAV channel count changed");
     assert(result.header.duration === 2, "rendered WAV duration changed");
     assert(result.responseErrors.every((error) => error < 0.025), "rendered EQ response changed");
-    console.log(`mastering EQ export regression passed (${result.header.size} bytes, 10 frequency checks)`);
+    assert(
+      JSON.stringify(result.progressStages) === JSON.stringify([
+        "loading",
+        "decoding",
+        "rendering",
+        "encoding",
+      ]),
+      `render progress stages changed: ${JSON.stringify(result.progressStages)}`,
+    );
+    assert(result.allocationError?.isResourceError === true, "allocation failure lost its resource classification");
+    assert(result.allocationError?.code === "INSUFFICIENT_RESOURCES", "allocation failure code changed");
+    assert(result.networkError?.isResourceError === false, "network failure was classified as a resource failure");
+    console.log(`mastering EQ export regression passed (${result.header.size} bytes, 10 frequency checks, ${result.progressStages.join(" → ")})`);
   } finally {
     await browser.close();
   }
