@@ -10,6 +10,11 @@ out-tsc
 
 # dependencies
 node_modules
+*.aab
+*.zip
+*.tar.gz
+*.mp3
+*.wav
 
 # IDEs and editors
 /.idea
