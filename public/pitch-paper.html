@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GravelKingPro — Executive Pitch</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#fff;color:#111;font-family:'Inter',sans-serif;line-height:1.7;font-size:16px}
+  /* COVER */
+  .cover{background:#080808;color:#f0f0f0;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;position:relative;overflow:hidden}
+  .cover::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,#c9a22715,transparent 70%)}
+  .logo-text{font-size:clamp(80px,15vw,160px);font-weight:900;color:#c9a227;letter-spacing:-6px;font-style:italic;line-height:1;text-shadow:0 0 100px #c9a22730;position:relative;z-index:1}
+  .cover-tagline{font-size:clamp(16px,2.5vw,28px);font-weight:700;color:#f0f0f0;letter-spacing:4px;text-transform:uppercase;margin:16px 0 8px;position:relative;z-index:1}
+  .cover-subtitle{font-size:clamp(13px,1.5vw,16px);color:#888;letter-spacing:6px;text-transform:uppercase;margin-bottom:60px;position:relative;z-index:1}
+  .cover-url{display:inline-block;background:#c9a227;color:#000;font-weight:900;font-size:14px;letter-spacing:4px;text-transform:uppercase;padding:14px 36px;border-radius:100px;position:relative;z-index:1;text-decoration:none}
+  /* PAGE LAYOUT */
+  .page{max-width:860px;margin:0 auto;padding:70px 40px}
+  .page-break{page-break-before:always}
+  /* TYPOGRAPHY */
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:5px;text-transform:uppercase;color:#c9a227;margin-bottom:14px}
+  h2{font-size:clamp(28px,4vw,42px);font-weight:900;color:#080808;line-height:1.1;margin-bottom:24px}
+  h2 em{color:#c9a227;font-style:normal}
+  p{font-size:16px;line-height:1.8;color:#444;margin-bottom:16px}
+  p.big{font-size:20px;font-weight:600;color:#111;line-height:1.6;margin-bottom:24px}
+  .divider{border:none;border-top:2px solid #f0f0f0;margin:60px 0}
+  /* HOOK BOX */
+  .hook{background:#080808;color:#f0f0f0;border-radius:16px;padding:48px;margin:40px 0;position:relative;overflow:hidden}
+  .hook::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#c9a227,#e8c84a)}
+  .hook p{color:#ccc;font-size:17px;line-height:1.8;margin:0}
+  .hook p strong{color:#c9a227}
+  /* TOOL CARDS */
+  .tools{display:flex;flex-direction:column;gap:0;margin:32px 0;border:2px solid #f0f0f0;border-radius:16px;overflow:hidden}
+  .tool-row{display:flex;align-items:flex-start;gap:24px;padding:28px 32px;border-bottom:1px solid #f0f0f0}
+  .tool-row:last-child{border-bottom:none}
+  .tool-row:hover{background:#fafafa}
+  .tool-emoji{font-size:36px;flex-shrink:0;width:50px;text-align:center;margin-top:4px}
+  .tool-body{}
+  .tool-name{font-size:18px;font-weight:900;color:#080808;margin-bottom:4px}
+  .tool-what{font-size:14px;font-weight:700;color:#c9a227;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px}
+  .tool-desc{font-size:14px;color:#555;line-height:1.7}
+  .tool-tier-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:3px 10px;border-radius:100px;margin-left:10px;vertical-align:middle}
+  .free{background:#f0faf0;color:#16a34a;border:1px solid #bbf7d0}
+  .pro{background:#f0f0ff;color:#4f46e5;border:1px solid #c7d2fe}
+  .ent{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+  /* NUMBERS */
+  .numbers{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:#f0f0f0;border:1px solid #f0f0f0;border-radius:16px;overflow:hidden;margin:32px 0}
+  .num-box{background:#fff;padding:32px 20px;text-align:center}
+  .num{font-size:clamp(28px,4vw,44px);font-weight:900;color:#c9a227;line-height:1}
+  .num-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:3px;color:#999;margin-top:6px}
+  /* ASKS */
+  .ask-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:32px 0}
+  .ask{background:#fafafa;border:1px solid #e8e8e8;border-radius:12px;padding:28px}
+  .ask-num{font-size:13px;font-weight:700;color:#c9a227;text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}
+  .ask h4{font-size:18px;font-weight:800;color:#111;margin-bottom:8px}
+  .ask p{font-size:14px;color:#666;line-height:1.6;margin:0}
+  /* QUOTE */
+  .quote{border-left:4px solid #c9a227;padding:24px 32px;background:#fffdf0;margin:32px 0;border-radius:0 12px 12px 0}
+  .quote p{font-size:18px;font-style:italic;color:#333;margin:0;line-height:1.7}
+  .quote cite{display:block;font-size:13px;font-weight:700;color:#c9a227;text-transform:uppercase;letter-spacing:3px;margin-top:12px;font-style:normal}
+  /* PRINT */
+  @media print{.cover{min-height:auto;padding:40px}.page{padding:50px 40px}body{font-size:14px}}
+  @media(max-width:600px){.ask-grid{grid-template-columns:1fr}.tool-row{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="logo-text">GK™</div>
+  <div class="cover-tagline">GravelKingPro</div>
+  <div class="cover-subtitle">Executive Pitch · All N One LLC · 2024</div>
+  <a class="cover-url" href="https://gravelkingpro.com">gravelkingpro.com</a>
+</div>
+
+<!-- THE ONE-LINER -->
+<div class="page">
+  <div class="eyebrow">What We Do</div>
+  <h2>The Platform That Gives Artists <em>Proof</em> They Made Their Music</h2>
+
+  <p class="big">GravelKingPro is the world's first music production platform with built-in intellectual property protection. Every tool an artist uses — from recording to mixing to writing lyrics — generates a forensic record that proves their human creative contribution. When that contribution reaches the legal threshold, the platform issues a certified IP document they can use to defend their rights.</p>
+
+  <div class="hook">
+    <p>In 2024, <strong>200 million AI-generated tracks</strong> were uploaded to streaming platforms. The U.S. Copyright Office denied protection to all of them. But buried in their 2023 ruling is a critical fact: <strong>music that a human has meaningfully edited, mixed, or arranged qualifies for copyright protection</strong> — if you can prove it. GravelKingPro is the only tool that proves it.</p>
+  </div>
+
+  <div class="numbers">
+    <div class="num-box"><div class="num">200M</div><div class="num-label">Unprotected AI tracks in 2024</div></div>
+    <div class="num-box"><div class="num">25%</div><div class="num-label">Human contribution needed for protection</div></div>
+    <div class="num-box"><div class="num">10</div><div class="num-label">Pro tools in one platform</div></div>
+    <div class="num-box"><div class="num">$0</div><div class="num-label">Cost to start</div></div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- THE TOOLS -->
+<div class="page">
+  <div class="eyebrow">The Platform</div>
+  <h2>Ten Tools. <em>One Workflow.</em></h2>
+  <p>Every tool in GravelKingPro is designed to serve one goal: help artists create great music and walk away owning it. Here's what the platform does, in plain English.</p>
+
+  <div class="tools">
+
+    <div class="tool-row">
+      <div class="tool-emoji">✍️</div>
+      <div class="tool-body">
+        <div class="tool-name">Songwriting Studio <span class="tool-tier-badge pro">Pro</span></div>
+        <div class="tool-what">What it does: Writes lyrics with you and tracks your contribution</div>
+        <div class="tool-desc">The artist describes their song concept, and the AI writes a starting draft. Then, as the artist rewrites, edits, and personalizes the lyrics, the platform tracks exactly how much of the final song came from the human vs. the AI. That percentage becomes part of the IP record.</div>
+      </div>
+    </div>
+
+    <div class="tool-row">
+      <div class="tool-emoji">🎚️</div>
+      <div class="tool-body">
+        <div class="tool-name">Professional Mixing Studio (DAW) <span class="tool-tier-badge pro">Pro</span></div>
+        <div class="tool-what">What it does: A full recording studio in a web browser</div>
+        <div class="tool-desc">Artists can mix, layer, and edit their tracks directly in GravelKingPro — no software to download, no studio to book. Every adjustment they make (volume, effects, arrangement) is logged as a creative action that contributes to their authorship score.</div>
+      </div>
+    </div>
+
+    <div class="tool-row" style="background:#fffdf0;border-left:4px solid #c9a227">
+      <div class="tool-emoji">⚖️</div>
+      <div class="tool-body">
+        <div class="tool-name">MLK V3 Authorship Engine <span class="tool-tier-badge ent">Core Technology</span></div>
+        <div class="tool-what">What it does: Measures how much of the music is human-made</div>
+        <div class="tool-desc">This is the technology that makes GravelKingPro unique and irreplaceable. It runs quietly in the background during every session, comparing what the artist does against the original AI-generated baseline, and outputs a score from 0 to 100 percent. This score is the legal foundation for the IP certificate. No other music platform has this.</div>
+      </div>
+    </div>
+
+    <div class="tool-row" style="background:#fffdf0;border-left:4px solid #c9a227">
+      <div class="tool-emoji">🏛️</div>
+      <div class="tool-body">
+        <div class="tool-name">IP Embed Certificate <span class="tool-tier-badge ent">Flagship Feature</span></div>
+        <div class="tool-what">What it does: Issues a legal proof-of-ownership document</div>
+        <div class="tool-desc">When an artist's score crosses 25%, GravelKingPro issues a certificate — a tamper-proof, timestamped digital document tied to their specific track and session. They can post it on their website, attach it to streaming profiles, or use it in a legal dispute. Think of it as a notary stamp for music. No other platform offers this.</div>
+      </div>
+    </div>
+
+    <div class="tool-row">
+      <div class="tool-emoji">🎤</div>
+      <div class="tool-body">
+        <div class="tool-name">Vocal Booth <span class="tool-tier-badge pro">Pro</span></div>
+        <div class="tool-what">What it does: A practice and recording environment for singers</div>
+        <div class="tool-desc">Artists can sing over any instrumental track with the lyrics automatically scrolling on screen in real time — like a professional karaoke booth. It also monitors the live vocal signal for level and quality. Great for rehearsal, content creation, or capturing a vocal performance.</div>
+      </div>
+    </div>
+
+    <div class="tool-row">
+      <div class="tool-emoji">🥁</div>
+      <div class="tool-body">
+        <div class="tool-name">Beat Maker <span class="tool-tier-badge pro">Pro</span></div>
+        <div class="tool-what">What it does: Creates original beats using AI</div>
+        <div class="tool-desc">Artists describe the style, tempo, and feel of beat they want, and the platform generates a custom beat. The beat is then loaded directly into the mixing studio for the artist to customize further — and every customization counts toward their authorship score.</div>
+      </div>
+    </div>
+
+    <div class="tool-row">
+      <div class="tool-emoji">💿</div>
+      <div class="tool-body">
+        <div class="tool-name">Track Mastering <span class="tool-tier-badge pro">Pro</span></div>
+        <div class="tool-what">What it does: Makes tracks ready for streaming services</div>
+        <div class="tool-desc">After mixing, artists submit their track for mastering — the final audio polish step required before releasing on Spotify, Apple Music, or any platform. The system automatically sets the loudness to streaming standards and delivers a release-ready file with a technical report.</div>
+      </div>
+    </div>
+
+    <div class="tool-row">
+      <div class="tool-emoji">📚</div>
+      <div class="tool-body">
+        <div class="tool-name">Track Library <span class="tool-tier-badge free">All Tiers</span></div>
+        <div class="tool-what">What it does: Stores everything in one organized place</div>
+        <div class="tool-desc">Every project, stem, mix, master file, and IP certificate lives in the Track Library. Artists can access their entire creative history from any device, download any file at any time, and manage their IP portfolio as it grows.</div>
+      </div>
+    </div>
+
+    <div class="tool-row">
+      <div class="tool-emoji">🔬</div>
+      <div class="tool-body">
+        <div class="tool-name">Node Auditor <span class="tool-tier-badge ent">Enterprise · $499/mo</span></div>
+        <div class="tool-what">What it does: Audits entire music catalogs for IP documentation</div>
+        <div class="tool-desc">Designed for record labels and music distributors. Node Auditor can process thousands of tracks at once, analyzing each one for human authorship and generating IP certificates across an entire catalog. This is the enterprise revenue engine — a single label contract is worth more than twelve individual Pro subscriptions.</div>
+      </div>
+    </div>
+
+    <div class="tool-row">
+      <div class="tool-emoji">🏷️</div>
+      <div class="tool-body">
+        <div class="tool-name">Label Hub <span class="tool-tier-badge ent">Enterprise</span></div>
+        <div class="tool-what">What it does: Gives labels a command center for their artists</div>
+        <div class="tool-desc">A management portal where record labels can see all their artists, review IP certificate status across their roster, submit bulk track orders, and track the authorship scores for every song in their catalog. Built specifically for teams, not individual users.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- CLEAN ROOM PROTOCOL -->
+<div class="page">
+  <div class="eyebrow">Architecture · MLK V3.5</div>
+  <h2>The <em>Clean Room Protocol</em> — Our Hardest Structural Moat</h2>
+
+  <p class="big">Every track that leaves GravelKing Pro's servers carries a forensic seal that cannot be separated from the audio without destroying it. This is not a tag. It is not metadata. It is woven into the physics of the file itself — and it does double duty.</p>
+
+  <div class="hook">
+    <p><strong>Dual-Utility Stamp:</strong> The moment a mastered WAV exits our pipeline, the MLK V3.5 engine embeds a cryptographic nominator directly into the Least Significant Bits of the PCM audio signal — invisible to the ear, permanent in the bits. The matching denominator and HMAC handshake live exclusively on our server (dual-backed to Firestore). <strong>Neither half is meaningful alone.</strong> Only GravelKing Pro can perform the verification handshake — making us the sole authority over the entire downstream ecosystem.</p>
+  </div>
+
+  <div class="numbers">
+    <div class="num-box"><div class="num">2</div><div class="num-label">Anchor points in every export</div></div>
+    <div class="num-box"><div class="num">SHA-256</div><div class="num-label">Cryptographic hash basis</div></div>
+    <div class="num-box"><div class="num">0</div><div class="num-label">Cost to the user to receive the seal</div></div>
+    <div class="num-box"><div class="num">∞</div><div class="num-label">Duration of Firestore record</div></div>
+  </div>
+
+  <h3 style="font-size:22px;font-weight:900;color:#080808;margin:40px 0 16px">Utility 1 — Legal &amp; Forensic</h3>
+  <p>If any downstream party — a distribution platform, a collaborator, an unlicensed re-publisher — modifies even a single bit of the audio, the LSB nominator is destroyed. When they upload that modified file for verification, our server returns <code style="background:#f5f5f5;padding:2px 6px;border-radius:4px;font-size:13px">HANDSHAKE_INVALID</code>. The chain of custody is broken at a provable, timestamped moment. The Firestore record of what <em>left our hands</em> is permanently subpoenable, even if GravelKing Pro as a company no longer exists.</p>
+  <p>This is the only music platform in the world where a creator's attorney can walk into a copyright dispute and say: <em>"Here is the exact cryptographic state of this file at the moment it was certified — and here is proof it has been altered since."</em></p>
+
+  <h3 style="font-size:22px;font-weight:900;color:#080808;margin:32px 0 16px">Utility 2 — Brand Lock ("The Membership Card")</h3>
+  <p>The stamp is also an active commercial asset. A GravelKing Pro–stamped master carries the GKP verification badge. That badge is the track's admission ticket to the GravelKing Pro ecosystem — licensing registries, label submission workflows, sync placement pipelines. A re-encoded or bitrate-downgraded version of that file <strong>fails verification and loses ecosystem status.</strong></p>
+  <p>This creates a structural disincentive for any downstream actor — streaming platforms, label A&amp;Rs, distribution services — to compress or alter the output. Doing so doesn't just reduce audio quality. It destroys the commercial and legal value of the asset. The incentive gradient now runs in our direction: <strong>preserve the master, preserve the cert, preserve the value.</strong></p>
+
+  <div class="quote">
+    <p>"A Sam's Club membership card has value because it unlocks a network. Our stamp works identically — it unlocks the GravelKing Pro verification network, and any alteration voids the card."</p>
+    <cite>GravelKing Pro Architecture Brief, 2026</cite>
+  </div>
+
+  <h3 style="font-size:22px;font-weight:900;color:#080808;margin:32px 0 16px">Developer Simplicity = Defensibility</h3>
+  <p>Because our system is designed to verify <em>clean, uncompressed masters at the point of export</em> — not to reverse-engineer mangled post-platform output — the technical complexity lives entirely on our server. Competitors cannot replicate the verification authority without also replicating our server-side denominator database. The moat is not an algorithm. The moat is the accumulated record.</p>
+</div>
+
+<hr class="divider"/>
+
+<!-- WHY IT WINS -->
+<div class="page">
+  <div class="eyebrow">The Advantage</div>
+  <h2>Why Nobody Else <em>Can Just Copy This</em></h2>
+
+  <p class="big">The IP Embed Certificate and MLK V3 Authorship Engine are not features — they are infrastructure. Here is why a competitor can't simply replicate this overnight:</p>
+
+  <div class="quote">
+    <p>"The first platform to solve a real legal problem in music production owns that category until a well-funded competitor builds an equivalent — and by then, trust and brand recognition are the moat."</p>
+    <cite>First-Mover Principle, Music Tech SaaS</cite>
+  </div>
+
+  <p>Every other music tool solves a creative problem. GravelKingPro solves a <strong>legal problem</strong> — and that makes it stickier. Artists don't just use it to make better music. They use it to protect their livelihood. That emotional connection drives retention in a way that "better EQ plugins" never will.</p>
+
+  <p>The platform is also built for a moment in time that hasn't fully arrived yet. As AI music generation becomes more mainstream and legal disputes over AI-assisted work multiply, GravelKingPro will be positioned as the tool that saw it coming — and built the solution first.</p>
+
+  <div class="ask-grid">
+    <div class="ask">
+      <div class="ask-num">Revenue</div>
+      <h4>$9.99/mo Pro</h4>
+      <p>Unlimited tools, unlimited processing, IP Certificates, priority support — all included for less than a single studio hour.</p>
+    </div>
+    <div class="ask">
+      <div class="ask-num">Revenue</div>
+      <h4>$499/mo Enterprise</h4>
+      <p>Node Auditor full access, Label Hub, bulk IP certificates, API access. One label contract = 12x a Pro subscription.</p>
+    </div>
+    <div class="ask">
+      <div class="ask-num">Projection</div>
+      <h4>$1M+ ARR by Month 24</h4>
+      <p>Conservative, based on 2–4% free-to-paid conversion and a single enterprise channel opening. Does not include partnership or licensing deals.</p>
+    </div>
+    <div class="ask">
+      <div class="ask-num">Current Value</div>
+      <h4>$400K–$800K</h4>
+      <p>Technology asset + first-mover IP category + live payment infrastructure + working product with no direct competitor.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- CLOSING -->
+<div class="page" style="text-align:center;padding-bottom:100px">
+  <div class="eyebrow" style="text-align:center">The Bottom Line</div>
+  <h2 style="max-width:650px;margin:0 auto 24px">The Music Industry Has a Rights Crisis. <em>We Have the Solution.</em></h2>
+  <p style="max-width:560px;margin:0 auto 40px;font-size:17px;color:#555">200 million unprotected tracks. A Copyright Office ruling that changes everything. A platform that's already built and live. No direct competitor. One team that saw the problem before anyone else.</p>
+  <a class="cover-url" href="https://gravelkingpro.com" style="display:inline-block;text-decoration:none;background:#c9a227;color:#000;font-weight:900;font-size:14px;letter-spacing:4px;text-transform:uppercase;padding:18px 48px;border-radius:100px">gravelkingpro.com</a>
+  <div style="margin-top:20px;font-size:13px;color:#aaa;letter-spacing:3px;text-transform:uppercase">All N One LLC · Bootstrapped · Independent</div>
+</div>
+
+</body>
+</html>
