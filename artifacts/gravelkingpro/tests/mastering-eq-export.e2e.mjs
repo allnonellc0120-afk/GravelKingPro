@@ -69,6 +69,11 @@ async function run() {
     assert(result.allocationError?.isResourceError === true, "allocation failure lost its resource classification");
     assert(result.allocationError?.code === "INSUFFICIENT_RESOURCES", "allocation failure code changed");
     assert(result.networkError?.isResourceError === false, "network failure was classified as a resource failure");
+    assert(result.cancellationCleanup?.cancelled === true, "long-track cancellation did not surface as cancelled");
+    assert(result.cancellationCleanup?.stopCalls > 0, "cancelled long-track source was not stopped");
+    assert(result.cancellationCleanup?.disconnectCalls >= 12, "cancelled long-track graph was not fully disconnected");
+    assert(result.cancellationCleanup?.closeCalls > 0, "cancelled long-track decode context was not closed");
+    assert(result.retryDuration === 2, "retry after cancellation did not complete");
     console.log(`mastering EQ export regression passed (${result.header.size} bytes, 10 frequency checks, ${result.progressStages.join(" → ")})`);
   } finally {
     await browser.close();

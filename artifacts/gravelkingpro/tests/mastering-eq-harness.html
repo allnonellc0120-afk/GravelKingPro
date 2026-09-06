@@ -8,6 +8,7 @@
     <pre id="result">running</pre>
     <script type="module">
       import {
+          isMasteringEqExportCancelled,
         isMasteringEqResourceError,
         renderMasteringEqWav,
       } from "/src/lib/mastering-eq.ts";
@@ -15,6 +16,7 @@
       const SAMPLE_RATE = 44_100;
       const DURATION_SECONDS = 2;
       const FRAME_COUNT = SAMPLE_RATE * DURATION_SECONDS;
+      const LONG_DURATION_SECONDS = 30;
       const TEST_FREQUENCIES = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
       const BAND_GAINS = [4, -3, 2.5, -2, 3, -1.5, 2, -2.5, 3.5, -1];
       const POST_EQ_GAIN = -1.25;
@@ -29,10 +31,11 @@
         }
       }
 
-      function createFixtureWav() {
+      function createFixtureWav(durationSeconds = DURATION_SECONDS) {
         const channelCount = 2;
         const blockAlign = channelCount * 2;
-        const dataSize = FRAME_COUNT * blockAlign;
+        const frameCount = SAMPLE_RATE * durationSeconds;
+        const dataSize = frameCount * blockAlign;
         const view = new DataView(new ArrayBuffer(44 + dataSize));
         writeAscii(view, 0, "RIFF");
         view.setUint32(4, 36 + dataSize, true);
@@ -49,7 +52,7 @@
         view.setUint32(40, dataSize, true);
 
         let offset = 44;
-        for (let frame = 0; frame < FRAME_COUNT; frame += 1) {
+        for (let frame = 0; frame < frameCount; frame += 1) {
           const time = frame / SAMPLE_RATE;
           const sample = TEST_FREQUENCIES.reduce(
             (sum, frequency) => sum + TEST_TONE_AMPLITUDE * Math.sin(2 * Math.PI * frequency * time),
@@ -196,6 +199,75 @@
             };
           }
 
+          // Abort a genuinely long render after startRendering() has begun,
+          // then retry a normal export. The counters verify that cancellation
+          // detaches the source/filter graph and closes the decode context
+          // before the next full-length render is allowed to start.
+          AudioContext.prototype.decodeAudioData = originalDecodeAudioData;
+          const originalStop = AudioBufferSourceNode.prototype.stop;
+          const originalDisconnect = AudioNode.prototype.disconnect;
+          const originalClose = AudioContext.prototype.close;
+          let stopCalls = 0;
+          let disconnectCalls = 0;
+          let closeCalls = 0;
+          AudioBufferSourceNode.prototype.stop = function (...args) {
+            stopCalls += 1;
+            return originalStop.apply(this, args);
+          };
+          AudioNode.prototype.disconnect = function (...args) {
+            disconnectCalls += 1;
+            return originalDisconnect.apply(this, args);
+          };
+          AudioContext.prototype.close = function (...args) {
+            closeCalls += 1;
+            return originalClose.apply(this, args);
+          };
+
+          const longFixture = createFixtureWav(LONG_DURATION_SECONDS);
+          window.fetch = async () => new Response(longFixture, {
+            status: 200,
+            headers: { "Content-Type": "audio/wav" },
+          });
+          const cancellationController = new AbortController();
+          let cancelScheduled = false;
+          let cancellationError;
+          try {
+            await renderMasteringEqWav(
+              "/fixtures/long-track.wav",
+              BAND_GAINS,
+              POST_EQ_GAIN,
+              (update) => {
+                if (update.stage === "rendering" && !cancelScheduled) {
+                  cancelScheduled = true;
+                  setTimeout(() => cancellationController.abort(), 0);
+                }
+              },
+              { signal: cancellationController.signal },
+            );
+          } catch (error) {
+            cancellationError = error;
+          }
+          const cancellationCleanup = {
+            cancelled: isMasteringEqExportCancelled(cancellationError),
+            stopCalls,
+            disconnectCalls,
+            closeCalls,
+          };
+
+          window.fetch = async () => new Response(fixture, {
+            status: 200,
+            headers: { "Content-Type": "audio/wav" },
+          });
+          const retry = await renderMasteringEqWav(
+            "/fixtures/retry.wav",
+            BAND_GAINS,
+            POST_EQ_GAIN,
+          );
+          const retryParsed = parseRenderedWav(await retry.arrayBuffer());
+          AudioBufferSourceNode.prototype.stop = originalStop;
+          AudioNode.prototype.disconnect = originalDisconnect;
+          AudioContext.prototype.close = originalClose;
+
           return {
             ok: parsed.riff === "RIFF"
               && parsed.wave === "WAVE"
@@ -215,7 +287,12 @@
               && allocationError?.isResourceError === true
               && allocationError.code === "INSUFFICIENT_RESOURCES"
               && networkError?.isResourceError === false
-              && networkError.name === "TypeError",
+              && networkError.name === "TypeError"
+              && cancellationCleanup.cancelled
+              && cancellationCleanup.stopCalls > 0
+              && cancellationCleanup.disconnectCalls >= 12
+              && cancellationCleanup.closeCalls > 0
+              && retryParsed.duration === DURATION_SECONDS,
             header: {
               type: rendered.type,
               size: rendered.size,
@@ -235,6 +312,8 @@
             progressStages,
             allocationError,
             networkError,
+            cancellationCleanup,
+            retryDuration: retryParsed.duration,
             frequencies: TEST_FREQUENCIES,
             measuredResponses,
             expectedResponses,
