@@ -13,6 +13,43 @@ import { fileURLToPath } from "node:url";
 const root = dirname(fileURLToPath(import.meta.url));
 const dist = join(root, "dist", "public");
 const config = JSON.parse(readFileSync(join(root, "seo.config.json"), "utf8"));
+const appleAssociationPath = join(
+  dist,
+  ".well-known",
+  "apple-developer-merchantid-domain-association",
+);
+const appleAssociationResponse = await fetch(
+  "https://js.stripe.com/.well-known/apple-developer-merchantid-domain-association",
+  { signal: AbortSignal.timeout(20_000) },
+);
+if (!appleAssociationResponse.ok) {
+  throw new Error(
+    `prerender: Stripe Apple verification file fetch failed with HTTP ${appleAssociationResponse.status}`,
+  );
+}
+const appleAssociation = (await appleAssociationResponse.text()).trim();
+if (!/^[0-9a-f]+$/i.test(appleAssociation) || appleAssociation.length < 1_000) {
+  throw new Error(
+    "prerender: Stripe Apple verification response is missing or invalid",
+  );
+}
+try {
+  const decoded = JSON.parse(
+    Buffer.from(appleAssociation, "hex").toString("utf8"),
+  );
+  if (
+    typeof decoded?.pspId !== "string" ||
+    typeof decoded?.signature !== "string"
+  ) {
+    throw new Error("missing signed association fields");
+  }
+} catch (error) {
+  throw new Error(
+    `prerender: Stripe Apple verification response is malformed: ${error.message}`,
+  );
+}
+mkdirSync(dirname(appleAssociationPath), { recursive: true });
+writeFileSync(appleAssociationPath, `${appleAssociation}\n`);
 
 const START = "<!-- SEO:START -->";
 const END = "<!-- SEO:END -->";
