@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
+import { recoverStaleMasterJobs } from "./routes/master";
 import { logger } from "./lib/logger";
 import { loadAuthUser } from "./middlewares/authMiddleware";
 import { maintenanceModeMiddleware } from "./middlewares/maintenanceMode";
@@ -20,6 +21,13 @@ process.on("uncaughtException", (err) => logger.fatal({ err }, "uncaughtExceptio
 process.on("unhandledRejection", (reason) => logger.fatal({ reason }, "unhandledRejection"));
 
 const app: Express = express();
+
+// In-process mastering cannot resume once its /tmp input disappears at a
+// restart. Recover stale records early so clients can retry instead of polling
+// "running" forever. A not-yet-published schema must not prevent boot.
+void recoverStaleMasterJobs().catch((err) => {
+  logger.warn({ err }, "unable to recover stale mastering jobs");
+});
 
 // Stamp request arrival so routes can report true server-side handler time
 // (health.ts serverMs, master.ts X-GK-Timing-* headers).

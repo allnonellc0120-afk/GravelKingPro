@@ -19,12 +19,14 @@ import type { User } from "@workspace/db";
 import { embedLsbPayload, extractLsbPayload } from "../kernel-v3";
 import { readFile, writeFile } from "fs/promises";
 import { db, ipCertStubsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { masterJobsTable } from "@workspace/db/schema";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { styleAuthorshipScore } from "@workspace/authorship";
 import { backupCertStub } from "../lib/firestore";
 import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
+import { ObjectStorageService } from "../lib/objectStorage";
 import {
   CREDIT_COSTS,
   grantCredits,
@@ -47,6 +49,35 @@ const upload = multer({
 });
 
 const masterRouter = Router();
+
+const masterJobStorage = new ObjectStorageService();
+
+/** Best-effort state write: a database outage must not turn a successful DSP
+ * request into an unreported process crash. The final storage write remains
+ * required before a job can be marked completed. */
+async function updateMasterJob(
+  id: string,
+  values: Partial<typeof masterJobsTable.$inferInsert>,
+): Promise<void> {
+  await db.update(masterJobsTable).set(values).where(eq(masterJobsTable.id, id));
+}
+
+/** Marks jobs interrupted by a process restart as failed rather than leaving
+ * them permanently "running". Inputs are request-local /tmp files, so they
+ * cannot safely be resumed after a restart. */
+export async function recoverStaleMasterJobs(): Promise<void> {
+  const cutoff = new Date(Date.now() - 10 * 60_000);
+  await db.update(masterJobsTable).set({
+    status: "failed",
+    stage: "interrupted",
+    error: "Mastering was interrupted by a server restart. Please submit the track again.",
+    completedAt: new Date(),
+  }).where(
+    // A running job with no heartbeat/update for ten minutes cannot have a
+    // surviving worker in this in-process implementation.
+    and(eq(masterJobsTable.status, "running"), lt(masterJobsTable.updatedAt, cutoff)),
+  );
+}
 
 /** Delete mastered-download copies older than the 1-hour token TTL. */
 async function sweepStaleDownloads(): Promise<void> {
@@ -476,21 +507,77 @@ masterRouter.post(
       }
     }
 
+    const suppliedClientJobId = typeof req.body.clientJobId === "string" ? req.body.clientJobId : null;
+    const suppliedIdempotencyKey = typeof req.headers["idempotency-key"] === "string"
+      ? req.headers["idempotency-key"]
+      : null;
+    if ((suppliedClientJobId && !/^[A-Za-z0-9_.:-]{1,128}$/.test(suppliedClientJobId)) ||
+        (suppliedIdempotencyKey && !/^[A-Za-z0-9_.:-]{1,128}$/.test(suppliedIdempotencyKey))) {
+      res.status(400).json({ success: false, error: "Invalid client job id or Idempotency-Key." });
+      return;
+    }
+
+    // This record is deliberately created after entitlement/quota gates but
+    // before normalization and kernel DSP. Anonymous browser use already has a
+    // durable usage user by this point; partner jobs remain ownerless and are
+    // intentionally not exposed by the owner-only job APIs below.
+    const jobId = randomUUID();
+    const jobOwnerId = req.dbUser?.id ?? usageUserId ?? exportUser?.id ?? creditUser?.id ?? null;
+    const insertedJob = await db.insert(masterJobsTable).values({
+      id: jobId,
+      userId: jobOwnerId,
+      type: "mastering",
+      status: "queued",
+      progress: 0,
+      stage: "queued",
+      originalFilename: req.file.originalname.slice(0, 255),
+      inputRef: req.file.path,
+      requestConfig: {
+        preset: presetName,
+        intensity,
+        denoise,
+        sidechainFilter,
+        sidechainFreq,
+        stereoLink,
+        adaptiveMode,
+        autoThreshold,
+        certify: certifyRequested,
+        format: mp3Requested ? "mp3" : "wav",
+      },
+      clientJobId: suppliedClientJobId,
+      idempotencyKey: suppliedIdempotencyKey,
+    }).onConflictDoNothing().returning({ id: masterJobsTable.id });
+    if (!insertedJob.length) {
+      await unlink(req.file.path).catch(() => {});
+      res.status(409).json({ success: false, error: "A mastering job with this client job id already exists." });
+      return;
+    }
+    res.setHeader("X-GK-Master-Job-Id", jobId);
+
     const uploadedPath = req.file.path;
     let filePath = uploadedPath;
     let normalizedPath: string | null = null;
     const outPath = `/tmp/gk_master_out_${randomUUID()}.wav`;
 
     try {
+      await updateMasterJob(jobId, {
+        status: "running", progress: 5, stage: "normalizing", startedAt: new Date(),
+      });
       // Normalize any format (m4a, mp4, mov, ogg, webm…) → WAV before the
       // preset chain. ffmpeg auto-detects the container so the user can drop
       // anything from their photo library and have it just work.
       normalizedPath = await normalizeToWav(uploadedPath);
       filePath = normalizedPath;
+      await updateMasterJob(jobId, { progress: 15, stage: "validated" });
 
       // Duration guard
       const duration = await probeFileDuration(filePath);
       if (duration > MAX_AUDIO_DURATION_S) {
+        await updateMasterJob(jobId, {
+          status: "failed", stage: "rejected",
+          error: "Audio exceeds the maximum allowed duration.",
+          completedAt: new Date(),
+        }).catch(() => {});
         res.status(422).json({
           success: false,
           error: `Audio exceeds the maximum allowed duration of ${Math.floor(MAX_AUDIO_DURATION_S / 60)} minutes.`,
@@ -533,6 +620,7 @@ masterRouter.post(
       const kernelStart = performance.now();
       let kernelMs: number | null = null;
       try {
+        await updateMasterJob(jobId, { progress: 20, stage: "mastering" });
         {
           // Resolve relative to this bundle (dist/index.mjs → ../python), never
           // process.cwd() — the container's cwd is /app, not the package dir.
@@ -555,6 +643,11 @@ masterRouter.post(
           pyStats = JSON.parse(stdout.trim().split("\n").pop() ?? "{}");
         }
       } catch (err: any) {
+        await updateMasterJob(jobId, {
+          status: "failed", stage: "failed",
+          error: String(err?.message ?? "The Morris Law Kernel failed.").slice(0, 4000),
+          completedAt: new Date(),
+        }).catch(() => {});
         req.log.error(
           { stderr: err?.stderr?.slice?.(-800) ?? String(err?.message ?? err) },
           "Morris Law Kernel failed (remote and local)",
@@ -568,6 +661,7 @@ masterRouter.post(
         kernelMs = performance.now() - kernelStart;
         if (prePassPath) await unlink(prePassPath).catch(() => {});
       }
+      await updateMasterJob(jobId, { progress: 70, stage: "mastered" });
 
       // Observability surfaced in response headers (mirrors kernel internals).
       const detectedRmsDb      = autoThreshold ? (pyStats.detectedRmsDb ?? null) : null;
@@ -583,6 +677,11 @@ masterRouter.post(
       if (walletMode && !isSample) {
         const spent = await spendCredits(creditUser!.id, walletCost, "master", walletReference);
         if (!spent.ok) {
+          await updateMasterJob(jobId, {
+            status: "failed", stage: "payment_required",
+            error: "Insufficient credits to fulfill mastered audio.",
+            completedAt: new Date(),
+          }).catch(() => {});
           res.status(402).json({
             success: false,
             code: "INSUFFICIENT_CREDITS",
@@ -600,6 +699,11 @@ masterRouter.post(
       // Count the free user's first full download against their allowance.
       if (!isSample && usageUserId) {
         if (usedTotalDownloads >= FREE_LIMITS.totalDownloads) {
+          await updateMasterJob(jobId, {
+            status: "failed", stage: "quota_rejected",
+            error: "Download allowance was exhausted before fulfillment.",
+            completedAt: new Date(),
+          }).catch(() => {});
           res.status(402).json({
             success: false,
             code: "LIMIT_REACHED",
@@ -623,6 +727,11 @@ masterRouter.post(
             await grantCredits(creditUser.id, walletCost, "quota_master_refund", `refund:${walletReference}`);
             walletSpent = false;
           }
+          await updateMasterJob(jobId, {
+            status: "failed", stage: "quota_rejected",
+            error: "Export quota was exhausted before fulfillment.",
+            completedAt: new Date(),
+          }).catch(() => {});
           res.status(429).json(exportLimitPayload(quota));
           return;
         }
@@ -730,6 +839,25 @@ masterRouter.post(
 
       const filename = `gravelking_mastered_${presetName}.wav`;
 
+      // Store the exact finalized WAV (including an opt-in certificate seal)
+      // before any response is sent. /tmp copies remain only for compatibility
+      // with existing synchronous/mobile download callers.
+      const outputObjectKey = `master-jobs/${jobId}/master.wav`;
+      await updateMasterJob(jobId, { progress: 90, stage: "storing_output" });
+      await masterJobStorage.savePrivateBuffer(outputObjectKey, outBuffer, "audio/wav", {
+        masterJobId: jobId,
+        originalFilename: req.file.originalname.slice(0, 255),
+      });
+      await updateMasterJob(jobId, {
+        status: "completed",
+        progress: 100,
+        stage: "completed",
+        outputObjectKey,
+        outputUrl: `/api/jobs/${jobId}/download`,
+        downloadFilename: filename,
+        completedAt: new Date(),
+      });
+
       // ── Real-URL download path ───────────────────────────────────────────
       // Large WAVs delivered as blob: URLs are unreliable on mobile browsers
       // (in-app playback works, but saving the file stalls). Stash a copy and
@@ -819,6 +947,12 @@ masterRouter.post(
       setResultHeaders();
       streamBuffer(res, outBuffer);
     } catch (err: any) {
+      await updateMasterJob(jobId, {
+        status: "failed",
+        stage: "failed",
+        error: String(err?.message ?? "Mastering failed.").slice(0, 4000),
+        completedAt: new Date(),
+      }).catch(() => {});
       if (walletSpent && creditUser) {
         await grantCredits(creditUser.id, walletCost, "failed_master_refund", `refund:${walletReference}`);
       }
@@ -930,6 +1064,107 @@ masterRouter.post(
     }
   }
 );
+
+// ── Durable mastering job status/download API ──────────────────────────────
+// These endpoints deliberately require a resolved database user. Ownerless
+// partner jobs have no browser identity to authorize a later read, so they
+// retain the synchronous partner response but are not enumerable/downloadable.
+masterRouter.get(["/kernel/master-jobs", "/jobs"], async (req: Request, res: Response) => {
+  if (!req.dbUser) {
+    res.status(401).json({ success: false, error: "Authentication required." });
+    return;
+  }
+  const jobs = await db.select({
+    id: masterJobsTable.id,
+    status: masterJobsTable.status,
+    progress: masterJobsTable.progress,
+    stage: masterJobsTable.stage,
+    originalFilename: masterJobsTable.originalFilename,
+    downloadFilename: masterJobsTable.downloadFilename,
+    error: masterJobsTable.error,
+    createdAt: masterJobsTable.createdAt,
+    updatedAt: masterJobsTable.updatedAt,
+    startedAt: masterJobsTable.startedAt,
+    completedAt: masterJobsTable.completedAt,
+  }).from(masterJobsTable)
+    .where(eq(masterJobsTable.userId, req.dbUser.id))
+    .orderBy(desc(masterJobsTable.createdAt))
+    .limit(50);
+  res.json({ jobs: jobs.map((job) => ({ ...job, jobId: job.id })) });
+});
+
+masterRouter.get(["/kernel/master-jobs/:id", "/jobs/:jobId"], async (req: Request, res: Response) => {
+  if (!req.dbUser) {
+    res.status(401).json({ success: false, error: "Authentication required." });
+    return;
+  }
+  const id = String(req.params.id ?? req.params.jobId ?? "");
+  const [job] = await db.select({
+    id: masterJobsTable.id,
+    status: masterJobsTable.status,
+    progress: masterJobsTable.progress,
+    stage: masterJobsTable.stage,
+    originalFilename: masterJobsTable.originalFilename,
+    requestConfig: masterJobsTable.requestConfig,
+    outputObjectKey: masterJobsTable.outputObjectKey,
+     outputUrl: masterJobsTable.outputUrl,
+    downloadFilename: masterJobsTable.downloadFilename,
+    error: masterJobsTable.error,
+    createdAt: masterJobsTable.createdAt,
+    updatedAt: masterJobsTable.updatedAt,
+    startedAt: masterJobsTable.startedAt,
+    completedAt: masterJobsTable.completedAt,
+  }).from(masterJobsTable)
+    .where(and(eq(masterJobsTable.id, id), eq(masterJobsTable.userId, req.dbUser.id)))
+    .limit(1);
+  if (!job) {
+    res.status(404).json({ success: false, error: "Mastering job not found." });
+    return;
+  }
+  const downloadUrl = job.status === "completed" ? `/api/jobs/${job.id}/download` : null;
+  res.json({ job: { ...job, jobId: job.id, outputUrl: job.outputUrl ?? downloadUrl }, jobId: job.id, downloadUrl });
+});
+
+masterRouter.get(["/kernel/master-jobs/:id/download", "/jobs/:jobId/download"], async (req: Request, res: Response) => {
+  if (!req.dbUser) {
+    res.status(401).json({ success: false, error: "Authentication required." });
+    return;
+  }
+  const id = String(req.params.id ?? req.params.jobId ?? "");
+  const [job] = await db.select({
+    status: masterJobsTable.status,
+    outputObjectKey: masterJobsTable.outputObjectKey,
+    downloadFilename: masterJobsTable.downloadFilename,
+  }).from(masterJobsTable)
+    .where(and(eq(masterJobsTable.id, id), eq(masterJobsTable.userId, req.dbUser.id)))
+    .limit(1);
+  if (!job) {
+    res.status(404).json({ success: false, error: "Mastering job not found." });
+    return;
+  }
+  if (job.status !== "completed" || !job.outputObjectKey) {
+    res.status(409).json({ success: false, error: "Mastered audio is not ready." });
+    return;
+  }
+  try {
+    const file = await masterJobStorage.getObjectEntityFile(`/objects/${job.outputObjectKey}`);
+    const [metadata] = await file.getMetadata();
+    const safeName = (job.downloadFilename ?? "gravelking_mastered.wav").replace(/[^\w.\- ]+/g, "_");
+    res.setHeader("Content-Type", String(metadata.contentType ?? "audio/wav"));
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    if (metadata.size) res.setHeader("Content-Length", String(metadata.size));
+    file.createReadStream()
+      .on("error", (err) => {
+        req.log.error({ err, masterJobId: id }, "durable mastered audio stream failed");
+        if (!res.headersSent) res.status(502).json({ success: false, error: "Unable to read mastered audio." });
+        else res.destroy(err);
+      })
+      .pipe(res);
+  } catch (err) {
+    req.log.error({ err, masterJobId: id }, "durable mastered audio unavailable");
+    res.status(502).json({ success: false, error: "Unable to read mastered audio." });
+  }
+});
 
 // ── GET /api/kernel/master-file ─────────────────────────────────────────────
 // Token-guarded (1h TTL) download of a mastered WAV over real HTTPS — mobile

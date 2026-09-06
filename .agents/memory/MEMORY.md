@@ -88,3 +88,4 @@
 - [Credit pricing rules](credit-pricing-rules.md) — generation 20 credits, master+download 75, free certificates, Pro $6.99/800 weekly, King Pro $24.99/2,500 monthly with hard reset
 - [Revenue metric integrity](revenue-metric-integrity.md) — MRR is active live Stripe subscriptions only; trials stay separate, revenue is live charges net of refunds
 - [Play deletion page](play-deletion-page.md) — Google Play reviewers need a public .com deletion URL with instructions present in the prerendered no-JS HTML
+- [Durable mastering jobs](durable-mastering-jobs.md) — mastering output/status survive route changes via Postgres jobs + private object storage; DSP remains request-bound until detached workers are added
