@@ -75,7 +75,7 @@
 - [Live-site browser proof](live-site-browser-proof.md) — verify production interactively via a throwaway nix-shell browser; never add browsers to the deploy image
 - [Export quota pattern](export-quota.md) — 20 WAV/MP3 exports per rolling 30 days, paid tiers included; consume must be ONE atomic reset-or-increment UPDATE or window-boundary races blow the cap
 - [API test suite flock + lyric-owner cookie rule](api-test-suite-flock.md) — test script must stay flock-wrapped (dist-test races); legacy lyric rows never grant access via gk_session cookie
-- [JAX speech session isolation](jax-speech-session-isolation.md) — invalidate each Web Speech session on send/stop; late cumulative result events otherwise repeat prior prompts
+- [JAX speech session isolation](jax-speech-session-isolation.md) — invalidate mic sessions and explicitly cancel HTMLAudioElement TTS; speechSynthesis.cancel alone cannot stop JAX
 - [Stale lib/db dist declarations](db-dist-declarations.md) — api-server typecheck fails on "missing" schema fields until `tsc -b lib/db --force`; dist/ never rebuilds automatically
 - [Stripe idempotency races](stripe-idempotency-races.md) — stable keys need bounded retry for in-flight conflicts; customer relinking must remain CAS-protected
 - [Package firewall blocked packages](package-firewall-block.md) — deploy installs 403 on some npm packages (all `tar` versions); fix by vendoring the tgz + pnpm file: override
