@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
-import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown, Shuffle } from "lucide-react";
+import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown, Shuffle, Loader2 } from "lucide-react";
 import { RemixModal } from "@/components/remix-modal";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,9 @@ import { downloadBlob, downloadUrl } from "@/lib/download";
 import {
   FLAT_MASTERING_EQ,
   getMasteringDownloadPath,
+  isMasteringEqResourceError,
   renderMasteringEqWav,
+  type MasteringEqExportStage,
 } from "@/lib/mastering-eq";
 import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
 import { EmailGate, useEmailGate } from "@/components/email-gate";
@@ -30,6 +32,8 @@ import { Link } from "wouter";
 import { useCredits } from "@/components/credit-wallet";
 
 type State = "idle" | "compressing" | "processing" | "done" | "error";
+
+type FineTuneExportStage = MasteringEqExportStage | "saving" | "complete";
 const ACTIVE_MASTER_JOB_KEY = "gk:active-master-job:v1";
 
 const PRESETS = [
@@ -261,6 +265,10 @@ export default function Mastering() {
   const [eqBandGains, setEqBandGains] = useState<number[]>(() => [...FLAT_MASTERING_EQ]);
   const [postEqGain, setPostEqGain] = useState(0);
   const [exportingEq, setExportingEq] = useState(false);
+  const [exportStage, setExportStage] = useState<FineTuneExportStage>("loading");
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportError, setExportError] = useState("");
+  const exportInFlightRef = useRef(false);
   const { balance: creditsBalance } = useCredits();
 
   const hydrateMasterJob = useCallback(async (jobId: string): Promise<boolean> => {
@@ -341,6 +349,7 @@ export default function Mastering() {
     setEqOpen(false);
     setEqBandGains([...FLAT_MASTERING_EQ]);
     setPostEqGain(0);
+    setExportError("");
 
     let uploadFile = file;
 
@@ -562,26 +571,57 @@ export default function Mastering() {
 
   const download = async () => {
     if (!resultUrl) return;
+    // A ref closes the small window between a click and the disabled button
+    // re-render, so a double-tap cannot allocate two full-length renders.
+    if (exportInFlightRef.current) return;
     if (getMasteringDownloadPath(eqBandGains, postEqGain) === "server") {
       downloadUrl(downloadHref ?? resultUrl, `gravelking_mastered_${preset}.wav`);
       return;
     }
 
+    exportInFlightRef.current = true;
     setExportingEq(true);
+    setExportError("");
+    setExportStage("loading");
+    setExportProgress(2);
     try {
-      const rendered = await renderMasteringEqWav(resultUrl, eqBandGains, postEqGain);
-      downloadBlob(rendered, `gravelking_mastered_${preset}_fine_tuned.wav`);
+      const rendered = await renderMasteringEqWav(
+        resultUrl,
+        eqBandGains,
+        postEqGain,
+        ({ stage, progress: nextProgress }) => {
+          setExportStage(stage);
+          setExportProgress(nextProgress);
+        },
+      );
+
+      // Give React one paint for the explicit saving state before handing the
+      // object URL to the browser or the native mobile bridge.
+      setExportStage("saving");
+      setExportProgress(97);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      downloadBlob(rendered, `gravelking_mastered_${preset}_fine_tuned.wav`, {
+        onStart: () => setExportStage("saving"),
+        onComplete: () => setExportProgress(100),
+      });
+      setExportStage("complete");
       toast({
         title: "Fine-tuned WAV ready",
         description: "Your EQ and post-EQ gain were baked into the download.",
       });
     } catch (error) {
+      const resourceError = isMasteringEqResourceError(error);
+      const message = resourceError
+        ? "This device ran out of memory while rendering the full-length WAV. Close other tabs or apps and try again. Your EQ settings are still here, or you can download the mastered WAV without fine-tuning."
+        : error instanceof Error ? error.message : "Try again.";
+      setExportError(message);
       toast({
         title: "Could not export fine-tuned WAV",
-        description: error instanceof Error ? error.message : "Try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {
+      exportInFlightRef.current = false;
       setExportingEq(false);
     }
   };
@@ -597,6 +637,10 @@ export default function Mastering() {
     setEqOpen(false);
     setEqBandGains([...FLAT_MASTERING_EQ]);
     setPostEqGain(0);
+    setExportError("");
+    setExportProgress(0);
+    setExportStage("loading");
+    exportInFlightRef.current = false;
     setExportingEq(false);
   };
 
@@ -1201,12 +1245,64 @@ export default function Mastering() {
 
                 {certId && <CertUnlockCard certId={certId} />}
 
+                {exportingEq && (
+                  <div
+                    className="space-y-2 rounded-lg border border-sky-500/20 bg-sky-500/5 p-3"
+                    aria-live="polite"
+                    aria-busy="true"
+                    data-testid="fine-tune-export-progress"
+                  >
+                    <div className="flex items-center gap-2 text-xs text-sky-300">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>{FINE_TUNE_EXPORT_LABELS[exportStage]}</span>
+                      <span className="ml-auto tabular-nums text-sky-200/70">{exportProgress}%</span>
+                    </div>
+                    <Progress value={exportProgress} className="h-1.5" />
+                    <p className="text-[11px] text-muted-foreground">
+                      Long tracks can take a minute. Keep this page open while the file is prepared.
+                    </p>
+                  </div>
+                )}
+
+                {exportError && (
+                  <div
+                    className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"
+                    role="alert"
+                    data-testid="fine-tune-export-error"
+                  >
+                    <p className="text-xs leading-relaxed text-amber-200">{exportError}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void download()}
+                        disabled={exportingEq}
+                        className="border-amber-500/30"
+                      >
+                        Try fine-tuned export again
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setExportError("");
+                          downloadUrl(downloadHref ?? resultUrl, `gravelking_mastered_${preset}.wav`);
+                        }}
+                        disabled={exportingEq}
+                      >
+                        Download mastered WAV without EQ
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   {/* This result already consumed its export credit server-side when
                       the master ran — saving it must stay possible even if the quota
                       just hit 0, so the download is never gated here. */}
-                  <Button onClick={() => void download()} disabled={exportingEq} className="flex-1 bg-sky-600 hover:bg-sky-700">
-                    <Download className="w-4 h-4 mr-2" /> {exportingEq ? "Rendering WAV…" : eqIsActive ? "Download Fine-Tuned WAV" : "Download WAV"}
+                  <Button onClick={() => void download()} disabled={exportingEq} className="flex-1 bg-sky-600 hover:bg-sky-700" aria-busy={exportingEq}>
+                    {exportingEq ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                    {exportingEq ? FINE_TUNE_EXPORT_LABELS[exportStage] : eqIsActive ? "Download Fine-Tuned WAV" : "Download WAV"}
                   </Button>
                   <Button variant="outline" onClick={reset} className="border-border/40">New File</Button>
                 </div>
@@ -1395,3 +1491,12 @@ export default function Mastering() {
     </Layout>
   );
 }
+
+const FINE_TUNE_EXPORT_LABELS: Record<FineTuneExportStage, string> = {
+  loading: "Loading the full mastered track…",
+  decoding: "Decoding the full-length audio…",
+  rendering: "Rendering your fine-tuned audio…",
+  encoding: "Encoding a downloadable WAV…",
+  saving: "Saving the WAV to your device…",
+  complete: "Fine-tuned WAV ready",
+};

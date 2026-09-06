@@ -51,8 +51,18 @@ function triggerBrowserDownload(url: string, name: string): void {
  * Save an in-memory Blob to the device: wraps it in an object URL, triggers the
  * save, then revokes the URL after the download has been handed off.
  */
-export function downloadBlob(blob: Blob, name: string): void {
+export interface BlobDownloadOptions {
+  onStart?: () => void;
+  onComplete?: () => void;
+}
+
+export function downloadBlob(blob: Blob, name: string, options?: BlobDownloadOptions): void {
+  options?.onStart?.();
   const url = URL.createObjectURL(blob);
-  downloadUrl(url, name);
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  try {
+    downloadUrl(url, name);
+    options?.onComplete?.();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
 }
