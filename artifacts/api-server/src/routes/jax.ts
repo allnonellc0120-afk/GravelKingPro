@@ -22,6 +22,7 @@ import {
   getJaxSession,
   listJaxSessions,
   saveJaxSession,
+  deleteJaxSession,
   type JaxAuthorshipEntry,
   type JaxSessionMessage,
 } from "../lib/firestore";
@@ -181,6 +182,20 @@ jaxRouter.put("/jax/sessions/:sessionId", async (req: Request, res: Response) =>
   const payload = sessionPayload(req);
   saveJaxSession(payload, sessionId);
   res.json({ ok: true, sessionId });
+});
+
+jaxRouter.delete("/jax/sessions/:sessionId", async (req: Request, res: Response) => {
+  const userId = currentUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to delete JAX sessions." });
+    return;
+  }
+  const deleted = await deleteJaxSession(userId, String(req.params.sessionId));
+  if (!deleted) {
+    res.status(404).json({ error: "JAX session not found." });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async (req: Request, res: Response) => {

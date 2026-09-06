@@ -278,3 +278,17 @@ export async function getJaxSession(userId: string, sessionId: string): Promise<
     return null;
   }
 }
+
+export async function deleteJaxSession(userId: string, sessionId: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const ref = db.collection("jax_sessions").doc(sessionId);
+    const doc = await ref.get();
+    if (!doc.exists || (doc.data() as JaxSessionData).userId !== userId) return false;
+    await ref.delete();
+    return true;
+  } catch {
+    return false;
+  }
+}
