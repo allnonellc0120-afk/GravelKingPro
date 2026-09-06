@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { getStripePublishableKey, getUncachableStripeClient } from '../stripeClient';
 import { ensureCustomerOnCurrentAccount } from '../lib/stripeCustomers';
 import { recordAnalyticsEvent } from '../analytics';
+import { logger } from '../lib/logger';
 import {
   CREDIT_PACKS,
   getCreditsBalance,
@@ -15,6 +16,81 @@ import {
 import type Stripe from 'stripe';
 
 const stripeRouter = Router();
+
+type PendingCreditPurchase = {
+  paymentIntentId: string;
+  amountCents: number;
+  credits: number;
+  createdAt: string;
+};
+
+const SETTLING_PAYMENT_INTENT_STATUSES = new Set(["processing", "succeeded"]);
+
+/**
+ * Stripe is the source of truth for a payment that has been confirmed but
+ * whose webhook grant has not reached the wallet ledger yet. Returning this
+ * alongside history lets the client discard stale local pending state and
+ * show the actual purchase amount and server timestamp.
+ */
+async function getPendingCreditPurchase(user: {
+  id: string;
+  stripeCustomerId: string | null;
+}): Promise<PendingCreditPurchase | null> {
+  if (!user.stripeCustomerId) return null;
+
+  try {
+    const stripe = await getUncachableStripeClient();
+    const intents = await stripe.paymentIntents.list({
+      customer: user.stripeCustomerId,
+      limit: 100,
+    });
+    const creditIntents = intents.data.filter((intent) =>
+      intent.metadata?.kind === "credits_purchase" &&
+      intent.metadata.user_id === user.id &&
+      SETTLING_PAYMENT_INTENT_STATUSES.has(intent.status),
+    );
+    if (creditIntents.length === 0) return null;
+
+    const settledRows = await db
+      .select({ paymentIntentId: creditTransactionsTable.stripePaymentIntentId })
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.userId, user.id));
+    const settledPaymentIntentIds = new Set(
+      settledRows
+        .map((row) => row.paymentIntentId)
+        .filter((paymentIntentId): paymentIntentId is string => Boolean(paymentIntentId)),
+    );
+
+    const pending = creditIntents
+      .filter((intent) => !settledPaymentIntentIds.has(intent.id))
+      .sort((a, b) => b.created - a.created || b.id.localeCompare(a.id))[0];
+    if (!pending) return null;
+
+    const credits = Number(pending.metadata?.credits);
+    if (!Number.isInteger(credits) || credits <= 0 || !Number.isInteger(pending.amount) || pending.amount <= 0) {
+      logger.warn(
+        { userId: user.id, paymentIntentId: pending.id },
+        "Ignoring credit payment with invalid settlement metadata",
+      );
+      return null;
+    }
+
+    return {
+      paymentIntentId: pending.id,
+      amountCents: pending.amount,
+      credits,
+      createdAt: new Date(pending.created * 1000).toISOString(),
+    };
+  } catch (err: unknown) {
+    // A Stripe outage should not hide the ledger history. The next history
+    // refresh will retry the server-side pending lookup.
+    logger.warn(
+      { userId: user.id, err },
+      "Unable to load pending credit purchase from Stripe",
+    );
+    return null;
+  }
+}
 
 const CHECKOUT_CATALOG = {
   "GravelKing Weekly": { plan: "pro", unitAmount: 999, interval: "month" },
@@ -167,11 +243,15 @@ stripeRouter.get('/credits/history', async (req: Request, res: Response) => {
     }
     const page = Number.parseInt(String(req.query.page ?? '1'), 10);
     const pageSize = Number.parseInt(String(req.query.pageSize ?? '10'), 10);
-    res.json(await getCreditTransactionHistory(
+    const history = await getCreditTransactionHistory(
       user.id,
       Number.isFinite(page) ? page : 1,
       Number.isFinite(pageSize) ? pageSize : 10,
-    ));
+    );
+    res.json({
+      ...history,
+      pendingPurchase: await getPendingCreditPurchase(user),
+    });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load credit history.' });
   }
