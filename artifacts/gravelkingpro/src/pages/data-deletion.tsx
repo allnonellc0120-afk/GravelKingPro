@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Clock3, FileText, Mail, ShieldCheck, Trash2 } from "lucide-react";
 import { useAuth } from "@clerk/react";
 
-const deletionEmail = "Allnonellc0120@gmail.com";
+const deletionEmail = "support@gravelkingpro.com";
 const requestSubject = "Account Deletion Request";
 const requestBody = `Please delete my GravelKing Pro personal data.
 
@@ -92,7 +92,7 @@ export default function DataDeletionPage() {
           <ul className="mt-4 space-y-3 text-muted-foreground">
             <li className="flex gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
-              <span>Account profile and session information, including your email address and account identifiers.</span>
+              <span>User credentials and account information, including your email address, account identifiers, and active sign-in sessions.</span>
             </li>
             <li className="flex gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
@@ -100,11 +100,11 @@ export default function DataDeletionPage() {
             </li>
             <li className="flex gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
-              <span>Uploaded audio and processing records that remain in our systems, subject to the limits below.</span>
+              <span>Saved audio, generated audio stems, uploaded audio, and related processing records that remain in our systems.</span>
             </li>
             <li className="flex gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
-              <span>Song drafts and library records associated with the identifier you provide.</span>
+              <span>Saved lyrics, song drafts, library records, and session logs associated with the identifier you provide.</span>
             </li>
           </ul>
         </section>
@@ -116,12 +116,12 @@ export default function DataDeletionPage() {
           </h2>
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-muted-foreground">
             <li>We confirm that we can match the request to the relevant account or record.</li>
-            <li>We delete the applicable GravelKing Pro records and active sessions.</li>
+            <li>We delete the applicable GravelKing Pro records, active sessions, saved lyrics, audio stems, and session logs.</li>
             <li>We reply when the request is completed or if we need more information to identify the records.</li>
           </ol>
           <p className="mt-4 text-muted-foreground leading-relaxed">
-            We aim to respond within 30 days. If a request needs more time or cannot be fully completed,
-            we will explain why in our response.
+            We remove the applicable account and data within 30 days after we verify the request.
+            If a request needs more time or cannot be fully completed, we will explain why in our response.
           </p>
         </section>
 
