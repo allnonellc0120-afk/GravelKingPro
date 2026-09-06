@@ -12,6 +12,9 @@ export const MASTERING_EQ_BANDS = [
 ] as const;
 
 export const FLAT_MASTERING_EQ = MASTERING_EQ_BANDS.map(() => 0);
+const MASTERING_EQ_Q = 1.4;
+
+export type MasteringDownloadPath = "server" | "eq-render";
 
 export interface EqChain {
   filters: BiquadFilterNode[];
@@ -30,7 +33,7 @@ export function createMasteringEqChain(
     filter.frequency.value = frequency;
     // A Q of 1.4 gives the ISO bands useful musical overlap without making
     // adjacent sliders sound like isolated notch filters.
-    filter.Q.value = 1.4;
+    filter.Q.value = MASTERING_EQ_Q;
     filter.gain.value = bandGains[index] ?? 0;
     return filter;
   });
@@ -63,6 +66,20 @@ export function updateMasteringEqChain(
 
 export function dbToLinear(db: number): number {
   return Math.pow(10, db / 20);
+}
+
+export function isMasteringEqActive(
+  bandGains: readonly number[],
+  postEqGain: number,
+): boolean {
+  return bandGains.some((gain) => gain !== 0) || postEqGain !== 0;
+}
+
+export function getMasteringDownloadPath(
+  bandGains: readonly number[],
+  postEqGain: number,
+): MasteringDownloadPath {
+  return isMasteringEqActive(bandGains, postEqGain) ? "eq-render" : "server";
 }
 
 export async function decodeAudioUrl(

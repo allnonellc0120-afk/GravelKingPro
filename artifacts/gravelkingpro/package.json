@@ -8,7 +8,7 @@
     "build": "vite build --config vite.config.ts && node prerender.mjs",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test tests/export-quota-label.test.mjs",
+    "test": "node --test tests/export-quota-label.test.mjs tests/mastering-eq-export.test.mjs && node tests/mastering-eq-export.e2e.mjs",
     "test:credit-wallet": "node tests/credit-wallet.e2e.mjs"
   },
   "devDependencies": {
