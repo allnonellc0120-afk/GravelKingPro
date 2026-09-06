@@ -179,21 +179,65 @@ export async function renderMasteringEqWav(
 ): Promise<Blob> {
   const signal = options?.signal;
   throwIfAborted(signal);
-  const decodeContext = new AudioContext();
+  let decodeContext: AudioContext | null = null;
+  let decodeClosePromise: Promise<void> | null = null;
+  let source: AudioBufferSourceNode | null = null;
+  let chain: EqChain | null = null;
+  let decodedBuffer: AudioBuffer | null = null;
+  let renderProgressId: ReturnType<typeof setInterval> | null = null;
+
+  const closeDecodeContext = (): Promise<void> | null => {
+    if (!decodeContext || decodeClosePromise) return decodeClosePromise;
+    decodeClosePromise = decodeContext.close().catch(() => {});
+    return decodeClosePromise;
+  };
+
+  // OfflineAudioContext has no close()/abort() API. Explicitly detach every
+  // node and buffer we own so an aborted full-length render does not keep its
+  // decoded audio alive until the browser eventually collects the context.
+  const releaseResources = (): void => {
+    if (renderProgressId !== null) {
+      clearInterval(renderProgressId);
+      renderProgressId = null;
+    }
+    if (source) {
+      try { source.stop(); } catch { /* already stopped */ }
+      try { source.disconnect(); } catch { /* already disconnected */ }
+      source.buffer = null;
+    }
+    if (chain) {
+      for (const filter of chain.filters) {
+        try { filter.disconnect(); } catch { /* already disconnected */ }
+      }
+      try { chain.outputGain.disconnect(); } catch { /* already disconnected */ }
+    }
+    source = null;
+    chain = null;
+    decodedBuffer = null;
+    // close() is asynchronous, but calling it from the abort listener starts
+    // releasing the decode context before the in-flight decode promise settles.
+    void closeDecodeContext();
+  };
+
+  const handleAbort = () => releaseResources();
+  signal?.addEventListener("abort", handleAbort, { once: true });
+
   try {
+    decodeContext = new AudioContext();
     try {
-      const decoded = await decodeAudioUrl(decodeContext, url, onProgress, signal);
+      decodedBuffer = await decodeAudioUrl(decodeContext, url, onProgress, signal);
       throwIfAborted(signal);
-      const offline = new OfflineAudioContext(
-        decoded.numberOfChannels,
-        decoded.length,
-        decoded.sampleRate,
+      const renderContext = new OfflineAudioContext(
+        decodedBuffer.numberOfChannels,
+        decodedBuffer.length,
+        decodedBuffer.sampleRate,
       );
-      const source = offline.createBufferSource();
-      source.buffer = decoded;
-      const chain = createMasteringEqChain(offline, source, bandGains, postEqGain);
-      chain.outputGain.connect(offline.destination);
-      source.start(0);
+      const renderSource = renderContext.createBufferSource();
+      source = renderSource;
+      renderSource.buffer = decodedBuffer;
+      chain = createMasteringEqChain(renderContext, renderSource, bandGains, postEqGain);
+      chain.outputGain.connect(renderContext.destination);
+      renderSource.start(0);
       onProgress?.({
         stage: "rendering",
         progress: 44,
@@ -201,7 +245,7 @@ export async function renderMasteringEqWav(
       });
 
       let renderProgress = 44;
-      const renderProgressId = setInterval(() => {
+      renderProgressId = setInterval(() => {
         if (signal?.aborted) return;
         renderProgress = Math.min(88, renderProgress + 2);
         onProgress?.({
@@ -212,22 +256,20 @@ export async function renderMasteringEqWav(
       }, 750);
       let rendered: AudioBuffer;
       try {
-        rendered = await awaitWithAbort(offline.startRendering(), signal, () => {
-          // OfflineAudioContext has no close()/abort() API. Stopping and
-          // disconnecting the source is the browser-supported way to release
-          // the render graph when a user cancels a long render.
-          try { source.stop(); } catch { /* already stopped */ }
-          try { source.disconnect(); } catch { /* already disconnected */ }
-          for (const filter of chain.filters) {
-            try { filter.disconnect(); } catch { /* already disconnected */ }
-          }
-          try { chain.outputGain.disconnect(); } catch { /* already disconnected */ }
+        rendered = await awaitWithAbort(renderContext.startRendering(), signal, () => {
+          releaseResources();
         });
       } finally {
-        clearInterval(renderProgressId);
+        if (renderProgressId !== null) {
+          clearInterval(renderProgressId);
+          renderProgressId = null;
+        }
       }
 
       throwIfAborted(signal);
+      // The offline graph is no longer needed once rendering has produced its
+      // buffer. Release it before the potentially long synchronous WAV encode.
+      releaseResources();
       onProgress?.({
         stage: "encoding",
         progress: 90,
@@ -244,7 +286,9 @@ export async function renderMasteringEqWav(
       throw error;
     }
   } finally {
-    await decodeContext.close().catch(() => {});
+    signal?.removeEventListener("abort", handleAbort);
+    releaseResources();
+    if (decodeClosePromise) await decodeClosePromise;
   }
 }
 

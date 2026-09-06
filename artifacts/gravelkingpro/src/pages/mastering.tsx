@@ -273,6 +273,15 @@ export default function Mastering() {
   const exportAbortRef = useRef<AbortController | null>(null);
   const { balance: creditsBalance } = useCredits();
 
+  useEffect(() => {
+    return () => {
+      // Route changes must release an in-flight full-length render just like
+      // pressing Cancel; otherwise the page can disappear while the browser
+      // keeps decoding and rendering the mastered result.
+      exportAbortRef.current?.abort();
+    };
+  }, []);
+
   const hydrateMasterJob = useCallback(async (jobId: string): Promise<boolean> => {
     const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, { credentials: "include" });
     if (!response.ok) {
@@ -607,6 +616,7 @@ export default function Mastering() {
       setExportStage("saving");
       setExportProgress(97);
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (controller.signal.aborted) return;
       downloadBlob(rendered, `gravelking_mastered_${preset}_fine_tuned.wav`, {
         onStart: () => setExportStage("saving"),
         onComplete: () => setExportProgress(100),
