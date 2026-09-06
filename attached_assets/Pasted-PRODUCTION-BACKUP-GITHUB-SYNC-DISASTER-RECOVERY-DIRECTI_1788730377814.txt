@@ -1,0 +1,31 @@
+PRODUCTION BACKUP, GITHUB SYNC & DISASTER RECOVERY DIRECTIVE:
+
+We need to establish a complete off-site snapshot and disaster recovery verification audit before releasing Version 5. Execute an automated sync and backup right now so all project assets are preserved off-platform:
+
+1. GITHUB REPOSITORY SYNC:
+- Stage, commit, and push 100% of the repository changes (including JAX fixes, Authorship ledger, MLK v3.5 Foundry routes, session persistence, and /data-deletion) to our connected GitHub repository.
+- Ensure the main branch is completely up to date with zero untracked files.
+- Print the exact, publicly accessible GitHub repository link in your response so the commit tree and codebase can be externally audited and verified.
+
+2. ASSET GENERATION & NAMING CONVENTIONS:
+- Name all export assets strictly using our brand format:
+  * Database dump: `GravelKingProApp_production_backup.sql` (Full PostgreSQL dump including users, ledger, and metadata).
+  * Android Release Bundle: `GravelKingProApp_v5_release.aab` (Signed production bundle pointing to gravelkingpro.com).
+  * Master Archive: `GravelKingProApp_Backup.zip` (Containing the SQL dump, .aab release bundle, and a sanitized .env recovery spec sheet).
+
+3. DROPBOX / DIRECT DELIVERY:
+- If the connected Dropbox integration/SDK is active, push `GravelKingProApp_Backup.zip` directly to the connected Dropbox root folder and provide the shareable view link.
+- If Dropbox direct API access is not active in this environment, save `GravelKingProApp_Backup.zip` in the root directory and provide the exact direct download link or one-line curl/download command so I can grab the single file immediately without searching the tree.
+
+4. CHECKLIST & SYSTEM AUDIT:
+- Provide a summary checklist using green checks (✅) for fully completed items and red Xs (❌) for any pending items across:
+  * JAX Stability & Vertex Grounding
+  * Authorship Ledger & HMAC-SHA256 Certification
+  * Generation, Library Storage, and Foundry Mastering (-14 LUFS)
+  * Android Version 5 Build & Domain Sanitization (gravelkingpro.com)
+  * Public Data Deletion Route (/data-deletion returning HTTP 200)
+  * Session Persistence & Background Task System
+- List the exact runtime dependencies (Node version, Python version, FFmpeg build requirements) and production startup commands (`npm run build`, `npm run start`).
+- Confirm the archive file size and exact hash (SHA-256) so we can verify the download payload.
+
+Halt all background tasks immediately after printing this report, the GitHub link, and the archive download commands.
