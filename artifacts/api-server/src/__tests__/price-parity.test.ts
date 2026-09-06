@@ -21,7 +21,7 @@ import { getUncachableStripeClient } from "../stripeClient";
 
 // ── Source of truth: what we advertise ───────────────────────────────────────
 const ADVERTISED = [
-  { product: "GravelKing Weekly", cents: 699, interval: "week", display: "$6.99" },
+  { product: "GravelKing Weekly", cents: 999, interval: "month", display: "$9.99" },
   { product: "GravelKing Studio", cents: 2499, interval: "month", display: "$24.99" },
   { product: "Node Auditor", cents: 24950, interval: "month", display: "$249.50" },
 ] as const;
@@ -108,6 +108,24 @@ async function main(): Promise<void> {
       rogue.length === 0,
       `rogue prices: ${[...new Set(rogue)].join(", ")}`,
     );
+  }
+
+  // The checkout route has its own server-side allowlist in addition to the
+  // Stripe catalog. Keep that acceptance guard aligned with the prices shown
+  // above, or the UI can display a plan that checkout rejects.
+  const checkoutRel = "artifacts/api-server/src/routes/stripe.ts";
+  const checkoutAbs = path.join(root, checkoutRel);
+  check(`${checkoutRel} exists (checkout catalog)`, existsSync(checkoutAbs));
+  if (existsSync(checkoutAbs)) {
+    const checkoutSrc = readFileSync(checkoutAbs, "utf8");
+    for (const plan of ADVERTISED) {
+      const entry = `"${plan.product}": { plan: "${plan.product === "GravelKing Weekly" ? "pro" : plan.product === "GravelKing Studio" ? "king" : "node_auditor"}", unitAmount: ${plan.cents}, interval: "${plan.interval}" }`;
+      check(
+        `checkout catalog accepts ${plan.display}/${plan.interval} for ${plan.product}`,
+        checkoutSrc.includes(entry),
+        `missing ${entry}`,
+      );
+    }
   }
 
   // Pages render prices live from GET /api/stripe/products via the shared

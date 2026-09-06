@@ -13,7 +13,7 @@ export interface PlanPrice {
 
 /** Fallbacks shown until (or if) the live Stripe products load. */
 export const FALLBACK_PRICES: Record<PlanTier, PlanPrice> = {
-  weekly: { amount: "$6.99", period: "/week", label: "$6.99/week" },
+  weekly: { amount: "$9.99", period: "/mo", label: "$9.99/mo" },
   monthly: { amount: "$24.99", period: "/mo", label: "$24.99/mo" },
   node_auditor: { amount: "$249.50", period: "/mo", label: "$249.50/mo" },
 };
@@ -69,7 +69,7 @@ async function fetchPlanPrices(): Promise<Record<PlanTier, PlanPrice>> {
     if (!tier || !(tier in FALLBACK_PRICES)) continue;
     const price = product.prices?.find(
       (p) => typeof p.unit_amount === "number" &&
-        p.recurring?.interval === (tier === "weekly" ? "week" : "month"),
+        p.recurring?.interval === "month",
     );
     if (!price || price.unit_amount == null) continue;
     const amount = formatAmount(price.unit_amount, price.currency);

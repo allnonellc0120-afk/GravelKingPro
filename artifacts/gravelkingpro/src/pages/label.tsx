@@ -287,7 +287,7 @@ export default function LabelPage() {
           <div className="flex items-center justify-center gap-3 flex-wrap">
             {isPro
               ? <Link href="/submit"><Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold"><Music className="w-4 h-4 mr-2" /> Submit Your Track</Button></Link>
-              : <Link href="/pricing"><Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold">See Pro plans — from $6.99/week</Button></Link>
+              : <Link href="/pricing"><Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold">See Pro plans — from $9.99/mo</Button></Link>
             }
             <Link href="/contact">
               <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">Contact the Label</Button>

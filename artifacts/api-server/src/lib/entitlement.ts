@@ -6,7 +6,7 @@ import { storage } from "../storage";
 /**
  * Canonical subscription tiers.
  *   free          — no paid plan
- *   pro           — $6.99/week: 800 credits and Pro tools
+ *   pro           — $9.99/month: 800 credits per billing period and Pro tools
  *   king          — $24.99/month: 2,500 credits, advanced tools, and free certificates
  *   node_auditor  — $249.50/month enterprise tier (superset of everything)
  */

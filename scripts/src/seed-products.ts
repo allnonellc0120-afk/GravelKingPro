@@ -6,9 +6,16 @@ async function ensureProduct(stripe: Stripe, name: string, description: string, 
   if (existing.data.length > 0) {
     console.log(`${name} already exists: ${existing.data[0].id}`);
     const product = existing.data[0];
+    const updates: Stripe.ProductUpdateParams = {};
     if (product.metadata?.tier !== tier) {
-      await stripe.products.update(product.id, { metadata: { ...product.metadata, tier } });
-      console.log(`  Updated ${name} metadata.tier=${tier}`);
+      updates.metadata = { ...product.metadata, tier };
+    }
+    if (product.description !== description) {
+      updates.description = description;
+    }
+    if (Object.keys(updates).length > 0) {
+      await stripe.products.update(product.id, updates);
+      console.log(`  Updated ${name} catalog metadata/description`);
     }
     return product;
   }
@@ -55,14 +62,15 @@ async function createProducts() {
   try {
     const stripe = await getUncachableStripeClient();
 
-    // Pro is a weekly plan: $6.99/week and 800 credits per renewal.
+    // Pro is the monthly $9.99 plan. Keep the legacy product name so existing
+    // Stripe subscribers and entitlement lookups retain their product identity.
     const weekly = await ensureProduct(
       stripe,
       'GravelKing Weekly',
-      'Pro access with 800 credits per week, Vocal Booth access, free certificates, mastering, and song generation.',
+      'Pro access with 800 credits per monthly billing period, Vocal Booth access, free certificates, mastering, and song generation.',
       'pro',
     );
-    await ensurePrice(stripe, weekly, 699, 'week');
+    await ensurePrice(stripe, weekly, 999, 'month');
 
     // King Pro is the monthly value plan: $24.99/month and 2,500 credits.
     const studio = await ensureProduct(
