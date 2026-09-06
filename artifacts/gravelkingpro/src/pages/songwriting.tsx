@@ -53,12 +53,14 @@ const BLOCK_TYPES: BlockType[] = ["Verse", "Chorus", "Bridge", "Hook", "Outro"];
 const ARTIST_PROFILE_KEY = "mlk_artist_profile";
 const DEFAULT_RULES = "Avoid simple AABB nursery rhymes. Use internal and slant rhymes, authentic flow, and natural meter.";
 const JAX_VOICE_STORAGE_KEY = "mlk_jax_selected_voice";
+const DEFAULT_JAX_VOICE_ID = "ErXwobaYiN019PkySvjV";
+const LEGACY_DEFAULT_JAX_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
 type JaxVoicePreset = readonly [string, string];
 const DEFAULT_JAX_VOICE_PRESETS: JaxVoicePreset[] = [
   ["admin", "Admin Configured Voice"],
-  ["pNInz6obpgDQGcFmaJgB", "JAX Baritone (Deep & Resonant)"],
+  [DEFAULT_JAX_VOICE_ID, "JAX Smooth / Younger Conversational"],
   ["N2lVS1w4EtoT3dr4eOWO", "JAX Gritty Blues / Rough"],
-  ["ErXwobaYiN019PkySvjV", "JAX Smooth Studio / Conversational"],
+  [LEGACY_DEFAULT_JAX_VOICE_ID, "JAX Baritone (Deep & Resonant)"],
   ["TxGEqnHWrfWFTfGW9XjX", "JAX Heavy Low-End / Narrator"],
   ["pqHfZKP75CvOlQylNhV4", "JAX Classic Vintage"],
 ] as const;
@@ -271,11 +273,18 @@ export default function SongwritingStudio() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem(JAX_VOICE_STORAGE_KEY) || "pNInz6obpgDQGcFmaJgB");
+  const [selectedVoice, setSelectedVoice] = useState(() => {
+    const saved = localStorage.getItem(JAX_VOICE_STORAGE_KEY);
+    return !saved || saved === LEGACY_DEFAULT_JAX_VOICE_ID ? DEFAULT_JAX_VOICE_ID : saved;
+  });
   const [jaxVoicePresets, setJaxVoicePresets] = useState<JaxVoicePreset[]>(DEFAULT_JAX_VOICE_PRESETS);
   const [voiceError, setVoiceError] = useState("");
   const recognitionRef = useRef<{ stop: () => void; sessionId: number } | null>(null);
   const speechSessionRef = useRef(0);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceObjectUrlRef = useRef<string | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
+  const voicePlaybackRef = useRef(0);
   const [artistProfile, setArtistProfile] = useState<ArtistProfile>(() => {
     try {
       const saved = localStorage.getItem(ARTIST_PROFILE_KEY);
@@ -296,6 +305,29 @@ export default function SongwritingStudio() {
     () => computeAuthorshipScore(aiDraft, draft.blocks.map((block) => block.content).filter(Boolean).join("\n\n")),
     [aiDraft, draft.blocks],
   );
+
+  const stopSpeaking = useCallback(() => {
+    voicePlaybackRef.current += 1;
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = null;
+    const audio = voiceAudioRef.current;
+    voiceAudioRef.current = null;
+    if (audio) {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    if (voiceObjectUrlRef.current) {
+      URL.revokeObjectURL(voiceObjectUrlRef.current);
+      voiceObjectUrlRef.current = null;
+    }
+    window.speechSynthesis?.cancel();
+    setSpeaking(false);
+  }, []);
+
+  useEffect(() => () => stopSpeaking(), [stopSpeaking]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -526,6 +558,7 @@ export default function SongwritingStudio() {
   };
 
   const loadJaxSession = async (id: string) => {
+    stopSpeaking();
     const result = await fetch(`/api/jax/sessions/${encodeURIComponent(id)}`, { credentials: "include" });
     if (!result.ok) return;
     const data = await result.json() as { session?: { sessionId: string; title: string; messages: ChatMessage[]; aiDraft: string; finalText: string; authorshipLedger: AuthorshipLedgerEntry[] } };
@@ -546,6 +579,7 @@ export default function SongwritingStudio() {
   };
 
   const startNewSession = () => {
+    stopSpeaking();
     setSessionId(crypto.randomUUID());
     setChatMessages([]);
     setResponse("");
@@ -556,6 +590,7 @@ export default function SongwritingStudio() {
   };
 
   const generate = async () => {
+    stopSpeaking();
     if (!prompt.trim() || generating) return;
     const submittedPrompt = prompt.trim();
     speechSessionRef.current += 1;
@@ -611,6 +646,7 @@ export default function SongwritingStudio() {
   };
 
   const toggleListening = () => {
+    stopSpeaking();
     type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }>> };
     type SpeechRecognitionLike = {
       lang: string; interimResults: boolean; continuous: boolean;
@@ -676,29 +712,61 @@ export default function SongwritingStudio() {
   };
 
   const speakText = async (text: string) => {
-    if (speaking) {
-      window.speechSynthesis?.cancel();
-      setSpeaking(false);
+    if (speaking || voiceAudioRef.current || ttsAbortRef.current) {
+      stopSpeaking();
       return;
     }
     setVoiceError("");
     setSpeaking(true);
+    const playbackId = voicePlaybackRef.current + 1;
+    voicePlaybackRef.current = playbackId;
+    const controller = new AbortController();
+    ttsAbortRef.current = controller;
     try {
       const result = await fetch("/api/jax/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ text, voiceId: selectedVoice }),
+        signal: controller.signal,
       });
       if (!result.ok) throw new Error((await result.json() as { error?: string }).error || "Voice playback unavailable.");
       const objectUrl = URL.createObjectURL(await result.blob());
+      if (voicePlaybackRef.current !== playbackId) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
       const audio = new Audio(objectUrl);
-      audio.onended = () => { URL.revokeObjectURL(objectUrl); setSpeaking(false); };
-      audio.onerror = () => { setVoiceError("The selected voice could not be played."); setSpeaking(false); };
+      voiceAudioRef.current = audio;
+      voiceObjectUrlRef.current = objectUrl;
+      audio.onended = () => {
+        if (voicePlaybackRef.current !== playbackId) return;
+        voiceAudioRef.current = null;
+        if (voiceObjectUrlRef.current === objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          voiceObjectUrlRef.current = null;
+        }
+        if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
+        setSpeaking(false);
+      };
+      audio.onerror = () => {
+        if (voicePlaybackRef.current !== playbackId) return;
+        voiceAudioRef.current = null;
+        if (voiceObjectUrlRef.current === objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          voiceObjectUrlRef.current = null;
+        }
+        if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
+        setVoiceError("The selected voice could not be played.");
+        setSpeaking(false);
+      };
       await audio.play();
     } catch (error) {
+      if (voicePlaybackRef.current !== playbackId || (error instanceof DOMException && error.name === "AbortError")) return;
       setVoiceError(error instanceof Error ? error.message : "Voice playback unavailable.");
       setSpeaking(false);
+    } finally {
+      if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
     }
   };
 
@@ -848,7 +916,7 @@ export default function SongwritingStudio() {
             <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto px-4 py-8 sm:px-8">
               {chatMessages.length === 0 ? <div className="m-auto max-w-xl text-center"><div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/15 text-xl font-bold text-violet-300">J</div><h1 className="text-3xl font-bold tracking-tight">What are we writing today?</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Tell JAX the story, mood, genre, or lyric you have in mind. We’ll shape it together.</p></div> : <div className="space-y-6">{chatMessages.map((message) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-violet-500 text-white" : "border border-white/10 bg-white/[0.04]"}`}>{message.role === "jax" ? <JaxMessageView content={message.content} /> : <p className="whitespace-pre-wrap">{message.content}</p>}{message.role === "jax" && <div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => void speakText(extractLyrics(message.content) || message.content)} className="border-white/10">{speaking ? "Stop voice" : "Read aloud"}</Button>{extractLyrics(message.content) && <Button size="sm" variant="outline" onClick={() => pushToCanvas(message.content)} className="border-white/10">Save to song</Button>}</div>}</div></div>)}{generating && <div className="text-sm text-muted-foreground">JAX is writing…</div>}{generationError && <p className="text-sm text-rose-300">{generationError}</p>}</div>}
             </div>
-            <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex items-center justify-between px-3 pb-1 pt-2 text-xs text-muted-foreground"><span>{remaining !== null ? `${remaining} prompts left today` : "JAX learns from this conversation"}</span><button type="button" onClick={() => setAutoVoice((enabled) => !enabled)} className={`rounded-full px-2.5 py-1 ${autoVoice ? "bg-violet-400/20 text-violet-200" : "bg-white/5"}`}>Auto-Voice {autoVoice ? "On" : "Off"}</button></div></div>{voiceError && <p className="mt-2 text-xs text-rose-300">{voiceError}</p>}</div></div>
+             <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-1 pt-2 text-xs text-muted-foreground"><span>{remaining !== null ? `${remaining} prompts left today` : "JAX learns from this conversation"}</span><div className="flex flex-wrap items-center gap-2"><label htmlFor="jax-voice-model" className="sr-only">JAX voice</label><select id="jax-voice-model" value={selectedVoice} onChange={(event) => { stopSpeaking(); setSelectedVoice(event.target.value); }} className="max-w-[190px] rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-xs text-foreground outline-none focus:border-violet-400">{jaxVoicePresets.map(([voiceId, label]) => <option key={voiceId} value={voiceId}>{label}</option>)}</select><button type="button" onClick={() => setAutoVoice((enabled) => !enabled)} className={`rounded-full px-2.5 py-1 ${autoVoice ? "bg-violet-400/20 text-violet-200" : "bg-white/5"}`}>Auto-Voice {autoVoice ? "On" : "Off"}</button></div></div></div>{voiceError && <p className="mt-2 text-xs text-rose-300">{voiceError}</p>}</div></div>
           </main>
         </div>
       </div>
