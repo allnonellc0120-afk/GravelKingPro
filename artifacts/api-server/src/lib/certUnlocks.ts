@@ -20,6 +20,8 @@ export interface CertUnlockQuotaStatus {
   resetsAt: string | null;
 }
 
+type CertUnlockDb = Pick<typeof db, "update" | "select">;
+
 function windowExpired(user: User, now: Date): boolean {
   return !user.certUnlockPeriodStart ||
     now.getTime() - user.certUnlockPeriodStart.getTime() >= CERT_UNLOCK_PERIOD_MS;
@@ -47,14 +49,17 @@ export function checkCertUnlockQuota(user: User, now = new Date()): CertUnlockQu
  * NOTE: the `INTERVAL '30 days'` literal must stay in sync with
  * CERT_UNLOCK_PERIOD_MS above.
  */
-export async function consumeCertUnlock(user: User): Promise<CertUnlockQuotaStatus> {
+export async function consumeCertUnlock(
+  user: User,
+  database: CertUnlockDb = db,
+): Promise<CertUnlockQuotaStatus> {
   if (user.isDeveloper) {
     return { allowed: true, used: 0, limit: CERT_UNLOCK_LIMIT, resetsAt: null };
   }
 
   const expired = sql`(${usersTable.certUnlockPeriodStart} IS NULL OR ${usersTable.certUnlockPeriodStart} <= NOW() - INTERVAL '30 days')`;
 
-  const updated = await db
+  const updated = await database
     .update(usersTable)
     .set({
       certUnlocks: sql`CASE WHEN ${expired} THEN 1 ELSE ${usersTable.certUnlocks} + 1 END`,
@@ -78,7 +83,7 @@ export async function consumeCertUnlock(user: User): Promise<CertUnlockQuotaStat
     };
   }
 
-  const [row] = await db
+  const [row] = await database
     .select({
       certUnlocks: usersTable.certUnlocks,
       certUnlockPeriodStart: usersTable.certUnlockPeriodStart,

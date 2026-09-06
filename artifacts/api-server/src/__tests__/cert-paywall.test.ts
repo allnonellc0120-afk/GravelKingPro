@@ -12,7 +12,8 @@
  *   [7]  Concurrent King unlocks consume exactly one allowance
  *   [8]  An expired allowance resets once under concurrent unlock load
  *   [9]  An exhausted monthly allowance still offers the $1.99 purchase
- *   [10] /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
+ *   [10] Concurrent exhausted allowance requests never observe a rolled-back claim
+ *   [11] /:certId.pdf route is correctly registered BEFORE /:certId in Express 5
  *        (regression guard for the "/:certId swallows /:certId.pdf" ordering bug)
  *
  * Webhook cert_unlock idempotency + owner-scoping is covered separately in
@@ -456,7 +457,48 @@ async function main(): Promise<void> {
     }
 
     // ── [10] PDF route registered before JSON route (Express 5 ordering) ───────
-    console.log("\n[10] PDF route registers before /:certId (Express 5 ordering regression)");
+    console.log("\n[10] Concurrent exhausted allowance requests never observe a rolled-back claim");
+    {
+      const periodStart = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+      const owner = await seedUser({
+        subscriptionTier: "king",
+        certUnlocks: 20,
+        certUnlockPeriodStart: periodStart,
+      });
+      const certId = await seedCert({ ownerUserId: owner.userId });
+
+      const results = await Promise.all(
+        Array.from({ length: 8 }, () =>
+          fetch(`${base}/api/court-cert/${certId}/unlock`, {
+            method: "POST",
+            headers: owner.bearerAuth,
+          }),
+        ),
+      );
+      const bodies = await Promise.all(results.map((r) => r.json() as Promise<Record<string, unknown>>));
+      check(
+        "10.1 every exhausted concurrent request returns 429",
+        results.every((r) => r.status === 429),
+        `statuses: ${results.map((r) => r.status).join(",")}`,
+      );
+      check(
+        "10.2 every exhausted concurrent response offers the $1.99 purchase",
+        bodies.every((body) =>
+          body.code === "CERT_UNLOCK_LIMIT_REACHED" &&
+          body.priceCents === 199 &&
+          body.checkoutUrl === `/api/court-cert/${certId}/checkout`,
+        ),
+        JSON.stringify(bodies),
+      );
+
+      const row = await readUserRow(owner.userId);
+      check("10.3 concurrent exhausted requests never exceed the allowance", row?.certUnlocks === 20, `certUnlocks=${row?.certUnlocks}`);
+      const certRow = await readCertRow(certId);
+      check("10.4 certificate remains locked after every denied request", certRow?.unlockedAt === null, String(certRow?.unlockedAt));
+    }
+
+    // ── [11] PDF route registered before JSON route (Express 5 ordering) ───────
+    console.log("\n[11] PDF route registers before /:certId (Express 5 ordering regression)");
     {
       const owner = await seedUser({ subscriptionTier: "king" });
       // Cert already unlocked so the route returns a PDF response (not 402)
@@ -469,9 +511,9 @@ async function main(): Promise<void> {
       const r = await fetch(`${base}/api/court-cert/${certId}.pdf`, {
         headers: owner.bearerAuth,
       });
-      check("10.1 /:certId.pdf → 200", r.status === 200, `got ${r.status}`);
+      check("11.1 /:certId.pdf → 200", r.status === 200, `got ${r.status}`);
       const ct = r.headers.get("content-type") ?? "";
-      check("10.2 /:certId.pdf content-type is application/pdf (not JSON)", ct.includes("application/pdf"), `got: ${ct}`);
+      check("11.2 /:certId.pdf content-type is application/pdf (not JSON)", ct.includes("application/pdf"), `got: ${ct}`);
     }
 
   } finally {

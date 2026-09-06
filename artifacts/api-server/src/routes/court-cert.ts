@@ -17,6 +17,13 @@ const router = Router();
 /** One-time, permanent per-certificate unlock price (USD cents). */
 export const CERT_UNLOCK_PRICE_CENTS = 199;
 
+class CertUnlockQuotaExceeded extends Error {
+  constructor(readonly quota: Awaited<ReturnType<typeof consumeCertUnlock>>) {
+    super("Included certificate allowance exhausted.");
+    this.name = "CertUnlockQuotaExceeded";
+  }
+}
+
 /**
  * Resolve the calling user without creating one. Certificate documents are
  * owner-only, so an unauthenticated caller gets nothing — we never mint a
@@ -269,34 +276,33 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
       return;
     }
 
-    // Claim conditional on still-locked, then consume one included allowance.
-    // The quota update itself is atomic against the current database row.
-    const claimed = await db
-      .update(ipCertStubsTable)
-      .set({
-        unlockedAt: sql`NOW()`,
-        unlockSource: user.isDeveloper ? "admin" : "included",
-      })
-      .where(and(eq(ipCertStubsTable.certId, certId), isNull(ipCertStubsTable.unlockedAt)))
-      .returning({ certId: ipCertStubsTable.certId });
+    // Claim and consume in one transaction. If the quota is exhausted, throwing
+    // rolls the claim back before another request can observe it as unlocked.
+    let result: { kind: "already-unlocked" } | { kind: "unlocked"; quota: Awaited<ReturnType<typeof consumeCertUnlock>> };
+    try {
+      result = await db.transaction(async (tx) => {
+        const claimed = await tx
+          .update(ipCertStubsTable)
+          .set({
+            unlockedAt: sql`NOW()`,
+            unlockSource: user.isDeveloper ? "admin" : "included",
+          })
+          .where(and(eq(ipCertStubsTable.certId, certId), isNull(ipCertStubsTable.unlockedAt)))
+          .returning({ certId: ipCertStubsTable.certId });
 
-    if (claimed.length === 0) {
-      // Raced with another unlock — it's unlocked now either way.
-      res.json({ success: true, unlocked: true, alreadyUnlocked: true });
-      return;
-    }
+        if (claimed.length === 0) {
+          return { kind: "already-unlocked" as const };
+        }
 
-    const quota = await consumeCertUnlock(user);
-    if (!quota.allowed) {
-      // The claim must not survive an exhausted allowance. The conditional
-      // predicate avoids clearing a claim that a separate request replaced.
-      await db
-        .update(ipCertStubsTable)
-        .set({ unlockedAt: null, unlockSource: null })
-        .where(and(
-          eq(ipCertStubsTable.certId, certId),
-          eq(ipCertStubsTable.unlockSource, "included"),
-        ));
+        const quota = await consumeCertUnlock(user, tx);
+        if (!quota.allowed) {
+          throw new CertUnlockQuotaExceeded(quota);
+        }
+        return { kind: "unlocked" as const, quota };
+      });
+    } catch (err) {
+      if (!(err instanceof CertUnlockQuotaExceeded)) throw err;
+      const quota = err.quota;
       res.status(429).json({
         success: false,
         code: "CERT_UNLOCK_LIMIT_REACHED",
@@ -311,10 +317,21 @@ router.post("/court-cert/:certId/unlock", async (req: Request, res: Response) =>
       return;
     }
 
+    if (result.kind === "already-unlocked") {
+      // Raced with another committed unlock — it's unlocked now either way.
+      res.json({ success: true, unlocked: true, alreadyUnlocked: true });
+      return;
+    }
+
     res.json({
       success: true,
       unlocked: true,
-      includedUnlocks: { available: true, used: quota.used, limit: quota.limit, resetsAt: quota.resetsAt },
+      includedUnlocks: {
+        available: true,
+        used: result.quota.used,
+        limit: result.quota.limit,
+        resetsAt: result.quota.resetsAt,
+      },
     });
   } catch (err) {
     logger.error({ err, certId }, "cert unlock failed");
