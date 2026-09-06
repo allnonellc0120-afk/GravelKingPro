@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db, creditTransactionsTable, usersTable } from "@workspace/db";
 import { grantCredits, spendCredits } from "../lib/credits";
+import { fulfillCreditPurchasePaymentIntent } from "../webhookHandlers";
 
 const userId = `credit-test-${randomUUID()}`;
 const email = `${userId}@example.test`;
@@ -33,20 +34,27 @@ async function main(): Promise<void> {
       throw new Error("duplicate grant was not idempotent");
     }
 
-    const paymentGrant = await grantCredits(
-      userId,
-      10,
-      "credits_purchase",
-      "test-payment-reference",
-      "pi_wallet_test",
-    );
-    const duplicatePaymentGrant = await grantCredits(
-      userId,
-      10,
-      "credits_purchase",
-      "test-payment-reference-retry",
-      "pi_wallet_test",
-    );
+    const [beforePaymentWebhook] = await db
+      .select({ creditsBalance: usersTable.creditsBalance })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    if (beforePaymentWebhook?.creditsBalance !== 40) {
+      throw new Error(`expected delayed payment to leave balance at 40 before webhook, got ${beforePaymentWebhook?.creditsBalance}`);
+    }
+
+    const paymentIntent = {
+      id: "pi_wallet_test",
+      metadata: {
+        kind: "credits_purchase",
+        user_id: userId,
+        credits: "10",
+      },
+    };
+    // The first delivery represents a delayed webhook arriving after the
+    // Payment Element has already confirmed in the browser. The replay uses
+    // the same PaymentIntent id, just as Stripe does on a retry.
+    const paymentGrant = await fulfillCreditPurchasePaymentIntent(paymentIntent);
+    const duplicatePaymentGrant = await fulfillCreditPurchasePaymentIntent(paymentIntent);
     if (!paymentGrant.granted || duplicatePaymentGrant.granted || duplicatePaymentGrant.balance !== 50) {
       throw new Error("duplicate payment-intent grant was not idempotent");
     }

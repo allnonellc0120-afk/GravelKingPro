@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ComponentType } from "react";
 import { ChevronLeft, ChevronRight, Coins, History, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StripePaymentForm } from "@/components/stripe-payment-form";
+import { StripePaymentForm, type StripePaymentFormProps } from "@/components/stripe-payment-form";
 
 export type CreditPack = {
   id: string;
@@ -81,7 +81,13 @@ export function useCredits() {
   return { balance, loading, refresh };
 }
 
-export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
+export function CreditWallet({
+  signedIn = true,
+  paymentForm: PaymentForm = StripePaymentForm,
+}: {
+  signedIn?: boolean;
+  paymentForm?: ComponentType<StripePaymentFormProps>;
+}) {
   const { balance, loading, refresh } = useCredits();
   const [packs, setPacks] = useState<CreditPack[]>([]);
   const [busyPack, setBusyPack] = useState<string | null>(null);
@@ -94,7 +100,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const loadHistory = useCallback(async (page: number) => {
+  const loadHistory = useCallback(async (page: number, options: { preservePending?: boolean } = {}) => {
     if (!signedIn) return;
     setHistoryLoading(true);
     try {
@@ -104,7 +110,8 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
       setHistory(Array.isArray(data.data) ? data.data : []);
       setHistoryPage(data.page ?? page);
       setHistoryHasMore(data.hasMore === true);
-      setPendingPurchase(parsePendingPurchase(data.pendingPurchase));
+      const serverPending = parsePendingPurchase(data.pendingPurchase);
+      if (serverPending || !options.preservePending) setPendingPurchase(serverPending);
     } finally {
       setHistoryLoading(false);
     }
@@ -152,6 +159,12 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
   const confirmPurchase = async () => {
     if (!payment) return;
     const paymentIntentId = payment.paymentIntentId;
+    setPendingPurchase({
+      paymentIntentId,
+      amountCents: payment.amountCents,
+      credits: payment.credits,
+      createdAt: new Date().toISOString(),
+    });
     setSettling(true);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       await refresh();
@@ -165,7 +178,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
       await new Promise((resolve) => setTimeout(resolve, 750));
     }
     setPayment(null);
-    await loadHistory(1);
+    await loadHistory(1, { preservePending: true });
     setSettling(false);
   };
 
@@ -202,7 +215,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
         </div>
         <div className="rounded-lg border border-sky-400/30 bg-sky-400/10 px-4 py-2 text-right">
           <p className="text-[10px] uppercase tracking-wider text-sky-200/70">Your balance</p>
-          <p className="text-2xl font-bold text-sky-200">
+          <p data-testid="credit-balance" className="text-2xl font-bold text-sky-200">
             {loading ? "…" : balance === null ? "Sign in" : balance}
             {balance !== null && <span className="ml-1 text-sm font-normal text-sky-200/70">credits</span>}
           </p>
@@ -226,6 +239,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{pack.description}</p>
             <Button
+              data-testid={`credit-buy-${pack.id}`}
               className="mt-3 w-full bg-sky-500 text-black hover:bg-sky-400"
               onClick={() => void buy(pack)}
               disabled={busyPack !== null || !!payment || !!pendingPurchase}
@@ -244,7 +258,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
       </div>
 
       {payment && (
-        <StripePaymentForm
+        <PaymentForm
           clientSecret={payment.secret}
           intentType="payment"
           submitLabel={`Buy ${payment.credits} credits for $${(payment.amountCents / 100).toFixed(2)}`}
@@ -253,7 +267,7 @@ export function CreditWallet({ signedIn = true }: { signedIn?: boolean }) {
         />
       )}
       {pendingPurchase && (
-        <div className="mt-6 rounded-lg border border-amber-400/40 bg-amber-400/[0.08] p-4" role="status">
+        <div data-testid="credit-pending" className="mt-6 rounded-lg border border-amber-400/40 bg-amber-400/[0.08] p-4" role="status">
           <p className="font-semibold text-amber-200">
             Payment of ${(pendingPurchase.amountCents / 100).toFixed(2)} is still settling
           </p>
