@@ -7,6 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "daw-audit": "tsx ./src/daw-benchmark.ts",
     "seed-products": "tsx ./src/seed-products.ts",
+    "verify-wallet-domain": "tsx ./src/verify-wallet-domain.ts",
     "generate-whitepaper": "tsx ./src/generate-whitepaper.ts",
     "generate-pitchdeck": "tsx ./src/generate-pitchdeck.ts",
     "seed-tracks": "tsx ./src/seed-tracks.ts",

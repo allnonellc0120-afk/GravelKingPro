@@ -1,12 +1,13 @@
 # Apple Pay / Google Pay checkout — verification & manual QA
 
-## Status (verified 2026-09-05)
+## Status (PMD verified 2026-09-06; republish required for the live asset)
 
 **Domain registration.** `gravelkingpro.com` is registered as a Stripe Payment
 Method Domain (`pmd_1UCKnWCxsQjjsZPGbAEsuCv6`) with `apple_pay: active` and
 `google_pay: active`, validated via `POST /v1/payment_method_domains/:id/validate`.
-The association file serves HTTP 200 at
-`https://gravelkingpro.com/.well-known/apple-developer-merchantid-domain-association`.
+The association URL currently returns HTTP 200 with the SPA fallback HTML on the
+deployed site; republish the web artifact, then run `pnpm wallet:verify` before
+considering the live wallet path healthy.
 (The legacy `gravelkingpro.it.com` domain is dead — it 404s; the live domain is
 `gravelkingpro.com`.)
 
@@ -16,6 +17,27 @@ mounted `PaymentElement` + `ExpressCheckoutElement`, filled the card fields with
 `4242 4242 4242 4242`, and confirmed with the exact call the component uses
 (`stripe.confirmSetup({ elements, confirmParams: { return_url }, redirect: "if_required" })`).
 Result: `setupIntent.status === "succeeded"`.
+
+## Publish gate
+
+Run the wallet verification before publishing and immediately after every
+publish:
+
+```bash
+pnpm wallet:verify
+```
+
+The command fails loudly unless both checks pass:
+
+- the live `.well-known` URL returns HTTP 200 with the verification file
+  instead of the SPA fallback HTML; and
+- Stripe's Payment Method Domain validation reports both `apple_pay` and
+  `google_pay` as `active`.
+
+The web prerender step fetches Stripe's canonical Apple verification file into
+`dist/public/.well-known` and fails the production build if Stripe does not
+return a valid file, preventing a publish from silently dropping it. The root
+`pnpm publish:check` runs that production build as a required pre-publish check.
 
 ## Why the wallet path can't be fully automated
 
