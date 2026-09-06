@@ -1389,3 +1389,17 @@ mtime_ms = 1788645814556
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/0b5755b2-cd7c-48b9-b3e7-b06150b64b53/b96f481b-3978-4cce-b87b-cc0443b0a26c"
 storage_version_token = "1788645831984200"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "zQfsRuH_cJ5ewV_ZoJXrw"
+uri = "file://GravelKingProApp_Backup.zip"
+type = "unspecified"
+title = "GravelKing Pro backup package"
+description = "Verified signed AAB plus sanitized recovery specification and an explicit status report. This package does not contain a production SQL dump because production export access is read-only in this workspace."
+logical_id = "f826a82b-a118-42dd-bb31-d8fdd6bcd525"
+content_hash = "sha256:c12ba5eb9311b565d9df80d201b5a6a41dae048d1cab5c91fb52266e73cecbdd"
+size = 1646891
+mtime_ms = 1788731421379
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/f826a82b-a118-42dd-bb31-d8fdd6bcd525/9933f2f9-9073-4933-a0c3-5e61b3757043"
+storage_version_token = "1788731425684969"
+content_type = "application/octet-stream"
