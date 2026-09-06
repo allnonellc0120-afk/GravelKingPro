@@ -91,4 +91,4 @@ ADMIN_KEY = "198484"
 JAX_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 
 [objectStorage]
-defaultBucketID = "replit-objstore-4427a4e0-0331-4b97-9168-a1d185787feb"
+defaultBucketID = "replit-objstore-979c4822-6564-42b5-98eb-8c88cdaccaec"
