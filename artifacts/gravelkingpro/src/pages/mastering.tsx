@@ -18,6 +18,7 @@ import { trackEvent } from "@/lib/analytics";
 import { downloadBlob, downloadUrl } from "@/lib/download";
 import {
   FLAT_MASTERING_EQ,
+  getMasteringDownloadPath,
   renderMasteringEqWav,
 } from "@/lib/mastering-eq";
 import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
@@ -496,11 +497,9 @@ export default function Mastering() {
     if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn, intensity, sidechainFilter, sidechainFreq, stereoLink, adaptiveMode, autoThreshold, autoThresholdOffset, { ipi: ipiNumber, iswc, isrc });
   };
 
-  const eqIsActive = eqBandGains.some((value) => value !== 0) || postEqGain !== 0;
-
   const download = async () => {
     if (!resultUrl) return;
-    if (!eqIsActive) {
+    if (getMasteringDownloadPath(eqBandGains, postEqGain) === "server") {
       downloadUrl(downloadHref ?? resultUrl, `gravelking_mastered_${preset}.wav`);
       return;
     }
@@ -548,6 +547,7 @@ export default function Mastering() {
 
   const busy = state === "compressing" || state === "processing";
   const selectedPreset = PRESETS.find(p => p.id === preset)!;
+  const eqIsActive = getMasteringDownloadPath(eqBandGains, postEqGain) === "eq-render";
 
   return (
     <Layout>

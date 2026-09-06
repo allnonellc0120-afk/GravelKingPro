@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mastering EQ export regression</title>
+  </head>
+  <body>
+    <pre id="result">running</pre>
+    <script type="module">
+      import { renderMasteringEqWav } from "/src/lib/mastering-eq.ts";
+
+      const SAMPLE_RATE = 44_100;
+      const DURATION_SECONDS = 2;
+      const FRAME_COUNT = SAMPLE_RATE * DURATION_SECONDS;
+      const TEST_FREQUENCIES = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+      const BAND_GAINS = [4, -3, 2.5, -2, 3, -1.5, 2, -2.5, 3.5, -1];
+      const POST_EQ_GAIN = -1.25;
+      const TEST_TONE_AMPLITUDE = 0.02;
+      const ANALYSIS_START = SAMPLE_RATE / 2;
+      const ANALYSIS_LENGTH = SAMPLE_RATE;
+      const EXPECTED_Q = 1.4;
+
+      function writeAscii(view, offset, value) {
+        for (let index = 0; index < value.length; index += 1) {
+          view.setUint8(offset + index, value.charCodeAt(index));
+        }
+      }
+
+      function createFixtureWav() {
+        const channelCount = 2;
+        const blockAlign = channelCount * 2;
+        const dataSize = FRAME_COUNT * blockAlign;
+        const view = new DataView(new ArrayBuffer(44 + dataSize));
+        writeAscii(view, 0, "RIFF");
+        view.setUint32(4, 36 + dataSize, true);
+        writeAscii(view, 8, "WAVE");
+        writeAscii(view, 12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, channelCount, true);
+        view.setUint32(24, SAMPLE_RATE, true);
+        view.setUint32(28, SAMPLE_RATE * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, 16, true);
+        writeAscii(view, 36, "data");
+        view.setUint32(40, dataSize, true);
+
+        let offset = 44;
+        for (let frame = 0; frame < FRAME_COUNT; frame += 1) {
+          const time = frame / SAMPLE_RATE;
+          const sample = TEST_FREQUENCIES.reduce(
+            (sum, frequency) => sum + TEST_TONE_AMPLITUDE * Math.sin(2 * Math.PI * frequency * time),
+            0,
+          );
+          const left = Math.max(-1, Math.min(1, sample));
+          const right = Math.max(-1, Math.min(1, sample * 0.75));
+          view.setInt16(offset, left < 0 ? left * 0x8000 : left * 0x7fff, true);
+          view.setInt16(offset + 2, right < 0 ? right * 0x8000 : right * 0x7fff, true);
+          offset += blockAlign;
+        }
+        return view.buffer;
+      }
+
+      function complexAtFrequency(samples, frequency) {
+        let real = 0;
+        let imaginary = 0;
+        const angular = 2 * Math.PI * frequency / SAMPLE_RATE;
+        for (let index = 0; index < ANALYSIS_LENGTH; index += 1) {
+          const sample = samples[ANALYSIS_START + index];
+          const phase = angular * index;
+          real += sample * Math.cos(phase);
+          imaginary -= sample * Math.sin(phase);
+        }
+        return (2 / ANALYSIS_LENGTH) * Math.hypot(real, imaginary);
+      }
+
+      function peakingMagnitudeAtFrequency(frequency, centerFrequency, gain) {
+        const angular = 2 * Math.PI * frequency / SAMPLE_RATE;
+        const centerAngular = 2 * Math.PI * centerFrequency / SAMPLE_RATE;
+        const alpha = Math.sin(centerAngular) / (2 * EXPECTED_Q);
+        const A = 10 ** (gain / 40);
+        const numerator = [
+          1 + alpha * A,
+          -2 * Math.cos(centerAngular),
+          1 - alpha * A,
+        ];
+        const denominator = [
+          1 + alpha / A,
+          -2 * Math.cos(centerAngular),
+          1 - alpha / A,
+        ];
+        const response = (coefficients) => {
+          let real = 0;
+          let imaginary = 0;
+          for (let index = 0; index < coefficients.length; index += 1) {
+            const phase = angular * index;
+            real += coefficients[index] * Math.cos(phase);
+            imaginary -= coefficients[index] * Math.sin(phase);
+          }
+          return Math.hypot(real, imaginary);
+        };
+        return response(numerator) / response(denominator);
+      }
+
+      function expectedResponseAtFrequency(frequency) {
+        return BAND_GAINS.reduce(
+          (response, gain, index) =>
+            response * peakingMagnitudeAtFrequency(frequency, TEST_FREQUENCIES[index], gain),
+          10 ** (POST_EQ_GAIN / 20),
+        );
+      }
+
+      function parseRenderedWav(bytes) {
+        const view = new DataView(bytes);
+        const channels = view.getUint16(22, true);
+        const sampleRate = view.getUint32(24, true);
+        const bitsPerSample = view.getUint16(34, true);
+        const dataSize = view.getUint32(40, true);
+        const frameCount = dataSize / (channels * (bitsPerSample / 8));
+        const left = new Float32Array(frameCount);
+        const right = new Float32Array(frameCount);
+        let offset = 44;
+        for (let frame = 0; frame < frameCount; frame += 1) {
+          left[frame] = view.getInt16(offset, true) / 0x7fff;
+          right[frame] = view.getInt16(offset + 2, true) / 0x7fff;
+          offset += channels * 2;
+        }
+        return {
+          riff: new TextDecoder().decode(new Uint8Array(bytes, 0, 4)),
+          wave: new TextDecoder().decode(new Uint8Array(bytes, 8, 4)),
+          channels,
+          sampleRate,
+          bitsPerSample,
+          frameCount,
+          duration: frameCount / sampleRate,
+          dataSize,
+          left,
+          right,
+        };
+      }
+
+      async function run() {
+        const fixture = createFixtureWav();
+        const originalFetch = window.fetch;
+        window.fetch = async () => new Response(fixture, {
+          status: 200,
+          headers: { "Content-Type": "audio/wav" },
+        });
+        try {
+          const rendered = await renderMasteringEqWav("/fixtures/multi-tone.wav", BAND_GAINS, POST_EQ_GAIN);
+          const parsed = parseRenderedWav(await rendered.arrayBuffer());
+          const inputAmplitude = TEST_TONE_AMPLITUDE;
+          const measuredResponses = TEST_FREQUENCIES.map((frequency) =>
+            complexAtFrequency(parsed.left, frequency) / inputAmplitude
+          );
+          const expectedResponses = TEST_FREQUENCIES.map(expectedResponseAtFrequency);
+          const responseErrors = measuredResponses.map((measured, index) =>
+            Math.abs(measured / expectedResponses[index] - 1)
+          );
+          return {
+            ok: parsed.riff === "RIFF"
+              && parsed.wave === "WAVE"
+              && rendered.type === "audio/wav"
+              && parsed.channels === 2
+              && parsed.sampleRate === SAMPLE_RATE
+              && parsed.bitsPerSample === 16
+              && parsed.frameCount === FRAME_COUNT
+              && parsed.duration === DURATION_SECONDS
+              && responseErrors.every((error) => error < 0.025),
+            header: {
+              type: rendered.type,
+              size: rendered.size,
+              riff: parsed.riff,
+              wave: parsed.wave,
+              channels: parsed.channels,
+              sampleRate: parsed.sampleRate,
+              bitsPerSample: parsed.bitsPerSample,
+              frameCount: parsed.frameCount,
+              duration: parsed.duration,
+              dataSize: parsed.dataSize,
+            },
+            frequencies: TEST_FREQUENCIES,
+            measuredResponses,
+            expectedResponses,
+            responseErrors,
+          };
+        } finally {
+          window.fetch = originalFetch;
+        }
+      }
+
+      window.__masteringEqRegression = run()
+        .then((result) => {
+          document.querySelector("#result").textContent = JSON.stringify(result);
+          return result;
+        })
+        .catch((error) => {
+          const result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+          document.querySelector("#result").textContent = JSON.stringify(result);
+          return result;
+        });
+    </script>
+  </body>
+</html>
