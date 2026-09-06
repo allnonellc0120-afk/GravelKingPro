@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { styleAuthorshipScore } from "@workspace/authorship";
 import { BeforeAfterDemo } from "@/components/before-after-demo";
+import { MasteringEqPanel } from "@/components/mastering-eq";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +15,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { trackEvent } from "@/lib/analytics";
-import { downloadUrl } from "@/lib/download";
+import { downloadBlob, downloadUrl } from "@/lib/download";
+import {
+  FLAT_MASTERING_EQ,
+  renderMasteringEqWav,
+} from "@/lib/mastering-eq";
 import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
 import { EmailGate, useEmailGate } from "@/components/email-gate";
 import { StripePaymentForm } from "@/components/stripe-payment-form";
@@ -29,14 +34,14 @@ const PRESETS = [
   { id: "baseline",   label: "Baseline",    desc: "Balanced +10% low end, YouTube loudness",   free: true,  accent: "#38bdf8" },
   { id: "normal",     label: "Normal",      desc: "Balanced loudness for any content",          free: true,  accent: "#94a3b8" },
   { id: "broadcast",  label: "Broadcast",   desc: "EBU R128 · –23 LUFS",                       free: false, accent: "#3b82f6" },
-  { id: "vinyl",      label: "Vinyl",       desc: "Warm analog character, boosted lows",        free: false, accent: "#f59e0b" },
-  { id: "podcast",    label: "Podcast",     desc: "Voice clarity, dynamic compression",         free: false, accent: "#22c55e" },
-  { id: "club",       label: "Club",        desc: "Heavy bass, punchy transients",              free: false, accent: "#a855f7" },
+  { id: "vinyl",      label: "Tape Warmth / Saturation", desc: "Warm analog character, boosted lows", free: false, accent: "#f59e0b" },
+  { id: "podcast",    label: "Vocal Punch / Phase Focus", desc: "Voice clarity, dynamic compression", free: false, accent: "#22c55e" },
+  { id: "club",       label: "Sub Low-End / Kick Weight", desc: "Heavy bass, punchy transients", free: false, accent: "#a855f7" },
   { id: "film",       label: "Film",        desc: "Wide cinematic dynamics",                    free: false, accent: "#ef4444" },
-  { id: "youtube",    label: "YouTube",     desc: "–14 LUFS loudness standard",                free: false, accent: "#ff0000" },
+  { id: "youtube",    label: "Final Gain / Ceiling (−14.0 LUFS)", desc: "YouTube loudness standard", free: false, accent: "#ff0000" },
   { id: "soundcloud", label: "SoundCloud",  desc: "–11 LUFS · loud & punchy",                  free: false, accent: "#ff5500" },
   { id: "apple",      label: "Apple Music", desc: "–16 LUFS · Sound Check standard",           free: false, accent: "#fc3c44" },
-  { id: "spacious",   label: "Spacious",    desc: "Reverb + stereo widener",                   free: false, accent: "#a78bfa" },
+  { id: "spacious",   label: "Vocal Air / Crisp Highs", desc: "Open top end with stereo space", free: false, accent: "#a78bfa" },
 ] as const;
 
 type PresetId = (typeof PRESETS)[number]["id"];
@@ -250,6 +255,10 @@ export default function Mastering() {
   const [ipiNumber, setIpiNumber] = useState("");
   const [iswc, setIswc] = useState("");
   const [isrc, setIsrc] = useState("");
+  const [eqOpen, setEqOpen] = useState(false);
+  const [eqBandGains, setEqBandGains] = useState<number[]>(() => [...FLAT_MASTERING_EQ]);
+  const [postEqGain, setPostEqGain] = useState(0);
+  const [exportingEq, setExportingEq] = useState(false);
   const { balance: creditsBalance } = useCredits();
 
   const styleScore = useMemo(() => styleAuthorshipScore(stylePrompt), [stylePrompt]);
@@ -268,6 +277,9 @@ export default function Mastering() {
     setResultUrl(null);
     setCertId(null);
     setErrorMsg("");
+    setEqOpen(false);
+    setEqBandGains([...FLAT_MASTERING_EQ]);
+    setPostEqGain(0);
 
     let uploadFile = file;
 
@@ -484,9 +496,32 @@ export default function Mastering() {
     if (pendingFile) processFile(pendingFile, preset, denoiseOn, stylePrompt, certifyOn, intensity, sidechainFilter, sidechainFreq, stereoLink, adaptiveMode, autoThreshold, autoThresholdOffset, { ipi: ipiNumber, iswc, isrc });
   };
 
-  const download = () => {
+  const eqIsActive = eqBandGains.some((value) => value !== 0) || postEqGain !== 0;
+
+  const download = async () => {
     if (!resultUrl) return;
-    downloadUrl(downloadHref ?? resultUrl, `gravelking_mastered_${preset}.wav`);
+    if (!eqIsActive) {
+      downloadUrl(downloadHref ?? resultUrl, `gravelking_mastered_${preset}.wav`);
+      return;
+    }
+
+    setExportingEq(true);
+    try {
+      const rendered = await renderMasteringEqWav(resultUrl, eqBandGains, postEqGain);
+      downloadBlob(rendered, `gravelking_mastered_${preset}_fine_tuned.wav`);
+      toast({
+        title: "Fine-tuned WAV ready",
+        description: "Your EQ and post-EQ gain were baked into the download.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not export fine-tuned WAV",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingEq(false);
+    }
   };
 
   const reset = () => {
@@ -497,6 +532,10 @@ export default function Mastering() {
     setBeforeUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
     setErrorMsg("");
     setPendingFile(null);
+    setEqOpen(false);
+    setEqBandGains([...FLAT_MASTERING_EQ]);
+    setPostEqGain(0);
+    setExportingEq(false);
   };
 
   if (emailGate.gated) {
@@ -1067,15 +1106,35 @@ export default function Mastering() {
                 </div>
 
                 {beforeUrl && (
-                  <BeforeAfterDemo
-                    before={{ label: "Before", sub: "Your original upload", src: beforeUrl }}
-                    after={{ label: "After", sub: `MLK v3 — ${selectedPreset.label}`, src: resultUrl }}
-                    heading="Hear the difference"
-                    sub="Your track — toggle before vs after mastering."
-                  />
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+                    <BeforeAfterDemo
+                      before={{ label: "Before", sub: "Your original upload", src: beforeUrl }}
+                      after={{ label: "After", sub: `MLK v3 — ${selectedPreset.label}`, src: resultUrl }}
+                      bandGains={eqBandGains}
+                      postEqGain={postEqGain}
+                      heading="Hear the difference"
+                      sub="Your track — toggle before vs after mastering."
+                    />
+                    <MasteringEqPanel
+                      open={eqOpen}
+                      onOpenChange={setEqOpen}
+                      bandGains={eqBandGains}
+                      postEqGain={postEqGain}
+                      onBandGainChange={(index, value) => {
+                        setEqBandGains((current) => {
+                          const next = [...current];
+                          next[index] = value;
+                          return next;
+                        });
+                      }}
+                      onPostEqGainChange={setPostEqGain}
+                      onReset={() => {
+                        setEqBandGains([...FLAT_MASTERING_EQ]);
+                        setPostEqGain(0);
+                      }}
+                    />
+                  </div>
                 )}
-
-                <audio src={resultUrl} controls className="w-full h-10" />
 
                 {certId && <CertUnlockCard certId={certId} />}
 
@@ -1083,8 +1142,8 @@ export default function Mastering() {
                   {/* This result already consumed its export credit server-side when
                       the master ran — saving it must stay possible even if the quota
                       just hit 0, so the download is never gated here. */}
-                  <Button onClick={download} className="flex-1 bg-sky-600 hover:bg-sky-700">
-                    <Download className="w-4 h-4 mr-2" /> Download WAV
+                  <Button onClick={() => void download()} disabled={exportingEq} className="flex-1 bg-sky-600 hover:bg-sky-700">
+                    <Download className="w-4 h-4 mr-2" /> {exportingEq ? "Rendering WAV…" : eqIsActive ? "Download Fine-Tuned WAV" : "Download WAV"}
                   </Button>
                   <Button variant="outline" onClick={reset} className="border-border/40">New File</Button>
                 </div>
@@ -1165,14 +1224,14 @@ export default function Mastering() {
                 { name: "Baseline",    desc: "Balanced +10% low-end boost, targeting YouTube loudness. Good all-purpose starting point." },
                 { name: "Normal",      desc: "Neutral loudness curve for any content where you want minimal coloration." },
                 { name: "Broadcast",   desc: "EBU R128 compliant at –23 LUFS. Required for TV, podcast distribution, and terrestrial radio." },
-                { name: "Vinyl",       desc: "Warm analog-style processing with boosted lows and soft high-end roll-off." },
-                { name: "Podcast",     desc: "Optimised for voice clarity: gentle compression, reduced room noise, and speech presence boost." },
-                { name: "Club",        desc: "Heavy sub-bass, punchy transient shaping, and loud overall level for PA systems." },
+                { name: "Tape Warmth / Saturation", desc: "Warm analog-style processing with boosted lows and soft high-end roll-off." },
+                { name: "Vocal Punch / Phase Focus", desc: "Optimised for voice clarity: gentle compression, reduced room noise, and speech presence boost." },
+                { name: "Sub Low-End / Kick Weight", desc: "Heavy sub-bass, punchy transient shaping, and loud overall level for PA systems." },
                 { name: "Film",        desc: "Wide cinematic dynamics with restrained limiting — preserves peaks for sync licensing." },
-                { name: "YouTube",     desc: "–14 LUFS integrated loudness, the level at which YouTube's normalizer stops reducing volume." },
+                { name: "Final Gain / Ceiling (−14.0 LUFS)", desc: "–14 LUFS integrated loudness, the level at which YouTube's normalizer stops reducing volume." },
                 { name: "SoundCloud",  desc: "–11 LUFS · the loudest level allowed before SoundCloud's compressor kicks in." },
                 { name: "Apple Music", desc: "–16 LUFS per Apple Sound Check. Ensures your track is not attenuated on Apple devices." },
-                { name: "Spacious",    desc: "Reverb tail and stereo widener for ambient, orchestral, or lo-fi tracks needing space." },
+                { name: "Vocal Air / Crisp Highs", desc: "An open, bright top end with stereo space for ambient, orchestral, or lo-fi tracks." },
               ].map(p => (
                 <div key={p.name} className="flex gap-3">
                   <span className="w-24 shrink-0 font-medium text-foreground/70">{p.name}</span>

@@ -45,7 +45,7 @@ export const helpTopics: HelpTopic[] = [
     eyebrow: "Sub-tool 03",
     summary: "Understand what the mastering controls change and what the kernel reports back.",
     status: "Implemented",
-    functions: ["Select Baseline, Spacious, Normal, Broadcast, Vinyl, Podcast, Club, Film, YouTube, SoundCloud, or Apple targets", "Set intensity from 0–100", "Set detector filter and frequency", "Choose stereo-link and adaptive mode", "Enable auto-threshold and review detected RMS/applied threshold when returned"],
+    functions: ["Select Baseline, Vocal Air / Crisp Highs, Normal, Broadcast, Tape Warmth / Saturation, Vocal Punch / Phase Focus, Sub Low-End / Kick Weight, Film, Final Gain / Ceiling (−14.0 LUFS), SoundCloud, or Apple Music targets", "Set intensity from 0–100", "Set detector filter and frequency", "Choose stereo-link and adaptive mode", "Enable auto-threshold and review detected RMS/applied threshold when returned"],
     howTo: ["Start with Normal or Baseline.", "Use a platform target only when it matches your delivery requirement.", "Enable auto-threshold when you want the kernel to measure the source before choosing the threshold.", "Compare the returned output and keep the processing headers with the session record."],
     engine: "Kernel preset mapping plus Python DSP parameters for EQ, saturation, adaptive sidechain compression, limiting, and LUFS staging.",
     routes: ["POST /api/kernel/master"],
