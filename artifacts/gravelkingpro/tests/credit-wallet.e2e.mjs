@@ -53,6 +53,7 @@ async function run() {
   const page = await browser.newPage();
   let grantArrived = false;
   let purchaseStatusChecks = 0;
+  let transientStatusFailures = 0;
 
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
@@ -96,6 +97,14 @@ async function run() {
     }
     if (url.pathname === "/api/credits/purchase-status") {
       purchaseStatusChecks += 1;
+      if (transientStatusFailures === 0) {
+        transientStatusFailures += 1;
+        return json({ error: "temporary settlement lookup failure" }, 503);
+      }
+      if (transientStatusFailures === 1) {
+        transientStatusFailures += 1;
+        return route.abort("failed");
+      }
       return json({ settled: grantArrived });
     }
     return json({ error: `Unexpected wallet test request: ${url.pathname}` }, 404);
@@ -110,8 +119,14 @@ async function run() {
 
   await pending.waitFor();
   assert(await pending.getByText("Payment of $10.00 is still settling").isVisible(), "pending settlement message was not shown");
+  const failureDeadline = Date.now() + 3_000;
+  while (transientStatusFailures < 2 && Date.now() < failureDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert(transientStatusFailures === 2, "the wallet did not survive both temporary settlement-check failures");
+  assert(await pending.isVisible(), "temporary settlement-check failures removed the pending message");
   assert(await buyButton.isDisabled(), "second purchase was not disabled while the webhook was delayed");
-  assert(purchaseStatusChecks >= 1, "the wallet did not poll purchase settlement status");
+  assert(purchaseStatusChecks >= 2, "the wallet did not retry settlement status after temporary failures");
 
   // Model the delayed payment_intent.succeeded delivery arriving after the
   // browser has already shown the pending state.
