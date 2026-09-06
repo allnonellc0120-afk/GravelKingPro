@@ -1,0 +1,35 @@
+SYSTEM OVERRIDE: JAX CONVERSATIONAL MEMORY, RECENT SESSIONS & CODE-BLOCK LYRICS ENGINE
+
+Execute the following complete refactor of the JAX companion interface and authorship tracking architecture.
+
+TASK 1: RECENT SESSIONS DRAWER & CHAT HISTORY (LEFT RAIL)
+- Implement a persistent left sidebar displaying "Recent Sessions":
+  * Auto-generate a concise song title/topic based on the first few prompts.
+  * Allow the user to start a "+ New Song" or click into previous sessions.
+  * Retain full conversation history and lyric drafts per session in the user's database.
+- Multi-Session Context Injection:
+  * When JAX answers, provide him with context from the user's past song sessions so he remembers ongoing stories, specific people (e.g. "Hope"), and previous bars without amnesia.
+
+TASK 2: KILL CHAT-BUBBLE LYRICS — USE CLEAN CODE BLOCKS
+- JAX must NEVER embed raw song lyrics inside standard chat message text.
+- Standard conversational chat remains clean: friendly banter, life talk, studio coaching, and voice dictation.
+- Whenever lyrics are output, updated, or finalized, JAX must format them exclusively inside a standalone Markdown code block with an explicit "Copy to Clipboard" button.
+- ZERO filler text inside the code block (no "Verse 1:", no "Ready for the next line?", no commentary). Only pure lyric lines.
+
+TASK 3: GRANULAR AUTHORSHIP DELTA ENGINE (VOICE DIRECTIVE VS. AI GENERATION)
+Implement an automated authorship classification ledger for the certificate:
+1. Human Dictation Tagging:
+   - When the user explicitly dictates phrasing (e.g., "Change line 2 to [exact words]" or "Replace word X with word Y"), JAX updates the lyric block and flags the added characters as 100% HUMAN AUTHORSHIP in the session metadata.
+2. AI Generation Tagging:
+   - When the user issues an open creative prompt (e.g., "Give me 3 other rhymes," "Write a sad bridge"), the resulting lines are flagged as AI GENERATED.
+3. Manual Clipboard / Typing Diff:
+   - When the user copies the block into the song generator or edits text, an inline Levenshtein diff calculates manual changes and credits them as human authorship.
+4. Active Ledger:
+   - Calculate the net Human Authorship % dynamically and pipe it directly to the HMAC-SHA256 provenance certificate generator.
+
+TASK 4: PERSONALITY & SEARCH UNLOCK
+- Remove all canned "I'm locked in the booth for songwriting only" guardrails.
+- Allow natural, empathetic conversation about life, emotions, and music.
+- Enable Google Search grounding on the Gemini API call so JAX can search real-time facts, rhymes, and musical history when asked.
+
+Halt and output "JAX SESSION RAIL & CODE BLOCK ENGINE COMPLETE" when deployed.
