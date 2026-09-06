@@ -136,6 +136,56 @@ async function migrateAppSchema() {
         ADD COLUMN IF NOT EXISTS credits_balance integer NOT NULL DEFAULT 0
     `);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS credit_transactions (
+        id                       varchar     PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id                  varchar     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        delta                    integer     NOT NULL,
+        kind                     text        NOT NULL,
+        reference                text,
+        stripe_payment_intent_id text,
+        created_at               timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS credit_transactions_user_created_idx
+        ON credit_transactions(user_id, created_at)
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS credit_transactions_reference_idx
+        ON credit_transactions(reference)
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS credit_transactions_stripe_intent_idx
+        ON credit_transactions(stripe_payment_intent_id)
+    `);
+
+    // One-time owner wallet initialization. The fixed ledger reference makes
+    // this safe across restarts and guarantees it never becomes an auto-refill.
+    await db.execute(sql`
+      WITH owner AS (
+        SELECT id, credits_balance
+        FROM users
+        WHERE lower(email) = 'allnonellc0120@gmail.com'
+        LIMIT 1
+      ),
+      adjustment AS (
+        INSERT INTO credit_transactions (user_id, delta, kind, reference)
+        SELECT
+          id,
+          5000 - credits_balance,
+          'admin_balance_set',
+          'owner-admin-initial-balance-5000'
+        FROM owner
+        WHERE credits_balance <> 5000
+        ON CONFLICT (reference) DO NOTHING
+        RETURNING user_id, delta
+      )
+      UPDATE users
+      SET credits_balance = users.credits_balance + adjustment.delta
+      FROM adjustment
+      WHERE users.id = adjustment.user_id
+    `);
+    await db.execute(sql`
       ALTER TABLE lyric_projects
         ADD COLUMN IF NOT EXISTS mode              text        NOT NULL DEFAULT 'simple',
         ADD COLUMN IF NOT EXISTS story_prompt      text,

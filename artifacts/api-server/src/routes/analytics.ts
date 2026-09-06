@@ -60,7 +60,7 @@ function clampString(value: unknown, max: number): string | null {
 }
 
 // Admin guard imported from shared lib (accepts httpOnly cookie or x-admin-key header).
-import { requireAdmin } from "../lib/adminAuth";
+import { ADMIN_AUTOMATION_EMAIL, requireAdmin } from "../lib/adminAuth";
 
 // Normalize a recurring price to a monthly amount (in cents).
 function monthlyCentsFor(price: Stripe.Price, quantity: number): number {
@@ -212,6 +212,8 @@ analyticsRouter.post("/analytics/event", async (req: Request, res: Response) => 
 analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) => {
   if (!await requireAdmin(req, res)) return;
   try {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
     const daysRaw = parseInt(String(req.query.days ?? "30"), 10);
     const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 365) : 30;
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -240,6 +242,17 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
         verifiedEmailAccounts: sql<number>`count(*) filter (where nullif(btrim(${usersTable.email}), '') is not null)`,
       })
       .from(usersTable);
+
+    const [ownerAccount] = await db
+      .select({
+        creditsBalance: usersTable.creditsBalance,
+        isPro: usersTable.isPro,
+        isDeveloper: usersTable.isDeveloper,
+        subscriptionTier: usersTable.subscriptionTier,
+      })
+      .from(usersTable)
+      .where(sql`lower(${usersTable.email}) = ${ADMIN_AUTOMATION_EMAIL.toLowerCase()}`)
+      .limit(1);
 
     const seriesRows = await db
       .select({
@@ -372,6 +385,7 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
       den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
 
     res.json({
+      generatedAt: new Date().toISOString(),
       rangeDays: days,
       totals: { pageviews, uniqueVisitors, externalVisitors, checkoutStarts },
       accounts: {
@@ -380,6 +394,12 @@ analyticsRouter.get("/analytics/summary", async (req: Request, res: Response) =>
         anonymousRecords:
           Number(accountTotals?.localRecords ?? 0) -
           Number(accountTotals?.verifiedEmailAccounts ?? 0),
+      },
+      ownerAccount: {
+        creditsBalance: ownerAccount?.creditsBalance ?? 0,
+        isPro: ownerAccount?.isPro ?? false,
+        isDeveloper: ownerAccount?.isDeveloper ?? false,
+        subscriptionTier: ownerAccount?.subscriptionTier ?? null,
       },
       subscriptions: {
         active: activeSubs,
