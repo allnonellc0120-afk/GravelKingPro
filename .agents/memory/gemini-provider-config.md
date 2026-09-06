@@ -44,3 +44,15 @@ one-off script must live **inside that package directory** — running it from
 to the script's own path, not the cwd. The CodeExecution sandbox was erroring
 ("durable ptc") during this work; a plain Node script via shell was the reliable
 path.
+
+## Vertex tool placement
+Vertex `generateContent` accepts `tools` at the top level, not inside
+`generationConfig`. Passing the same search tool in both places causes a 400
+`Unknown name "tools" at 'generation_config'`, which surfaces as a JAX outage.
+
+**Why:** The JAX route uses Google Search grounding for current/factual prompts,
+so a malformed request can make ordinary chat appear intermittently unavailable.
+
+**How to apply:** When adding generation options, destructure `tools` before
+serializing `generationConfig`; verify both a grounded lookup and a lyric request
+through `/api/jax/generate`, not only a direct model probe.

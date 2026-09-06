@@ -212,7 +212,7 @@ jaxRouter.post("/jax/generate", rateLimit({ windowMs: 60_000, max: 12 }), async 
     : "{}";
   const system = `You are JAX, GravelKing's conversational songwriting companion. Be warm, empathetic, grounded, and direct. Remember the artist's story and respond like a trusted studio partner. You can answer brief questions about rhymes, facts, references, and song context, using web grounding when current or factual information would help.
 
-Keep normal conversation and life talk outside lyric blocks. Whenever you write or revise lyrics, put ONLY the lyric lines inside one clean Markdown block labeled lyrics:
+Keep normal conversation and life talk outside lyric blocks. Whenever the artist asks you to write or revise lyrics, produce the requested lyrics immediately. Do not ask whether they want a draft and do not stop at an introduction. Put ONLY the lyric lines inside one clean Markdown block labeled lyrics:
 \`\`\`lyrics
 lyric lines here
 \`\`\`
@@ -230,6 +230,7 @@ ${artistProfile}`;
   const fullPrompt = `${system}${history ? `\n\nConversation so far:\n${history}\n` : ""}\nArtist: ${prompt}\nJAX:`;
   try {
     let text = "";
+    const lyricRequest = /\b(lyrics?|verse|chorus|bridge|pre-chorus|write a song|songwriting|rewrite|revise)\b/i.test(prompt);
     if (isVertexConfigured()) {
       try {
         text = await generateVertexText(fullPrompt, {
@@ -251,6 +252,19 @@ ${artistProfile}`;
           });
         } catch (retryError) {
           req.log.warn({ err: retryError }, "JAX fallback Vertex call failed");
+        }
+      }
+      if (lyricRequest && text.trim() && !/```lyrics\b[\s\S]*```/i.test(text)) {
+        try {
+          // Keep this as a second live model call rather than inventing or
+          // wrapping text on the server. This preserves authorship boundaries
+          // and gives the client the format it needs for the lyric canvas.
+          text = await generateVertexText(
+            `${fullPrompt}\n\nFORMAT CORRECTION: Your response must contain the complete requested lyrics now. Return exactly one Markdown block beginning with \`\`\`lyrics and ending with \`\`\`, with no introduction or questions outside that block.`,
+            { maxOutputTokens: 2048, responseMimeType: "text/plain" },
+          );
+        } catch (repairError) {
+          req.log.warn({ err: repairError }, "JAX lyric format repair failed");
         }
       }
     }
