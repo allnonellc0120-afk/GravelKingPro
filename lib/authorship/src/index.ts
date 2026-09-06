@@ -90,6 +90,86 @@ export function authorshipScore(aiDraft: string, finalText: string): number {
   return Math.max(0, Math.min(100, Math.round(raw * 100)));
 }
 
+export type AuthorshipLedgerEntry = {
+  text: string;
+  source: "human" | "ai";
+  start: number;
+  end: number;
+  rationale: "explicit-dictation" | "human-edit" | "ai-generation";
+};
+
+/**
+ * Return a character-range ledger for the final lyric text.
+ *
+ * Unchanged text remains attributed to the AI draft. Inserted text is human
+ * editing, and exact phrases the artist dictated are upgraded to explicit
+ * human authorship even when the same words also existed in the draft.
+ */
+export function authorshipLedger(
+  aiDraft: string,
+  finalText: string,
+  explicitHumanText: string[] = [],
+): AuthorshipLedgerEntry[] {
+  const a = normalize(aiDraft ?? "");
+  const b = normalize(finalText ?? "");
+  if (!b) return [];
+
+  const explicitRanges = explicitHumanText
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .flatMap((text) => {
+      const ranges: Array<[number, number]> = [];
+      let from = 0;
+      while (from < b.length) {
+        const start = b.indexOf(text, from);
+        if (start < 0) break;
+        ranges.push([start, start + text.length]);
+        from = start + Math.max(1, text.length);
+      }
+      return ranges;
+    });
+
+  const entries: AuthorshipLedgerEntry[] = [];
+  const add = (text: string, start: number, source: "human" | "ai", rationale: AuthorshipLedgerEntry["rationale"]) => {
+    if (!text) return;
+    const previous = entries[entries.length - 1];
+    if (previous && previous.end === start && previous.source === source && previous.rationale === rationale) {
+      previous.text += text;
+      previous.end += text.length;
+      return;
+    }
+    entries.push({ text, source, start, end: start + text.length, rationale });
+  };
+  const addWithExplicitRanges = (text: string, start: number, source: "human" | "ai", rationale: AuthorshipLedgerEntry["rationale"]) => {
+    let cursor = start;
+    for (const [rangeStart, rangeEnd] of explicitRanges) {
+      if (rangeEnd <= cursor || rangeStart >= start + text.length) continue;
+      const humanStart = Math.max(rangeStart, cursor);
+      if (humanStart > cursor) add(text.slice(cursor - start, humanStart - start), cursor, source, rationale);
+      const humanEnd = Math.min(rangeEnd, start + text.length);
+      add(text.slice(humanStart - start, humanEnd - start), humanStart, "human", "explicit-dictation");
+      cursor = humanEnd;
+    }
+    if (cursor < start + text.length) add(text.slice(cursor - start), cursor, source, rationale);
+  };
+
+  if (!a) {
+    addWithExplicitRanges(b, 0, "human", "human-edit");
+    return entries;
+  }
+
+  const dmp = new DiffMatchPatch();
+  const diffs = dmp.diff_main(a, b);
+  dmp.diff_cleanupSemantic(diffs);
+  let finalOffset = 0;
+  for (const [op, text] of diffs) {
+    if (op === OP_DELETE) continue;
+    addWithExplicitRanges(text, finalOffset, op === OP_INSERT ? "human" : "ai", op === OP_INSERT ? "human-edit" : "ai-generation");
+    finalOffset += text.length;
+  }
+  return entries;
+}
+
 // ── Style / Instrumental Authorship Scorer ────────────────────────────────────
 //
 // Measures how much HUMAN creative specificity went into a style prompt used

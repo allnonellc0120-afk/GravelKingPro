@@ -202,3 +202,79 @@ export function updateSongDraft(
     .set({ ...update, updatedAt: new Date().toISOString() }, { merge: true })
     .catch(() => {});
 }
+
+// ── jax_sessions ─────────────────────────────────────────────────────────────
+
+export interface JaxSessionMessage {
+  id: string;
+  role: "user" | "jax";
+  content: string;
+  createdAt: string;
+  explicitHumanText?: string[];
+}
+
+export interface JaxAuthorshipEntry {
+  text: string;
+  source: "human" | "ai";
+  start: number;
+  end: number;
+  rationale: "explicit-dictation" | "human-edit" | "ai-generation";
+}
+
+export interface JaxSessionData {
+  sessionId: string;
+  userId: string;
+  title: string;
+  messages: JaxSessionMessage[];
+  aiDraft: string;
+  finalText: string;
+  authorshipScore: number;
+  authorshipLedger: JaxAuthorshipEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function saveJaxSession(
+  data: Omit<JaxSessionData, "sessionId" | "createdAt" | "updatedAt">,
+  explicitId?: string,
+): string {
+  const sessionId = explicitId ?? randomUUID();
+  const db = getDb();
+  if (!db) return sessionId;
+  const now = new Date().toISOString();
+  const doc: JaxSessionData = {
+    ...data,
+    sessionId,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const clean = Object.fromEntries(Object.entries(doc).filter(([, value]) => value !== undefined));
+  db.collection("jax_sessions").doc(sessionId).set(clean, { merge: true }).catch(() => {});
+  return sessionId;
+}
+
+export async function listJaxSessions(userId: string): Promise<JaxSessionData[]> {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    const snap = await db.collection("jax_sessions").where("userId", "==", userId).limit(50).get();
+    return snap.docs
+      .map((doc) => doc.data() as JaxSessionData)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  } catch {
+    return [];
+  }
+}
+
+export async function getJaxSession(userId: string, sessionId: string): Promise<JaxSessionData | null> {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const doc = await db.collection("jax_sessions").doc(sessionId).get();
+    if (!doc.exists) return null;
+    const session = doc.data() as JaxSessionData;
+    return session.userId === userId ? session : null;
+  } catch {
+    return null;
+  }
+}
