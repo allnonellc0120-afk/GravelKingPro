@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   User, CreditCard, Crown, Zap, Scissors, ShieldCheck,
-  LogOut, ExternalLink, Loader2, Check, Lock,
+  LogOut, ExternalLink, Loader2, Check, Lock, Trash2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -275,8 +275,32 @@ export default function Account() {
           </Card>
         </motion.div>
 
-        {/* Quick links */}
+        {/* Privacy and account deletion */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <Card className="border-rose-500/20 bg-rose-500/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                Account and data deletion
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Request deletion of your GravelKing Pro account and associated personal data.
+                The deletion page explains what is removed, what may need to be retained, and how long the request takes.
+              </p>
+              <Link href="/data-deletion">
+                <Button variant="outline" className="border-rose-500/30 text-rose-300 hover:bg-rose-500/10">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Request account deletion
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Quick links */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
           <Card className="border-border/40 bg-card/20">
             <CardContent className="pt-5 grid grid-cols-2 gap-2">
               {[
