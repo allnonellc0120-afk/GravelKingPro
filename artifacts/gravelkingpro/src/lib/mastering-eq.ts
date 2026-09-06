@@ -37,6 +37,21 @@ export function isMasteringEqResourceError(error: unknown): error is MasteringEq
   return error instanceof MasteringEqResourceError;
 }
 
+export class MasteringEqExportCancelledError extends Error {
+  readonly code = "EXPORT_CANCELLED";
+
+  constructor() {
+    super("Fine-tuned export cancelled.");
+    this.name = "MasteringEqExportCancelledError";
+  }
+}
+
+export function isMasteringEqExportCancelled(error: unknown): boolean {
+  if (error instanceof MasteringEqExportCancelledError) return true;
+  if (!error || typeof error !== "object") return false;
+  return (error as { name?: unknown }).name === "AbortError";
+}
+
 export interface EqChain {
   filters: BiquadFilterNode[];
   outputGain: GainNode;
@@ -107,24 +122,37 @@ export async function decodeAudioUrl(
   context: BaseAudioContext,
   url: string,
   onProgress?: (update: MasteringEqProgress) => void,
+  signal?: AbortSignal,
 ): Promise<AudioBuffer> {
+  throwIfAborted(signal);
   onProgress?.({
     stage: "loading",
     progress: 6,
     detail: "Loading the full mastered track…",
   });
-  const response = await fetch(url, { credentials: "include" });
+  let response: Response;
+  try {
+    response = await fetch(url, { credentials: "include", signal });
+  } catch (error) {
+    if (signal?.aborted) throw new MasteringEqExportCancelledError();
+    throw error;
+  }
   if (!response.ok) {
     throw new Error(`Could not load mastered audio (HTTP ${response.status}).`);
   }
-  const bytes = await response.arrayBuffer();
+  const bytes = await awaitWithAbort(response.arrayBuffer(), signal);
+  throwIfAborted(signal);
   onProgress?.({
     stage: "decoding",
     progress: 18,
     detail: "Decoding the full-length audio…",
   });
   try {
-    const decoded = await context.decodeAudioData(bytes.slice(0));
+    const decoded = await awaitWithAbort(
+      context.decodeAudioData(bytes.slice(0)),
+      signal,
+    );
+    throwIfAborted(signal);
     onProgress?.({
       stage: "decoding",
       progress: 38,
@@ -147,11 +175,15 @@ export async function renderMasteringEqWav(
   bandGains: readonly number[],
   postEqGain: number,
   onProgress?: (update: MasteringEqProgress) => void,
+  options?: { signal?: AbortSignal },
 ): Promise<Blob> {
+  const signal = options?.signal;
+  throwIfAborted(signal);
   const decodeContext = new AudioContext();
   try {
     try {
-      const decoded = await decodeAudioUrl(decodeContext, url, onProgress);
+      const decoded = await decodeAudioUrl(decodeContext, url, onProgress, signal);
+      throwIfAborted(signal);
       const offline = new OfflineAudioContext(
         decoded.numberOfChannels,
         decoded.length,
@@ -170,6 +202,7 @@ export async function renderMasteringEqWav(
 
       let renderProgress = 44;
       const renderProgressId = setInterval(() => {
+        if (signal?.aborted) return;
         renderProgress = Math.min(88, renderProgress + 2);
         onProgress?.({
           stage: "rendering",
@@ -179,18 +212,32 @@ export async function renderMasteringEqWav(
       }, 750);
       let rendered: AudioBuffer;
       try {
-        rendered = await offline.startRendering();
+        rendered = await awaitWithAbort(offline.startRendering(), signal, () => {
+          // OfflineAudioContext has no close()/abort() API. Stopping and
+          // disconnecting the source is the browser-supported way to release
+          // the render graph when a user cancels a long render.
+          try { source.stop(); } catch { /* already stopped */ }
+          try { source.disconnect(); } catch { /* already disconnected */ }
+          for (const filter of chain.filters) {
+            try { filter.disconnect(); } catch { /* already disconnected */ }
+          }
+          try { chain.outputGain.disconnect(); } catch { /* already disconnected */ }
+        });
       } finally {
         clearInterval(renderProgressId);
       }
 
+      throwIfAborted(signal);
       onProgress?.({
         stage: "encoding",
         progress: 90,
         detail: "Encoding a downloadable WAV…",
       });
-      return await audioBufferToWav(rendered, onProgress);
+      return await audioBufferToWav(rendered, onProgress, signal);
     } catch (error) {
+      if (signal?.aborted || isMasteringEqExportCancelled(error)) {
+        throw new MasteringEqExportCancelledError();
+      }
       if (error instanceof MasteringEqResourceError || isLikelyResourceError(error)) {
         throw new MasteringEqResourceError();
       }
@@ -204,7 +251,9 @@ export async function renderMasteringEqWav(
 async function audioBufferToWav(
   buffer: AudioBuffer,
   onProgress?: (update: MasteringEqProgress) => void,
+  signal?: AbortSignal,
 ): Promise<Blob> {
+  throwIfAborted(signal);
   const channelCount = buffer.numberOfChannels;
   const frameCount = buffer.length;
   const bytesPerSample = 2;
@@ -231,6 +280,7 @@ async function audioBufferToWav(
   );
   let offset = 44;
   for (let frame = 0; frame < frameCount; frame += 1) {
+    if (frame % 16_384 === 0) throwIfAborted(signal);
     for (let channel = 0; channel < channelCount; channel += 1) {
       const sample = Math.max(-1, Math.min(1, channels[channel][frame]));
       view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
@@ -245,16 +295,53 @@ async function audioBufferToWav(
         progress: 90 + Math.round((frame / frameCount) * 9),
         detail: "Encoding a downloadable WAV…",
       });
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await awaitWithAbort(new Promise<void>((resolve) => setTimeout(resolve, 0)), signal);
     }
   }
 
+  throwIfAborted(signal);
   onProgress?.({
     stage: "encoding",
     progress: 99,
     detail: "Finishing the WAV file…",
   });
   return new Blob([view], { type: "audio/wav" });
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new MasteringEqExportCancelledError();
+}
+
+async function awaitWithAbort<T>(
+  promise: Promise<T>,
+  signal?: AbortSignal,
+  onAbort?: () => void,
+): Promise<T> {
+  if (signal?.aborted) {
+    onAbort?.();
+    throw new MasteringEqExportCancelledError();
+  }
+  if (!signal) return promise;
+
+  return await new Promise<T>((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener("abort", handleAbort);
+    const handleAbort = () => {
+      onAbort?.();
+      cleanup();
+      reject(new MasteringEqExportCancelledError());
+    };
+    signal.addEventListener("abort", handleAbort, { once: true });
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
 }
 
 function isLikelyResourceError(error: unknown): boolean {

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
-import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown, Shuffle, Loader2 } from "lucide-react";
+import { Download, Upload, Wand2, CheckCircle2, AlertCircle, FileDown, Shuffle, Loader2, X } from "lucide-react";
 import { RemixModal } from "@/components/remix-modal";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ import { downloadBlob, downloadUrl } from "@/lib/download";
 import {
   FLAT_MASTERING_EQ,
   getMasteringDownloadPath,
+  isMasteringEqExportCancelled,
   isMasteringEqResourceError,
   renderMasteringEqWav,
   type MasteringEqExportStage,
@@ -269,6 +270,7 @@ export default function Mastering() {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportError, setExportError] = useState("");
   const exportInFlightRef = useRef(false);
+  const exportAbortRef = useRef<AbortController | null>(null);
   const { balance: creditsBalance } = useCredits();
 
   const hydrateMasterJob = useCallback(async (jobId: string): Promise<boolean> => {
@@ -580,6 +582,8 @@ export default function Mastering() {
     }
 
     exportInFlightRef.current = true;
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
     setExportingEq(true);
     setExportError("");
     setExportStage("loading");
@@ -590,11 +594,14 @@ export default function Mastering() {
         eqBandGains,
         postEqGain,
         ({ stage, progress: nextProgress }) => {
+          if (controller.signal.aborted) return;
           setExportStage(stage);
           setExportProgress(nextProgress);
         },
+        { signal: controller.signal },
       );
 
+      if (controller.signal.aborted) return;
       // Give React one paint for the explicit saving state before handing the
       // object URL to the browser or the native mobile bridge.
       setExportStage("saving");
@@ -610,6 +617,10 @@ export default function Mastering() {
         description: "Your EQ and post-EQ gain were baked into the download.",
       });
     } catch (error) {
+      if (controller.signal.aborted || isMasteringEqExportCancelled(error)) {
+        setExportError("");
+        return;
+      }
       const resourceError = isMasteringEqResourceError(error);
       const message = resourceError
         ? "This device ran out of memory while rendering the full-length WAV. Close other tabs or apps and try again. Your EQ settings are still here, or you can download the mastered WAV without fine-tuning."
@@ -621,12 +632,20 @@ export default function Mastering() {
         variant: "destructive",
       });
     } finally {
+      if (exportAbortRef.current === controller) exportAbortRef.current = null;
       exportInFlightRef.current = false;
       setExportingEq(false);
     }
   };
 
+  const cancelFineTuneExport = () => {
+    if (!exportInFlightRef.current) return;
+    exportAbortRef.current?.abort();
+  };
+
   const reset = () => {
+    exportAbortRef.current?.abort();
+    exportAbortRef.current = null;
     setState("idle");
     setProgress(0);
     setFileName("");
@@ -1261,6 +1280,17 @@ export default function Mastering() {
                     <p className="text-[11px] text-muted-foreground">
                       Long tracks can take a minute. Keep this page open while the file is prepared.
                     </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={cancelFineTuneExport}
+                      className="w-full border-sky-400/30 text-sky-200 hover:bg-sky-500/10"
+                      data-testid="button-cancel-fine-tune-export"
+                    >
+                      <X className="mr-1.5 h-3.5 w-3.5" />
+                      Cancel fine-tuned export
+                    </Button>
                   </div>
                 )}
 
