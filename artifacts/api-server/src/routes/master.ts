@@ -180,8 +180,8 @@ export const MASTER_PRESETS: Record<
     filter: BASELINE_FILTER,
   },
   spacious: {
-    label: "Spacious",
-    description: "Baseline + reverb & stereo space maker for width and depth.",
+    label: "Vocal Air / Crisp Highs",
+    description: "Open top end with stereo space for width and depth.",
     filter: `bass=g=1,${REVERB_SPACE},loudnorm=I=-14:TP=-1:LRA=11`,
   },
   normal: {
@@ -195,18 +195,18 @@ export const MASTER_PRESETS: Record<
     filter: "bass=g=1,highpass=f=80,loudnorm=I=-23:TP=-2:LRA=7",
   },
   vinyl: {
-    label: "Vinyl",
+    label: "Tape Warmth / Saturation",
     description: "Baseline + warm analog boost for lows and subtle air.",
     filter: "bass=g=3,treble=g=1,loudnorm=I=-16:TP=-1:LRA=13",
   },
   podcast: {
-    label: "Podcast",
+    label: "Vocal Punch / Phase Focus",
     description: "Baseline + highpass + dynamic compression for speech clarity.",
     filter:
       "bass=g=1,highpass=f=100,compand=attacks=0.01:decays=0.1:points=-70/-70|-30/-25|0/-5|20/-5,loudnorm=I=-16:TP=-1.5:LRA=11",
   },
   club: {
-    label: "Club",
+    label: "Sub Low-End / Kick Weight",
     description: "Baseline + heavy bass, punchy transients, and loud dance-floor energy.",
     filter:
       "bass=g=4,treble=g=2,compand=attacks=0.005:decays=0.05:points=-70/-70|-20/-15|0/-3|20/-3,loudnorm=I=-12:TP=-0.5:LRA=8",
@@ -218,7 +218,7 @@ export const MASTER_PRESETS: Record<
       "bass=g=1,highpass=f=40,compand=attacks=0.05:decays=0.5:points=-70/-70|-40/-35|-20/-15|0/-5|20/-5,loudnorm=I=-24:TP=-2:LRA=15",
   },
   youtube: {
-    label: "YouTube",
+    label: "Final Gain / Ceiling (−14.0 LUFS)",
     description: "Baseline tuned for YouTube's -14 LUFS normalization.",
     filter: "bass=g=1,loudnorm=I=-14:TP=-1:LRA=11",
   },
