@@ -144,6 +144,8 @@ export async function tryGravelKingVoiceSwap(
       modelWeightsUrl ??
       process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] ??
       undefined,
+      indexRate: 0.85,
+      protect: 0.15,
   }));
   const converted = await downloadVoiceSwapOutput(convertedUrl);
   return mixVoiceSwapAudioInMemory(instrumental, converted);
