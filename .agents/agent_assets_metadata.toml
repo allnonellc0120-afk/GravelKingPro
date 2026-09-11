@@ -1751,3 +1751,17 @@ mtime_ms = 1789155565689
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/d3436627-76db-4da5-bfdb-c0e704e29a92/78aaf2c3-3161-4a0c-8def-75d5910a04cc"
 storage_version_token = "1789155592636114"
 content_type = "audio/mpeg"
+
+[[outputs]]
+id = "LIrieWxpVKiFABujsnFET"
+uri = "file://rvc-vocal-60s-gravelking-v2.mp3"
+type = "audio"
+title = "60s RVC Converted Vocal — gravelking_v2 (0:15–1:15 verse section)"
+description = "Full 60-second converted vocal from the isolated Gravel Road Mercy vocal stem (0:15–1:15). gravelking_v2 model, rmvpe pitch detection, index rate 0.90, protect 0.10. Vocals only — no mixing, no new generation."
+logical_id = "209ee06e-74d8-48be-9874-3d3281b9d3cf"
+content_hash = "sha256:9f9ac9b748d63e5faf9662f5bbd313a84bafda555e2ff4e9d8ba758d92db7204"
+size = 960723
+mtime_ms = 1789157655082
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/209ee06e-74d8-48be-9874-3d3281b9d3cf/aa505c20-c25a-4896-bd2b-2dddbbf7a5ff"
+storage_version_token = "1789157662684894"
+content_type = "audio/mpeg"
