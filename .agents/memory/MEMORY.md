@@ -94,3 +94,4 @@
 - [Investor outreach approval boundary](investor-outreach-approval.md) — recurring dispatch sends only explicit queued recipient/subject/body payloads; overdue tracker entries alone never generate email
 - [Root ignition restart](root-ignition-restart.md) — restart the standalone Python service before verifying main.py changes on port 8080
 - [GravelKing RVC weights](gravelking-rvc-weights.md) — trained v2 RVC artifacts live in backend-aware Object Storage; managed-bucket IAM may force fallback
+- [JAX admin generation ownership](jax-admin-generation-ownership.md) — admin automation creates tracks without a user; attach the successful track to the owner profile and purchased_tracks row

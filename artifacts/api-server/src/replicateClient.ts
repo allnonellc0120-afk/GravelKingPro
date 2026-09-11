@@ -43,6 +43,8 @@ export interface VoiceConvertInput {
   pitchShift?: number;
   /** RVC index mix rate. Defaults to 0.8. */
   indexRate?: number;
+  /** RVC protection amount for consonants/clean source detail. */
+  protect?: number;
 }
 
 function requireHttpUrl(value: string, field: string): string {
@@ -108,13 +110,17 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     ? requireHttpUrl(input.modelWeightsUrl, "modelWeightsUrl")
     : undefined;
   const pitchShift = input.pitchShift ?? 0;
-  const indexRate = input.indexRate ?? 0.8;
+  const indexRate = input.indexRate ?? 0.85;
+  const protect = input.protect ?? 0.15;
 
   if (!Number.isFinite(pitchShift) || pitchShift < -24 || pitchShift > 24) {
     throw new Error("Replicate RVC pitchShift must be between -24 and 24 semitones");
   }
   if (!Number.isFinite(indexRate) || indexRate < 0 || indexRate > 1) {
     throw new Error("Replicate RVC indexRate must be between 0 and 1");
+  }
+  if (!Number.isFinite(protect) || protect < 0 || protect > 1) {
+    throw new Error("Replicate RVC protect must be between 0 and 1");
   }
 
   const modelInput: Record<string, string | number> = {
@@ -130,7 +136,7 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     index_rate: indexRate,
     filter_radius: 3,
     rms_mix_rate: 0.25,
-    protect: 0.33,
+    protect,
   };
 
   const output = await getReplicateClient().run(modelRef, { input: modelInput });
