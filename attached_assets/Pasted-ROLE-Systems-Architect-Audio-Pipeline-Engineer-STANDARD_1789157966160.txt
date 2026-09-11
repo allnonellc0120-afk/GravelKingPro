@@ -1,0 +1,29 @@
+ROLE: Systems Architect & Audio Pipeline Engineer
+STANDARD: GravelKing Protocol / Morris Law kernel V2
+
+TASK:
+Finalize the end-to-end song pipeline by implementing the full middle-tier async worker architecture, wiring the GKA frontend contract, and delivering the mixed master to the admin library.
+
+1. MIDDLE-TIER ASYNC WORKER (Eliminate 120s Timeouts):
+   - POST `/api/tracks/generate`:
+     * Returns immediate HTTP 200 with `{ success: true, trackId, jobId, status: "processing" }` in under 500ms.
+     * Offloads the actual generation, RVC conversion, and mixing to a non-blocking background queue/worker.
+   - Polling / Event Route:
+     * Expose GET `/api/tracks/:id/status` (or SSE `/api/tracks/:id/progress`) emitting real-time pipeline stages:
+       `{ stage: "generating" | "isolating" | "converting" | "mastering" | "ready" | "failed", progress: 0-100 }`.
+   - Native Stem Handling:
+     * When generating via JAX / MLK, output separated backing and vocal guide streams directly to bypass the Demucs step whenever possible.
+
+2. GKA CLIENT CONTRACT & AUDIO MIDDLEWARE:
+   - Frontend Studio Feedback: The GKA UI consumes the status endpoint to animate the mastering stages so the screen never hangs or freezes.
+   - Playback & Edge Caching: Deliver finished audio via the internal proxy route (`/api/tracks/:id/stream`). Allow GKA to cache decoded audio buffers in local browser storage (IndexedDB) for zero-bandwidth replays.
+   - Zero-Disk Standard: All audio buffers remain in memory until streamed directly into Object Storage.
+
+3. VOCAL CONVERSION & MIXDOWN ENFORCEMENT:
+   - Voice conversion must strictly use the verified `models/gravelking_v2.zip` with parameters:
+     * `protect: 0.10`, `index_rate: 0.90`, `pitch_detection_algorithm: "rmvpe"`.
+   - Hard assertion: If RVC conversion fails, throw an explicit error; never persist unconverted stock audio.
+
+4. IMMEDIATE DELIVERABLE:
+   - Mix the verified 60s GravelKing vocal track back over the "Gravel Road Mercy" instrumental backing track in memory.
+   - Persist the mixed master to Object Storage, link it to the admin profile library in the database, and return the internal playback URL in chat.

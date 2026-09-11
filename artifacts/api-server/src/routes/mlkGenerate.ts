@@ -15,7 +15,8 @@ import { generateAndMasterTrack, hashLyrics, remixTrack, type VocalMode } from "
 import { verifyLyrics } from "../services/lyricGuard";
 import { isAdminAutomationAuthenticated, ADMIN_AUTOMATION_EMAIL } from "../lib/adminAuth";
 import { db, usersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { masterJobsTable } from "@workspace/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { CREDIT_COSTS, grantCredits, spendCredits } from "../lib/credits";
 import { buildSignedRvcModelStreamUrl, resolveRvcModelOrigin } from "../services/rvcModelAccess";
@@ -27,118 +28,282 @@ const mlkGenerateRouter = Router();
 const generateRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 3 });
 const generateConcurrency = concurrencyLimit(2);
 
+interface GenerationRequestBody {
+  lyricId?: string;
+  text?: string;
+  title?: string;
+  artistName?: string;
+  stylePrompt?: string;
+  vocalMode?: string;
+  durationS?: number;
+  lyricAudit?: { finalLyricsHash?: string; authorshipScore?: number; ledger?: unknown[] };
+}
+
+interface PreparedGeneration {
+  userId: string;
+  body: GenerationRequestBody;
+  vocalMode: VocalMode;
+  text: string;
+  creditReference: string;
+  creditsSpent: boolean;
+  creditBalance?: number;
+  modelWeightsUrl: string;
+}
+
+/**
+ * Shared pre-flight for both generation entry points: identity, config,
+ * lyrics validation, copyright gate, and the credit spend. Returns null when
+ * the response has already been sent (caller must return immediately).
+ */
+async function prepareGeneration(
+  req: Request,
+  res: Response,
+): Promise<PreparedGeneration | null> {
+  // Shared identity resolver: OIDC first, else gk_session — ISSUING the
+  // cookie when absent so the same session can later fetch the track from
+  // the gated /api/tracks/:id/download route.
+  let user = await getUsageUser(req, res);
+  if (isAdminAutomationAuthenticated(req)) {
+    const [adminUser] = await db
+      .select()
+      .from(usersTable)
+      .where(sql`lower(${usersTable.email}) = ${ADMIN_AUTOMATION_EMAIL.toLowerCase()}`)
+      .limit(1);
+    if (!adminUser) {
+      res.status(403).json({ error: "Bound admin identity is not provisioned." });
+      return null;
+    }
+    user = adminUser;
+  }
+  const userId = user.id;
+
+  if (!isVertexConfigured()) {
+    res.status(503).json({ error: "Vertex AI is not configured on this server." });
+    return null;
+  }
+
+  const body = req.body as GenerationRequestBody;
+  const vocalMode: VocalMode =
+    body.vocalMode === "instrumental" || body.vocalMode === "random"
+      ? body.vocalMode
+      : "lyrics";
+  const text = (body.text ?? "").toString();
+  // Lyrics are only required when the user is supplying their own —
+  // "random" (model-written) and "instrumental" runs need none.
+  if (vocalMode === "lyrics" && text.replace(/\s/g, "").length < 5) {
+    res.status(400).json({ error: "Lyrics text is required (min 5 characters)." });
+    return null;
+  }
+
+  // GravelKing Protocol copyright gate — server-side enforcement point.
+  // User-supplied lyrics must clear the AI copyright screen before any
+  // generation runs. The UI's /lyrics/verify preview is advisory; this is
+  // the gate a crafted client cannot skip.
+  if (vocalMode === "lyrics") {
+    const screen = await verifyLyrics(text);
+    if (screen.verdict === "flagged") {
+      res.status(422).json({
+        error: screen.reason ?? "These lyrics appear to reproduce a commercially released song.",
+        code: "lyrics_flagged",
+        ...(screen.matchedWork ? { matchedWork: screen.matchedWork } : {}),
+      });
+      return null;
+    }
+  }
+
+  const adminBypass = isAdminAutomationAuthenticated(req) || user.isDeveloper;
+  const creditReference = `song:${randomUUID()}`;
+  let creditsSpent = false;
+  let creditBalance: number | undefined;
+  if (!adminBypass) {
+    const spent = await spendCredits(userId, CREDIT_COSTS.song, "song", creditReference);
+    if (!spent.ok) {
+      res.status(402).json({
+        error: `This song costs ${CREDIT_COSTS.song} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
+        code: "INSUFFICIENT_CREDITS",
+        creditsRequired: CREDIT_COSTS.song,
+        creditsBalance: spent.balance,
+        purchaseUrl: "/pricing#credits",
+      });
+      return null;
+    }
+    creditsSpent = true;
+    creditBalance = spent.balance;
+    res.setHeader("X-GK-Credits-Balance", String(spent.balance));
+  }
+
+  return {
+    userId,
+    body,
+    vocalMode,
+    text,
+    creditReference,
+    creditsSpent,
+    creditBalance,
+    modelWeightsUrl: buildSignedRvcModelStreamUrl(
+      resolveRvcModelOrigin(`https://${req.get("host")}`),
+      3600,
+    ),
+  };
+}
+
+/** Run the full MLK pipeline for a prepared request. Throws on failure. */
+async function runGeneration(prepared: PreparedGeneration) {
+  const { body, vocalMode, text, userId } = prepared;
+  const serverLyricHash = vocalMode === "lyrics" ? hashLyrics(text).hash : "";
+  return generateAndMasterTrack(body.lyricId ?? null, text, userId, {
+    title: body.title,
+    artistName: body.artistName,
+    stylePrompt: body.stylePrompt,
+    vocalMode,
+    targetDurationS:
+      typeof body.durationS === "number" && Number.isFinite(body.durationS)
+        ? body.durationS
+        : undefined,
+    lyricAudit: body.lyricAudit?.finalLyricsHash && Array.isArray(body.lyricAudit.ledger)
+      ? {
+          finalLyricsHash: serverLyricHash,
+          authorshipScore: Math.max(0, Math.min(100, Number(body.lyricAudit.authorshipScore) || 0)),
+          ledger: body.lyricAudit.ledger.slice(0, 500),
+        }
+      : undefined,
+    modelWeightsUrl: prepared.modelWeightsUrl,
+  });
+}
+
+/**
+ * POST /api/tracks/generate — asynchronous generation worker.
+ *
+ * Validation, copyright screening, and the credit spend happen synchronously
+ * (so bad requests fail fast), then the pipeline is handed to a durable
+ * background job row and the client gets { jobId, status: "processing" }
+ * immediately. Clients poll GET /api/tracks/:jobId/status.
+ */
 mlkGenerateRouter.post(
-  ["/mlk/v35/generate-master", "/tracks/generate"],
+  "/tracks/generate",
   generateRateLimit,
   generateConcurrency,
   async (req: Request, res: Response) => {
-    // Shared identity resolver: OIDC first, else gk_session — ISSUING the
-    // cookie when absent so the same session can later fetch the track from
-    // the gated /api/tracks/:id/download route.
-    let user = await getUsageUser(req, res);
-    if (isAdminAutomationAuthenticated(req)) {
-      const [adminUser] = await db
-        .select()
-        .from(usersTable)
-        .where(sql`lower(${usersTable.email}) = ${ADMIN_AUTOMATION_EMAIL.toLowerCase()}`)
-        .limit(1);
-      if (!adminUser) {
-        res.status(403).json({ error: "Bound admin identity is not provisioned." });
-        return;
-      }
-      user = adminUser;
-    }
-    const userId = user.id;
+    const prepared = await prepareGeneration(req, res);
+    if (!prepared) return;
 
-    if (!isVertexConfigured()) {
-      res.status(503).json({ error: "Vertex AI is not configured on this server." });
+    const jobId = randomUUID();
+    await db.insert(masterJobsTable).values({
+      id: jobId,
+      userId: prepared.userId,
+      type: "generation",
+      status: "running",
+      stage: "generating",
+      progress: 5,
+      startedAt: new Date(),
+      requestConfig: {
+        title: prepared.body.title ?? null,
+        vocalMode: prepared.vocalMode,
+        durationS: prepared.body.durationS ?? null,
+        creditReference: prepared.creditReference,
+      },
+    });
+
+    res.json({ success: true, jobId, status: "processing" });
+
+    // Background pipeline — the HTTP request is already answered. Failures
+    // fail the job row (and refund credits) instead of hitting a proxy timeout.
+    void (async () => {
+      try {
+        const result = await runGeneration(prepared);
+        await db.update(masterJobsTable).set({
+          status: "completed",
+          stage: "done",
+          progress: 100,
+          outputObjectKey: result.trackId,
+          outputUrl: `/api/tracks/${result.trackId}/stream`,
+          completedAt: new Date(),
+        }).where(eq(masterJobsTable.id, jobId));
+      } catch (err) {
+        req.log.error({ err, jobId }, "MLK v3.5 background generation failed");
+        if (prepared.creditsSpent) {
+          await grantCredits(
+            prepared.userId,
+            CREDIT_COSTS.song,
+            "failed_song_refund",
+            `refund:${prepared.creditReference}`,
+          ).catch((refundErr) => req.log.error({ err: refundErr, jobId }, "generation refund failed"));
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        await db.update(masterJobsTable).set({
+          status: "failed",
+          stage: "failed",
+          error: userFacingGenerationError(message).error,
+          completedAt: new Date(),
+        }).where(eq(masterJobsTable.id, jobId));
+      }
+    })();
+  },
+);
+
+/**
+ * GET /api/tracks/:id/status — generation job polling.
+ * Returns processing | ready | failed. On ready, includes the track id and
+ * internal stream URL. Only the job owner (or admin automation) may read it.
+ */
+mlkGenerateRouter.get("/tracks/:id/status", async (req: Request, res: Response) => {
+  const jobId = req.params.id;
+  const [job] = await db
+    .select()
+    .from(masterJobsTable)
+    .where(and(eq(masterJobsTable.id, jobId), eq(masterJobsTable.type, "generation")))
+    .limit(1);
+  if (!job) {
+    res.status(404).json({ error: "Generation job not found." });
+    return;
+  }
+  if (!isAdminAutomationAuthenticated(req)) {
+    const user = await getUsageUser(req, res);
+    if (job.userId && job.userId !== user.id) {
+      res.status(403).json({ error: "This generation job belongs to another account." });
       return;
     }
+  }
 
-    const body = req.body as {
-      lyricId?: string;
-      text?: string;
-      title?: string;
-      artistName?: string;
-      stylePrompt?: string;
-      vocalMode?: string;
-      durationS?: number;
-      lyricAudit?: { finalLyricsHash?: string; authorshipScore?: number; ledger?: unknown[] };
-    };
-    const vocalMode: VocalMode =
-      body.vocalMode === "instrumental" || body.vocalMode === "random"
-        ? body.vocalMode
-        : "lyrics";
-    const text = (body.text ?? "").toString();
-    // Lyrics are only required when the user is supplying their own —
-    // "random" (model-written) and "instrumental" runs need none.
-    if (vocalMode === "lyrics" && text.replace(/\s/g, "").length < 5) {
-      res.status(400).json({ error: "Lyrics text is required (min 5 characters)." });
-      return;
-    }
+  if (job.status === "completed") {
+    res.json({
+      status: "ready",
+      jobId,
+      trackId: job.outputObjectKey,
+      streamUrl: job.outputUrl,
+    });
+    return;
+  }
+  if (job.status === "failed") {
+    res.json({ status: "failed", jobId, error: job.error ?? "Generation failed." });
+    return;
+  }
+  res.json({ status: "processing", jobId, stage: job.stage, progress: job.progress });
+});
 
-    // GravelKing Protocol copyright gate — server-side enforcement point.
-    // User-supplied lyrics must clear the AI copyright screen before any
-    // generation runs. The UI's /lyrics/verify preview is advisory; this is
-    // the gate a crafted client cannot skip.
-    if (vocalMode === "lyrics") {
-      const screen = await verifyLyrics(text);
-      if (screen.verdict === "flagged") {
-        res.status(422).json({
-          error: screen.reason ?? "These lyrics appear to reproduce a commercially released song.",
-          code: "lyrics_flagged",
-          ...(screen.matchedWork ? { matchedWork: screen.matchedWork } : {}),
-        });
-        return;
-      }
-    }
-
-    const adminBypass = isAdminAutomationAuthenticated(req) || user.isDeveloper;
-    const creditReference = `song:${randomUUID()}`;
-    let creditsSpent = false;
-    if (!adminBypass) {
-      const spent = await spendCredits(userId, CREDIT_COSTS.song, "song", creditReference);
-      if (!spent.ok) {
-        res.status(402).json({
-          error: `This song costs ${CREDIT_COSTS.song} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
-          code: "INSUFFICIENT_CREDITS",
-          creditsRequired: CREDIT_COSTS.song,
-          creditsBalance: spent.balance,
-          purchaseUrl: "/pricing#credits",
-        });
-        return;
-      }
-      creditsSpent = true;
-      res.setHeader("X-GK-Credits-Balance", String(spent.balance));
-    }
+/**
+ * POST /api/mlk/v35/generate-master — legacy synchronous entry point.
+ * New clients should use POST /api/tracks/generate + the status poller.
+ */
+mlkGenerateRouter.post(
+  "/mlk/v35/generate-master",
+  generateRateLimit,
+  generateConcurrency,
+  async (req: Request, res: Response) => {
+    const prepared = await prepareGeneration(req, res);
+    if (!prepared) return;
 
     try {
-      const serverLyricHash = vocalMode === "lyrics" ? hashLyrics(text).hash : "";
-      const result = await generateAndMasterTrack(body.lyricId ?? null, text, userId, {
-        title: body.title,
-        artistName: body.artistName,
-        stylePrompt: body.stylePrompt,
-        vocalMode,
-        targetDurationS:
-          typeof body.durationS === "number" && Number.isFinite(body.durationS)
-            ? body.durationS
-            : undefined,
-        lyricAudit: body.lyricAudit?.finalLyricsHash && Array.isArray(body.lyricAudit.ledger)
-          ? {
-              finalLyricsHash: serverLyricHash,
-              authorshipScore: Math.max(0, Math.min(100, Number(body.lyricAudit.authorshipScore) || 0)),
-              ledger: body.lyricAudit.ledger.slice(0, 500),
-            }
-          : undefined,
-        modelWeightsUrl: buildSignedRvcModelStreamUrl(
-          resolveRvcModelOrigin(`https://${req.get("host")}`),
-          3600,
-        ),
-      });
+      const result = await runGeneration(prepared);
       res.json({ success: true, ...result });
     } catch (err) {
-      if (creditsSpent) {
-        await grantCredits(userId, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
+      if (prepared.creditsSpent) {
+        await grantCredits(
+          prepared.userId,
+          CREDIT_COSTS.song,
+          "failed_song_refund",
+          `refund:${prepared.creditReference}`,
+        );
       }
       const message = err instanceof Error ? err.message : String(err);
       // Full raw error (stack, upstream JSON) stays in the server logs ONLY.
