@@ -18,7 +18,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { CREDIT_COSTS, grantCredits, spendCredits } from "../lib/credits";
-import { buildSignedRvcModelStreamUrl } from "../services/rvcModelAccess";
+import { buildSignedRvcModelStreamUrl, resolveRvcModelOrigin } from "../services/rvcModelAccess";
 
 const mlkGenerateRouter = Router();
 
@@ -131,7 +131,7 @@ mlkGenerateRouter.post(
             }
           : undefined,
         modelWeightsUrl: buildSignedRvcModelStreamUrl(
-          `https://${req.get("host")}`,
+          resolveRvcModelOrigin(`https://${req.get("host")}`),
           3600,
         ),
       });
