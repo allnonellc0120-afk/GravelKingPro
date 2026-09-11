@@ -38,3 +38,7 @@ outputType = "console"
 
 [userenv.shared]
 REPLICATE_RVC_MODEL = "zsxkib/realistic-voice-cloning"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000

@@ -1737,3 +1737,17 @@ mtime_ms = 1788740460697
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/2cd022e4-1b20-4f54-a0ed-ef8f95c71177/7d68aaea-5a14-49fb-a08e-68ec69ba7bdb"
 storage_version_token = "1788740538067956"
 content_type = "text/csv"
+
+[[outputs]]
+id = "gwNqf6PHCzXfIsGzeBymI"
+uri = "file://rvc-vocal-converted-gravelking-v2.mp3"
+type = "audio"
+title = "RVC Converted Vocal — gravelking_v2"
+description = "Direct output of a single RVC conversion (gravelking_v2.pth + .index, rmvpe, index rate 0.9). No mixing, no generation, no fallback."
+logical_id = "d3436627-76db-4da5-bfdb-c0e704e29a92"
+content_hash = "sha256:9411c5ac58cf686b5bb48bb363280e5bf3f0a58af95d846eb7527b48b5246286"
+size = 272762
+mtime_ms = 1789155565689
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/d3436627-76db-4da5-bfdb-c0e704e29a92/78aaf2c3-3161-4a0c-8def-75d5910a04cc"
+storage_version_token = "1789155592636114"
+content_type = "audio/mpeg"

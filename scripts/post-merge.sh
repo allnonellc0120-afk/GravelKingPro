@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 pnpm install --frozen-lockfile
-pnpm --filter db push
 
 # Sync MorrisLawKernel/ to the private GitHub repo (allnonellc0120-afk/MorrisLawKernel)
 # via the Replit GitHub connector. One retry for transient GitHub API blips.
