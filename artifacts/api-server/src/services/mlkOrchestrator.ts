@@ -8,6 +8,7 @@
 
 import { randomUUID, createHash, createHmac } from "crypto";
 import { deflateSync } from "zlib";
+import { spawn } from "child_process";
 
 import { db, ipCertStubsTable, tracksTable, purchasedTracksTable } from "@workspace/db";
 import { and, eq, like } from "drizzle-orm";
@@ -69,6 +70,36 @@ async function downloadVoiceSwapOutput(url: string): Promise<Buffer> {
   }
 }
 
+async function mixVoiceSwapAudioInMemory(
+  instrumental: Buffer,
+  converted: Buffer,
+): Promise<Buffer> {
+  const child = spawn("ffmpeg", [
+    "-hide_banner", "-loglevel", "error",
+    "-i", "pipe:0",
+    "-i", "pipe:3",
+    "-filter_complex", "amix=inputs=2:duration=longest:dropout_transition=0",
+    "-acodec", "pcm_s16le", "-f", "wav", "pipe:1",
+  ], { stdio: ["pipe", "pipe", "pipe", "pipe"] });
+  const chunks: Buffer[] = [];
+  const errors: Buffer[] = [];
+  child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+  child.stderr.on("data", (chunk: Buffer) => errors.push(chunk));
+  const result = await new Promise<Buffer>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) resolve(Buffer.concat(chunks));
+      else reject(new Error(`In-memory audio recombination failed (${code}): ${Buffer.concat(errors).toString().slice(0, 500)}`));
+    });
+    child.stdin.end(converted);
+    (child.stdio[3] as NodeJS.WritableStream | null)?.write(instrumental, () => {
+      (child.stdio[3] as NodeJS.WritableStream).end();
+    });
+  });
+  if (!result.length) throw new Error("In-memory audio recombination returned no audio");
+  return result;
+}
+
 function withVoiceSwapTimeout<T>(promise: Promise<T>): Promise<T> {
   return Promise.race([
     promise,
@@ -115,7 +146,7 @@ export async function tryGravelKingVoiceSwap(
       undefined,
   }));
   const converted = await downloadVoiceSwapOutput(convertedUrl);
-  return mixPcmWavBuffers(instrumental, converted);
+  return mixVoiceSwapAudioInMemory(instrumental, converted);
 }
 
 export async function saveGeneratedAudioArtifacts(

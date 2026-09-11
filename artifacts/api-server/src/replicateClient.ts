@@ -60,6 +60,7 @@ function requireHttpUrl(value: string, field: string): string {
 
 function outputUrl(output: unknown): string {
   if (typeof output === "string" && /^https?:\/\//.test(output)) return output;
+  if (output instanceof URL) return output.toString();
   if (Array.isArray(output)) {
     for (const item of output) {
       try {
@@ -74,9 +75,12 @@ function outputUrl(output: unknown): string {
     if (typeof candidate.url === "function") {
       const url = candidate.url();
       if (typeof url === "string" && /^https?:\/\//.test(url)) return url;
+      if (url instanceof URL) return url.toString();
     }
     if (typeof candidate.url === "string" && /^https?:\/\//.test(candidate.url)) return candidate.url;
+    if (candidate.url instanceof URL) return candidate.url.toString();
     if (typeof candidate.href === "string" && /^https?:\/\//.test(candidate.href)) return candidate.href;
+    if (candidate.href instanceof URL) return candidate.href.toString();
   }
   throw new Error("Replicate RVC returned no audio URL");
 }
@@ -117,6 +121,7 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     rvc_model: "CUSTOM",
     song_input: audio,
     custom_rvc_model_download_url: modelWeights ?? "",
+    pitch_detection_algorithm: "rmvpe",
     pitch_change: pitchShift === 0
       ? "no-change"
       : pitchShift > 0
