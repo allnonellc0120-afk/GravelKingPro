@@ -6,6 +6,7 @@ import { useAppState } from "@/lib/context";
 import { Layout } from "@/components/layout";
 import { downloadBlob } from "@/lib/download";
 import { trackEvent } from "@/lib/analytics";
+import { submitGenerationJob } from "@/lib/generation-jobs";
 import { useCredits } from "@/components/credit-wallet";
 import { authorshipLedger as buildAuthorshipLedger, authorshipScore as computeAuthorshipScore, preserveHumanEdits, type AuthorshipLedgerEntry } from "@workspace/authorship";
 import { Button } from "@/components/ui/button";
@@ -522,6 +523,7 @@ export default function SongwritingStudio() {
   const [generatorLyrics, setGeneratorLyrics] = useState("");
   const [generatorBusy, setGeneratorBusy] = useState(false);
   const [generatorMessage, setGeneratorMessage] = useState("");
+  const [generatorProgress, setGeneratorProgress] = useState<number | null>(null);
   const [regeneratingMessageId, setRegeneratingMessageId] = useState<string | null>(null);
   const [stage2Hash, setStage2Hash] = useState("");
   const [stage3Hash, setStage3Hash] = useState("");
@@ -1395,14 +1397,21 @@ export default function SongwritingStudio() {
       const lyricAudit = await buildRenderAudit(lyrics);
       trackEvent("song_generate_clicked", { engine: "mlk" });
       setGeneratorMessage("Rendering your take… this can take a couple of minutes.");
-      const result = await fetch("/api/mlk/v35/generate-master", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-         body: JSON.stringify({ text: lyrics, title: draft.title, stylePrompt: style, vocalMode: "lyrics", durationS: 120, lyricAudit }),
+      const state = await submitGenerationJob({
+        kind: "generate",
+        dedupeKey: `${await sha256Text(lyrics)}:${await sha256Text(style)}`,
+        body: { text: lyrics, title: draft.title, stylePrompt: style, vocalMode: "lyrics", durationS: 120, lyricAudit },
+        onProgress: (job) => {
+          if (job.status === "processing") {
+            const pct = typeof job.progress === "number" ? job.progress : 5;
+            setGeneratorProgress(pct);
+            setGeneratorMessage(`Rendering your take (${pct}%)… this can take a couple of minutes.`);
+          }
+        },
       });
-      const data = await result.json() as { error?: string; trackId?: string; audioFullKey?: string; previewUrl?: string };
-      if (!result.ok) throw new Error(data.error || "Generator could not complete this take.");
+      setGeneratorProgress(null);
+      const data = { trackId: state.trackId ?? undefined, audioFullKey: undefined as string | undefined, previewUrl: state.streamUrl ?? undefined };
+      if (!data.trackId) throw new Error("Generator could not complete this take.");
       const binding = JSON.stringify({ trackId: data.trackId, audioFullKey: data.audioFullKey, previewUrl: data.previewUrl, lyricsHash: activeHash, styleHash: stage2Hash });
       setStage3Hash(bytesToHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(binding))));
       setGeneratorMessage(`Render complete${filled.length ? ` — JAX supplied the ${filled.join(" and ")}` : ""}. The take is in your library, ready to certify when you are.`);
@@ -1410,6 +1419,7 @@ export default function SongwritingStudio() {
       trackEvent("song_generated", { engine: "mlk", auto_filled: filled.join("+") || "none" });
       if (data.trackId) navigate(`/library?track=${encodeURIComponent(data.trackId)}`);
     } catch (error) {
+      setGeneratorProgress(null);
       setGeneratorMessage(error instanceof Error ? error.message : "Generator could not complete this take.");
       toast({ title: "Generation failed", description: error instanceof Error ? error.message : "Generator could not complete this take.", variant: "destructive" });
     } finally {
@@ -1519,6 +1529,11 @@ export default function SongwritingStudio() {
                     <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with JAX (20 credits)"}</Button>
             </div>
           </div>
+          {generatorBusy && generatorProgress !== null && (
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={generatorProgress}>
+              <div className="h-full rounded-full bg-amber-500 transition-all duration-700" style={{ width: `${Math.max(5, Math.min(95, generatorProgress))}%` }} />
+            </div>
+          )}
           {generatorMessage && <p className="mt-4 text-sm text-emerald-300">{generatorMessage}</p>}
         </div>
       </section>
