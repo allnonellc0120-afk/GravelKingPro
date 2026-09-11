@@ -351,59 +351,178 @@ function userFacingGenerationError(message: string): { status: number; error: st
  * v3.5 kernel, and issues a CHILD IP cert linked to the parent (chain of
  * title). Same cost profile as generation → same rate/concurrency limits.
  */
+interface RemixRequestBody {
+  parentTrackId?: string;
+  twist?: string;
+  vocalsOn?: boolean;
+  artistName?: string;
+}
+
+interface PreparedRemix {
+  userId: string;
+  parentTrackId: string;
+  twist: string;
+  vocalsOn: boolean;
+  artistName?: string;
+  creditReference: string;
+  creditsSpent: boolean;
+}
+
+/** Shared pre-flight for remix: identity, config, parent id, credit spend. */
+async function prepareRemix(req: Request, res: Response): Promise<PreparedRemix | null> {
+  let user = await getUsageUser(req, res);
+  if (isAdminAutomationAuthenticated(req)) {
+    const [adminUser] = await db
+      .select()
+      .from(usersTable)
+      .where(sql`lower(${usersTable.email}) = ${ADMIN_AUTOMATION_EMAIL.toLowerCase()}`)
+      .limit(1);
+    if (!adminUser) {
+      res.status(403).json({ error: "Bound admin identity is not provisioned." });
+      return null;
+    }
+    user = adminUser;
+  }
+
+  if (!isVertexConfigured()) {
+    res.status(503).json({ error: "Vertex AI is not configured on this server." });
+    return null;
+  }
+
+  const adminBypass = isAdminAutomationAuthenticated(req) || user.isDeveloper;
+  const creditReference = `remix:${randomUUID()}`;
+  let creditsSpent = false;
+  if (!adminBypass) {
+    const spent = await spendCredits(user.id, CREDIT_COSTS.song, "song", creditReference);
+    if (!spent.ok) {
+      res.status(402).json({
+        error: `This remix costs ${CREDIT_COSTS.song} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
+        code: "INSUFFICIENT_CREDITS",
+        creditsRequired: CREDIT_COSTS.song,
+        creditsBalance: spent.balance,
+        purchaseUrl: "/pricing#credits",
+      });
+      return null;
+    }
+    creditsSpent = true;
+    res.setHeader("X-GK-Credits-Balance", String(spent.balance));
+  }
+
+  const body = req.body as RemixRequestBody;
+  const parentTrackId = (body.parentTrackId ?? "").toString().trim();
+  if (!parentTrackId) {
+    if (creditsSpent) {
+      await grantCredits(user.id, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
+    }
+    res.status(400).json({ error: "parentTrackId is required." });
+    return null;
+  }
+
+  return {
+    userId: user.id,
+    parentTrackId,
+    twist: (body.twist ?? "").toString(),
+    vocalsOn: body.vocalsOn === true,
+    artistName: body.artistName,
+    creditReference,
+    creditsSpent,
+  };
+}
+
+/**
+ * POST /api/tracks/remix — asynchronous remix worker.
+ * Same ACK/poll contract as /api/tracks/generate: the durable job row tracks
+ * the pipeline while the client polls GET /api/tracks/:jobId/status.
+ */
 mlkGenerateRouter.post(
-  ["/mlk/v35/remix", "/tracks/remix"],
+  "/tracks/remix",
   generateRateLimit,
   generateConcurrency,
   async (req: Request, res: Response) => {
-    const user = await getUsageUser(req, res);
+    const prepared = await prepareRemix(req, res);
+    if (!prepared) return;
 
-    if (!isVertexConfigured()) {
-      res.status(503).json({ error: "Vertex AI is not configured on this server." });
-      return;
-    }
+    const jobId = randomUUID();
+    await db.insert(masterJobsTable).values({
+      id: jobId,
+      userId: prepared.userId,
+      type: "generation",
+      status: "running",
+      stage: "generating",
+      progress: 5,
+      startedAt: new Date(),
+      requestConfig: {
+        remixOf: prepared.parentTrackId,
+        vocalsOn: prepared.vocalsOn,
+        creditReference: prepared.creditReference,
+      },
+    });
 
-    const adminBypass = isAdminAutomationAuthenticated(req) || user.isDeveloper;
-    const creditReference = `remix:${randomUUID()}`;
-    let creditsSpent = false;
-    if (!adminBypass) {
-      const spent = await spendCredits(user.id, CREDIT_COSTS.song, "song", creditReference);
-      if (!spent.ok) {
-        res.status(402).json({
-          error: `This remix costs ${CREDIT_COSTS.song} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
-          code: "INSUFFICIENT_CREDITS",
-          creditsRequired: CREDIT_COSTS.song,
-          creditsBalance: spent.balance,
-          purchaseUrl: "/pricing#credits",
+    res.json({ success: true, jobId, status: "processing" });
+
+    void (async () => {
+      try {
+        const result = await remixTrack(prepared.parentTrackId, prepared.userId, {
+          twist: prepared.twist,
+          vocalsOn: prepared.vocalsOn,
+          artistName: prepared.artistName,
         });
-        return;
+        await db.update(masterJobsTable).set({
+          status: "completed",
+          stage: "done",
+          progress: 100,
+          outputObjectKey: result.trackId,
+          outputUrl: `/api/tracks/${result.trackId}/stream`,
+          completedAt: new Date(),
+        }).where(eq(masterJobsTable.id, jobId));
+      } catch (err) {
+        req.log.error({ err, jobId }, "MLK v3.5 background remix failed");
+        if (prepared.creditsSpent) {
+          await grantCredits(
+            prepared.userId,
+            CREDIT_COSTS.song,
+            "failed_song_refund",
+            `refund:${prepared.creditReference}`,
+          ).catch((refundErr) => req.log.error({ err: refundErr, jobId }, "remix refund failed"));
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        await db.update(masterJobsTable).set({
+          status: "failed",
+          stage: "failed",
+          error: userFacingGenerationError(message).error,
+          completedAt: new Date(),
+        }).where(eq(masterJobsTable.id, jobId));
       }
-      creditsSpent = true;
-      res.setHeader("X-GK-Credits-Balance", String(spent.balance));
-    }
+    })();
+  },
+);
 
-    const body = req.body as {
-      parentTrackId?: string;
-      twist?: string;
-      vocalsOn?: boolean;
-      artistName?: string;
-    };
-    const parentTrackId = (body.parentTrackId ?? "").toString().trim();
-    if (!parentTrackId) {
-      res.status(400).json({ error: "parentTrackId is required." });
-      return;
-    }
+/**
+ * POST /api/mlk/v35/remix — legacy synchronous remix entry point.
+ */
+mlkGenerateRouter.post(
+  "/mlk/v35/remix",
+  generateRateLimit,
+  generateConcurrency,
+  async (req: Request, res: Response) => {
+    const prepared = await prepareRemix(req, res);
+    if (!prepared) return;
 
     try {
-      const result = await remixTrack(parentTrackId, user.id, {
-        twist: (body.twist ?? "").toString(),
-        vocalsOn: body.vocalsOn === true,
-        artistName: body.artistName,
+      const result = await remixTrack(prepared.parentTrackId, prepared.userId, {
+        twist: prepared.twist,
+        vocalsOn: prepared.vocalsOn,
+        artistName: prepared.artistName,
       });
       res.json({ success: true, ...result });
     } catch (err) {
-      if (creditsSpent) {
-        await grantCredits(user.id, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
+      if (prepared.creditsSpent) {
+        await grantCredits(
+          prepared.userId,
+          CREDIT_COSTS.song,
+          "failed_song_refund",
+          `refund:${prepared.creditReference}`,
+        );
       }
       const message = err instanceof Error ? err.message : String(err);
       // Full raw error (stack, upstream JSON) stays in the server logs ONLY.

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Shuffle, AlertTriangle, Mic, MicOff, Sparkles } from "lucide-react";
 import { StyleTagPills, appendStyleTag } from "@/components/style-tag-pills";
 import { useToast } from "@/hooks/use-toast";
+import { submitGenerationJob, type GenerationJobState } from "@/lib/generation-jobs";
 
 export function RemixModal({
   open,
@@ -39,32 +40,31 @@ export function RemixModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [progress, setProgress] = useState<GenerationJobState | null>(null);
+
   const handleRemix = async () => {
     setBusy(true);
     setError(null);
+    setProgress(null);
     try {
-      const res = await fetch("/api/mlk/v35/remix", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ parentTrackId, twist: twist.trim(), vocalsOn }),
+      const state = await submitGenerationJob({
+        kind: "remix",
+        dedupeKey: `${parentTrackId}:${twist.trim()}:${vocalsOn ? "v" : "i"}`,
+        body: { parentTrackId, twist: twist.trim(), vocalsOn },
+        onProgress: setProgress,
       });
-      const data = (await res.json()) as { error?: string; code?: string; trackId?: string; title?: string };
-      if (!res.ok || !data.trackId) {
-        const msg = data.error || `Remix failed (HTTP ${res.status})`;
-        // Upstream AI safety filter rejected the prompt — coach, don't scare.
-        if (res.status === 422 || data.code === "content_blocked") {
-          toast({ title: "Prompt flagged", description: msg, variant: "destructive" });
-        }
-        throw new Error(msg);
-      }
+      if (!state.trackId) throw new Error("Remix failed.");
       // Full reload with the new track id re-runs the Mastering Tool's vault
       // preload — the remix lands ready to master, exactly like a generation.
       window.location.assign(
-        `${window.location.pathname}?gkTrack=${encodeURIComponent(data.trackId)}&gkTitle=${encodeURIComponent(data.title ?? `${parentTitle} (Remix)`)}`,
+        `${window.location.pathname}?gkTrack=${encodeURIComponent(state.trackId)}&gkTitle=${encodeURIComponent(`${parentTitle} (Remix)`)}`,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Remix failed.");
+      const msg = err instanceof Error ? err.message : "Remix failed.";
+      if ((err as Error & { code?: string }).code === "content_blocked") {
+        toast({ title: "Prompt flagged", description: msg, variant: "destructive" });
+      }
+      setError(msg);
       setBusy(false);
     }
   };
@@ -126,9 +126,19 @@ export function RemixModal({
               : <><Shuffle className="w-4 h-4 mr-2" />Remix Track with MLK v3.5</>}
           </Button>
           {busy && (
-            <p className="text-[10px] font-medium text-sky-300/80 flex items-center justify-center gap-1">
-              <Sparkles className="w-3 h-3" /> AI Optimized for Production Sound
-            </p>
+            <div className="space-y-1.5">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar"
+                aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress?.progress ?? 5}>
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+                  style={{ width: `${Math.max(5, Math.min(95, progress?.progress ?? 5))}%` }}
+                />
+              </div>
+              <p className="text-[10px] font-medium text-sky-300/80 flex items-center justify-center gap-1">
+                <Sparkles className="w-3 h-3" /> AI Optimized for Production Sound
+                {progress?.stage ? ` — ${progress.stage}` : ""}
+              </p>
+            </div>
           )}
 
           {error && (
