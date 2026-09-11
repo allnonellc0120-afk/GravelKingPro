@@ -20,6 +20,7 @@ import {
 } from "../services/mlkOrchestrator";
 import {
   buildSignedRvcModelStreamUrl,
+  resolveRvcModelOrigin,
   GRAVELKING_RVC_INDEX_KEY,
   GRAVELKING_RVC_MODEL_KEY,
   GRAVELKING_RVC_MODEL_FILENAME,
@@ -585,7 +586,7 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     const { audioFullKey, audioFullMp3Key, audioPreviewKey } = buildGeneratedAudioKeys(trackId);
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
     const modelWeightsUrl = buildSignedRvcModelStreamUrl(
-      `${req.protocol}://${req.get("host")}`,
+      resolveRvcModelOrigin(`${req.protocol}://${req.get("host")}`),
       3600,
     );
     const voiceSwap = await tryGravelKingVoiceSwap(mp3, modelWeightsUrl);
