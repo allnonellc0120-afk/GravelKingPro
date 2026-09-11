@@ -3,11 +3,11 @@ import { generateVertexText, generateVertexTextStream, isVertexConfigured } from
 import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
 import { ReplitConnectors } from "@replit/connectors-sdk";
-import { randomUUID, createHash } from "crypto";
+import { randomUUID, createHash, createHmac, timingSafeEqual } from "crypto";
 import { db, artistProfilesTable, tracksTable, purchasedTracksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
-  getSignedObjectURL,
+  getObjectFileWithFallback,
   ObjectStorageService,
   saveObjectWithFallback,
 } from "../lib/objectStorage";
@@ -30,6 +30,7 @@ import {
 import { authorshipScore } from "@workspace/authorship";
 const objectStorage = new ObjectStorageService();
 const GRAVELKING_RVC_MODEL_KEY = "models/gravelking_v2.pth";
+const GRAVELKING_RVC_MODEL_FILENAME = "gravelking_v2.pth";
 
 const jaxRouter = Router();
 const connectors = new ReplitConnectors();
@@ -46,6 +47,53 @@ const ARTIST_PROFILE_FIELDS = [
 function writeSse(res: Response, event: string, payload: unknown) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
 }
+
+function rvcModelStreamSignature(expiresAt: number): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET is required for signed RVC model streaming");
+  return createHmac("sha256", secret)
+    .update(`${expiresAt}:${GRAVELKING_RVC_MODEL_KEY}`)
+    .digest("base64url");
+}
+
+export function buildSignedRvcModelStreamUrl(origin: string, ttlSec = 3600): string {
+  const expiresAt = Math.floor(Date.now() / 1000) + ttlSec;
+  const signature = rvcModelStreamSignature(expiresAt);
+  return `${origin.replace(/\/+$/, "")}/api/jax/rvc-model/${expiresAt}/${signature}/${GRAVELKING_RVC_MODEL_FILENAME}`;
+}
+
+jaxRouter.get(
+  "/jax/rvc-model/:expiresAt/:signature/gravelking_v2.pth",
+  async (req: Request, res: Response) => {
+    const expiresAt = Number(req.params.expiresAt);
+    if (!Number.isSafeInteger(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
+      res.status(403).json({ error: "Model URL expired" });
+      return;
+    }
+    const expected = Buffer.from(rvcModelStreamSignature(expiresAt));
+    const signatureParam = req.params.signature;
+    const supplied = Buffer.from(
+      Array.isArray(signatureParam) ? (signatureParam[0] ?? "") : (signatureParam ?? ""),
+    );
+    if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
+      res.status(403).json({ error: "Invalid model URL signature" });
+      return;
+    }
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
+    const file = await getObjectFileWithFallback(bucketId, GRAVELKING_RVC_MODEL_KEY);
+    if (!file) {
+      res.status(404).json({ error: "RVC model weights not found" });
+      return;
+    }
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${GRAVELKING_RVC_MODEL_FILENAME}"`);
+    file.createReadStream().on("error", (error) => {
+      req.log.error({ err: error }, "Signed RVC model stream failed");
+      if (!res.headersSent) res.status(502).end();
+      else res.destroy(error);
+    }).pipe(res);
+  },
+);
 
 function profileResponse(profile: typeof artistProfilesTable.$inferSelect | null) {
   return profile ?? {
@@ -539,9 +587,8 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
     let finalAudio: Buffer = mp3;
     try {
-      const modelWeightsUrl = await getSignedObjectURL(
-        bucketId,
-        GRAVELKING_RVC_MODEL_KEY,
+      const modelWeightsUrl = buildSignedRvcModelStreamUrl(
+        `${req.protocol}://${req.get("host")}`,
         3600,
       );
       finalAudio = await tryGravelKingVoiceSwap(mp3, modelWeightsUrl);
