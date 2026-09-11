@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/gravelking-angel-investment-roadmap/"
+title = "GravelKing Pro Road to Angel Investment"
+description = "A practical investor targeting and fundraising deck for GravelKing Pro and GravelKing Productions."
+version = "1.0.0"
+id = "artifacts/gravelking-angel-investment-roadmap"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/gravelking-angel-investment-roadmap/" ]
+localPort = 23604
+
+[services.development]
+run = "pnpm --filter @workspace/gravelking-angel-investment-roadmap run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gravelking-angel-investment-roadmap", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/gravelking-angel-investment-roadmap/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23604"
+BASE_PATH = "/gravelking-angel-investment-roadmap/"

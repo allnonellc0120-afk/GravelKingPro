@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@replit/connectors-sdk": "^0.4.1",
+    "replicate": "^1.4.0",
     "stripe": "^22.2.0",
     "stripe-replit-sync": "^1.0.0"
   }

@@ -234,10 +234,10 @@ export interface JaxSessionData {
   updatedAt: string;
 }
 
-export function saveJaxSession(
+export async function saveJaxSession(
   data: Omit<JaxSessionData, "sessionId" | "createdAt" | "updatedAt">,
   explicitId?: string,
-): string {
+): Promise<string> {
   const sessionId = explicitId ?? randomUUID();
   const db = getDb();
   if (!db) return sessionId;
@@ -249,7 +249,7 @@ export function saveJaxSession(
     updatedAt: now,
   };
   const clean = Object.fromEntries(Object.entries(doc).filter(([, value]) => value !== undefined));
-  db.collection("jax_sessions").doc(sessionId).set(clean, { merge: true }).catch(() => {});
+  await db.collection("jax_sessions").doc(sessionId).set(clean, { merge: true });
   return sessionId;
 }
 

@@ -13,6 +13,7 @@ const STRUCTURAL_WEIGHT = 0.5;
 
 const OP_DELETE = -1;
 const OP_INSERT = 1;
+const OP_EQUAL = 0;
 
 function normalize(s: string): string {
   return s.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
@@ -97,6 +98,66 @@ export type AuthorshipLedgerEntry = {
   end: number;
   rationale: "explicit-dictation" | "human-edit" | "ai-generation";
 };
+
+export type AuthorshipDiffEntry = {
+  operation: "insert" | "delete" | "equal";
+  text: string;
+  source: "human" | "ai";
+};
+
+/**
+ * Live diff against the immutable original AI draft. Unlike the final ledger,
+ * this includes deleted AI text so an editor can see the exact operation while
+ * they are working.
+ */
+export function authorshipDiff(aiDraft: string, finalText: string): AuthorshipDiffEntry[] {
+  const a = normalize(aiDraft ?? "");
+  const b = normalize(finalText ?? "");
+  if (!a && !b) return [];
+  if (!a) return b ? [{ operation: "insert", text: b, source: "human" }] : [];
+  if (!b) return [{ operation: "delete", text: a, source: "human" }];
+
+  const dmp = new DiffMatchPatch();
+  const diffs = dmp.diff_main(a, b);
+  dmp.diff_cleanupSemantic(diffs);
+  return diffs
+    .filter(([, text]) => Boolean(text))
+    .map(([op, text]) => ({
+      operation: op === OP_INSERT ? "insert" : op === OP_DELETE ? "delete" : "equal",
+      text,
+      source: op === OP_EQUAL ? "ai" : "human",
+    }));
+}
+
+/**
+ * Reapply edits made to the current song when JAX emits a refreshed version.
+ * The refreshed AI text remains the immutable snapshot; this returns the
+ * working text with prior human patches carried forward wherever context
+ * still matches.
+ */
+export function preserveHumanEdits(originalAi: string, currentFinal: string, refreshedAi: string): string {
+  const original = normalize(originalAi ?? "");
+  const current = normalize(currentFinal ?? "");
+  const refreshed = normalize(refreshedAi ?? "");
+  if (!original || !current || original === current || !refreshed) return refreshed;
+
+  const originalLines = original.split("\n");
+  const currentLines = current.split("\n");
+  const refreshedLines = refreshed.split("\n");
+  const lineEdited = currentLines.length === originalLines.length &&
+    currentLines.some((line, index) => line !== originalLines[index]);
+  if (lineEdited && refreshedLines.length >= currentLines.length) {
+    for (let index = 0; index < currentLines.length; index += 1) {
+      if (currentLines[index] !== originalLines[index]) refreshedLines[index] = currentLines[index];
+    }
+    return refreshedLines.join("\n");
+  }
+
+  const dmp = new DiffMatchPatch();
+  const patches = dmp.patch_make(original, current);
+  const [merged, applied] = dmp.patch_apply(patches, refreshed);
+  return applied.some(Boolean) ? merged : refreshed;
+}
 
 /**
  * Return a character-range ledger for the final lyric text.

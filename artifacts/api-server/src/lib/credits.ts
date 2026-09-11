@@ -7,6 +7,8 @@ import { storage } from "../storage";
 export const CREDIT_COSTS = {
   song: 20,
   master: 75,
+  exportMp3: 50,
+  exportWav: 100,
   certificate: 0,
 } as const;
 
@@ -23,7 +25,7 @@ export const MONTHLY_CREDITS = {
   king: 2500,
 } as const;
 
-export type CreditSpendKind = "song" | "master" | "certificate";
+export type CreditSpendKind = "song" | "master" | "export_mp3" | "export_wav" | "certificate";
 
 export async function resolveCreditUser(req: Request): Promise<User | null> {
   if (req.dbUser) return req.dbUser;

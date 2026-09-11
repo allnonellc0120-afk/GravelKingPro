@@ -5,6 +5,8 @@ import { getStripeSync } from "./stripeClient";
 import { ensureStripeProducts } from "./lib/stripeProducts";
 import { submitSitemapToGSC } from "./lib/googleSearchConsole";
 import { scheduleOverdueAlerts } from "./lib/investorAlerts";
+import { scheduleInvestorOutreachDispatcher } from "./lib/investorOutreach";
+import { scheduleIndexNowSubmission } from "./lib/indexNow";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -350,6 +352,28 @@ async function migrateAppSchema() {
         UNIQUE (prospect_id, touch_number)
       )
     `);
+    // Partner promo attribution. A referred account can redeem a campaign
+    // code once; paid-invoice handling changes applied -> converted.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS promo_referrals (
+        id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        referrer_name     text NOT NULL,
+        referred_user_id  varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        promo_code_used   text NOT NULL,
+        status            text NOT NULL DEFAULT 'applied',
+        created_at        timestamptz NOT NULL DEFAULT now(),
+        converted_at      timestamptz,
+        stripe_invoice_id text
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS promo_referrals_user_code_unique
+        ON promo_referrals(referred_user_id, promo_code_used)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS promo_referrals_code_status_idx
+        ON promo_referrals(promo_code_used, status)
+    `);
 
     logger.info("App schema migration complete");
   } catch (err: unknown) {
@@ -446,6 +470,8 @@ await ensureDemoAccount();
 await initStripe();
 await submitSitemapOnStartup();
 scheduleOverdueAlerts();
+scheduleInvestorOutreachDispatcher();
+scheduleIndexNowSubmission();
 
 app.listen(port, (err) => {
   if (err) {

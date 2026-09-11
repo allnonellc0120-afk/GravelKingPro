@@ -386,12 +386,28 @@ const createSubscriptionIntent = async (req: Request, res: Response) => {
       return;
     }
 
+    req.log?.info({
+      userId: dbUser.id,
+      plan,
+      subscriptionId: subscription.id,
+      customerId,
+      intentType: paymentIntent ? "payment" : "setup",
+      trialDays,
+    }, "Stripe subscription checkout initiated");
+
     void recordAnalyticsEvent({
       type: 'checkout_started',
       visitorId: (req.cookies as Record<string, string>)?.gk_vid ?? null,
       sessionId: dbUser.sessionId ?? dbUser.id,
       path: '/checkout',
       metadata: { priceId, plan, embedded: 'true' },
+    }).catch(() => {});
+    void recordAnalyticsEvent({
+      type: 'checkout_session_initiated',
+      visitorId: (req.cookies as Record<string, string>)?.gk_vid ?? null,
+      sessionId: dbUser.sessionId ?? dbUser.id,
+      path: '/checkout',
+      metadata: { plan, intentType: paymentIntent ? "payment" : "setup" },
     }).catch(() => {});
 
     res.json({

@@ -1,12 +1,14 @@
-modules = ["nodejs-24", "python-3.11", "postgresql-16"]
+run = "python main.py"
+entrypoint = "main.py"
+modules = ["python-3.11", "nodejs-24", "postgresql-16"]
 
 [deployment]
 router = "application"
-deploymentTarget = "autoscale"
+deploymentTarget = "cloudrun"
+run = ["python3", "main.py"]
 
-[deployment.postBuild]
-args = ["pnpm", "store", "prune"]
-env = { "CI" = "true" }
+[nix]
+channel = "stable-23_11"
 
 [workflows]
 runButton = "Project"
@@ -18,77 +20,21 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "studio-audio"
+args = "Morris Law Kernel: Python"
 
 [[workflows.workflow]]
-name = "studio-audio"
+name = "Morris Law Kernel: Python"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm --filter @workspace/api-server run test"
+args = "PORT=5000 python3 main.py"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
-isValidation = true
-
-[agent]
-stack = "PNPM_WORKSPACE"
-expertMode = true
-integrations = ["stripe:1.0.0", "github:1.0.0", "google-mail:1.0.0"]
-
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 90000
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
-localPort = 8081
-externalPort = 8081
-
-[[ports]]
-localPort = 8082
-externalPort = 3000
-
-[[ports]]
-localPort = 18783
-externalPort = 5000
-
-[[ports]]
-localPort = 19390
-externalPort = 3003
-
-[[ports]]
-localPort = 24065
-externalPort = 3001
-
-[[ports]]
-localPort = 24393
-externalPort = 4200
-
-[[ports]]
-localPort = 24394
-externalPort = 3002
-
-[[ports]]
-localPort = 26198
-externalPort = 80
-
-[nix]
-channel = "stable-25_05"
-packages = ["libxcrypt", "pkg-config", "xsimd"]
+outputType = "console"
 
 [userenv]
 
 [userenv.shared]
-VITE_STRIPE_PUBLISHABLE_KEY = "pk_test_51Tf1ojANk3kJTOQRKfpUlYyaxT2uN9H2pw3Zb9lYCGbaUN07fQDCLMopYzUvkDRdtUYugTUai4fsa6OT6GjkQjR300QdR3PM8R"
-REMOTE_KERNEL_URL = "https://ais-pre-lx5wyntcp7kr7waxdaam3k-470299616699.us-west2.run.app"
-DEMUCS_URL = "https://gkp-demucs-745385691167.us-central1.run.app"
-MLK_KERNEL_URL = "https://morris-law-kernel-api-aitarpccdq-wl.a.run.app"
-ADMIN_KEY = "198484"
-JAX_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
-
-[objectStorage]
-defaultBucketID = "replit-objstore-4427a4e0-0331-4b97-9168-a1d185787feb"
+REPLICATE_RVC_MODEL = "zsxkib/realistic-voice-cloning"

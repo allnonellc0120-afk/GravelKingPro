@@ -1,0 +1,10 @@
+[
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2001","position":1,"filepath":"src/pages/slides/PartnershipCover.tsx","title":"GravelKing Pro","description":"B2B partnership brief","speakerNotes":""},
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2002","position":2,"filepath":"src/pages/slides/IndustryGap.tsx","title":"The industry gap","description":"The fragmented creator-audio workflow","speakerNotes":""},
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2003","position":3,"filepath":"src/pages/slides/CreatorWorkspace.tsx","title":"One creator workspace","description":"The product surface","speakerNotes":""},
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2004","position":4,"filepath":"src/pages/slides/TrustWorkflow.tsx","title":"Trust is built into the workflow","description":"Provenance and authorship","speakerNotes":""},
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2005","position":5,"filepath":"src/pages/slides/PartnerChannels.tsx","title":"Built for partner channels","description":"Label, studio, school, and publisher use cases","speakerNotes":""},
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2006","position":6,"filepath":"src/pages/slides/BusinessModel.tsx","title":"Business model","description":"Current product structure and configurable partner pricing","speakerNotes":""},
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2007","position":7,"filepath":"src/pages/slides/PilotProposal.tsx","title":"Pilot proposal","description":"A measured 30-day partner pilot","speakerNotes":""},
+  {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2008","position":8,"filepath":"src/pages/slides/PartnershipConversation.tsx","title":"Partnership conversation","description":"Next discussion","speakerNotes":""}
+]

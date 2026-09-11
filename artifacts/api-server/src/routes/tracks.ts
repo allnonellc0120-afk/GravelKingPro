@@ -9,14 +9,14 @@ import { storage } from "../storage";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
-import { consumeExport, exportLimitPayload } from "../lib/exportQuota";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isAdminAutomationAuthenticated } from "../lib/adminAuth";
 import { recordAnalyticsEvent } from "../analytics";
+import { CREDIT_COSTS, spendCredits } from "../lib/credits";
 
 const execFileAsync = promisify(execFile);
 
@@ -770,17 +770,58 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
     return;
   }
 
-  // MP3 downloads are unlimited for paid plans; only WAV consumes the
-  // tier-aware quota. Consume only once the file is confirmed available.
+  // Older tracks may predate the stored MP3 sibling. Produce the format the
+  // user explicitly requested instead of silently returning a WAV file.
+  let generatedMp3: Buffer | null = null;
+  if (req.query.format === "mp3" && contentType !== "audio/mpeg") {
+    const sourcePath = join(tmpdir(), `gkp-download-${randomUUID()}.source`);
+    const mp3Path = join(tmpdir(), `gkp-download-${randomUUID()}.mp3`);
+    try {
+      const [sourceBuffer] = await file.download();
+      writeFileSync(sourcePath, sourceBuffer);
+      await execFileAsync("ffmpeg", [
+        "-y", "-i", sourcePath,
+        "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100",
+        mp3Path,
+      ], { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 });
+      generatedMp3 = readFileSync(mp3Path);
+      audioKey = track.audioFullKey.replace(/\.[^./]+$/, ".mp3");
+      contentType = "audio/mpeg";
+    } catch (err) {
+      req.log?.error?.({ err, trackId }, "track download: MP3 conversion failed");
+      res.status(500).json({ error: "Could not prepare this track as MP3" });
+      return;
+    } finally {
+      try { unlinkSync(sourcePath); } catch { /* ignore */ }
+      try { unlinkSync(mp3Path); } catch { /* ignore */ }
+    }
+  }
+
+  // Charge only after the requested file is confirmed available. Developer
+  // and admin automation requests remain operational bypasses.
   const [dlUser] = session
     ? await db.select().from(usersTable).where(eq(usersTable.id, session.userId))
     : [];
-  if (dlUser && !adminBypass && contentType === "audio/wav") {
-    const quota = await consumeExport(dlUser);
-    if (!quota.allowed) {
-      res.status(429).json(exportLimitPayload(quota));
+  if (dlUser && !adminBypass && !dlUser.isDeveloper) {
+    const requestedMp3 = req.query.format === "mp3";
+    const creditCost = requestedMp3 ? CREDIT_COSTS.exportMp3 : CREDIT_COSTS.exportWav;
+    const spend = await spendCredits(
+      dlUser.id,
+      creditCost,
+      requestedMp3 ? "export_mp3" : "export_wav",
+      `track_export:${trackId}:${requestedMp3 ? "mp3" : "wav"}:${randomUUID()}`,
+    );
+    if (!spend.ok) {
+      res.status(402).json({
+        error: `${requestedMp3 ? "MP3" : "WAV"} download costs ${creditCost} credits. You have ${spend.balance}.`,
+        code: "INSUFFICIENT_CREDITS",
+        creditsRequired: creditCost,
+        creditsBalance: spend.balance,
+        purchaseUrl: "/pricing#credits",
+      });
       return;
     }
+    res.setHeader("X-GK-Credits-Balance", String(spend.balance));
   }
 
   const safeTitle = track.title.replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "track";
@@ -789,6 +830,11 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
 
   res.setHeader("Content-Type", contentType);
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+  if (generatedMp3) {
+    res.end(generatedMp3);
+    return;
+  }
 
   file.createReadStream()
     .on("error", (err) => {

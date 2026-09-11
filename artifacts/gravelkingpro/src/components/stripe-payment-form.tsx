@@ -82,7 +82,17 @@ function PaymentForm({ intentType, onSuccess, onCancel, submitLabel }: Omit<Stri
          <span>or pay by card</span>
          <span className="h-px flex-1 bg-border/60" />
        </div>
-       <PaymentElement options={{ layout: "tabs" }} />
+       <PaymentElement
+         options={{
+           layout: "tabs",
+           fields: {
+             billingDetails: {
+               address: "auto",
+               phone: "never",
+             },
+           },
+         }}
+       />
       {error && <p className="mt-3 text-sm text-red-400" role="alert">{error}</p>}
       <Button onClick={submit} disabled={!stripe || !elements || submitting} className="w-full mt-5 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold">
         {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirming securely…</> : submitLabel ?? (intentType === "setup" ? "Save payment method securely" : "Confirm subscription")}

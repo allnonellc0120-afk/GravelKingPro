@@ -1,0 +1,36 @@
+ROLE: Lead Conversion Rate Optimization (CRO) & Full-Stack Stripe Engineer.
+OBJECTIVE: Eliminate checkout abandonment and fix zero-conversion on the subscription flow. The issue is NOT bank declines; visitors are opening checkout sessions and bouncing without attempting payment.
+
+CONSTRAINTS:
+- Do not touch existing database user authentication or core app routing.
+- Keep modifications strictly focused on Checkout UX, session options, and funnel instrumentation.
+
+EXECUTION TASKS:
+
+1. CHECKOUT UI & FRICTION STRIPPING (Enable 1-Click Pay):
+- Find where `stripe.checkout.sessions.create()` is executed.
+- Ensure dynamic, one-touch mobile wallets are forced on:
+  `automatic_payment_methods: { enabled: true }`
+- Remove any billing address requirements unless strictly necessary for tax:
+  `billing_address_collection: 'auto'`
+- Remove phone number collection if present (`phone_number_collection: { enabled: false }`).
+- Ensure `allow_promotion_codes: true` is enabled if you offer launch discounts.
+
+2. PREVENT REDIRECT BOUNCE (Embedded vs. Hosted Checkout):
+- If users are being redirected off-site to a external Stripe hosted URL (which often causes high mobile bounce rates), review whether we can embed Stripe Checkout directly or ensure the redirect opens seamlessly with clear return URLs:
+  - Verify `success_url` returns to a clear, welcoming onboarding screen: `https://.../dashboard?session_id={CHECKOUT_SESSION_ID}`
+  - Verify `cancel_url` routes to an exit-offer or friction-survey page, NOT a generic blank home screen.
+
+3. FUNNEL TELEMETRY & LOGGING (Find Where They Leave):
+- Add client-side analytics or console events for:
+  - `checkout_modal_opened`
+  - `checkout_session_initiated`
+  - `checkout_canceled`
+- Log the session creation in backend logs with user email/ID and timestamp so we know the exact volume of attempts hitting the checkout endpoint today.
+
+4. WEBHOOK SYNC (Ensure Completed Sales Don't Break):
+- Ensure `/api/stripe/webhook` listens to `checkout.session.completed` so the moment someone actually finishes, their account role immediately updates to paid without waiting or requiring manual database edits.
+
+OUTPUT:
+1. Exact code diffs showing the updated checkout session options.
+2. Steps to test the new frictionless checkout flow on mobile.

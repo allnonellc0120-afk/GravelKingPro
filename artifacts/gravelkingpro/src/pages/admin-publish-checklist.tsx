@@ -245,7 +245,7 @@ function ChecklistDashboard() {
       key: "custom-domain",
       label: `Custom domain active (${data.domain.domainValue})`,
       detail: data.domain.customDomainSet
-        ? "Serving from gravelkingpro.com — assetlinks.json will resolve correctly"
+        ? "Serving from the custom domain — the .it.com host must be used for Google Play assetlinks.json"
         : "Not on the custom domain — TWA assetlinks.json and Play billing may not work",
       status: data.domain.customDomainSet ? "pass" : "warn",
     },

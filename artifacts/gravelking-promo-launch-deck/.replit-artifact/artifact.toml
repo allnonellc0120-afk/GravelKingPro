@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/gravelking-promo-launch-deck/"
+title = "GravelKing Pro Launch Campaign"
+description = "A Music Label-styled promotional growth deck for GravelKing Pro, covering campaign promise, audiences, creative angles, platform system, weekly cadence, target matrix, and launch CTA."
+version = "1.0.0"
+id = "artifacts/gravelking-promo-launch-deck"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/gravelking-promo-launch-deck/" ]
+localPort = 19587
+
+[services.development]
+run = "pnpm --filter @workspace/gravelking-promo-launch-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gravelking-promo-launch-deck", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/gravelking-promo-launch-deck/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19587"
+BASE_PATH = "/gravelking-promo-launch-deck/"

@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, varchar, real, uuid, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, varchar, real, uuid, uniqueIndex, boolean, integer, jsonb } from "drizzle-orm/pg-core";
 import { usersTable } from "./auth";
 
 // "private" = personal-library-only (AI-generated tracks default here; never
@@ -22,6 +22,10 @@ export const tracksTable = pgTable("tracks", {
   // Generated-track lyrics (exact text the AI sang, when vocalMode === "lyrics").
   // Displayed under the Library player. Null for uploads/instrumentals.
   lyricsText: text("lyrics_text"),
+  finalLyricsHash: text("final_lyrics_hash"),
+  lyricsAuthorshipScore: integer("lyrics_authorship_score"),
+  lyricsAuthorshipLedger: jsonb("lyrics_authorship_ledger"),
+  finalLyricsLabel: text("final_lyrics_label"),
   // Label admin controls
   adminOverride: boolean("admin_override").notNull().default(false),
   overrideExpiresAt: timestamp("override_expires_at", { withTimezone: true }),

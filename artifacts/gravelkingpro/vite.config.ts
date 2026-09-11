@@ -41,13 +41,6 @@ export default defineConfig({
         // Without this, the service worker hijacks navigations to /api/*
         // (incl. the Clerk proxy at /api/__clerk) and renders the SPA 404 page.
         navigateFallbackDenylist: [/^\/api\//, /^\/mobile\//, /^\/mlk-licensing/, /^\/gravelkingpro-promo/],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/gravelkingpro\.it\.com\/api\//,
-            handler: "NetworkFirst",
-            options: { cacheName: "api-cache", networkTimeoutSeconds: 10 },
-          },
-        ],
       },
       manifest: {
         name: "GravelKing Pro",

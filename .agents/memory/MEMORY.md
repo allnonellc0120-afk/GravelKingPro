@@ -84,8 +84,12 @@
 - [Production certificate verification](production-certificate-verification.md) — generated cert proof requires global ACRCloud no_match; local_no_match/unavailable intentionally produces no cert
 - [API test suite flock + lyric-owner cookie rule](api-test-suite-flock.md) — test script must stay flock-wrapped (dist-test races); legacy lyric rows never grant access via gk_session cookie
 - [JAX route faked responses](jax-route-faked-responses.md) — generation routes must call the live model; never canned placeholder strings
+- [JAX authorship snapshots](jax-authorship-snapshots.md) — compare each lyric card to its immutable AI snapshot; only direct inline edits earn human credit
 - [Stripe wallet domain](stripe-wallet-domain.md) — embedded Apple/Google Pay need a validated Payment Method Domain + live .well-known association file; live domain is gravelkingpro.com (.it.com is dead)
-- [Credit pricing rules](credit-pricing-rules.md) — generation 20 credits, master+download 75, free certificates, Pro $6.99/800 weekly, King Pro $24.99/2,500 monthly with hard reset
+- [Credit pricing rules](credit-pricing-rules.md) — generation 20 credits; MP3 exports 50 and WAV exports 100; free certificates; subscription wallets hard-reset
 - [Revenue metric integrity](revenue-metric-integrity.md) — MRR is active live Stripe subscriptions only; trials stay separate, revenue is live charges net of refunds
 - [Play deletion page](play-deletion-page.md) — Google Play reviewers need a public .com deletion URL with instructions present in the prerendered no-JS HTML
 - [Durable mastering jobs](durable-mastering-jobs.md) — mastering output/status survive route changes via Postgres jobs + private object storage; DSP remains request-bound until detached workers are added
+- [Artist dossier privacy](artist-dossier-privacy.md) — artist memory is a user-scoped Postgres row; server-side opt-in is the only source injected into JAX prompts
+- [Investor outreach approval boundary](investor-outreach-approval.md) — recurring dispatch sends only explicit queued recipient/subject/body payloads; overdue tracker entries alone never generate email
+- [Root ignition restart](root-ignition-restart.md) — restart the standalone Python service before verifying main.py changes on port 8080

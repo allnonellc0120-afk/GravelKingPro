@@ -3,10 +3,4 @@ name = "repl-nix-workspace"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
-dependencies = [
-    "numpy>=2.0",
-    "scipy>=1.10",
-    "psutil>=5.9",
-    "streamlit>=1.60.0",
-    "pyloudnorm>=0.2.0",
-]
+dependencies = []

@@ -283,6 +283,70 @@ const maybeValidateIngestion = (req: Request, res: Response, next: NextFunction)
   next();
 };
 
+// Convert an already-mastered result to MP3 without running the mastering
+// kernel a second time. The finish screen posts its mastered WAV blob here.
+masterRouter.post(
+  "/kernel/export-result-mp3",
+  partnerAwareRateLimit,
+  masterConcurrency,
+  upload.single("audio"),
+  async (req: Request, res: Response) => {
+    if (!req.file) {
+      res.status(400).json({ error: "No mastered audio file received." });
+      return;
+    }
+    const sourcePath = req.file.path;
+    const outputPath = `/tmp/gk_master_export_${randomUUID()}.mp3`;
+    try {
+      const creditUser = await resolveCreditUser(req);
+      if (!creditUser) {
+        res.status(401).json({ error: "Sign in to download this MP3." });
+        return;
+      }
+
+      await execFileAsync("ffmpeg", [
+        "-y", "-i", sourcePath,
+        "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100",
+        outputPath,
+      ], { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 });
+
+      if (!creditUser.isDeveloper) {
+        const reference = `export_mp3:${randomUUID()}`;
+        const spent = await spendCredits(
+          creditUser.id,
+          CREDIT_COSTS.exportMp3,
+          "export_mp3",
+          reference,
+        );
+        if (!spent.ok) {
+          res.status(402).json({
+            error: `MP3 download costs ${CREDIT_COSTS.exportMp3} credits. You have ${spent.balance}.`,
+            code: "INSUFFICIENT_CREDITS",
+            creditsRequired: CREDIT_COSTS.exportMp3,
+            creditsBalance: spent.balance,
+            purchaseUrl: "/pricing#credits",
+          });
+          return;
+        }
+        res.setHeader("X-GK-Credits-Balance", String(spent.balance));
+      }
+
+      const mp3Buffer = Buffer.from(await readFile(outputPath));
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", 'attachment; filename="gravelking_mastered.mp3"');
+      streamBuffer(res, mp3Buffer);
+    } catch (err) {
+      req.log.error({ err }, "mastered MP3 export failed");
+      if (!res.headersSent) res.status(500).json({ error: "Could not create the MP3 download." });
+    } finally {
+      await Promise.all([
+        unlink(sourcePath).catch(() => {}),
+        unlink(outputPath).catch(() => {}),
+      ]);
+    }
+  },
+);
+
 masterRouter.post(
   ["/kernel/master", "/v1/ingest", "/export-wav", "/export-mp3"],
   requirePartnerApiKey,
@@ -431,20 +495,21 @@ masterRouter.post(
     // paid Studio sessions must never be routed into the pay-per-master
     // credit flow merely because their session row is not developer-flagged.
     const paidTier = !partnerReq && !adminReq && await hasStudio(req);
-    const creditUser = !partnerReq && !adminReq && !mp3Requested
+    const creditUser = !partnerReq && !adminReq
       ? await resolveCreditUser(req)
       : null;
-    const walletMode = !!creditUser && !creditUser.isDeveloper && !paidTier;
-    // Certification is intentionally free while the provenance workflow is
-    // being adopted. A master + its download is one 75-credit action.
-    const walletCost = CREDIT_COSTS.master;
-    const walletReference = `master:${randomUUID()}`;
+    const walletMode = !!creditUser && !creditUser.isDeveloper;
+    // The requested output format sets the wallet charge. Certification stays
+    // free while the provenance workflow is being adopted.
+    const walletCost = mp3Requested ? CREDIT_COSTS.exportMp3 : CREDIT_COSTS.exportWav;
+    const walletKind = mp3Requested ? "export_mp3" : "export_wav";
+    const walletReference = `${walletKind}:${randomUUID()}`;
     let walletSpent = false;
     // The master admin key is an explicit operational override: it bypasses
     // tier, free allowance, and rolling export quota checks for this route.
     // Pro+ users get unlimited MP3 exports; WAV remains tier-quota limited.
-    const unlimited = partnerReq || adminReq || paidTier;
-    const wavQuotaEligible = paidTier && !mp3Requested;
+    const unlimited = partnerReq || adminReq || creditUser?.isDeveloper === true;
+    const wavQuotaEligible = paidTier && !mp3Requested && !walletMode;
 
     // Check (don't consume) BEFORE the expensive kernel run; consume after
     // a successful master, right where free downloads are counted.
@@ -461,16 +526,6 @@ masterRouter.post(
     let isSample = false;
     let usageUserId: string | null = null;
     let usedTotalDownloads = 0;
-    if (mp3Requested && !unlimited) {
-      res.status(402).json({
-        success: false,
-        code: "PRO_REQUIRED",
-        feature: "mp3_export",
-        error: "MP3 exports require a GravelKing Pro subscription.",
-        fallback: { action: "subscribe", url: "/pricing" },
-      });
-      return;
-    }
     if (!unlimited && !walletMode) {
       const usageUser = await getUsageUser(req, res);
       usageUserId = usageUser.id;
@@ -675,7 +730,7 @@ masterRouter.post(
       // for malformed audio or a failed DSP run while keeping the balance
       // check atomic immediately before fulfillment.
       if (walletMode && !isSample) {
-        const spent = await spendCredits(creditUser!.id, walletCost, "master", walletReference);
+        const spent = await spendCredits(creditUser!.id, walletCost, walletKind, walletReference);
         if (!spent.ok) {
           await updateMasterJob(jobId, {
             status: "failed", stage: "payment_required",
@@ -685,7 +740,7 @@ masterRouter.post(
           res.status(402).json({
             success: false,
             code: "INSUFFICIENT_CREDITS",
-            error: `This master${certify ? " and certificate" : ""} costs ${walletCost} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
+            error: `${mp3Requested ? "MP3" : "WAV"} download costs ${walletCost} credits. You have ${spent.balance}. Buy a credit pack to continue.`,
             creditsRequired: walletCost,
             creditsBalance: spent.balance,
             purchaseUrl: "/pricing#credits",

@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { downloadBlob } from "@/lib/download";
 import { ExportQuotaBadge } from "@/components/export-quota-badge";
-import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
+import { useExportQuota } from "@/hooks/use-export-quota";
+import { CreditTopUpDialog, type CreditTopUpRequest } from "@/components/credit-top-up-dialog";
 import {
   Library, Download, Music, ArrowLeft, Loader2, FileText, Mic,
   CheckCircle2, Clock, Play, Pause, Wand2, ChevronLeft, ChevronRight,
@@ -73,7 +74,7 @@ function fmtTime(s: number): string {
  */
 function TrackPlayer({
   track, onBack, onPrev, onNext, hasPrev, hasNext,
-  quota, downloading, onDownload,
+  downloading, onDownload,
 }: {
   track: Track;
   onBack: () => void;
@@ -81,7 +82,6 @@ function TrackPlayer({
   onNext: () => void;
   hasPrev: boolean;
   hasNext: boolean;
-  quota: ReturnType<typeof useExportQuota>["quota"];
   downloading: string | null;
   onDownload: (trackId: string, format: "wav" | "mp3") => void;
 }) {
@@ -212,36 +212,30 @@ function TrackPlayer({
                 <Wand2 className="w-4 h-4 mr-2" /> Master this track
               </Button>
             </Link>
-            {quota && quota.remaining <= 0 ? (
-              <p className="text-[11px] text-rose-400 text-center leading-tight">
-                Export limit reached — resets {formatResetDate(quota.resetsAt)}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  className="gap-1.5"
-                  disabled={downloading === `${track.id}:wav`}
-                  onClick={() => onDownload(track.id, "wav")}
-                  data-testid="button-player-download-wav"
-                >
-                  {downloading === `${track.id}:wav` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                  WAV
-                </Button>
-                <Button
-                  variant="outline"
-                  className="gap-1.5"
-                  disabled={downloading === `${track.id}:mp3`}
-                  onClick={() => onDownload(track.id, "mp3")}
-                  data-testid="button-player-download-mp3"
-                >
-                  {downloading === `${track.id}:mp3` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                  MP3
-                </Button>
-              </div>
-            )}
+            <div className="grid grid-cols-1 gap-2">
+              <Button
+                variant="outline"
+                className="gap-1.5"
+                disabled={downloading === `${track.id}:mp3`}
+                onClick={() => onDownload(track.id, "mp3")}
+                data-testid="button-player-download-mp3"
+              >
+                {downloading === `${track.id}:mp3` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Download MP3 (50 Credits)
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-1.5"
+                disabled={downloading === `${track.id}:wav`}
+                onClick={() => onDownload(track.id, "wav")}
+                data-testid="button-player-download-wav"
+              >
+                {downloading === `${track.id}:wav` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Download WAV (100 Credits)
+              </Button>
+            </div>
             <p className="text-[10px] text-muted-foreground/60 text-center">
-              Playback is free — downloads count toward your rolling 30-day export quota.
+              Playback is free. Download credits are deducted only after the file is available.
             </p>
           </div>
         </div>
@@ -286,6 +280,7 @@ export default function LibraryPage() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [busyTrack, setBusyTrack] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
   const search = useSearch();
   const [, navigate] = useLocation();
   const { quota, refresh: refreshQuota } = useExportQuota();
@@ -361,7 +356,20 @@ export default function LibraryPage() {
     try {
       const r = await fetch(`/api/tracks/${trackId}/download${format === "mp3" ? "?format=mp3" : ""}`, { credentials: "include" });
       if (!r.ok) {
-        const data = (await r.json().catch(() => ({}))) as { error?: string };
+        const data = (await r.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+          creditsRequired?: number;
+          creditsBalance?: number;
+        };
+        if (r.status === 402 && data.code === "INSUFFICIENT_CREDITS") {
+          setTopUpRequest({
+            format: format === "mp3" ? "MP3" : "WAV",
+            required: data.creditsRequired ?? (format === "mp3" ? 50 : 100),
+            balance: data.creditsBalance ?? 0,
+          });
+          return;
+        }
         toast({ title: "Download failed", description: data.error || "Please try again.", variant: "destructive" });
         return;
       }
@@ -474,7 +482,6 @@ export default function LibraryPage() {
             onNext={() => { if (selectedIdx < tracks.length - 1) selectTrack(tracks[selectedIdx + 1]!.id); }}
             hasPrev={selectedIdx > 0}
             hasNext={selectedIdx >= 0 && selectedIdx < tracks.length - 1}
-            quota={quota}
             downloading={downloading}
             onDownload={download}
           />
@@ -543,6 +550,28 @@ export default function LibraryPage() {
                         {t.isPinned && <span className="text-[11px] text-amber-400 flex items-center gap-1"><Pin className="w-3 h-3" /> Pinned</span>}
                         <span className="text-[11px] text-amber-400 font-medium">Open player →</span>
                       </div>
+                      <div className="grid grid-cols-1 gap-2 mt-3" onClick={(event) => event.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={downloading === `${t.id}:mp3`}
+                          onClick={() => void download(t.id, "mp3")}
+                          data-testid={`button-card-download-mp3-${t.id}`}
+                        >
+                          {downloading === `${t.id}:mp3` ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                          Download MP3 (50 Credits)
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={downloading === `${t.id}:wav`}
+                          onClick={() => void download(t.id, "wav")}
+                          data-testid={`button-card-download-wav-${t.id}`}
+                        >
+                          {downloading === `${t.id}:wav` ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                          Download WAV (100 Credits)
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -550,6 +579,7 @@ export default function LibraryPage() {
             )}
           </>
         )}
+        <CreditTopUpDialog request={topUpRequest} onOpenChange={(open) => { if (!open) setTopUpRequest(null); }} />
 
         {/* ── Lyrics & Songs ── */}
         {!selected && tab === "songs" && (

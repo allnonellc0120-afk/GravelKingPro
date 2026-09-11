@@ -47,6 +47,10 @@ export interface ProvenanceAttribution {
   provenance?: string;
   /** 0–100 human-authorship score derived from the style prompt */
   styleAuthorshipScore?: number;
+  finalLyricsLabel?: string;
+  finalLyricsHash?: string;
+  lyricsAuthorshipScore?: number;
+  lyricsAuthorshipLedger?: unknown[];
   /** Commercial-catalog copyright screen result at certification time */
   copyrightScreen?: {
     status: string;          // 'no_match' | 'local_no_match' | 'match' | 'unavailable' | 'not_run'
@@ -143,6 +147,10 @@ export function generateForensicCertificate(
       attribution.category ||
       attribution.provenance ||
       attribution.styleAuthorshipScore !== undefined ||
+      attribution.finalLyricsLabel ||
+      attribution.finalLyricsHash ||
+      attribution.lyricsAuthorshipScore !== undefined ||
+      attribution.lyricsAuthorshipLedger ||
       attribution.copyrightScreen)
   );
 
@@ -179,6 +187,10 @@ export function generateForensicCertificate(
         ...(attribution!.styleAuthorshipScore !== undefined
           ? { styleAuthorshipScore: attribution!.styleAuthorshipScore }
           : {}),
+        ...(attribution!.finalLyricsLabel ? { finalLyricsLabel: attribution!.finalLyricsLabel } : {}),
+        ...(attribution!.finalLyricsHash ? { finalLyricsHash: attribution!.finalLyricsHash } : {}),
+        ...(attribution!.lyricsAuthorshipScore !== undefined ? { lyricsAuthorshipScore: attribution!.lyricsAuthorshipScore } : {}),
+        ...(attribution!.lyricsAuthorshipLedger ? { lyricsAuthorshipLedger: attribution!.lyricsAuthorshipLedger } : {}),
         ...(attribution!.copyrightScreen ? {
           copyrightScreen: {
             status: attribution!.copyrightScreen.status,
@@ -267,6 +279,11 @@ export function certificateToPdf(certificate: ForensicCertificate): Buffer {
       ...(certificate.attribution.provenance ? [`Audio Provenance:    ${certificate.attribution.provenance}`] : []),
       ...(certificate.attribution.styleAuthorshipScore !== undefined
         ? [`Style Authorship Score (0-100): ${certificate.attribution.styleAuthorshipScore}`]
+        : []),
+      ...(certificate.attribution.finalLyricsLabel ? [`${certificate.attribution.finalLyricsLabel}`] : []),
+      ...(certificate.attribution.finalLyricsHash ? [`Final Lyrics SHA-256: ${certificate.attribution.finalLyricsHash}`] : []),
+      ...(certificate.attribution.lyricsAuthorshipScore !== undefined
+        ? [`Final Lyrics Human Authorship Score (0-100): ${certificate.attribution.lyricsAuthorshipScore}`]
         : []),
       ...(certificate.attribution.copyrightScreen ? [
         "",

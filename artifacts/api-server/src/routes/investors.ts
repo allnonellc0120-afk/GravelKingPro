@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { db, investorProspectsTable, investorTouchesTable } from "@workspace/db";
 import { eq, asc, sql } from "drizzle-orm";
 import { runOverdueAlertCheck } from "../lib/investorAlerts";
+import { dispatchDueInvestorOutreach } from "../lib/investorOutreach";
 
 const investorsRouter = Router();
 
@@ -369,6 +370,111 @@ investorsRouter.post(
     } catch (err) {
       console.error("[investors] check-overdue error", err);
       res.status(500).json({ error: "Overdue check failed" });
+    }
+  },
+);
+
+investorsRouter.post(
+  "/admin/investors/:id/touches/:touchNumber/queue",
+  async (req: Request, res: Response) => {
+    if (!(await guard(req, res))) return;
+    try {
+      const { id, touchNumber: touchNumberText } = req.params as {
+        id: string;
+        touchNumber: string;
+      };
+      const touchNumber = Number(touchNumberText);
+      const { recipientEmail, subject, body, scheduledAt } = req.body as {
+        recipientEmail?: string;
+        subject?: string;
+        body?: string;
+        scheduledAt?: string;
+      };
+      const email = String(recipientEmail ?? "").trim().toLowerCase();
+      const cleanSubject = String(subject ?? "").trim();
+      const cleanBody = String(body ?? "").trim();
+      const schedule = scheduledAt ? new Date(scheduledAt) : new Date();
+
+      if (![1, 2, 3].includes(touchNumber)) {
+        res.status(400).json({ error: "touchNumber must be 1, 2, or 3" });
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        res.status(400).json({ error: "A valid recipient email is required." });
+        return;
+      }
+      if (!cleanSubject || cleanSubject.length > 200 || !cleanBody || cleanBody.length > 20_000) {
+        res.status(400).json({ error: "Subject and message body are required." });
+        return;
+      }
+      if (Number.isNaN(schedule.getTime())) {
+        res.status(400).json({ error: "scheduledAt must be a valid date." });
+        return;
+      }
+
+      const [prospect] = await db
+        .select({ status: investorProspectsTable.status })
+        .from(investorProspectsTable)
+        .where(eq(investorProspectsTable.id, id));
+      if (!prospect) {
+        res.status(404).json({ error: "Prospect not found." });
+        return;
+      }
+      if (["responded", "meeting_booked", "passed", "closed"].includes(prospect.status)) {
+        res.status(409).json({ error: "Outreach is closed for this prospect." });
+        return;
+      }
+
+      const [existing] = await db
+        .select()
+        .from(investorTouchesTable)
+        .where(eq(investorTouchesTable.prospectId, id))
+        .then((rows) => rows.filter((row) => row.touchNumber === touchNumber));
+      if (existing?.sentAt || existing?.dispatchStatus === "sent") {
+        res.status(409).json({ error: "This touch was already sent." });
+        return;
+      }
+
+      const values = {
+        recipientEmail: email,
+        subject: cleanSubject,
+        body: cleanBody,
+        scheduledAt: schedule,
+        dispatchStatus: "queued",
+        attempts: 0,
+        lastError: null,
+        updatedAt: new Date(),
+      };
+      if (existing) {
+        await db
+          .update(investorTouchesTable)
+          .set(values)
+          .where(eq(investorTouchesTable.id, existing.id));
+      } else {
+        await db.insert(investorTouchesTable).values({
+          prospectId: id,
+          touchNumber,
+          ...values,
+        });
+      }
+      res.json({ ok: true, dispatchStatus: "queued", scheduledAt: schedule.toISOString() });
+    } catch (err) {
+      console.error("[investors] queue outreach error", err);
+      res.status(500).json({ error: "Failed to queue outreach." });
+    }
+  },
+);
+
+investorsRouter.post(
+  "/admin/investors/dispatch-due",
+  async (req: Request, res: Response) => {
+    if (!(await guard(req, res))) return;
+    try {
+      const result = await dispatchDueInvestorOutreach();
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error("[investors] dispatch-due error", err);
+      res.status(500).json({ error: "Outreach dispatch failed." });
     }
   },
 );

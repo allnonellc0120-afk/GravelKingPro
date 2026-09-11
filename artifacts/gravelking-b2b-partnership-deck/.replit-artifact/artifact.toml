@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/gravelking-b2b-partnership-deck/"
+title = "GravelKing Pro B2B Partnership Brief"
+description = "A Music Label-styled B2B partnership deck for labels, studios, schools, publishers, and creator-audio partners."
+version = "1.0.0"
+id = "artifacts/gravelking-b2b-partnership-deck"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/gravelking-b2b-partnership-deck/" ]
+localPort = 21269
+
+[services.development]
+run = "pnpm --filter @workspace/gravelking-b2b-partnership-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gravelking-b2b-partnership-deck", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/gravelking-b2b-partnership-deck/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21269"
+BASE_PATH = "/gravelking-b2b-partnership-deck/"
