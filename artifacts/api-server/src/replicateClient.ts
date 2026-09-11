@@ -47,6 +47,11 @@ export interface VoiceConvertInput {
   protect?: number;
 }
 
+export interface VoiceConvertResult {
+  outputUrl: string;
+  predictionId: string;
+}
+
 function requireHttpUrl(value: string, field: string): string {
   let parsed: URL;
   try {
@@ -95,7 +100,7 @@ function outputUrl(output: unknown): string {
  * unversioned endpoint. The deployment requires rvc_model=CUSTOM when custom
  * weights are supplied.
  */
-export async function convertToGravelKingVoice(input: VoiceConvertInput): Promise<string> {
+export async function convertToGravelKingVoice(input: VoiceConvertInput): Promise<VoiceConvertResult> {
   const model = DEFAULT_RVC_MODEL;
   if (!/^[^/\s]+\/[^/:\s]+(?::[^:\s]+)?$/.test(model)) {
     throw new Error("REPLICATE_RVC_MODEL must use owner/model or owner/model:version format");
@@ -110,8 +115,8 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     ? requireHttpUrl(input.modelWeightsUrl, "modelWeightsUrl")
     : undefined;
   const pitchShift = input.pitchShift ?? 0;
-  const indexRate = input.indexRate ?? 0.85;
-  const protect = input.protect ?? 0.15;
+  const indexRate = input.indexRate ?? 0.90;
+  const protect = input.protect ?? 0.10;
 
   if (!Number.isFinite(pitchShift) || pitchShift < -24 || pitchShift > 24) {
     throw new Error("Replicate RVC pitchShift must be between -24 and 24 semitones");
@@ -139,8 +144,17 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     protect,
   };
 
-  const output = await getReplicateClient().run(modelRef, { input: modelInput });
-  return outputUrl(output);
+  const [, version] = model.split(":");
+  if (!version) throw new Error("Pinned Replicate RVC model version is required");
+  const predictionId = await postPredictionWithRetry(() =>
+    replicateFetch("/predictions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version, input: modelInput }),
+    }),
+  );
+  const output = await pollPrediction(predictionId, 180_000);
+  return { outputUrl: outputUrl(output), predictionId };
 }
 
 // Default per-request network timeout. Every Replicate HTTP call is bounded by
