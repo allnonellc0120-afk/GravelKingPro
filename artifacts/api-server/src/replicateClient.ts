@@ -8,7 +8,7 @@ import Replicate from "replicate";
 
 const REPLICATE_BASE = "https://api.replicate.com/v1";
 export const DEFAULT_RVC_MODEL =
-  "zsxkib/realistic-voice-cloning";
+  "zsxkib/realistic-voice-cloning:0a9c7c558af4c0f20667c1bd1260ce32a2879944a0b9e44e1398660c077b1550";
 
 function getToken(): string | undefined {
   return process.env["REPLICATE_API_TOKEN"];
@@ -84,11 +84,9 @@ function outputUrl(output: unknown): string {
 /**
  * Run custom RVC voice conversion through the configured Replicate model.
  *
- * REPLICATE_RVC_MODEL must be an approved Replicate model identifier such as
- * "owner/model" or a full version identifier. The model is intentionally
- * configuration-driven because RVC models do not share one universal input
- * schema; this adapter sends the conventional audio/model_weights/pitch_shift/
- * index_rate fields used by the project's selected RVC deployment.
+ * REPLICATE_RVC_MODEL may override the pinned release for controlled testing.
+ * The default is the validated GravelKing release. The selected deployment
+ * requires rvc_model=CUSTOM when custom weights are supplied.
  */
 export async function convertToGravelKingVoice(input: VoiceConvertInput): Promise<string> {
   const model = process.env["REPLICATE_RVC_MODEL"]?.trim() || DEFAULT_RVC_MODEL;
@@ -115,6 +113,7 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
   }
 
   const modelInput: Record<string, string | number> = {
+    rvc_model: "CUSTOM",
     song_input: audio,
     custom_rvc_model_download_url: modelWeights ?? "",
     pitch_change: pitchShift === 0
