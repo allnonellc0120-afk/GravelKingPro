@@ -6,7 +6,11 @@ import { ReplitConnectors } from "@replit/connectors-sdk";
 import { randomUUID, createHash } from "crypto";
 import { db, artistProfilesTable, tracksTable, purchasedTracksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { ObjectStorageService, saveObjectWithFallback } from "../lib/objectStorage";
+import {
+  getSignedObjectURL,
+  ObjectStorageService,
+  saveObjectWithFallback,
+} from "../lib/objectStorage";
 import {
   buildCoverArtBuffer,
   buildGeneratedAudioKeys,
@@ -25,6 +29,7 @@ import {
 } from "../lib/firestore";
 import { authorshipScore } from "@workspace/authorship";
 const objectStorage = new ObjectStorageService();
+const GRAVELKING_RVC_MODEL_KEY = "models/gravelking_v2.pth";
 
 const jaxRouter = Router();
 const connectors = new ReplitConnectors();
@@ -534,7 +539,12 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
     let finalAudio: Buffer = mp3;
     try {
-      finalAudio = await tryGravelKingVoiceSwap(mp3);
+      const modelWeightsUrl = await getSignedObjectURL(
+        bucketId,
+        GRAVELKING_RVC_MODEL_KEY,
+        3600,
+      );
+      finalAudio = await tryGravelKingVoiceSwap(mp3, modelWeightsUrl);
       req.log.info({ trackId }, "[Jax Voice Swap: SUCCESS]");
     } catch (voiceError) {
       req.log.warn({ err: voiceError, trackId }, "[Jax Voice Swap: FALLBACK]");

@@ -238,6 +238,16 @@ export async function signObjectURLAnyBackend(file: File, ttlSec: number): Promi
   });
 }
 
+export async function getSignedObjectURL(
+  bucketName: string,
+  objectName: string,
+  ttlSec = 3600,
+): Promise<string> {
+  const file = await getObjectFileWithFallback(bucketName, objectName);
+  if (!file) throw new ObjectNotFoundError();
+  return signObjectURLAnyBackend(file, ttlSec);
+}
+
 export class ObjectNotFoundError extends Error {
   constructor() {
     super("Object not found");

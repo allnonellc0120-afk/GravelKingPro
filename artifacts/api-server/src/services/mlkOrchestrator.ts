@@ -81,7 +81,10 @@ function withVoiceSwapTimeout<T>(promise: Promise<T>): Promise<T> {
   ]);
 }
 
-export async function tryGravelKingVoiceSwap(inputAudio: Buffer): Promise<Buffer> {
+export async function tryGravelKingVoiceSwap(
+  inputAudio: Buffer,
+  modelWeightsUrl?: string,
+): Promise<Buffer> {
   const audioUrl = await uploadFile(inputAudio, "gk_input_audio", "audio/mpeg");
   const splitOutput = await withVoiceSwapTimeout(runModel(
     "ryan5453",
@@ -106,7 +109,10 @@ export async function tryGravelKingVoiceSwap(inputAudio: Buffer): Promise<Buffer
   ]);
   const convertedUrl = await withVoiceSwapTimeout(convertToGravelKingVoice({
     audioUrl: await uploadFile(vocals, "gk_vocal.wav", "audio/wav"),
-    modelWeightsUrl: process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] || undefined,
+    modelWeightsUrl:
+      modelWeightsUrl ??
+      process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] ??
+      undefined,
   }));
   const converted = await downloadVoiceSwapOutput(convertedUrl);
   return mixPcmWavBuffers(instrumental, converted);
