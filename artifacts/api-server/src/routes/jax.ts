@@ -28,9 +28,11 @@ import {
   type JaxSessionMessage,
 } from "../lib/firestore";
 import { authorshipScore } from "@workspace/authorship";
+import { zipSync } from "fflate";
 const objectStorage = new ObjectStorageService();
 const GRAVELKING_RVC_MODEL_KEY = "models/gravelking_v2.pth";
-const GRAVELKING_RVC_MODEL_FILENAME = "gravelking_v2.pth";
+const GRAVELKING_RVC_INDEX_KEY = "models/gravelking_v2.index";
+const GRAVELKING_RVC_MODEL_FILENAME = "gravelking_v2.zip";
 
 const jaxRouter = Router();
 const connectors = new ReplitConnectors();
@@ -52,7 +54,7 @@ function rvcModelStreamSignature(expiresAt: number): string {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error("SESSION_SECRET is required for signed RVC model streaming");
   return createHmac("sha256", secret)
-    .update(`${expiresAt}:${GRAVELKING_RVC_MODEL_KEY}`)
+    .update(`${expiresAt}:${GRAVELKING_RVC_MODEL_KEY}:${GRAVELKING_RVC_INDEX_KEY}`)
     .digest("base64url");
 }
 
@@ -63,7 +65,7 @@ export function buildSignedRvcModelStreamUrl(origin: string, ttlSec = 3600): str
 }
 
 jaxRouter.get(
-  "/jax/rvc-model/:expiresAt/:signature/gravelking_v2.pth",
+  "/jax/rvc-model/:expiresAt/:signature/gravelking_v2.zip",
   async (req: Request, res: Response) => {
     const expiresAt = Number(req.params.expiresAt);
     if (!Number.isSafeInteger(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
@@ -80,18 +82,26 @@ jaxRouter.get(
       return;
     }
     const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
-    const file = await getObjectFileWithFallback(bucketId, GRAVELKING_RVC_MODEL_KEY);
-    if (!file) {
-      res.status(404).json({ error: "RVC model weights not found" });
+    const [weightsFile, indexFile] = await Promise.all([
+      getObjectFileWithFallback(bucketId, GRAVELKING_RVC_MODEL_KEY),
+      getObjectFileWithFallback(bucketId, GRAVELKING_RVC_INDEX_KEY),
+    ]);
+    if (!weightsFile || !indexFile) {
+      res.status(404).json({ error: "RVC model package is incomplete" });
       return;
     }
-    res.setHeader("Content-Type", "application/octet-stream");
+    const [[weights], [index]] = await Promise.all([
+      weightsFile.download(),
+      indexFile.download(),
+    ]);
+    const archive = Buffer.from(zipSync({
+      "gravelking_v2.pth": new Uint8Array(weights),
+      "gravelking_v2.index": new Uint8Array(index),
+    }, { level: 0 }));
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Length", String(archive.length));
     res.setHeader("Content-Disposition", `attachment; filename="${GRAVELKING_RVC_MODEL_FILENAME}"`);
-    file.createReadStream().on("error", (error) => {
-      req.log.error({ err: error }, "Signed RVC model stream failed");
-      if (!res.headersSent) res.status(502).end();
-      else res.destroy(error);
-    }).pipe(res);
+    res.end(archive);
   },
 );
 
