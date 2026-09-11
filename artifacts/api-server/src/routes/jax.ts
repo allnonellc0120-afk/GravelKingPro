@@ -532,7 +532,7 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     // routes derive the .mp3 key from audioFullKey, so no schema change.
     const { audioFullKey, audioFullMp3Key, audioPreviewKey } = buildGeneratedAudioKeys(trackId);
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
-    let finalAudio = mp3;
+    let finalAudio: Buffer = mp3;
     try {
       finalAudio = await tryGravelKingVoiceSwap(mp3);
       req.log.info({ trackId }, "[Jax Voice Swap: SUCCESS]");

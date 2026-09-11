@@ -1,8 +1,8 @@
 /**
  * Integration test: Task-94 generation-pipeline surfaces.
  *
- *   1. buildCoverArgs → deterministic ffmpeg args that actually render a
- *      600×600 cover PNG with the title baked in.
+ *   1. In-memory cover and preview builders produce deterministic bounded
+ *      media buffers without filesystem staging.
  *   2. POST /api/lyrics/verify → input validation + honest "ai_screening"
  *      labeling (verdict itself may fail open when Vertex is unreachable).
  *   3. GET /api/library → owner sees lyricsText; audioFullKey NEVER leaks.
@@ -26,9 +26,9 @@ import { eq } from "drizzle-orm";
 
 import app from "../app";
 import {
-  buildCoverArgs,
+  buildCoverArtBuffer,
   buildGeneratedAudioKeys,
-  buildGeneratedPreviewArgs,
+  buildGeneratedPreviewBuffer,
   GENERATED_PREVIEW_SECONDS,
   extractInteractionLyrics,
   saveGeneratedAudioArtifacts,
@@ -170,32 +170,20 @@ async function main(): Promise<void> {
       );
     }
 
-    // ── 1. Cover generation helper ─────────────────────────────────────────
-    console.log("\n[1] buildCoverArgs renders a real 600×600 PNG");
+    // ── 1. In-memory cover generation helper ───────────────────────────────
+    console.log("\n[1] buildCoverArtBuffer renders a deterministic PNG");
     {
-      const argsA = buildCoverArgs(trackId, "Test Track: One", "/tmp/a.png");
-      const argsB = buildCoverArgs(trackId, "Test Track: One", "/tmp/a.png");
-      check("cover args are deterministic for the same track id", JSON.stringify(argsA) === JSON.stringify(argsB));
-
-      const otherArgs = buildCoverArgs(randomUUID(), "Test Track: One", "/tmp/b.png");
-      // Gradient colors are seeded from the id — two ids virtually never collide.
+      const coverA = buildCoverArtBuffer(trackId);
+      const coverB = buildCoverArtBuffer(trackId);
+      const otherCover = buildCoverArtBuffer(randomUUID());
+      check("cover bytes are deterministic for the same track id", coverA.equals(coverB));
+      check("different track ids produce different cover bytes", !coverA.equals(otherCover));
       check(
-        "different track ids produce different gradients",
-        JSON.stringify(argsA.find((a) => a.includes("gradients"))) !==
-          JSON.stringify(otherArgs.find((a) => a.includes("gradients"))),
+        "cover buffer is a 128×128 PNG",
+        coverA.subarray(1, 4).toString("ascii") === "PNG" &&
+          coverA.readUInt32BE(16) === 128 &&
+          coverA.readUInt32BE(20) === 128,
       );
-
-      const coverPath = `/tmp/gk_cover_test_${randomUUID()}.png`;
-      await execFileAsync("ffmpeg", buildCoverArgs(trackId, "Pipeline Test Cover", coverPath), { timeout: 30_000 });
-      const { stdout } = await execFileAsync(
-        "ffprobe",
-        ["-v", "quiet", "-print_format", "json", "-show_streams", coverPath],
-        { timeout: 15_000 },
-      );
-      const info = JSON.parse(stdout) as { streams?: Array<{ width?: number; height?: number }> };
-      const v = info.streams?.[0];
-      check("rendered cover is 600×600", v?.width === 600 && v?.height === 600, JSON.stringify(v));
-      await unlink(coverPath).catch(() => {});
     }
 
     // ── Generated audio privacy boundary ─────────────────────────────────────
@@ -288,20 +276,16 @@ async function main(): Promise<void> {
       }
 
       const source = await makeTinyWav(31);
-      const preview = `/tmp/gk_preview_test_${randomUUID()}.mp3`;
-      const sourcePath = `/tmp/gk_preview_source_${randomUUID()}.wav`;
-      await writeFile(sourcePath, source);
-      await execFileAsync("ffmpeg", buildGeneratedPreviewArgs(sourcePath, preview), { timeout: 30_000 });
-      const { stdout } = await execFileAsync(
-        "ffprobe",
-        ["-v", "quiet", "-print_format", "json", "-show_format", preview],
-        { timeout: 15_000 },
-      );
-      const previewInfo = JSON.parse(stdout) as { format?: { duration?: string } };
+      const preview = buildGeneratedPreviewBuffer(source, "audio/wav");
+      const channels = preview.readUInt16LE(22);
+      const sampleRate = preview.readUInt32LE(24);
+      const bits = preview.readUInt16LE(34);
+      const dataBytes = preview.readUInt32LE(40);
+      const previewDuration = dataBytes / (sampleRate * channels * (bits / 8));
       check(
         `public preview duration is capped at ${GENERATED_PREVIEW_SECONDS}s`,
-        Number(previewInfo.format?.duration ?? Infinity) <= GENERATED_PREVIEW_SECONDS + 0.25,
-        JSON.stringify(previewInfo.format),
+        previewDuration <= GENERATED_PREVIEW_SECONDS + 0.01,
+        String(previewDuration),
       );
       const privateWrites: Array<{ key: string; body: Buffer }> = [];
       const publicWrites: Array<{ key: string; body: Buffer }> = [];
@@ -324,8 +308,6 @@ async function main(): Promise<void> {
       check("artifact writer sends only preview/cover to public storage", publicWrites.length === 2 &&
         publicWrites.every((write) => !write.key.includes("audio_full")) &&
         publicWrites.some((write) => write.key === keys.audioPreviewKey));
-      await unlink(sourcePath).catch(() => {});
-      await unlink(preview).catch(() => {});
     }
 
     // ── Seed an owned generated track with real audio in storage ───────────

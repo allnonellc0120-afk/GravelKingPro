@@ -1,24 +1,9 @@
 /**
- * MLK v3.5 Orchestrator — in-house generate-and-master pipeline.
+ * GravelKing V2 generation orchestrator.
  *
- * STANDALONE service module (Task #73 spec). Orchestrates ONLY — every stage
- * calls the existing, real production code paths:
- *
- *   a) Lyric hash        — same SHA-256 normalization as /api/lyrics/import
- *   b) Music generation  — Vertex AI Lyria (lyria-3-pro-preview) on the
- *                          owner's GCP service account (geminiVertex auth)
- *   c) Mastering         — the REAL Morris Law Kernel v3.5: primary Cloud Run
- *                          kernel service (MLK_KERNEL_URL), fallback the local
- *                          python/mlk_master.py worker subprocess. Identical
- *                          invocation to routes/master.ts. NO ffmpeg DSP, NO
- *                          mock, NO placeholder — if neither kernel can run,
- *                          this throws loudly.
- *   d) Cert + vault      — Dual-Anchor nominator/denominator HMAC cert
- *                          (ip_cert_stubs + Firestore backup + LSB embed),
- *                          then persisted to the existing user vault tables
- *                          (tracks + purchased_tracks → shows in /api/library).
- *
- * No existing kernel, schema, or controller files are modified.
+ * Generated audio, separated stems, voice-conversion results, previews, and
+ * cover art remain in memory until they are written directly to Object Storage.
+ * Generation stays unmastered; mastering remains a separate user action.
  */
 
 import { randomUUID, createHash, createHmac } from "crypto";
