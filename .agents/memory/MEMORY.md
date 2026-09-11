@@ -95,3 +95,4 @@
 - [Root ignition restart](root-ignition-restart.md) — restart the standalone Python service before verifying main.py changes on port 8080
 - [GravelKing RVC weights](gravelking-rvc-weights.md) — trained v2 RVC artifacts live in backend-aware Object Storage; managed-bucket IAM may force fallback
 - [JAX admin generation ownership](jax-admin-generation-ownership.md) — admin automation creates tracks without a user; attach the successful track to the owner profile and purchased_tracks row
+- [MLK primary generation routes](mlk-primary-generation-routes.md) — `/api/tracks/generate` and `/api/tracks/remix` are MLK aliases; JAX remains explicit secondary tooling

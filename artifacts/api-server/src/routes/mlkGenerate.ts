@@ -1,5 +1,6 @@
 /**
- * POST /api/mlk/v35/generate-master — Task #73 orchestration endpoint.
+ * POST /api/mlk/v35/generate-master and /api/tracks/generate — MLK primary
+ * orchestration endpoints.
  *
  * Thin controller over services/mlkOrchestrator.generateAndMasterTrack:
  * lyric hash → Vertex AI Lyria → REAL MLK v3.5 kernel → Dual-Anchor cert →
@@ -17,6 +18,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { CREDIT_COSTS, grantCredits, spendCredits } from "../lib/credits";
+import { buildSignedRvcModelStreamUrl } from "../services/rvcModelAccess";
 
 const mlkGenerateRouter = Router();
 
@@ -26,7 +28,7 @@ const generateRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 3 });
 const generateConcurrency = concurrencyLimit(2);
 
 mlkGenerateRouter.post(
-  "/mlk/v35/generate-master",
+  ["/mlk/v35/generate-master", "/tracks/generate"],
   generateRateLimit,
   generateConcurrency,
   async (req: Request, res: Response) => {
@@ -128,6 +130,10 @@ mlkGenerateRouter.post(
               ledger: body.lyricAudit.ledger.slice(0, 500),
             }
           : undefined,
+        modelWeightsUrl: buildSignedRvcModelStreamUrl(
+          `https://${req.get("host")}`,
+          3600,
+        ),
       });
       res.json({ success: true, ...result });
     } catch (err) {
@@ -173,7 +179,7 @@ function userFacingGenerationError(message: string): { status: number; error: st
 }
 
 /**
- * POST /api/mlk/v35/remix — MLK v3.5 Remix Engine.
+ * POST /api/mlk/v35/remix and /api/tracks/remix — MLK v3.5 Remix Engine.
  *
  * Takes an existing vault track, anchors on its original style prompt, blends
  * the user's new twist, regenerates via Lyria, masters through the real MLK
@@ -181,7 +187,7 @@ function userFacingGenerationError(message: string): { status: number; error: st
  * title). Same cost profile as generation → same rate/concurrency limits.
  */
 mlkGenerateRouter.post(
-  "/mlk/v35/remix",
+  ["/mlk/v35/remix", "/tracks/remix"],
   generateRateLimit,
   generateConcurrency,
   async (req: Request, res: Response) => {

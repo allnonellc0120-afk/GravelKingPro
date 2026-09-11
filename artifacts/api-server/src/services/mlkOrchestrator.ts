@@ -112,10 +112,16 @@ function withVoiceSwapTimeout<T>(promise: Promise<T>): Promise<T> {
   ]);
 }
 
+export interface GravelKingVoiceSwapResult {
+  audio: Buffer;
+  predictionId: string;
+  mixed: true;
+}
+
 export async function tryGravelKingVoiceSwap(
   inputAudio: Buffer,
   modelWeightsUrl?: string,
-): Promise<Buffer> {
+): Promise<GravelKingVoiceSwapResult> {
   const audioUrl = await uploadFile(inputAudio, "gk_input_audio", "audio/mpeg");
   const splitOutput = await withVoiceSwapTimeout(runModel(
     "ryan5453",
@@ -138,17 +144,35 @@ export async function tryGravelKingVoiceSwap(
     downloadVoiceSwapOutput(vocalUrl),
     downloadVoiceSwapOutput(instrumentalUrl),
   ]);
-  const convertedUrl = await withVoiceSwapTimeout(convertToGravelKingVoice({
+  const conversion = await withVoiceSwapTimeout(convertToGravelKingVoice({
     audioUrl: await uploadFile(vocals, "gk_vocal.wav", "audio/wav"),
     modelWeightsUrl:
       modelWeightsUrl ??
       process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] ??
       undefined,
-      indexRate: 0.85,
-      protect: 0.15,
+    indexRate: 0.90,
+    protect: 0.10,
   }));
-  const converted = await downloadVoiceSwapOutput(convertedUrl);
-  return mixVoiceSwapAudioInMemory(instrumental, converted);
+  logger.info(
+    { predictionId: conversion.predictionId },
+    "[Gravel King RVC: PREDICTION CREATED]",
+  );
+  const converted = await downloadVoiceSwapOutput(conversion.outputUrl);
+  if (converted.length < 1_000) {
+    throw new Error(`RVC prediction ${conversion.predictionId} returned invalid audio`);
+  }
+  const mixed = await mixVoiceSwapAudioInMemory(instrumental, converted);
+  const mixedHash = createHash("sha256").update(mixed).digest("hex");
+  const instrumentalHash = createHash("sha256").update(instrumental).digest("hex");
+  const convertedHash = createHash("sha256").update(converted).digest("hex");
+  if (mixedHash === instrumentalHash || mixedHash === convertedHash) {
+    throw new Error(`RVC prediction ${conversion.predictionId} was not mixed into the final master`);
+  }
+  logger.info(
+    { predictionId: conversion.predictionId, mixedBytes: mixed.length, mixedHash },
+    "[Gravel King RVC: MIX VERIFIED]",
+  );
+  return { audio: mixed, predictionId: conversion.predictionId, mixed: true };
 }
 
 export async function saveGeneratedAudioArtifacts(
@@ -433,6 +457,8 @@ export async function generateAndMasterTrack(
     vocalMode?: VocalMode;
     /** Requested song length in seconds (advisory — appended to the Lyria brief). */
     targetDurationS?: number;
+    /** Signed clean-path URL for the GravelKing RVC package. */
+    modelWeightsUrl?: string;
     /** When set, this run is a remix — the child cert records the parent linkage. */
     remixOf?: { parentTrackId: string; parentCertId: string | null };
     lyricAudit?: {
@@ -531,16 +557,13 @@ export async function generateAndMasterTrack(
   })() : 0;
 
   if (vocalMode !== "instrumental") {
-    try {
-      finalAudio = await tryGravelKingVoiceSwap(audio);
-      finalMimeType = "audio/wav";
-      logger.info("[Gravel King Voice Swap: SUCCESS]");
-    } catch (voiceSwapErr) {
-      logger.warn(
-        { err: voiceSwapErr instanceof Error ? voiceSwapErr.message : String(voiceSwapErr) },
-        "[Gravel King Voice Swap: FALLBACK]",
-      );
-    }
+    const voiceSwap = await tryGravelKingVoiceSwap(audio, opts.modelWeightsUrl);
+    finalAudio = voiceSwap.audio;
+    finalMimeType = "audio/wav";
+    logger.info(
+      { predictionId: voiceSwap.predictionId, mixed: voiceSwap.mixed },
+      "[Gravel King Voice Swap: REQUIRED SUCCESS]",
+    );
   }
 
   // Generation remains unmastered. All audio stays in memory until cloud storage.

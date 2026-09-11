@@ -3,7 +3,7 @@ import { generateVertexText, generateVertexTextStream, isVertexConfigured } from
 import { rateLimit } from "../lib/rateLimiter";
 import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
 import { ReplitConnectors } from "@replit/connectors-sdk";
-import { randomUUID, createHash, createHmac, timingSafeEqual } from "crypto";
+import { randomUUID, createHash, timingSafeEqual } from "crypto";
 import { db, artistProfilesTable, tracksTable, purchasedTracksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
@@ -18,6 +18,13 @@ import {
   tryGravelKingVoiceSwap,
   saveGeneratedAudioArtifacts,
 } from "../services/mlkOrchestrator";
+import {
+  buildSignedRvcModelStreamUrl,
+  GRAVELKING_RVC_INDEX_KEY,
+  GRAVELKING_RVC_MODEL_KEY,
+  GRAVELKING_RVC_MODEL_FILENAME,
+  rvcModelStreamSignature,
+} from "../services/rvcModelAccess";
 import { CREDIT_COSTS, grantCredits, resolveCreditUser, spendCredits } from "../lib/credits";
 import {
   getJaxSession,
@@ -30,10 +37,6 @@ import {
 import { authorshipScore } from "@workspace/authorship";
 import { zipSync } from "fflate";
 const objectStorage = new ObjectStorageService();
-const GRAVELKING_RVC_MODEL_KEY = "models/gravelking_v2.pth";
-const GRAVELKING_RVC_INDEX_KEY = "models/gravelking_v2.index";
-const GRAVELKING_RVC_MODEL_FILENAME = "gravelking_v2.zip";
-
 const jaxRouter = Router();
 const connectors = new ReplitConnectors();
 const DAILY_FREE_LIMIT = 5;
@@ -48,20 +51,6 @@ const ARTIST_PROFILE_FIELDS = [
 
 function writeSse(res: Response, event: string, payload: unknown) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
-}
-
-function rvcModelStreamSignature(expiresAt: number): string {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) throw new Error("SESSION_SECRET is required for signed RVC model streaming");
-  return createHmac("sha256", secret)
-    .update(`${expiresAt}:${GRAVELKING_RVC_MODEL_KEY}:${GRAVELKING_RVC_INDEX_KEY}`)
-    .digest("base64url");
-}
-
-export function buildSignedRvcModelStreamUrl(origin: string, ttlSec = 3600): string {
-  const expiresAt = Math.floor(Date.now() / 1000) + ttlSec;
-  const signature = rvcModelStreamSignature(expiresAt);
-  return `${origin.replace(/\/+$/, "")}/api/jax/rvc-model/${expiresAt}/${signature}/${GRAVELKING_RVC_MODEL_FILENAME}`;
 }
 
 jaxRouter.get(
@@ -595,17 +584,16 @@ jaxRouter.post("/jax/generate-music", rateLimit({
     // routes derive the .mp3 key from audioFullKey, so no schema change.
     const { audioFullKey, audioFullMp3Key, audioPreviewKey } = buildGeneratedAudioKeys(trackId);
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
-    let finalAudio: Buffer = mp3;
-    try {
-      const modelWeightsUrl = buildSignedRvcModelStreamUrl(
-        `${req.protocol}://${req.get("host")}`,
-        3600,
-      );
-      finalAudio = await tryGravelKingVoiceSwap(mp3, modelWeightsUrl);
-      req.log.info({ trackId }, "[Jax Voice Swap: SUCCESS]");
-    } catch (voiceError) {
-      req.log.warn({ err: voiceError, trackId }, "[Jax Voice Swap: FALLBACK]");
-    }
+    const modelWeightsUrl = buildSignedRvcModelStreamUrl(
+      `${req.protocol}://${req.get("host")}`,
+      3600,
+    );
+    const voiceSwap = await tryGravelKingVoiceSwap(mp3, modelWeightsUrl);
+    const finalAudio = voiceSwap.audio;
+    req.log.info(
+      { trackId, predictionId: voiceSwap.predictionId, mixed: voiceSwap.mixed },
+      "[Jax Voice Swap: REQUIRED SUCCESS]",
+    );
     await saveGeneratedAudioArtifacts(
       {
         bucketId,
