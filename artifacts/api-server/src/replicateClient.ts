@@ -84,12 +84,13 @@ function outputUrl(output: unknown): string {
 /**
  * Run custom RVC voice conversion through the configured Replicate model.
  *
- * REPLICATE_RVC_MODEL may override the pinned release for controlled testing.
- * The default is the validated GravelKing release. The selected deployment
- * requires rvc_model=CUSTOM when custom weights are supplied.
+ * GravelKing voice conversion is pinned to the validated release. Do not allow
+ * a stale environment override to silently send production traffic to the
+ * unversioned endpoint. The deployment requires rvc_model=CUSTOM when custom
+ * weights are supplied.
  */
 export async function convertToGravelKingVoice(input: VoiceConvertInput): Promise<string> {
-  const model = process.env["REPLICATE_RVC_MODEL"]?.trim() || DEFAULT_RVC_MODEL;
+  const model = DEFAULT_RVC_MODEL;
   if (!/^[^/\s]+\/[^/:\s]+(?::[^:\s]+)?$/.test(model)) {
     throw new Error("REPLICATE_RVC_MODEL must use owner/model or owner/model:version format");
   }
