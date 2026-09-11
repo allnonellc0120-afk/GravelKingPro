@@ -36,6 +36,7 @@ export function Layout({
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(`${base}/pricing?plan=monthly`)}`;
 
   const links = [
+    { href: "/library", label: "Library" },
     { href: "/mastering", label: "Mastering" },
     { href: "/vocal-booth", label: "Vocal Booth" },
     { href: "/songwriting", label: "Lyrics Generator", icon: Sparkles },

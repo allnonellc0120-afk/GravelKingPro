@@ -4,14 +4,132 @@
  * and polling. No local torch/Python — pure HTTPS.
  */
 
+import Replicate from "replicate";
+
 const REPLICATE_BASE = "https://api.replicate.com/v1";
+export const DEFAULT_RVC_MODEL =
+  "zsxkib/realistic-voice-cloning";
 
 function getToken(): string | undefined {
   return process.env["REPLICATE_API_TOKEN"];
 }
 
+let sdkClient: Replicate | null = null;
+
+/**
+ * Lazily initialize the official Replicate SDK. Keeping this lazy preserves
+ * the existing no-token behavior: routes can still report "not configured"
+ * and fall back locally instead of crashing during API-server startup.
+ */
+export function getReplicateClient(): Replicate {
+  const token = getToken();
+  if (!token) throw new Error("REPLICATE_API_TOKEN is not set");
+  if (!sdkClient) {
+    sdkClient = new Replicate({ auth: token });
+  }
+  return sdkClient;
+}
+
 export function isConfigured(): boolean {
   return Boolean(getToken());
+}
+
+export interface VoiceConvertInput {
+  /** URL of the clean vocal stem to convert. */
+  audioUrl: string;
+  /** Optional URL for a custom RVC .pth/.zip model weights file. */
+  modelWeightsUrl?: string;
+  /** Pitch shift in semitones. Defaults to 0. */
+  pitchShift?: number;
+  /** RVC index mix rate. Defaults to 0.8. */
+  indexRate?: number;
+}
+
+function requireHttpUrl(value: string, field: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`Replicate RVC ${field} must be a valid URL`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Replicate RVC ${field} must use http or https`);
+  }
+  return parsed.toString();
+}
+
+function outputUrl(output: unknown): string {
+  if (typeof output === "string" && /^https?:\/\//.test(output)) return output;
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      try {
+        return outputUrl(item);
+      } catch {
+        // Try the next output when a model returns multiple files.
+      }
+    }
+  }
+  if (output && typeof output === "object") {
+    const candidate = output as { url?: unknown; href?: unknown };
+    if (typeof candidate.url === "function") {
+      const url = candidate.url();
+      if (typeof url === "string" && /^https?:\/\//.test(url)) return url;
+    }
+    if (typeof candidate.url === "string" && /^https?:\/\//.test(candidate.url)) return candidate.url;
+    if (typeof candidate.href === "string" && /^https?:\/\//.test(candidate.href)) return candidate.href;
+  }
+  throw new Error("Replicate RVC returned no audio URL");
+}
+
+/**
+ * Run custom RVC voice conversion through the configured Replicate model.
+ *
+ * REPLICATE_RVC_MODEL must be an approved Replicate model identifier such as
+ * "owner/model" or a full version identifier. The model is intentionally
+ * configuration-driven because RVC models do not share one universal input
+ * schema; this adapter sends the conventional audio/model_weights/pitch_shift/
+ * index_rate fields used by the project's selected RVC deployment.
+ */
+export async function convertToGravelKingVoice(input: VoiceConvertInput): Promise<string> {
+  const model = process.env["REPLICATE_RVC_MODEL"]?.trim() || DEFAULT_RVC_MODEL;
+  if (!/^[^/\s]+\/[^/:\s]+(?::[^:\s]+)?$/.test(model)) {
+    throw new Error("REPLICATE_RVC_MODEL must use owner/model or owner/model:version format");
+  }
+  const modelRef = model as `${string}/${string}` | `${string}/${string}:${string}`;
+  if (!input || typeof input.audioUrl !== "string") {
+    throw new Error("Replicate RVC audioUrl is required");
+  }
+
+  const audio = requireHttpUrl(input.audioUrl, "audioUrl");
+  const modelWeights = input.modelWeightsUrl
+    ? requireHttpUrl(input.modelWeightsUrl, "modelWeightsUrl")
+    : undefined;
+  const pitchShift = input.pitchShift ?? 0;
+  const indexRate = input.indexRate ?? 0.8;
+
+  if (!Number.isFinite(pitchShift) || pitchShift < -24 || pitchShift > 24) {
+    throw new Error("Replicate RVC pitchShift must be between -24 and 24 semitones");
+  }
+  if (!Number.isFinite(indexRate) || indexRate < 0 || indexRate > 1) {
+    throw new Error("Replicate RVC indexRate must be between 0 and 1");
+  }
+
+  const modelInput: Record<string, string | number> = {
+    song_input: audio,
+    custom_rvc_model_download_url: modelWeights ?? "",
+    pitch_change: pitchShift === 0
+      ? "no-change"
+      : pitchShift > 0
+        ? `+${pitchShift}`
+        : `${pitchShift}`,
+    index_rate: indexRate,
+    filter_radius: 3,
+    rms_mix_rate: 0.25,
+    protect: 0.33,
+  };
+
+  const output = await getReplicateClient().run(modelRef, { input: modelInput });
+  return outputUrl(output);
 }
 
 // Default per-request network timeout. Every Replicate HTTP call is bounded by

@@ -120,6 +120,12 @@ async function buildCertificate(stub: StubRow) {
       category: stub.category ?? undefined,
       provenance: stub.provenance ?? undefined,
       styleAuthorshipScore: stub.styleAuthorshipScore ?? undefined,
+      finalLyricsLabel: stub.finalLyricsLabel ?? undefined,
+      finalLyricsHash: stub.finalLyricsHash ?? undefined,
+      lyricsAuthorshipScore: stub.lyricsAuthorshipScore ?? undefined,
+      lyricsAuthorshipLedger: Array.isArray(stub.lyricsAuthorshipLedger)
+        ? stub.lyricsAuthorshipLedger
+        : undefined,
       copyrightScreen: stub.fingerprintStatus
         ? {
             status: stub.fingerprintStatus,

@@ -19,8 +19,8 @@
     "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1.1.1",
-  "appVersionCode": 5,
+  "appVersionName": "1.1.2",
+  "appVersionCode": 6,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://gravelkingpro.com/manifest.webmanifest",
@@ -45,5 +45,5 @@
   "protocolHandlers": [],
   "fileHandlers": [],
   "launchHandlerClientMode": "",
-  "appVersion": "1.1.1"
+  "appVersion": "1.1.2"
 }

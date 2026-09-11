@@ -7,9 +7,10 @@ import {
   promotersTable,
   referralAttributionsTable,
   commissionsTable,
+  promoReferralsTable,
   ipCertStubsTable,
 } from '@workspace/db';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Request } from 'express';
 import { recordAnalyticsEvent } from './analytics';
 import { grantCredits, resetCredits, MONTHLY_CREDITS } from './lib/credits';
@@ -299,6 +300,21 @@ export class WebhookHandlers {
               .from(usersTable)
               .where(eq(usersTable.stripeCustomerId, customerId));
             if (user) {
+              // Nina's campaign converts only after money is actually paid.
+              // The update is idempotent: later paid invoices do not create
+              // additional conversions for the same referred account.
+              await db
+                .update(promoReferralsTable)
+                .set({
+                  status: "converted",
+                  convertedAt: new Date(),
+                  stripeInvoiceId: invoice.id,
+                })
+                .where(and(
+                  eq(promoReferralsTable.referredUserId, user.id),
+                  eq(promoReferralsTable.promoCodeUsed, "NINA"),
+                  eq(promoReferralsTable.status, "applied"),
+                ));
               const [attribution] = await db
                 .select()
                 .from(referralAttributionsTable)

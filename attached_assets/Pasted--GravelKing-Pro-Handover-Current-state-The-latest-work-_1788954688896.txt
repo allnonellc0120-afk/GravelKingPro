@@ -1,0 +1,144 @@
+# GravelKing Pro Handover
+
+## Current state
+
+The latest work implemented authenticated, user-isolated JAX artist memory plus the requested songwriting and Library UX changes.
+
+### Completed
+
+- Added `artist_profiles` Drizzle schema:
+  - `lib/db/src/schema/artist_profiles.ts`
+  - Exported from `lib/db/src/schema/index.ts`
+  - Scoped by authenticated database user ID
+  - Includes:
+    - `memoryEnabled`, default `true`
+    - bio, genre, subgenres, tempo
+    - stylistic rules
+    - life events
+    - emotional history
+    - storytelling themes
+    - lyrical cadence
+    - vocal style
+    - vocabulary habits
+    - timestamps
+
+- Added authenticated artist-memory API routes in:
+  - `artifacts/api-server/src/routes/jax.ts`
+  - `GET /api/jax/artist-profile`
+  - `PUT /api/jax/artist-profile`
+  - `DELETE /api/jax/artist-profile`
+  - Every database query is constrained with:
+    - `eq(artistProfilesTable.userId, req.dbUser.id)`
+
+- Updated `/api/jax/generate`:
+  - Loads the profile server-side using `req.dbUser.id`
+  - Ignores client-supplied profile data as the persistent source of truth
+  - Injects profile data into the JAX prompt only when `memoryEnabled === true`
+  - Uses `{}` when disabled or unavailable
+
+- Updated `artifacts/gravelkingpro/src/pages/songwriting.tsx`:
+  - Removed the visible Past Sessions drawer
+  - Removed the sessions sidebar toggle
+  - Removed session cards and delete-session dialog from the UI
+  - Removed the lyric card `onTouchEnd` handler
+  - Kept native button `onClick` behavior with touch manipulation
+  - Replaced localStorage-only artist profile with backend persistence
+  - Added “Personalize JAX Memory” toggle, default enabled
+  - Added “Clear Memory” button
+  - Added fields for the expanded artist dossier
+  - Added loading/success/error toasts for generation
+  - Routes completed generations to:
+    - `/library?track=<trackId>`
+
+- Updated `artifacts/gravelkingpro/src/components/layout.tsx`:
+  - Added Library to the primary navigation.
+
+- Existing Library behavior already supports:
+  - `?track=<id>`
+  - Selecting the generated track
+  - Showing it in the top player
+  - Pinning it if desired
+
+## Database status
+
+The development database table was created manually because both normal and force Drizzle push commands hit an existing non-TTY schema conflict:
+
+```text
+Interactive prompts require a TTY terminal
+```
+
+The direct development DDL matched the Drizzle schema exactly.
+
+Production still needs the normal publish-time schema migration before this feature is usable there. The proposed follow-up task for production verification was cancelled.
+
+## Verification completed
+
+Passed:
+
+```text
+pnpm --filter @workspace/gravelkingpro run typecheck
+pnpm --filter @workspace/api-server run typecheck
+git diff --check
+```
+
+Runtime checks:
+
+- API health:
+  - `GET /api/healthz` → HTTP 200
+- Unauthenticated artist-memory boundary:
+  - `GET /api/jax/artist-profile` → HTTP 401
+- API workflow restarted successfully
+- GravelKing frontend workflow restarted successfully
+- Songwriting preview loaded successfully
+- Preview showed the single active songwriting canvas with no Past Sessions drawer or toggle
+
+## Core workflows currently running
+
+- `artifacts/api-server: API Server`
+- `artifacts/gravelkingpro: web`
+
+Several optional deck/artifact workflows are also running despite the older preference to keep optional workflows stopped.
+
+## Important next steps
+
+1. Publish the updated app so the production database receives `artist_profiles`.
+2. Verify production:
+   - Signed-in user can save profile memory.
+   - Clear Memory removes the row.
+   - Disabled memory is not included in JAX prompts.
+   - A second user cannot read the first user’s profile.
+3. Consider removing now-unused frontend session persistence code if the backend-only session support is no longer needed:
+   - `JAX_SESSION_KEY`
+   - session list state
+   - local session snapshot helpers
+   - backend session autosave/load functions
+
+## Main proof pattern
+
+```ts
+const user = req.dbUser;
+
+const [artistProfileRow] = user
+  ? await db
+      .select()
+      .from(artistProfilesTable)
+      .where(eq(artistProfilesTable.userId, user.id))
+      .limit(1)
+  : [];
+
+const artistProfile = artistProfileRow?.memoryEnabled
+  ? JSON.stringify({
+      bio: artistProfileRow.bio,
+      genre: artistProfileRow.genre,
+      subGenres: artistProfileRow.subGenres,
+      tempo: artistProfileRow.tempo,
+      stylisticRules: artistProfileRow.stylisticRules,
+      lifeEvents: artistProfileRow.lifeEvents,
+      emotionalHistory: artistProfileRow.emotionalHistory,
+      storytellingThemes: artistProfileRow.storytellingThemes,
+      lyricalCadence: artistProfileRow.lyricalCadence,
+      vocalStyle: artistProfileRow.vocalStyle,
+      vocabularyHabits: artistProfileRow.vocabularyHabits,
+    }).slice(0, 24_000)
+  : "{}";
+```

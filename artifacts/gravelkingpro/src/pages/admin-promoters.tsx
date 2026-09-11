@@ -21,12 +21,28 @@ interface PromoterRow {
   paidCents: number;
 }
 
+interface NinaReferral {
+  id: string;
+  referredUserId: string;
+  status: "applied" | "converted";
+  createdAt: string;
+  convertedAt: string | null;
+  email: string | null;
+}
+
+interface NinaReport {
+  totalReferred: number;
+  totalConversions: number;
+  referrals: NinaReferral[];
+}
+
 function usd(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
 function PromotersDashboard() {
   const [rows, setRows] = useState<PromoterRow[] | null>(null);
+  const [nina, setNina] = useState<NinaReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +55,8 @@ function PromotersDashboard() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as { promoters: PromoterRow[] };
       setRows(json.promoters);
+      const ninaRes = await fetch("/api/admin/promo/nina", { credentials: "include" });
+      if (ninaRes.ok) setNina((await ninaRes.json()) as NinaReport);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -94,6 +112,38 @@ function PromotersDashboard() {
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {nina && (
+        <Card className="border-amber-500/30">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Nina referral campaign</h2>
+                <p className="text-xs text-muted-foreground">
+                  Code NINA · conversions count only after a paid subscription invoice
+                </p>
+              </div>
+              <span className="font-mono text-amber-400">NINA</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-muted-foreground">Referred:</span> {nina.totalReferred}</div>
+              <div><span className="text-muted-foreground">Paid conversions:</span> {nina.totalConversions}</div>
+            </div>
+            {nina.referrals.length > 0 && (
+              <div className="space-y-1 border-t border-border/40 pt-3">
+                {nina.referrals.slice(0, 20).map((referral) => (
+                  <div key={referral.id} className="flex items-center justify-between gap-3 text-xs">
+                    <span className="truncate text-muted-foreground">{referral.email || referral.referredUserId}</span>
+                    <span className={referral.status === "converted" ? "text-green-500" : "text-yellow-500"}>
+                      {referral.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {rows === null ? (
         <div className="flex justify-center py-16">

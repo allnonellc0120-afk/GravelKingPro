@@ -1,0 +1,33 @@
+{
+  "files": {},
+  "jobs": {
+    "9a132b32-f097-4352-878f-256c5d31a3f1": {
+      "completed_at": "2026-09-09T17:37:54.095442+00:00",
+      "job_id": "9a132b32-f097-4352-878f-256c5d31a3f1",
+      "queued_at": "2026-09-09T17:37:53.775518+00:00",
+      "source_count": 2,
+      "sources": [
+        {
+          "bytes": 31520,
+          "content_type": "text/html",
+          "label": "icloud-drive",
+          "profile_target": "acoustic_grit",
+          "sha256": "e034fd73898e3d2c4b632965f243a519113367d30283e12c7fd8e7c6aa9add35",
+          "status": "SOURCE_RECEIVED_NON_AUDIO",
+          "url": "https://www.icloud.com/iclouddrive/"
+        },
+        {
+          "bytes": 9516,
+          "content_type": "text/html",
+          "label": "icloud-shared",
+          "profile_target": "southern_pocket",
+          "sha256": "d0ae3568b9b421abefe2b2f0e11a3cf90456f06e8c48ede9583ed7e198c32561",
+          "status": "SOURCE_RECEIVED_NON_AUDIO",
+          "url": "https://www.icloud.com/sharedalbum/"
+        }
+      ],
+      "status": "COMPLETE"
+    }
+  },
+  "version": 1
+}

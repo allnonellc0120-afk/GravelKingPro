@@ -31,6 +31,7 @@ import { ExportQuotaBadge } from "@/components/export-quota-badge";
 import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
 import { Link } from "wouter";
 import { useCredits } from "@/components/credit-wallet";
+import { CreditTopUpDialog, type CreditTopUpRequest } from "@/components/credit-top-up-dialog";
 
 type State = "idle" | "compressing" | "processing" | "done" | "error";
 
@@ -271,7 +272,9 @@ export default function Mastering() {
   const [exportError, setExportError] = useState("");
   const exportInFlightRef = useRef(false);
   const exportAbortRef = useRef<AbortController | null>(null);
-  const { balance: creditsBalance } = useCredits();
+  const { balance: creditsBalance, refresh: refreshCredits } = useCredits();
+  const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
+  const [exportingMp3, setExportingMp3] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -442,7 +445,19 @@ export default function Mastering() {
         if (data.code === "EMAIL_REQUIRED") { emailGate.forceGate(); return; }
       }
       if (resp.status === 402) {
-        const data = await resp.json() as { error: string };
+        const data = await resp.json() as {
+          error: string;
+          code?: string;
+          creditsRequired?: number;
+          creditsBalance?: number;
+        };
+        if (data.code === "INSUFFICIENT_CREDITS") {
+          setTopUpRequest({
+            format: "WAV",
+            required: data.creditsRequired ?? 100,
+            balance: data.creditsBalance ?? 0,
+          });
+        }
         setState("error");
         setErrorMsg(data.error ?? "Free limit reached.");
         return;
@@ -648,6 +663,49 @@ export default function Mastering() {
     }
   };
 
+  const downloadMp3 = async () => {
+    if (!resultUrl || exportingMp3) return;
+    setExportingMp3(true);
+    try {
+      const mastered = await fetch(resultUrl).then((response) => response.blob());
+      const body = new FormData();
+      body.append("audio", mastered, "gravelking_mastered.wav");
+      const response = await fetch("/api/kernel/export-result-mp3", {
+        method: "POST",
+        credentials: "include",
+        body,
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as {
+          error?: string;
+          code?: string;
+          creditsRequired?: number;
+          creditsBalance?: number;
+        };
+        if (response.status === 402 && data.code === "INSUFFICIENT_CREDITS") {
+          setTopUpRequest({
+            format: "MP3",
+            required: data.creditsRequired ?? 50,
+            balance: data.creditsBalance ?? 0,
+          });
+          return;
+        }
+        throw new Error(data.error ?? "Could not create the MP3 download.");
+      }
+      const mp3 = await response.blob();
+      downloadBlob(mp3, `gravelking_mastered_${preset}.mp3`);
+      await refreshCredits();
+    } catch (error) {
+      toast({
+        title: "MP3 download failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingMp3(false);
+    }
+  };
+
   const cancelFineTuneExport = () => {
     if (!exportInFlightRef.current) return;
     exportAbortRef.current?.abort();
@@ -713,7 +771,7 @@ export default function Mastering() {
             Apply a professional mastering chain with optional denoise. Runs locally with MLK v3 — no upload to third parties.
           </p>
            <p className="mt-2 text-xs text-sky-300">
-             Wallet: {creditsBalance === null ? "sign in to view your balance" : `${creditsBalance} credits`} · Master + download: 75 credits · Certificate: free with Pro
+             Wallet: {creditsBalance === null ? "sign in to view your balance" : `${creditsBalance} credits`} · MP3: 50 credits · WAV: 100 credits · Certificate: free with Pro
            </p>
         </div>
 
@@ -1336,16 +1394,20 @@ export default function Mastering() {
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* This result already consumed its export credit server-side when
                       the master ran — saving it must stay possible even if the quota
                       just hit 0, so the download is never gated here. */}
-                  <Button onClick={() => void download()} disabled={exportingEq} className="flex-1 bg-sky-600 hover:bg-sky-700" aria-busy={exportingEq}>
-                    {exportingEq ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                    {exportingEq ? FINE_TUNE_EXPORT_LABELS[exportStage] : eqIsActive ? "Download Fine-Tuned WAV" : "Download WAV"}
+                  <Button onClick={() => void downloadMp3()} disabled={exportingMp3 || exportingEq} variant="outline" aria-busy={exportingMp3} data-testid="button-download-master-mp3">
+                    {exportingMp3 ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                    {exportingMp3 ? "Preparing MP3…" : "Download MP3 (50 Credits)"}
                   </Button>
-                  <Button variant="outline" onClick={reset} className="border-border/40">New File</Button>
+                  <Button onClick={() => void download()} disabled={exportingEq || exportingMp3} className="bg-sky-600 hover:bg-sky-700" aria-busy={exportingEq} data-testid="button-download-master-wav">
+                    {exportingEq ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                    {exportingEq ? FINE_TUNE_EXPORT_LABELS[exportStage] : eqIsActive ? "Download Fine-Tuned WAV (100 Credits)" : "Download WAV (100 Credits)"}
+                  </Button>
                 </div>
+                <Button variant="outline" onClick={reset} className="w-full border-border/40">New File</Button>
                 <a
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("Just mastered my track with GravelKing Pro 🎚️ Server-side mastering, no plugins needed — free to try → gravelkingpro.com #MusicProduction #Mastering #AudioEngineering #BeatMaker")}`}
                   target="_blank"
@@ -1359,6 +1421,7 @@ export default function Mastering() {
             </Card>
           </motion.div>
         )}
+        <CreditTopUpDialog request={topUpRequest} onOpenChange={(open) => { if (!open) setTopUpRequest(null); }} />
 
         {/* Error */}
         {state === "error" && (

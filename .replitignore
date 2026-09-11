@@ -10,6 +10,20 @@
 .config/npm
 .git
 
+# Production static directories and API bundles are required by the publish
+# router after artifact builds complete; do not exclude their dist outputs.
+artifacts/api-server/dist-test
+
+# The promotional video artifact is a standalone deliverable and has no
+# production service in this autoscale deployment.
+artifacts/gravelking-promo
+
+# Local/test audio and generated export bundles are not runtime dependencies.
+artifacts/api-server/local_masters
+*.zip
+*.mp4
+zi*
+
 # Heavy media never referenced by any build or runtime code
 attached_assets/final_promos
 attached_assets/generated_videos

@@ -1,0 +1,52 @@
+ROLE: Principal Full-Stack Engineer & Payment Systems Architect.
+OBJECTIVE: Audit, patch, and harden our Stripe integration to eliminate checkout abandonment (22 expired sessions), fix subscription linking (129 users with missing Stripe IDs), and prevent unhandled card declines.
+
+CONSTRAINTS:
+- Do NOT refactor existing working routes or rewrite authentication.
+- Keep changes localized to the payment routes, checkout session creation, webhook listeners, and user schema updates.
+- Work incrementally: Plan -> Update Database/Schema -> Update Checkout Route -> Implement Webhook Handler -> Verify.
+
+EXECUTION TASKS:
+
+1. CHECKOUT SESSION CONFIGURATION (Fix 91.7% Abandonment):
+- Locate where `stripe.checkout.sessions.create()` is declared.
+- Enable automatic dynamic payment methods so Apple Pay, Google Pay, and Link work seamlessly:
+  `automatic_payment_methods: { enabled: true }`
+- Remove any hardcoded `payment_method_types: ['card']` that blocks digital wallets.
+- Attach customer tracking metadata to every session:
+  `client_reference_id: user.id`
+  `metadata: { userId: user.id }`
+- If an existing `stripeCustomerId` exists on the user profile, pass `customer: user.stripeCustomerId`; otherwise pass `customer_email: user.email`.
+
+2. DATABASE / SCHEMA SYNC (Fix 24 Ghost Pro Accounts):
+- Ensure the user table/schema contains:
+  - `stripeCustomerId` (TEXT / VARCHAR, nullable, indexed)
+  - `stripeSubscriptionId` (TEXT / VARCHAR, nullable, indexed)
+  - `subscriptionStatus` (TEXT: 'active', 'trialing', 'canceled', 'past_due', 'incomplete')
+  - `isPro` (BOOLEAN, default: false)
+
+3. WEBHOOK ROUTE (Fix Missing Subscription Linkage):
+- Verify or implement `/api/stripe/webhook` with raw body parsing enabled (`express.raw({ type: 'application/json' })`).
+- Handle the following events deterministically:
+  - `checkout.session.completed`:
+    Extract `client_reference_id` (or `metadata.userId`), `customer`, and `subscription`.
+    Update the database user: set `stripeCustomerId`, `stripeSubscriptionId`, `isPro: true`, and `subscriptionStatus: 'active'`.
+  - `customer.subscription.updated`:
+    Update `subscriptionStatus = subscription.status`.
+    Set `isPro = (subscription.status === 'active' || subscription.status === 'trialing')`.
+  - `customer.subscription.deleted`:
+    Set `isPro = false` and `subscriptionStatus = 'canceled'`.
+  - `invoice.payment_failed`:
+    Log customer ID and attempt count. Set `subscriptionStatus = 'past_due'`.
+
+4. DECLINE & ERROR LOGGING (Fix 12 Unhandled Card Declines):
+- In the payment failure/catch blocks and webhook logs, capture and print:
+  - `error.code`
+  - `error.decline_code`
+  - `error.raw.message`
+- Return clear, user-facing error messages on the frontend if a payment intent fails instead of leaving them in an abandoned hanging state.
+
+OUTPUT EXPECTED:
+1. Short list of files modified.
+2. The exact code diffs for checkout session creation and the webhook handler.
+3. Steps to run a test webhook event locally or verify with Stripe CLI.

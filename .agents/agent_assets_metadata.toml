@@ -1611,3 +1611,129 @@ mtime_ms = 1788734462474
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/a75d4763-7769-4e01-9b69-0d8c8ddfdeb3/1fb4b1e6-f350-4d23-b268-59a7456f30e7"
 storage_version_token = "1788734534594409"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "EakQLRcK4seYejbJSKBpS"
+uri = "file://attached_assets/generated_images/gravelking_authorship_workflow.png"
+type = "image"
+title = "GravelKing Pro JAX Authorship Workflow"
+description = "Visual workflow showing AI snapshotting, human-line locking, constrained regeneration, deterministic reassembly, and certificate sealing."
+logical_id = "028985c1-1614-4026-83cc-5de2eed6148c"
+content_hash = "sha256:37ff47616a5d0f9f98b55555ea8f230b8f485fbd4bcc52a25ba5333acad2a5d6"
+size = 1422846
+mtime_ms = 1788739604151
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/028985c1-1614-4026-83cc-5de2eed6148c/acc6de3f-f65a-4d72-9c78-2f5ebb52aaab"
+storage_version_token = "1788739666534042"
+content_type = "image/png"
+
+[[outputs]]
+id = "YYsbxnGha9zBRiVW5mXOV"
+uri = "file://attached_assets/gravelking-pro-jax-authorship-white-paper.pdf"
+type = "pdf"
+title = "GravelKing Pro JAX Authorship White Paper"
+description = "White paper checklist documenting the old behavior, new behavior, regeneration workflow, audit fields, certificate wording, and verification results."
+logical_id = "213f1e68-b87c-4152-9ffe-e553e39e70e2"
+content_hash = "sha256:a3d9df88d7cafef408403861fd251110a9d1e23c10d641d7939ffc35dcc76e23"
+size = 1782962
+mtime_ms = 1788739662659
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/213f1e68-b87c-4152-9ffe-e553e39e70e2/5846ee98-2927-4e77-9186-47a37bd92011"
+storage_version_token = "1788739667754860"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "m29yL7aPACi6CzNdG0-xt"
+uri = "file://.local/outputs/GravelKing-Pro-Launch-Campaign.pdf"
+type = "pdf"
+title = "GravelKing Pro Launch Campaign (PDF)"
+description = "Eight-slide promotional launch deck."
+logical_id = "10b3aa11-bd18-4f0c-82c9-24d0e4778f2e"
+content_hash = "sha256:cb47de5f0f003b72638caa484a55aa085369773631d89299d5abe01a91158d3c"
+size = 235727
+mtime_ms = 1788740496576
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/10b3aa11-bd18-4f0c-82c9-24d0e4778f2e/7a7da6e2-f522-4f20-93e6-629508d814bd"
+storage_version_token = "1788740532821014"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "goD9YB8L_jSIrud2FQRAI"
+uri = "file://.local/outputs/GravelKing-Pro-Launch-Campaign.pptx"
+type = "slides"
+title = "GravelKing Pro Launch Campaign (PPTX)"
+description = "Editable PowerPoint export of the promotional launch deck."
+logical_id = "1451c9d4-7181-44f0-8698-9315bfa6df20"
+content_hash = "sha256:89527d69c248bbd5f2bd89d0b95cfd583140dbd8edc904b3d2b2cbe8133d9c3c"
+size = 4857149
+mtime_ms = 1788740500444
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/1451c9d4-7181-44f0-8698-9315bfa6df20/adc2e832-a039-4fcf-b6f2-aacd75db5fa2"
+storage_version_token = "1788740533900606"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "Lc6N-SmA2-SH_HU1uqqj8"
+uri = "file://.local/outputs/GravelKing-Pro-B2B-Partnership-Brief.pdf"
+type = "pdf"
+title = "GravelKing Pro B2B Partnership Brief (PDF)"
+description = "Eight-slide partnership deck."
+logical_id = "dfed3518-9c55-4d50-b0ca-291a5def9ba3"
+content_hash = "sha256:54d2bd550254158590cbe4e87d4373721956b3eeaa8c5637e771531ce8bd4c3e"
+size = 208532
+mtime_ms = 1788740501912
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/dfed3518-9c55-4d50-b0ca-291a5def9ba3/fb23638d-6d6b-46bc-94a4-27eaefaaca08"
+storage_version_token = "1788740534701163"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "YjuU1tvCiCM3empB3ngfh"
+uri = "file://.local/outputs/GravelKing-Pro-B2B-Partnership-Brief.pptx"
+type = "slides"
+title = "GravelKing Pro B2B Partnership Brief (PPTX)"
+description = "Editable PowerPoint export of the partnership deck."
+logical_id = "8ff8ea5d-fc75-4ebb-b33e-2c7bfa694c4e"
+content_hash = "sha256:bc4686ea5dded79c0d9e7a8297b9ae4825d694dc027b9d3f30b9c9ebeeb4012f"
+size = 4810996
+mtime_ms = 1788740505608
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/8ff8ea5d-fc75-4ebb-b33e-2c7bfa694c4e/383b8fd6-e8b1-484c-bf60-72cb71ce155e"
+storage_version_token = "1788740535880759"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "BO26MrpOasO1bSXqGKiTh"
+uri = "file://artifacts/gravelking-promo-launch-deck/GRAVELKING_PRO_FINANCIAL_APPRAISAL.pdf"
+type = "pdf"
+title = "GravelKing Pro Financial Appraisal"
+description = "Decision memo with current-value bands, investment ask, scenarios, and execution odds."
+logical_id = "ec6bd493-6f8e-48a9-8700-3242345359a0"
+content_hash = "sha256:6593fd72ecf4ba285a3a2798dbf43df887f726b329537e7f94c2bfd3652b25a1"
+size = 7536
+mtime_ms = 1788740460707
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ec6bd493-6f8e-48a9-8700-3242345359a0/215790e0-23ca-492f-908a-88365b7caf99"
+storage_version_token = "1788740536549699"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "ZcZK6TnzyQi0IQfhzygQC"
+uri = "file://artifacts/gravelking-promo-launch-deck/GRAVELKING_PRO_LAUNCH_WALKTHROUGH.md"
+type = "text"
+title = "GravelKing Pro Launch Walkthrough"
+description = "Master walkthrough copy and claims discipline."
+logical_id = "a0cee09c-4281-4bae-9412-df0f8d2319b4"
+content_hash = "sha256:97522d5d8e09916b4730b62f1f686cf0c17a9db3df8ebb4d7d7b088ac27b4cc7"
+size = 1582
+mtime_ms = 1788740460667
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/a0cee09c-4281-4bae-9412-df0f8d2319b4/99eebde1-b492-44ee-b882-b09f19e65e86"
+storage_version_token = "1788740537179771"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "yZv1lfDU6Goz4blbfoO7w"
+uri = "file://artifacts/gravelking-promo-launch-deck/GRAVELKING_PRO_100_TARGET_30_DAY_CAMPAIGN.csv"
+type = "table"
+title = "GravelKing Pro 100-Target 30-Day Campaign"
+description = "100 target rows with platform-specific copy for each day of a 30-day month."
+logical_id = "2cd022e4-1b20-4f54-a0ed-ef8f95c71177"
+content_hash = "sha256:2923d0adeaf30680f301889f1a5e4e9c21db1db617f29bb34d6060f47652da4e"
+size = 495545
+mtime_ms = 1788740460697
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/2cd022e4-1b20-4f54-a0ed-ef8f95c71177/7d68aaea-5a14-49fb-a08e-68ec69ba7bdb"
+storage_version_token = "1788740538067956"
+content_type = "text/csv"

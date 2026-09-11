@@ -10,7 +10,7 @@ import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { getUsageUser } from "../lib/usage";
 import { isVertexConfigured } from "../geminiVertex";
-import { generateAndMasterTrack, remixTrack, type VocalMode } from "../services/mlkOrchestrator";
+import { generateAndMasterTrack, hashLyrics, remixTrack, type VocalMode } from "../services/mlkOrchestrator";
 import { verifyLyrics } from "../services/lyricGuard";
 import { isAdminAutomationAuthenticated, ADMIN_AUTOMATION_EMAIL } from "../lib/adminAuth";
 import { db, usersTable } from "@workspace/db";
@@ -61,6 +61,7 @@ mlkGenerateRouter.post(
       stylePrompt?: string;
       vocalMode?: string;
       durationS?: number;
+      lyricAudit?: { finalLyricsHash?: string; authorshipScore?: number; ledger?: unknown[] };
     };
     const vocalMode: VocalMode =
       body.vocalMode === "instrumental" || body.vocalMode === "random"
@@ -110,6 +111,7 @@ mlkGenerateRouter.post(
     }
 
     try {
+      const serverLyricHash = vocalMode === "lyrics" ? hashLyrics(text).hash : "";
       const result = await generateAndMasterTrack(body.lyricId ?? null, text, userId, {
         title: body.title,
         artistName: body.artistName,
@@ -119,6 +121,13 @@ mlkGenerateRouter.post(
           typeof body.durationS === "number" && Number.isFinite(body.durationS)
             ? body.durationS
             : undefined,
+        lyricAudit: body.lyricAudit?.finalLyricsHash && Array.isArray(body.lyricAudit.ledger)
+          ? {
+              finalLyricsHash: serverLyricHash,
+              authorshipScore: Math.max(0, Math.min(100, Number(body.lyricAudit.authorshipScore) || 0)),
+              ledger: body.lyricAudit.ledger.slice(0, 500),
+            }
+          : undefined,
       });
       res.json({ success: true, ...result });
     } catch (err) {

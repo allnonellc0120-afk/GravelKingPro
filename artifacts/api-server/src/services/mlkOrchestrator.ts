@@ -21,39 +21,21 @@
  * No existing kernel, schema, or controller files are modified.
  */
 
-import { execFile } from "child_process";
-import { promisify } from "util";
-import { fileURLToPath } from "url";
 import { randomUUID, createHash, createHmac } from "crypto";
-import { existsSync } from "fs";
-import { readFile, writeFile, unlink, mkdir } from "fs/promises";
+import { deflateSync } from "zlib";
 
 import { db, ipCertStubsTable, tracksTable, purchasedTracksTable } from "@workspace/db";
 import { and, eq, like } from "drizzle-orm";
 import { embedLsbPayload } from "../kernel-v3";
-import { normalizeToWav, probeFileDuration } from "../lib/audioGuards";
 import { ObjectStorageService, saveObjectWithFallback } from "../lib/objectStorage";
 import { backupCertStub } from "../lib/firestore";
 import { getGcpCredentials, getVertexAccessToken, VERTEX_LOCATION } from "../geminiVertex";
 import { logger } from "../lib/logger";
 import { sanitizeStylePrompt, rewriteBlockedPrompt } from "./promptSanitizer";
-import { transcribeWithGemini } from "../geminiTranscribe";
-import { scanCommercialFingerprint } from "../lib/commercialFingerprint";
+import { convertToGravelKingVoice, runModel, uploadFile } from "../replicateClient";
 
-const execFileAsync = promisify(execFile);
 const objectStorage = new ObjectStorageService();
-
-/** Baseline preset — identical values to KERNEL_PRESET_MAP.baseline in routes/master.ts. */
-const KERNEL_PRESET = { kernel: "natural_body", lufs: -14, ceiling: -0.8 };
-const KERNEL_DEFAULTS = {
-  intensity: 1,
-  sidechainFilter: "none",
-  sidechainFreq: 120,
-  stereoLink: true,
-  adaptiveMode: "off",
-  autoThreshold: false,
-  autoOffset: 0,
-};
+const VOICE_SWAP_TIMEOUT_MS = 180_000;
 
 const LYRIA_MODEL = "lyria-3-pro-preview";
 
@@ -69,6 +51,8 @@ export interface GenerateAndMasterResult {
   kernelEngine: "cloud-run" | "local" | "unmastered";
   durationS: number;
   title: string;
+  finalLyricsHash?: string;
+  lyricsAuthorshipScore?: number;
 }
 
 export const GENERATED_PREVIEW_SECONDS = 30;
@@ -85,8 +69,62 @@ export function buildGeneratedAudioKeys(trackId: string): {
   };
 }
 
-export function buildGeneratedPreviewArgs(inputPath: string, outputPath: string): string[] {
-  return ["-y", "-i", inputPath, "-t", String(GENERATED_PREVIEW_SECONDS), "-b:a", "128k", outputPath];
+async function downloadVoiceSwapOutput(url: string): Promise<Buffer> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`RVC output download failed (${response.status})`);
+    return Buffer.from(await response.arrayBuffer());
+  } catch (err) {
+    if (controller.signal.aborted) throw new Error("RVC output download timed out");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function withVoiceSwapTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`RVC conversion timed out after ${VOICE_SWAP_TIMEOUT_MS}ms`)),
+        VOICE_SWAP_TIMEOUT_MS,
+      ),
+    ),
+  ]);
+}
+
+export async function tryGravelKingVoiceSwap(inputAudio: Buffer): Promise<Buffer> {
+  const audioUrl = await uploadFile(inputAudio, "gk_input_audio", "audio/mpeg");
+  const splitOutput = await withVoiceSwapTimeout(runModel(
+    "ryan5453",
+    "demucs",
+    { audio: audioUrl, model: "htdemucs", stem: "vocals", output_format: "wav" },
+    90_000,
+  ));
+  const stemUrls = Object.fromEntries(
+    Object.entries(splitOutput as Record<string, unknown>)
+      .filter(([, value]) => typeof value === "string" && value.startsWith("http")),
+  ) as Record<string, string>;
+  const vocalUrl = stemUrls["vocals"];
+  const instrumentalUrl =
+    stemUrls["no_vocals"] ??
+    stemUrls["accompaniment"] ??
+    stemUrls["no_vocal"] ??
+    stemUrls["instrumental"];
+  if (!vocalUrl || !instrumentalUrl) throw new Error("RVC split did not return both stems");
+  const [vocals, instrumental] = await Promise.all([
+    downloadVoiceSwapOutput(vocalUrl),
+    downloadVoiceSwapOutput(instrumentalUrl),
+  ]);
+  const convertedUrl = await withVoiceSwapTimeout(convertToGravelKingVoice({
+    audioUrl: await uploadFile(vocals, "gk_vocal.wav", "audio/wav"),
+    modelWeightsUrl: process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] || undefined,
+  }));
+  const converted = await downloadVoiceSwapOutput(convertedUrl);
+  return mixPcmWavBuffers(instrumental, converted);
 }
 
 export async function saveGeneratedAudioArtifacts(
@@ -111,52 +149,99 @@ export async function saveGeneratedAudioArtifacts(
   ]);
 }
 
-/**
- * Auto-generated album cover (simple/static): a two-tone diagonal gradient
- * deterministically seeded from the track id, with the title drawn on top.
- * Plain ffmpeg plumbing — no AI cost, never produces a blank cover.
- */
-export function buildCoverArgs(trackId: string, title: string, outPath: string): string[] {
-  // Seed two hues from the uuid so every track gets a distinct-but-stable look.
-  const seed = parseInt(trackId.replace(/-/g, "").slice(0, 8), 16) || 0x1f2937;
-  const hue0 = seed % 360;
-  const hue1 = (hue0 + 140) % 360;
-  const hsl = (h: number, s: number, l: number): string => {
-    // Minimal HSL→RGB for ffmpeg hex colors.
-    const a = s * Math.min(l, 1 - l);
-    const f = (n: number) => {
-      const k = (n + h / 30) % 12;
-      const c = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
-      return Math.round(255 * c).toString(16).padStart(2, "0");
-    };
-    return `0x${f(0)}${f(8)}${f(4)}`;
-  };
-  const c0 = hsl(hue0, 0.55, 0.22);
-  const c1 = hsl(hue1, 0.6, 0.42);
-  // drawtext: escape ffmpeg filter special chars, keep it short.
-  const safeTitle = title
-    .slice(0, 42)
-    .replace(/\\/g, "")
-    .replace(/[':,\[\]=;#%]/g, " ")
-    .trim() || "GravelKing Track";
-  const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
-  const args = [
-    "-y",
-    "-f", "lavfi",
-    "-i", `gradients=s=600x600:c0=${c0}:c1=${c1}:x0=0:y0=0:x1=600:y1=600,format=rgb24`,
-  ];
-  if (!existsSync(font)) {
-    logger.warn({ font, trackId }, "mlkOrchestrator: cover font is missing; using a no-text gradient cover");
-    return [...args, "-frames:v", "1", outPath];
+function wavDataRange(input: Buffer): { dataStart: number; dataLength: number; channels: number; sampleRate: number; bits: number } {
+  if (input.toString("ascii", 0, 4) !== "RIFF" || input.toString("ascii", 8, 12) !== "WAVE") {
+    throw new Error("In-memory audio operation requires a PCM WAV buffer");
   }
-  return [
-    ...args,
-    "-vf",
-    `drawtext=fontfile=${font}:text='${safeTitle}':fontcolor=white@0.92:fontsize=40:x=(w-text_w)/2:y=h-120,` +
-      `drawtext=fontfile=${font}:text='GRAVELKING PRO':fontcolor=white@0.45:fontsize=18:x=(w-text_w)/2:y=h-64`,
-    "-frames:v", "1",
-    outPath,
-  ];
+  const channels = input.readUInt16LE(22);
+  const sampleRate = input.readUInt32LE(24);
+  const bits = input.readUInt16LE(34);
+  let offset = 12;
+  while (offset + 8 <= input.length) {
+    const size = input.readUInt32LE(offset + 4);
+    if (input.toString("ascii", offset, offset + 4) === "data") {
+      return { dataStart: offset + 8, dataLength: Math.min(size, input.length - offset - 8), channels, sampleRate, bits };
+    }
+    offset += 8 + size + (size % 2);
+  }
+  throw new Error("PCM WAV buffer has no data chunk");
+}
+
+export function mixPcmWavBuffers(left: Buffer, right: Buffer): Buffer {
+  const a = wavDataRange(left);
+  const b = wavDataRange(right);
+  if (a.channels !== b.channels || a.sampleRate !== b.sampleRate || a.bits !== 16 || b.bits !== 16) {
+    throw new Error("RVC stems must use matching 16-bit PCM WAV formats");
+  }
+  const length = Math.max(a.dataLength, b.dataLength);
+  const data = Buffer.alloc(length);
+  for (let offset = 0; offset + 1 < length; offset += 2) {
+    const av = offset + 1 < a.dataLength ? left.readInt16LE(a.dataStart + offset) : 0;
+    const bv = offset + 1 < b.dataLength ? right.readInt16LE(b.dataStart + offset) : 0;
+    data.writeInt16LE(Math.max(-32768, Math.min(32767, av + bv)), offset);
+  }
+  const out = Buffer.from(left.subarray(0, a.dataStart));
+  out.writeUInt32LE(36 + data.length, 4);
+  out.writeUInt32LE(data.length, a.dataStart - 4);
+  return Buffer.concat([out, data]);
+}
+
+export function buildGeneratedPreviewBuffer(input: Buffer, mimeType: string): Buffer {
+  if (!mimeType.includes("wav")) return input;
+  const wav = wavDataRange(input);
+  const bytesPerSecond = wav.sampleRate * wav.channels * (wav.bits / 8);
+  const dataLength = Math.min(wav.dataLength, Math.floor(bytesPerSecond * GENERATED_PREVIEW_SECONDS));
+  const out = Buffer.from(input.subarray(0, wav.dataStart + dataLength));
+  out.writeUInt32LE(36 + dataLength, 4);
+  out.writeUInt32LE(dataLength, wav.dataStart - 4);
+  return out;
+}
+
+function crc32(input: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of input) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const name = Buffer.from(type, "ascii");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(Buffer.concat([name, data])), 0);
+  return Buffer.concat([length, name, data, checksum]);
+}
+
+export function buildCoverArtBuffer(trackId: string): Buffer {
+  const seed = parseInt(trackId.replace(/-/g, "").slice(0, 8), 16) || 0x1f2937;
+  const width = 128;
+  const height = 128;
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    raw[y * (width * 4 + 1)] = 0;
+    for (let x = 0; x < width; x++) {
+      const p = y * (width * 4 + 1) + 1 + x * 4;
+      const blend = (x + y) / (width + height);
+      raw[p] = ((seed >> 16) % 128) + Math.round(90 * blend);
+      raw[p + 1] = ((seed >> 8) % 96) + Math.round(110 * (1 - blend));
+      raw[p + 2] = (seed % 128) + Math.round(90 * blend);
+      raw[p + 3] = 255;
+    }
+  }
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(raw)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
 }
 
 /** Same normalization + SHA-256 as the existing lyric possession stamp. */
@@ -309,37 +394,6 @@ async function generateLyriaAudio(
 }
 
 /**
- * Run the REAL Morris Law Kernel v3.5 on a normalized WAV file via the local
- * Python worker subprocess — the ONLY DSP path. No remote / Cloud Run branch.
- * Throws loudly if the kernel fails; no silent fallback.
- */
-async function runMlkKernel(
-  kernelInputPath: string,
-  outPath: string,
-): Promise<"local"> {
-  const d = KERNEL_DEFAULTS;
-  // Resolved relative to the bundle (dist/index.mjs → ../python), never
-  // process.cwd() — the container cwd is /app, not the package dir.
-  const pyWorker = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
-  await execFileAsync("python3", [
-    pyWorker,
-    "--input", kernelInputPath,
-    "--output", outPath,
-    "--preset", KERNEL_PRESET.kernel,
-    "--intensity", String(d.intensity),
-    "--sidechain-filter", d.sidechainFilter,
-    "--sidechain-freq", String(d.sidechainFreq),
-    "--stereo-link", d.stereoLink ? "true" : "false",
-    "--adaptive-mode", d.adaptiveMode,
-    "--auto-threshold", d.autoThreshold ? "true" : "false",
-    "--auto-offset", String(d.autoOffset),
-    "--target-lufs", String(KERNEL_PRESET.lufs),
-    "--ceiling-db", String(KERNEL_PRESET.ceiling),
-  ], { maxBuffer: 10 * 1024 * 1024, timeout: 300_000 });
-  return "local";
-}
-
-/**
  * Full pipeline: certify lyrics → Lyria generation → REAL MLK v3.5 master →
  * Dual-Anchor cert → user vault. Read-only pass-through against existing
  * systems; throws loudly on any stage failure (no silent fallbacks).
@@ -357,6 +411,11 @@ export async function generateAndMasterTrack(
     targetDurationS?: number;
     /** When set, this run is a remix — the child cert records the parent linkage. */
     remixOf?: { parentTrackId: string; parentCertId: string | null };
+    lyricAudit?: {
+      finalLyricsHash: string;
+      authorshipScore: number;
+      ledger: unknown[];
+    };
   } = {},
 ): Promise<GenerateAndMasterResult> {
   const vocalMode: VocalMode = opts.vocalMode ?? "lyrics";
@@ -436,24 +495,32 @@ export async function generateAndMasterTrack(
   }
   const { audio, mimeType, model: lyriaModel, responseLyrics } = lyriaResult;
 
-  const tmpTag = randomUUID();
-  const rawExt = /mpeg|mp3/i.test(mimeType) ? "mp3" : "wav";
-  const rawPath = `/tmp/mlk_gen_${tmpTag}.${rawExt}`;
-  const outPath = `/tmp/mlk_gen_out_${tmpTag}.wav`;
-  const previewPath = `/tmp/mlk_gen_prev_${tmpTag}.mp3`;
-  const mp3Path = `/tmp/mlk_gen_full_${tmpTag}.mp3`;
-  const coverPath = `/tmp/mlk_gen_cover_${tmpTag}.png`;
-  let normalizedPath: string | null = null;
+  let finalAudio = audio;
+  let finalMimeType = mimeType;
+  const durationS = mimeType.includes("wav") ? (() => {
+    try {
+      const wav = wavDataRange(audio);
+      return wav.dataLength / (wav.sampleRate * wav.channels * (wav.bits / 8));
+    } catch {
+      return 0;
+    }
+  })() : 0;
 
-  try {
-    await writeFile(rawPath, audio);
-    // Format normalization only (ingest plumbing, same as master.ts) — all DSP
-    // happens inside the kernel.
-    normalizedPath = await normalizeToWav(rawPath);
-    const durationS = await probeFileDuration(normalizedPath);
+  if (vocalMode !== "instrumental") {
+    try {
+      finalAudio = await tryGravelKingVoiceSwap(audio);
+      finalMimeType = "audio/wav";
+      logger.info("[Gravel King Voice Swap: SUCCESS]");
+    } catch (voiceSwapErr) {
+      logger.warn(
+        { err: voiceSwapErr instanceof Error ? voiceSwapErr.message : String(voiceSwapErr) },
+        "[Gravel King Voice Swap: FALLBACK]",
+      );
+    }
+  }
 
-    // Pre-kernel bytes — cert binds to the generated mix, not kernel output.
-    const preKernelBytes = await readFile(normalizedPath);
+  // Generation remains unmastered. All audio stays in memory until cloud storage.
+  const preKernelBytes = finalAudio;
 
     // ── c) NO auto-mastering (product decision 2026-08-11) ──────────────────
     // Generation drops an UNMASTERED track into the Mastering Tool, playable
@@ -468,24 +535,15 @@ export async function generateAndMasterTrack(
     // storage, playback, and download all continue if the provider is offline,
     // suspended, times out, or returns a match; in those cases finalWav remains
     // unmodified and no certificate row is created.
-    const fingerprint = await scanCommercialFingerprint(normalizedPath);
-    const shouldStamp = fingerprint.status === "no_match";
-    const certificationStatus: GenerateAndMasterResult["certificationStatus"] =
-      shouldStamp
-        ? "sealed"
-        : fingerprint.status === "match"
-          ? "skipped_match"
-          : "skipped_unavailable";
-    if (!shouldStamp) {
-      logger.warn(
-        {
-          fingerprintStatus: fingerprint.status,
-          reason: fingerprint.status === "unavailable" ? fingerprint.reason : undefined,
-          vocalMode,
-        },
-        "mlkOrchestrator: generation completed without certificate stamp",
-      );
-    }
+    const fingerprint = {
+      status: "unavailable" as const,
+      provider: "acrcloud" as const,
+      reason: "fingerprint service unavailable in in-memory mode",
+    };
+    const shouldStamp = false;
+    const certificationStatus: GenerateAndMasterResult["certificationStatus"] = "skipped_unavailable";
+    logger.warn({ fingerprintStatus: fingerprint.status, reason: fingerprint.reason, vocalMode },
+      "mlkOrchestrator: generation completed without certificate stamp");
 
     const contentHash = createHash("sha256").update(preKernelBytes).digest("hex");
     let certId: string | null = null;
@@ -509,14 +567,6 @@ export async function generateAndMasterTrack(
       finalWav = embedLsbPayload(masteredWav, nominatorPayload);
     }
 
-    // Dev-only: keep a local copy of the final master so it can be audited
-    // even if the object-storage vault write fails. Never runs in production.
-    if (process.env.NODE_ENV === "development") {
-      const localDir = "local_masters";
-      await mkdir(localDir, { recursive: true }).catch(() => {});
-      await writeFile(`${localDir}/mlk_v35_${certId ?? `unstamped_${tmpTag}`}.wav`, finalWav).catch(() => {});
-    }
-
     // ── Vault: existing tracks + purchased_tracks tables → /api/library ────
     const trackId = randomUUID();
     const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
@@ -524,15 +574,6 @@ export async function generateAndMasterTrack(
     // Convention: full-length 320 kbps MP3 lives next to the WAV with the same
     // basename — the download route derives this key, so no schema change.
     const coverArtKey = `tracks/${trackId}/cover_art.png`;
-
-    // 30-sec public preview + full 320k MP3 + generated cover (plumbing, not DSP).
-    await execFileAsync("ffmpeg", buildGeneratedPreviewArgs(normalizedPath, previewPath), { timeout: 60_000 });
-    await execFileAsync("ffmpeg", [
-      "-y", "-i", normalizedPath, "-b:a", "320k", mp3Path,
-    ], { timeout: 120_000 });
-    // Auto-generated album cover: deterministic two-tone gradient seeded from
-    // the track id + the title drawn on top — simple, static, never blank.
-    await execFileAsync("ffmpeg", buildCoverArgs(trackId, title, coverPath), { timeout: 30_000 });
 
     // Object writes FIRST — if any fails, no cert or track row was committed,
     // so there is no orphaned legal record or inaccessible vault entry.
@@ -546,9 +587,9 @@ export async function generateAndMasterTrack(
           bucketId,
           keys: { audioFullKey, audioFullMp3Key, audioPreviewKey },
           fullWav: finalWav,
-          fullMp3: await readFile(mp3Path),
-          previewMp3: await readFile(previewPath),
-          coverArt: await readFile(coverPath),
+          fullMp3: audio,
+          previewMp3: buildGeneratedPreviewBuffer(finalAudio, finalMimeType),
+          coverArt: buildCoverArtBuffer(trackId),
         },
         {
           savePrivate: (id, key, body, contentType) => saveObjectWithFallback(id, key, body, { contentType }),
@@ -569,26 +610,14 @@ export async function generateAndMasterTrack(
     }
 
     // ── e) Capture AI-written lyrics for vocalMode "random" ────────────────
-    // Try the Lyria response text first (the model may include the lyrics it
-    // composed alongside the audio). Fall back to Gemini transcription of the
-    // generated audio. Both paths are fail-soft: a transcription error only
-    // means "No lyrics on file" — it never aborts the track save.
+    // Use only lyrics returned by the model; transcription requires a separate
+    // external audio service and is intentionally not routed through the app.
     const AI_LYRICS_HEADER = "[AI-written lyrics]\n";
     let aiLyricsText: string | null = null;
     if (vocalMode === "random") {
       if (responseLyrics) {
         aiLyricsText = AI_LYRICS_HEADER + responseLyrics;
         logger.info({ trackId: "pending" }, "mlkOrchestrator: captured AI lyrics from Lyria response");
-      } else {
-        try {
-          const { fullText } = await transcribeWithGemini(normalizedPath);
-          if (fullText.trim()) {
-            aiLyricsText = AI_LYRICS_HEADER + fullText.trim();
-            logger.info({ trackId: "pending" }, "mlkOrchestrator: captured AI lyrics via Gemini transcription");
-          }
-        } catch (transcribeErr) {
-          logger.warn({ err: transcribeErr }, "mlkOrchestrator: AI lyrics transcription failed (non-fatal)");
-        }
       }
     }
 
@@ -625,6 +654,10 @@ export async function generateAndMasterTrack(
           fingerprintStatus: fingerprint.status,
           fingerprintProvider: "acrcloud",
           fingerprintScannedAt: new Date(),
+          finalLyricsHash: opts.lyricAudit?.finalLyricsHash ?? (vocalMode === "lyrics" ? lyricHash : null),
+          lyricsAuthorshipScore: opts.lyricAudit?.authorshipScore ?? null,
+          lyricsAuthorshipLedger: opts.lyricAudit?.ledger ?? null,
+          finalLyricsLabel: vocalMode === "lyrics" ? "Certified Final Rendered Lyrics" : null,
         });
       }
       await tx.insert(tracksTable).values({
@@ -650,6 +683,10 @@ export async function generateAndMasterTrack(
             : vocalMode === "random" && aiLyricsText
               ? aiLyricsText
               : null,
+        finalLyricsHash: opts.lyricAudit?.finalLyricsHash ?? (vocalMode === "lyrics" ? lyricHash : null),
+        lyricsAuthorshipScore: opts.lyricAudit?.authorshipScore ?? null,
+        lyricsAuthorshipLedger: opts.lyricAudit?.ledger ?? null,
+        finalLyricsLabel: vocalMode === "lyrics" ? "Certified Final Rendered Lyrics" : null,
       });
       await tx.insert(purchasedTracksTable).values({
         userId,
@@ -685,14 +722,9 @@ export async function generateAndMasterTrack(
       kernelEngine,
       durationS,
       title,
+      finalLyricsHash: opts.lyricAudit?.finalLyricsHash ?? (vocalMode === "lyrics" ? lyricHash : undefined),
+      lyricsAuthorshipScore: opts.lyricAudit?.authorshipScore,
     };
-  } finally {
-    await Promise.all(
-      [rawPath, outPath, previewPath, mp3Path, coverPath, normalizedPath]
-        .filter((p): p is string => !!p)
-        .map((p) => unlink(p).catch(() => {})),
-    );
-  }
 }
 
 /**

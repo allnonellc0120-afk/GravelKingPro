@@ -1,0 +1,62 @@
+{
+  "protocol": "GravelKing_Sprint_Directive",
+  "version": "2.0.0",
+  "target_agent": "Cousin",
+  "priority": "CRITICAL_REALTIME",
+  "directive_context": {
+    "mandate": "Performance parity between bare-metal engine and web transport layers.",
+    "accountability_rule": "Agent code quality dictates Jax client latency. Eliminate the 45-second execution choke immediately."
+  },
+  "execution_payload": {
+    "network_and_transport": {
+      "streaming": true,
+      "protocol": "Server-Sent Events (SSE)",
+      "target_ttft_ms": "<500",
+      "payload_optimization": {
+        "context_truncation": true,
+        "history_window": 2,
+        "strip_legacy_debug_logs": true
+      }
+    },
+    "thread_decoupling": {
+      "tts_blocking_ui": false,
+      "audio_execution": "asynchronous_lazy_load",
+      "render_priority": "text_stream_first"
+    },
+    "engine_prompt_injection": {
+      "hook_injection_point": "request_middleware",
+      "cadence_rules": {
+        "phrasing": "Rubber_Band_Asymmetric",
+        "verse_compression": "multi_syllable_clusters_mid_bar",
+        "rhyme_mechanics": "3_Point_Pivot",
+        "pivot_structure": ["Anchor", "Bridge", "Resolve"],
+        "density_split": {
+          "verse": "high_density_internal_slants",
+          "chorus": "drop_syllables_60_percent_vowel_sustain"
+        }
+      },
+      "mentor_output_format": {
+        "append_delivery_guide": true,
+        "max_bullets": 3,
+        "fields": ["breath_pockets", "consonant_softening", "vowel_sustain"]
+      }
+    }
+  },
+  "constraints": {
+    "run_external_builds": false,
+    "run_heavy_bundlers": false,
+    "install_new_dependencies": false
+  },
+  "required_telemetry_output": {
+    "sample_output_validation": {
+      "verse_4_lines": "demonstrating_3_point_pivot_and_rubber_band",
+      "chorus_2_lines": "demonstrating_60pct_density_drop_and_vowel_sustain",
+      "studio_delivery_notes": "parsed_and_formatted"
+    },
+    "accounting_report": [
+      "execution_duration_seconds",
+      "modified_file_paths",
+      "measured_ttft_delta_ms"
+    ]
+  }
+}

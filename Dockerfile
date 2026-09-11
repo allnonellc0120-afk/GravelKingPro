@@ -1,12 +1,13 @@
 # GravelKing Pro — Enterprise API Core
 # Multi-stage build for a defensible, auditable production image.
 
-FROM node:22-slim AS base
+FROM node:24.13.0-bookworm-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@9.4.0 --activate
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    python3.11 \
     ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*

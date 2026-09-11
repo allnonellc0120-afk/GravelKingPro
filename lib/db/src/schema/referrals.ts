@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { usersTable } from "./auth";
 
 /** Creators who signed up to promote GravelKing Pro for a commission. */
@@ -42,6 +42,35 @@ export const referralAttributionsTable = pgTable("referral_attributions", {
     .references(() => promotersTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Promo-code attribution for partner campaigns that are tracked separately
+ * from the commission-bearing promoter program.
+ *
+ * The unique user/code pair makes redemption idempotent at the database
+ * boundary. A paid Stripe invoice moves the row from applied to converted.
+ */
+export const promoReferralsTable = pgTable(
+  "promo_referrals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    referrerName: text("referrer_name").notNull(),
+    referredUserId: text("referred_user_id")
+      .notNull()
+      .references(() => usersTable.id),
+    promoCodeUsed: text("promo_code_used").notNull(),
+    status: text("status").notNull().default("applied"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    convertedAt: timestamp("converted_at", { withTimezone: true }),
+    stripeInvoiceId: text("stripe_invoice_id"),
+  },
+  (table) => [
+    uniqueIndex("promo_referrals_user_code_unique").on(
+      table.referredUserId,
+      table.promoCodeUsed,
+    ),
+  ],
+);
 
 /** Commission accrued from a verified paid Stripe invoice. */
 export const commissionsTable = pgTable("commissions", {

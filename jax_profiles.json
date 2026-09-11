@@ -1,0 +1,76 @@
+{
+  "lineage": "Kevin Morris",
+  "version": "morris-law-kernel-v2-master-5-pillar",
+  "profiles": {
+    "acoustic_grit": {
+      "archetype": "Heart-Shaped Box",
+      "description": "Dry pick attack, low baritone rasp, guttural chest pushes.",
+      "performance_tags": ["[Dry Pick Attack]", "[Low Baritone Rasp]", "[Guttural Chest Push]"],
+      "cadence_parameters": {
+        "verse_flow": "tight, dry, behind-the-beat phrasing",
+        "melodic_shape": "low-register descending grit",
+        "dynamic_arc": "compressed verse with chest-push accents"
+      },
+      "stem_preservation_flags": {
+        "grit_integrity_lock": true,
+        "anti_smoothing": true
+      }
+    },
+    "southern_pocket": {
+      "archetype": "My Baby Says It's Alright",
+      "description": "Conversational verse flow, drawl cadence, unquantized melodic hook.",
+      "performance_tags": ["[Conversational Verse]", "[Drawl Cadence]", "[Unquantized Melodic Hook]"],
+      "cadence_parameters": {
+        "verse_flow": "conversational and elastic",
+        "melodic_shape": "unquantized hook with drawled arrivals",
+        "dynamic_arc": "restrained verse opening into warm hook"
+      },
+      "stem_preservation_flags": {
+        "grit_integrity_lock": true,
+        "anti_smoothing": true
+      }
+    },
+    "soul_blues_strain": {
+      "archetype": "Empty Feeling",
+      "description": "6/8 slow drag, high dynamic strain, soaring raspy belt.",
+      "performance_tags": ["[6/8 Slow Drag]", "[High Dynamic Strain]", "[Soaring Raspy Belt]"],
+      "cadence_parameters": {
+        "verse_flow": "spacious triplet pull",
+        "melodic_shape": "long ascending strain into belt",
+        "dynamic_arc": "quiet ache to high-pressure release"
+      },
+      "stem_preservation_flags": {
+        "grit_integrity_lock": true,
+        "anti_smoothing": true
+      }
+    },
+    "modern_trap_hook": {
+      "archetype": "Bye Felicia",
+      "description": "Staccato cadence, double-time punch, anthemic trap bounce.",
+      "performance_tags": ["[Staccato Cadence]", "[Double-Time Punch]", "[Anthemic Trap Bounce]"],
+      "cadence_parameters": {
+        "verse_flow": "short clipped attacks with double-time bursts",
+        "melodic_shape": "simple chantable hook",
+        "dynamic_arc": "percussive verses into wide anthem"
+      },
+      "stem_preservation_flags": {
+        "grit_integrity_lock": true,
+        "anti_smoothing": true
+      }
+    },
+    "swamp_soul_rasp": {
+      "archetype": "This River",
+      "description": "Dark gospel soul, slow downbeat drag, sustained chest rasp release.",
+      "performance_tags": ["[Dark Gospel Soul]", "[Slow Downbeat Drag]", "[Sustained Chest Rasp Release]"],
+      "cadence_parameters": {
+        "verse_flow": "slow, deliberate downbeat drag",
+        "melodic_shape": "gospel-shaped rises with held rasp",
+        "dynamic_arc": "low chest tension into sustained release"
+      },
+      "stem_preservation_flags": {
+        "grit_integrity_lock": true,
+        "anti_smoothing": true
+      }
+    }
+  }
+}

@@ -42,7 +42,7 @@ const track = await j(await fetch(`${base}/edits/${edit.id}/tracks/internal`, {
   body: JSON.stringify({
     track: "internal",
     releases: [{
-      name: "1.1.0 internal",
+      name: "1.1.2 internal",
       versionCodes: [String(up.versionCode)],
       status: "completed",
       releaseNotes: [{ language: "en-US", text: "Adds Google Play Billing: subscribe to GravelKing Weekly, Studio, or Node Auditor directly in the app. One subscription unlocks web too." }],
@@ -52,5 +52,5 @@ const track = await j(await fetch(`${base}/edits/${edit.id}/tracks/internal`, {
 console.log("track set:", JSON.stringify(track));
 
 // 4. commit edit
-const commit = await j(await fetch(`${base}/edits/${edit.id}:commit`, { method: "POST", headers: H }));
+const commit = await j(await fetch(`${base}/edits/${edit.id}:commit?changesNotSentForReview=true`, { method: "POST", headers: H }));
 console.log("committed edit:", commit.id);

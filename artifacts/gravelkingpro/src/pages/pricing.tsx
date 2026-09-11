@@ -312,6 +312,10 @@ export default function Pricing() {
       }
       const payment = await checkoutRes.json() as { clientSecret?: string; intentType?: "payment" | "setup"; };
       if (!payment.clientSecret || !payment.intentType) throw new Error("Stripe did not return an in-app payment session.");
+      trackFunnelEvent("checkout_session_initiated", { plan: planId, intentType: payment.intentType });
+      trackEvent("checkout_session_initiated", { plan: planId, intentType: payment.intentType });
+      trackFunnelEvent("checkout_modal_opened", { plan: planId });
+      trackEvent("checkout_modal_opened", { plan: planId });
       setPaymentState({ clientSecret: payment.clientSecret, intentType: payment.intentType, planId });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";
@@ -351,8 +355,14 @@ export default function Pricing() {
           <StripePaymentForm
             clientSecret={paymentState.clientSecret}
             intentType={paymentState.intentType}
-            onCancel={() => setPaymentState(null)}
+            onCancel={() => {
+              trackFunnelEvent("checkout_canceled", { plan: paymentState.planId });
+              trackEvent("checkout_canceled", { plan: paymentState.planId });
+              setPaymentState(null);
+            }}
             onSuccess={async () => {
+              trackFunnelEvent("checkout_returned", { plan: paymentState.planId, outcome: "success" });
+              trackEvent("checkout_returned", { plan: paymentState.planId, outcome: "success" });
               // Stripe confirms the PaymentIntent before our webhook updates the
               // account row. Keep the embedded form open while that short
               // propagation window closes instead of making a successful
@@ -501,8 +511,8 @@ export default function Pricing() {
               <div className="flex items-center gap-3">
                 <Sparkles className="w-5 h-5 text-amber-500 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-amber-400">Promo active — Node Auditor unlocked</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">All features are enabled for free via your promo code.</p>
+                  <p className="text-sm font-semibold text-amber-400">Promo active — King features unlocked</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">7-day access plus 400 trial credits. Credits are still used for song generation and mastering.</p>
                 </div>
               </div>
               <button
@@ -753,8 +763,8 @@ export default function Pricing() {
               <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 px-4 py-3">
                 <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-amber-400">Code applied — all tools unlocked</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Enjoy full Node Auditor access, on the house.</p>
+                  <p className="text-sm font-semibold text-amber-400">Code applied — King features unlocked</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Your 7-day trial includes 400 credits. Credits are still required for song generation and mastering.</p>
                 </div>
               </div>
             ) : (
@@ -762,16 +772,21 @@ export default function Pricing() {
                 onSubmit={async (e) => {
                   e.preventDefault();
                   setPromoError(false);
-                   const ok = await redeemPromo(promoInput);
-                  if (ok) {
+                    const redemption = await redeemPromo(promoInput);
+                   if (redemption.ok) {
                     setPromoInput("");
                     toast({
-                      title: "Promo code accepted!",
-                      description: "Node Auditor access is now unlocked — all tools are yours.",
+                       title: redemption.referralTracked ? "Referral recorded!" : "Promo code accepted!",
+                        description: redemption.referralTracked
+                          ? "Nina has been credited to your account. Her referral converts only if your subscription payment is collected."
+                          : redemption.creditsGranted
+                         ? "King features unlocked for 7 days and 400 trial credits added. Credits are still required for generation and mastering."
+                         : "King features are active. Your 400 trial credits were already added to this account.",
                     });
                   } else {
                     setPromoError(true);
                     inputRef.current?.select();
+                     toast({ title: "Promo code not applied", description: redemption.message ?? "Invalid promo code.", variant: "destructive" });
                   }
                 }}
                 className="flex gap-2"
@@ -791,7 +806,7 @@ export default function Pricing() {
               </form>
             )}
             {promoError && (
-              <p className="text-xs text-destructive">Invalid promo code — check the code and try again.</p>
+              <p className="text-xs text-destructive">Promo code could not be applied — check the code or whether it was already redeemed.</p>
             )}
           </div>
         </motion.div>

@@ -1,0 +1,10 @@
+[
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3001","position":1,"filepath":"src/pages/slides/InvestorCover.tsx","title":"The road to angel investment","description":"GravelKing Pro fundraising roadmap","speakerNotes":""},
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3002","position":2,"filepath":"src/pages/slides/InvestorProof.tsx","title":"What exists today","description":"Verified product and operating proof","speakerNotes":""},
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3003","position":3,"filepath":"src/pages/slides/InvestorAsk.tsx","title":"The investment ask","description":"A focused bootstrap round","speakerNotes":""},
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3004","position":4,"filepath":"src/pages/slides/InvestorUseOfFunds.tsx","title":"Use of funds","description":"What the first capital must prove","speakerNotes":""},
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3005","position":5,"filepath":"src/pages/slides/InvestorTargeting.tsx","title":"Who to ask","description":"Specialist, operator, and strategic lanes","speakerNotes":""},
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3006","position":6,"filepath":"src/pages/slides/InvestorOutreach.tsx","title":"How to reach them","description":"Warm introductions and disciplined follow-up","speakerNotes":""},
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3007","position":7,"filepath":"src/pages/slides/InvestorMilestones.tsx","title":"What the round unlocks","description":"Milestones for the next valuation step","speakerNotes":""},
+  {"id":"inv0a7f0-3d8e-4d40-9d22-1a0a8f4a3008","position":8,"filepath":"src/pages/slides/InvestorClose.tsx","title":"The meeting close","description":"A direct invitation to invest","speakerNotes":""}
+]

@@ -1,0 +1,10 @@
+[
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1001","position":1,"filepath":"src/pages/slides/LaunchCover.tsx","title":"Make the song. Keep the proof.","description":"GravelKing Pro launch campaign","speakerNotes":""},
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1002","position":2,"filepath":"src/pages/slides/CampaignPromise.tsx","title":"Campaign promise","description":"The core creator promise","speakerNotes":""},
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1003","position":3,"filepath":"src/pages/slides/AudienceTargets.tsx","title":"Audience targets","description":"Who the launch is for","speakerNotes":""},
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1004","position":4,"filepath":"src/pages/slides/CreativeAngles.tsx","title":"Five creative angles","description":"The campaign message system","speakerNotes":""},
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1005","position":5,"filepath":"src/pages/slides/PlatformSystem.tsx","title":"Platform system","description":"How the message adapts by channel","speakerNotes":""},
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1006","position":6,"filepath":"src/pages/slides/WeeklyRhythm.tsx","title":"Weekly rhythm","description":"The seven-day content cadence","speakerNotes":""},
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1007","position":7,"filepath":"src/pages/slides/TargetMatrix.tsx","title":"30-day target matrix","description":"Campaign operating rules","speakerNotes":""},
+  {"id":"a1f0a7f0-3d8e-4d40-9d22-1a0a8f4a1008","position":8,"filepath":"src/pages/slides/LaunchCta.tsx","title":"Launch CTA","description":"Where to start","speakerNotes":""}
+]

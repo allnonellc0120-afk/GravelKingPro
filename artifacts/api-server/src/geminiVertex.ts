@@ -73,7 +73,7 @@ type VertexPart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } };
 
-interface GenerationConfig {
+export interface GenerationConfig {
   maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
@@ -138,4 +138,68 @@ export async function generateVertexText(
   generationConfig: GenerationConfig = {},
 ): Promise<string> {
   return generateVertexContent([{ text: prompt }], generationConfig);
+}
+
+/**
+ * Streams plain-text Gemini output as Vertex emits it. The callback receives
+ * text deltas, while the resolved value contains the complete response.
+ */
+export async function generateVertexTextStream(
+  prompt: string,
+  generationConfig: GenerationConfig = {},
+  onText: (text: string) => void,
+  timeoutMs = 60_000,
+): Promise<string> {
+  const creds = getGcpCredentials();
+  const token = await getVertexAccessToken();
+  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:streamGenerateContent?alt=sse`;
+  const { tools, ...vertexGenerationConfig } = generationConfig;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 8192, ...vertexGenerationConfig },
+      ...(tools ? { tools } : {}),
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok || !response.body) {
+    const bodyText = await response.text().catch(() => "");
+    throw new Error(`Vertex AI Gemini stream ${response.status}: ${bodyText.slice(0, 400)}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let completeText = "";
+
+  const consumeLine = (line: string) => {
+    if (!line.startsWith("data:")) return;
+    const data = line.slice(5).trim();
+    if (!data || data === "[DONE]") return;
+    const chunk = JSON.parse(data) as VertexResponse;
+    const text = chunk.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? "")
+      .join("") ?? "";
+    if (!text) return;
+    completeText += text;
+    onText(text);
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+    for (const line of lines) consumeLine(line);
+    if (done) break;
+  }
+  if (buffer.trim()) consumeLine(buffer);
+  return completeText;
 }

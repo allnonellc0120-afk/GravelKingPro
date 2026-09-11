@@ -10,7 +10,7 @@
  * This makes server-verified ownership the only path to a valid cert —
  * legally admissible as a timestamped, server-authoritative IP record.
  */
-import { pgTable, text, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
 
 export const ipCertStubsTable = pgTable("ip_cert_stubs", {
   /** UUID — embedded in the track as the lookup key */
@@ -36,6 +36,10 @@ export const ipCertStubsTable = pgTable("ip_cert_stubs", {
 
   /** 0–100 human-authorship score derived from the style prompt specificity */
   styleAuthorshipScore: integer("style_authorship_score"),
+  finalLyricsHash: text("final_lyrics_hash"),
+  lyricsAuthorshipScore: integer("lyrics_authorship_score"),
+  lyricsAuthorshipLedger: jsonb("lyrics_authorship_ledger"),
+  finalLyricsLabel: text("final_lyrics_label"),
 
   // ── Global Music Industry Identifiers (optional, artist-supplied) ────────
   // Binding these to the cryptographic cert ties the IDs to the

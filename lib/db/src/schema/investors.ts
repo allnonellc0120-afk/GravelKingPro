@@ -43,6 +43,16 @@ export const investorTouchesTable = pgTable(
     response: text("response"),
     /** Private notes about the exchange. */
     notes: text("notes"),
+    /** Explicitly approved email delivery fields. */
+    recipientEmail: text("recipient_email"),
+    subject: text("subject"),
+    body: text("body"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    /** draft | queued | sending | sent | failed */
+    dispatchStatus: text("dispatch_status").notNull().default("draft"),
+    attempts: integer("attempts").notNull().default(0),
+    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+    lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

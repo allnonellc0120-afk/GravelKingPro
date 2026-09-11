@@ -15,6 +15,15 @@ export type Results = {
 } | null;
 
 export type SubscriptionTier = "weekly" | "monthly" | "node_auditor" | null;
+export type PromoRedemption = {
+  ok: boolean;
+  creditsGranted: boolean;
+  creditsBalance?: number;
+  alreadyRedeemed?: boolean;
+  code?: string;
+  referralTracked?: boolean;
+  message?: string;
+};
 
 const SEP_STRENGTH_KEY = "gkp_sep_strength";
 const DEFAULT_SEP_STRENGTH = 0.75;
@@ -43,8 +52,8 @@ interface AppState {
   setHasRun: (hasRun: boolean) => void;
   /** null = no promo active, string = the active promo code */
   activePromo: string | null;
-  /** Returns true if code was valid, false if invalid */
-  redeemPromo: (code: string) => Promise<boolean>;
+  /** Redeem a promo and report whether its one-time credits were granted. */
+  redeemPromo: (code: string) => Promise<PromoRedemption>;
   revokePromo: () => void;
   /** Persisted separation/carve strength (multiplier) applied across the separation tools */
   sepStrength: number;
@@ -91,9 +100,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshSubscription = useCallback(async (): Promise<{ tier: SubscriptionTier; plan: string | null; isDeveloper?: boolean }> => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8_000);
     try {
       setIsLoadingSubscription(true);
-      const resp = await fetch("/api/subscription/status", { credentials: "include" });
+      const resp = await fetch("/api/subscription/status", {
+        credentials: "include",
+        signal: controller.signal,
+      });
       if (resp.ok) {
         const data = await resp.json() as { isPro: boolean; plan: string | null; isDeveloper?: boolean; promoExpiresAt?: string };
         setPlan(data.plan);
@@ -104,8 +118,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { tier: t, plan: data.plan, isDeveloper: data.isDeveloper };
       }
     } catch {
-      // Network error — leave tier as-is
+      // Network errors must not leave mobile users waiting forever. Keep the
+      // current entitlement if one is already known; otherwise fail closed to
+      // the free state and let focus/visibility refresh retry later.
     } finally {
+      window.clearTimeout(timeout);
       setIsLoadingSubscription(false);
     }
     return { tier: null, plan: null, isDeveloper: false };
@@ -139,17 +156,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setTier = (t: SubscriptionTier) => setUserTier(t);
 
-  const redeemPromo = useCallback(async (code: string): Promise<boolean> => {
+  const redeemPromo = useCallback(async (code: string): Promise<PromoRedemption> => {
     const response = await fetch("/api/promo/redeem", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ code }),
     });
-    if (!response.ok) return false;
-    setActivePromo("GKPRO7DAY");
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({})) as { error?: string };
+      return { ok: false, creditsGranted: false, message: error.error };
+    }
+    const data = await response.json() as {
+      creditsGranted?: boolean;
+      creditsBalance?: number;
+      alreadyRedeemed?: boolean;
+      code?: string;
+      referralTracked?: boolean;
+      message?: string;
+    };
+    if (data.code !== "NINA") setActivePromo("GKPRO7DAY");
     await refreshSubscription();
-    return true;
+    return {
+      ok: true,
+      creditsGranted: data.creditsGranted === true,
+      creditsBalance: data.creditsBalance,
+      alreadyRedeemed: data.alreadyRedeemed === true,
+      code: data.code,
+      referralTracked: data.referralTracked === true,
+      message: data.message,
+    };
   }, []);
 
   const revokePromo = useCallback(() => {
