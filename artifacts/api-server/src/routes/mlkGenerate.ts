@@ -149,7 +149,10 @@ async function prepareGeneration(
 }
 
 /** Run the full MLK pipeline for a prepared request. Throws on failure. */
-async function runGeneration(prepared: PreparedGeneration) {
+async function runGeneration(
+  prepared: PreparedGeneration,
+  onStage?: (stage: "demucs" | "rvc" | "mlk_master") => Promise<void>,
+) {
   const { body, vocalMode, text, userId } = prepared;
   const serverLyricHash = vocalMode === "lyrics" ? hashLyrics(text).hash : "";
   return generateAndMasterTrack(body.lyricId ?? null, text, userId, {
@@ -172,6 +175,7 @@ async function runGeneration(prepared: PreparedGeneration) {
         }
       : undefined,
     modelWeightsUrl: prepared.modelWeightsUrl,
+    onStage,
   });
 }
 
@@ -213,21 +217,20 @@ mlkGenerateRouter.post(
     // fail the job row (and refund credits) instead of hitting a proxy timeout.
     void (async () => {
       try {
-        await db.update(masterJobsTable).set({
-          status: "processing",
-          stage: "processing_demucs",
-          progress: 25,
-          startedAt: new Date(),
-        }).where(eq(masterJobsTable.id, jobId));
-        await db.update(masterJobsTable).set({
-          stage: "processing_rvc",
-          progress: 60,
-        }).where(eq(masterJobsTable.id, jobId));
-        const result = await runGeneration(prepared);
-        await db.update(masterJobsTable).set({
-          stage: "processing_mlk_master",
-          progress: 85,
-        }).where(eq(masterJobsTable.id, jobId));
+        const stageProgress = {
+          demucs: ["processing_demucs", 25],
+          rvc: ["processing_rvc", 60],
+          mlk_master: ["processing_mlk_master", 85],
+        } as const;
+        const result = await runGeneration(prepared, async (stage) => {
+          const [jobStage, progress] = stageProgress[stage];
+          await db.update(masterJobsTable).set({
+            status: "processing",
+            stage: jobStage,
+            progress,
+            startedAt: stage === "demucs" ? new Date() : undefined,
+          }).where(eq(masterJobsTable.id, jobId));
+        });
         await db.update(masterJobsTable).set({
           status: "completed",
           stage: "done",

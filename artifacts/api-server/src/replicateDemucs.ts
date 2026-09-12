@@ -13,7 +13,8 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID } from "crypto";
 import { zipSync } from "fflate";
-import { uploadFile, runModel, isConfigured } from "./replicateClient";
+import { uploadFile, isConfigured } from "./replicateClient";
+import { runModel } from "./replicatePredictionWorker";
 import { applyMLKv3Fast } from "./kernel-v3";
 
 export { isConfigured };

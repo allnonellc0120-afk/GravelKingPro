@@ -9,7 +9,8 @@
  */
 
 import { readFile } from "fs/promises";
-import { uploadFile, runModel, isConfigured } from "./replicateClient";
+import { uploadFile, isConfigured } from "./replicateClient";
+import { runModel } from "./replicatePredictionWorker";
 
 export { isConfigured };
 

@@ -18,7 +18,12 @@ import { backupCertStub } from "../lib/firestore";
 import { getGcpCredentials, getVertexAccessToken, VERTEX_LOCATION } from "../geminiVertex";
 import { logger } from "../lib/logger";
 import { sanitizeStylePrompt, rewriteBlockedPrompt } from "./promptSanitizer";
-import { convertToGravelKingVoice, runModel, uploadFile } from "../replicateClient";
+import {
+  convertToGravelKingVoice,
+  predictionOutputUrl,
+  uploadFile,
+} from "../replicateClient";
+import { runModel, waitForPrediction } from "../replicatePredictionWorker";
 
 const objectStorage = new ObjectStorageService();
 const VOICE_SWAP_TIMEOUT_MS = 600_000;
@@ -135,7 +140,9 @@ export interface GravelKingVoiceSwapResult {
 export async function tryGravelKingVoiceSwap(
   inputAudio: Buffer,
   modelWeightsUrl?: string,
+  onStage?: (stage: "demucs" | "rvc" | "mlk_master") => Promise<void> | void,
 ): Promise<GravelKingVoiceSwapResult> {
+  await onStage?.("demucs");
   const audioUrl = await uploadFile(inputAudio, "gk_input_audio", "audio/mpeg");
   const splitOutput = await withVoiceSwapTimeout(runModel(
     "ryan5453",
@@ -173,11 +180,16 @@ export async function tryGravelKingVoiceSwap(
     { predictionId: conversion.predictionId },
     "[Gravel King RVC: PREDICTION CREATED]",
   );
-  const converted = await downloadVoiceSwapOutput(conversion.outputUrl);
+  await onStage?.("rvc");
+  const convertedOutput = await withVoiceSwapTimeout(
+    waitForPrediction(conversion.predictionId, VOICE_SWAP_TIMEOUT_MS),
+  );
+  const converted = await downloadVoiceSwapOutput(predictionOutputUrl(convertedOutput));
   if (converted.length < 1_000) {
     throw new Error(`RVC prediction ${conversion.predictionId} returned invalid audio`);
   }
   const mixed = await mixVoiceSwapAudioInMemory(instrumental, converted);
+  await onStage?.("mlk_master");
   const mixedHash = createHash("sha256").update(mixed).digest("hex");
   const instrumentalHash = createHash("sha256").update(instrumental).digest("hex");
   const convertedHash = createHash("sha256").update(converted).digest("hex");
@@ -475,6 +487,8 @@ export async function generateAndMasterTrack(
     targetDurationS?: number;
     /** Signed clean-path URL for the GravelKing RVC package. */
     modelWeightsUrl?: string;
+    /** Durable worker stage heartbeat. Never supplied by client-facing code. */
+    onStage?: (stage: "demucs" | "rvc" | "mlk_master") => Promise<void> | void;
     /** When set, this run is a remix — the child cert records the parent linkage. */
     remixOf?: { parentTrackId: string; parentCertId: string | null };
     lyricAudit?: {
@@ -573,7 +587,7 @@ export async function generateAndMasterTrack(
   })() : 0;
 
   if (vocalMode !== "instrumental") {
-    const voiceSwap = await tryGravelKingVoiceSwap(audio, opts.modelWeightsUrl);
+    const voiceSwap = await tryGravelKingVoiceSwap(audio, opts.modelWeightsUrl, opts.onStage);
     finalAudio = voiceSwap.audio;
     finalMimeType = "audio/wav";
     logger.info(
