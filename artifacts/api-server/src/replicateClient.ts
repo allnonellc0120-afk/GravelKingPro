@@ -52,7 +52,6 @@ export interface VoiceConvertInput {
 }
 
 export interface VoiceConvertResult {
-  outputUrl: string;
   predictionId: string;
 }
 
@@ -69,13 +68,13 @@ function requireHttpUrl(value: string, field: string): string {
   return parsed.toString();
 }
 
-function outputUrl(output: unknown): string {
+export function predictionOutputUrl(output: unknown): string {
   if (typeof output === "string" && /^https?:\/\//.test(output)) return output;
   if (output instanceof URL) return output.toString();
   if (Array.isArray(output)) {
     for (const item of output) {
       try {
-        return outputUrl(item);
+        return predictionOutputUrl(item);
       } catch {
         // Try the next output when a model returns multiple files.
       }
@@ -161,8 +160,9 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
       body: JSON.stringify({ version, input: modelInput }),
     }),
   );
-  const output = await pollPrediction(predictionId, 600_000);
-  return { outputUrl: outputUrl(output), predictionId };
+  // Dispatch only. Waiting belongs to the background prediction worker so a
+  // client-facing request can acknowledge the durable job immediately.
+  return { predictionId };
 }
 
 // Default per-request network timeout. Every Replicate HTTP call is bounded by
@@ -401,53 +401,3 @@ export async function createPrediction(
   );
 }
 
-/**
- * Poll a prediction until it succeeds, fails, or times out.
- * Returns the output on success.
- */
-export async function pollPrediction(
-  id: string,
-  timeoutMs = 180_000,
-): Promise<unknown> {
-  const deadline = Date.now() + timeoutMs;
-  let delayMs = 2_000;
-
-  for (;;) {
-    if (Date.now() > deadline) {
-      throw new Error(`Replicate prediction ${id} timed out after ${timeoutMs}ms`);
-    }
-
-    const res = await replicateFetch(`/predictions/${id}`);
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Replicate poll failed (${res.status}): ${body}`);
-    }
-
-    const data = (await res.json()) as {
-      status: string;
-      output?: unknown;
-      error?: string;
-    };
-
-    if (data.status === "succeeded") return data.output;
-    if (data.status === "failed" || data.status === "canceled") {
-      throw new Error(`Replicate prediction ${data.status}: ${data.error ?? "unknown error"}`);
-    }
-
-    await new Promise<void>((r) => setTimeout(r, delayMs));
-    delayMs = Math.min(delayMs * 1.5, 10_000);
-  }
-}
-
-/**
- * Full round-trip: create prediction, poll, return output.
- */
-export async function runModel(
-  owner: string,
-  name: string,
-  input: Record<string, unknown>,
-  timeoutMs = 180_000,
-): Promise<unknown> {
-  const id = await createPrediction(owner, name, input);
-  return pollPrediction(id, timeoutMs);
-}
