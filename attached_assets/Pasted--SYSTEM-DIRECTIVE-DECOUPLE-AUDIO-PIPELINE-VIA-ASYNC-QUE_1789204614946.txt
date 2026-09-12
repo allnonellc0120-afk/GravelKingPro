@@ -1,0 +1,83 @@
+### SYSTEM DIRECTIVE: DECOUPLE AUDIO PIPELINE VIA ASYNC QUEUE & STATE MACHINE
+
+**Root Cause:** Synchronous execution inside `replicateClient.ts` blocks the main HTTP thread during multi-step inference (Demucs stem separation -> RVC voice synthesis -> Python MLK V3.5 mastering). Edge proxies (Cloud Run / Vercel / Nginx) drop the idle socket after 30–60 seconds, returning 504 Gateway Timeout and triggering UI failure.
+
+**Core Mandate:** Completely eliminate synchronous waiting on the client-facing route. Offload orchestration to a state-driven queue with instant client acknowledgment (< 500ms).
+
+```json
+{
+  "system_architecture": {
+    "engine": "GravelKing Pro / MLK V3.5 Audio Engine",
+    "pattern": "Decoupled Async Job Queue with Webhook/Polling Orchestration",
+    "database_schema": {
+      "table": "generation_jobs",
+      "fields": {
+        "id": "UUID PRIMARY KEY DEFAULT gen_random_uuid()",
+        "user_id": "TEXT NOT NULL",
+        "status": "VARCHAR(32) CHECK (status IN ('queued', 'processing_demucs', 'processing_rvc', 'processing_mlk_master', 'completed', 'failed')) DEFAULT 'queued'",
+        "current_stage": "INTEGER DEFAULT 1",
+        "total_stages": "INTEGER DEFAULT 3",
+        "progress_percent": "INTEGER DEFAULT 0",
+        "lyrics": "TEXT",
+        "style_prompt": "TEXT",
+        "original_audio_url": "TEXT NULL",
+        "demucs_vocal_url": "TEXT NULL",
+        "demucs_instrumental_url": "TEXT NULL",
+        "rvc_vocal_url": "TEXT NULL",
+        "final_master_wav_url": "TEXT NULL",
+        "final_master_mp3_url": "TEXT NULL",
+        "error_message": "TEXT NULL",
+        "created_at": "TIMESTAMPTZ DEFAULT NOW()",
+        "updated_at": "TIMESTAMPTZ DEFAULT NOW()"
+      }
+    },
+    "endpoints": [
+      {
+        "method": "POST",
+        "route": "/api/generate/mlk",
+        "sla": "< 500ms response",
+        "execution": [
+          "Validate user authentication and verify credit balance.",
+          "Insert row into `generation_jobs` with status='queued', progress_percent=5.",
+          "Dispatch asynchronous trigger (initiate Demucs isolation on Replicate with webhook destination or dispatch to background runner).",
+          "Return HTTP 202 Immediately: { success: true, jobId: string, status: 'queued' }"
+        ]
+      },
+      {
+        "method": "GET",
+        "route": "/api/jobs/[id]",
+        "sla": "< 100ms response",
+        "execution": [
+          "Query `generation_jobs` by id.",
+          "If row not found: return HTTP 404.",
+          "Return HTTP 200: { id, status, current_stage, progress_percent, final_master_wav_url, final_master_mp3_url, error_message }"
+        ]
+      },
+      {
+        "method": "POST",
+        "route": "/api/webhooks/replicate",
+        "sla": "< 200ms response",
+        "execution": [
+          "Verify webhook signature and extract prediction status.",
+          "If failed: UPDATE generation_jobs SET status='failed', error_message=payload.error WHERE id=jobId.",
+          "If stage == 'demucs' succeeded: store stem URLs, update status to 'processing_rvc', progress_percent=40, trigger RVC model with canonical .pth/.index.",
+          "If stage == 'rvc' succeeded: store rvc_vocal_url, update status to 'processing_mlk_master', progress_percent=75, trigger Python MLK V3.5 mastering script.",
+          "If stage == 'mastering' succeeded: store final output URLs, update status='completed', progress_percent=100, deduct credits.",
+          "Return HTTP 200 OK."
+        ]
+      }
+    ],
+    "frontend_contract": {
+      "trigger": "Click 'Generate with MLK'",
+      "on_initiate": "Disable button, open progress modal, display: 'Initializing audio pipeline...'",
+      "polling_behavior": "Poll GET /api/jobs/[id] every 2500ms.",
+      "state_transitions": {
+        "processing_demucs": "Update UI to 'Splitting stems via Demucs (Stage 1/3)...' (Progress: 25%)",
+        "processing_rvc": "Update UI to 'Synthesizing GravelKing vocal model via RVC (Stage 2/3)...' (Progress: 60%)",
+        "processing_mlk_master": "Update UI to 'Executing MLK V3.5 Python master chain (Stage 3/3)...' (Progress: 85%)",
+        "completed": "Terminate poll. Close modal. Render audio player with final master URLs. Deduct UI credits.",
+        "failed": "Terminate poll. Display exact error message from API. Re-enable button. Do not deduct credits."
+      }
+    }
+  }
+}
