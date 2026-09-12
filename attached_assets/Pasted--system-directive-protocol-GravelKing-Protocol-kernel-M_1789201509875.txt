@@ -1,0 +1,71 @@
+{
+  "system_directive": {
+    "protocol": "GravelKing Protocol",
+    "kernel": "Morris Law Kernel V2",
+    "author": "Kevin Morris",
+    "mode": "STRICT_TASK_EXECUTION_AND_VERIFICATION",
+    "mentor_guidance": "Execute the required pipeline repairs, run actual validation commands to prove functionality, and respond ONLY with a raw JSON report adhering to the response contract below. Do not fake metrics, do not mock success, and do not fall back to presets."
+  },
+  "issue_diagnosis": {
+    "root_cause": "The RVC voice pipeline fails and falls back to raw vocals because REPLICATE_RVC_MODEL_WEIGHTS_URL is undefined, causing Replicate to receive an empty download URL and hit a hard timeout.",
+    "runtime_failure": "The API server process failed to launch due to a missing PORT environment variable required by the compiled bundle."
+  },
+  "required_actions": [
+    {
+      "step": 1,
+      "file": "./artifacts/api-server/src/services/mlkOrchestrator.ts",
+      "action": "Ensure fallback weights URL is locked to https://www.dropbox.com/scl/fi/k7ujxiy2bzt4jcnijlr8c/VoiceAudio.wav?rlkey=48iwn7qo57itnps5e0d6dqkeb&dl=1 when process.env.REPLICATE_RVC_MODEL_WEIGHTS_URL is missing."
+    },
+    {
+      "step": 2,
+      "file": "./artifacts/api-server/src/services/mlkOrchestrator.ts",
+      "action": "Lock VOICE_SWAP_TIMEOUT_MS to 600000 (10 minutes) so inference does not abort early."
+    },
+    {
+      "step": 3,
+      "command": "pnpm --filter @workspace/api-server run build",
+      "action": "Recompile ./artifacts/api-server/dist/index.mjs and verify the compiled output physically contains the VoiceAudio.wav Dropbox URL."
+    },
+    {
+      "step": 4,
+      "action": "Identify the target port configured in the Vite frontend proxy settings and start the compiled backend server using that exact PORT environment variable."
+    },
+    {
+      "step": 5,
+      "action": "Verify the backend server is actively listening on localhost with a live PID and responding to HTTP requests."
+    }
+  ],
+  "response_requirement": {
+    "format": "JSON_ONLY",
+    "instructions": "Run the necessary verification shell commands and return the output matching the schema below with real, ground-truth data.",
+    "schema": {
+      "status": "COMPLETED | FAILED",
+      "protocol": "GravelKing Protocol",
+      "kernel": "Morris Law Kernel V2",
+      "files_modified": [
+        {
+          "path": "string",
+          "line_numbers": ["string"],
+          "diff_summary": "string"
+        }
+      ],
+      "build_verification": {
+        "command_run": "string",
+        "dist_file": "./artifacts/api-server/dist/index.mjs",
+        "grep_match_found": true,
+        "matched_line_content": "string"
+      },
+      "runtime_verification": {
+        "active_pid": "number",
+        "listening_port": "number",
+        "process_status": "RUNNING | CRASHED",
+        "health_check_response": "string"
+      },
+      "proof_of_execution": {
+        "rvc_url_verified": true,
+        "timeout_ms_verified": 600000,
+        "timestamp": "ISO_TIMESTAMP"
+      }
+    }
+  }
+}
