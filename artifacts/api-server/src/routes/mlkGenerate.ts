@@ -196,10 +196,9 @@ mlkGenerateRouter.post(
       id: jobId,
       userId: prepared.userId,
       type: "generation",
-      status: "running",
-      stage: "generating",
+      status: "queued",
+      stage: "queued",
       progress: 5,
-      startedAt: new Date(),
       requestConfig: {
         title: prepared.body.title ?? null,
         vocalMode: prepared.vocalMode,
@@ -208,13 +207,27 @@ mlkGenerateRouter.post(
       },
     });
 
-    res.json({ success: true, jobId, status: "processing" });
+    res.status(202).json({ success: true, jobId, status: "queued" });
 
     // Background pipeline — the HTTP request is already answered. Failures
     // fail the job row (and refund credits) instead of hitting a proxy timeout.
     void (async () => {
       try {
+        await db.update(masterJobsTable).set({
+          status: "processing",
+          stage: "processing_demucs",
+          progress: 25,
+          startedAt: new Date(),
+        }).where(eq(masterJobsTable.id, jobId));
+        await db.update(masterJobsTable).set({
+          stage: "processing_rvc",
+          progress: 60,
+        }).where(eq(masterJobsTable.id, jobId));
         const result = await runGeneration(prepared);
+        await db.update(masterJobsTable).set({
+          stage: "processing_mlk_master",
+          progress: 85,
+        }).where(eq(masterJobsTable.id, jobId));
         await db.update(masterJobsTable).set({
           status: "completed",
           stage: "done",
@@ -251,7 +264,7 @@ mlkGenerateRouter.post(
  * internal stream URL. Only the job owner (or admin automation) may read it.
  */
 mlkGenerateRouter.get("/tracks/:id/status", async (req: Request, res: Response) => {
-  const jobId = req.params.id;
+  const jobId = String(req.params.id);
   const [job] = await db
     .select()
     .from(masterJobsTable)
@@ -451,10 +464,9 @@ mlkGenerateRouter.post(
       id: jobId,
       userId: prepared.userId,
       type: "generation",
-      status: "running",
-      stage: "generating",
+      status: "queued",
+      stage: "queued",
       progress: 5,
-      startedAt: new Date(),
       requestConfig: {
         remixOf: prepared.parentTrackId,
         vocalsOn: prepared.vocalsOn,
@@ -462,15 +474,29 @@ mlkGenerateRouter.post(
       },
     });
 
-    res.json({ success: true, jobId, status: "processing" });
+    res.status(202).json({ success: true, jobId, status: "queued" });
 
     void (async () => {
       try {
+        await db.update(masterJobsTable).set({
+          status: "processing",
+          stage: "processing_demucs",
+          progress: 25,
+          startedAt: new Date(),
+        }).where(eq(masterJobsTable.id, jobId));
+        await db.update(masterJobsTable).set({
+          stage: "processing_rvc",
+          progress: 60,
+        }).where(eq(masterJobsTable.id, jobId));
         const result = await remixTrack(prepared.parentTrackId, prepared.userId, {
           twist: prepared.twist,
           vocalsOn: prepared.vocalsOn,
           artistName: prepared.artistName,
         });
+        await db.update(masterJobsTable).set({
+          stage: "processing_mlk_master",
+          progress: 85,
+        }).where(eq(masterJobsTable.id, jobId));
         await db.update(masterJobsTable).set({
           status: "completed",
           stage: "done",

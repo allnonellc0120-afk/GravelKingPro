@@ -12,7 +12,9 @@ export const masterJobsTable = pgTable(
     id: varchar("id", { length: 64 }).primaryKey(),
     userId: varchar("user_id").references(() => usersTable.id, { onDelete: "set null" }),
     type: varchar("type", { length: 32 }).notNull().default("mastering"),
-    status: varchar("status", { length: 16 }).notNull().default("queued"),
+    // queued/processing are intentionally distinct: queued work has not
+    // started and may be safely claimed after a process restart.
+    status: varchar("status", { length: 32 }).notNull().default("queued"),
     progress: integer("progress").notNull().default(0),
     stage: varchar("stage", { length: 64 }).notNull().default("queued"),
     originalFilename: varchar("original_filename", { length: 255 }),

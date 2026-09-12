@@ -8,7 +8,7 @@
  *    double-submit resumes the SAME job instead of spending credits twice.
  */
 
-export type GenerationJobStatus = "processing" | "ready" | "failed";
+export type GenerationJobStatus = "queued" | "processing" | "ready" | "failed";
 
 export interface GenerationJobState {
   status: GenerationJobStatus;
@@ -21,7 +21,7 @@ export interface GenerationJobState {
 }
 
 const JOB_CACHE_PREFIX = "gka:genjob:";
-const POLL_INTERVAL_MS = 4_000;
+const POLL_INTERVAL_MS = 2_500;
 const POLL_TIMEOUT_MS = 15 * 60_000;
 
 function cacheKey(kind: "generate" | "remix", dedupeKey: string): string {
@@ -113,7 +113,12 @@ export async function submitGenerationJob(opts: SubmitGenerationOptions): Promis
     credentials: "include",
     body: JSON.stringify(opts.body),
   });
-  const data = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string; code?: string };
+  const data = (await res.json().catch(() => ({}))) as {
+    jobId?: string;
+    status?: "queued" | "processing";
+    error?: string;
+    code?: string;
+  };
   if (!res.ok || !data.jobId) {
     const err = new Error(data.error || `Generation request failed (HTTP ${res.status})`);
     (err as Error & { code?: string }).code = data.code;
@@ -121,7 +126,7 @@ export async function submitGenerationJob(opts: SubmitGenerationOptions): Promis
   }
 
   writeCachedJobId(opts.kind, opts.dedupeKey, data.jobId);
-  opts.onProgress?.({ status: "processing", jobId: data.jobId });
+  opts.onProgress?.({ status: data.status === "queued" ? "queued" : "processing", jobId: data.jobId });
   try {
     const state = await pollJob(data.jobId, opts.onProgress);
     clearCachedJob(opts.kind, opts.dedupeKey);
