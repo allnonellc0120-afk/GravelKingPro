@@ -62,7 +62,7 @@ export function buildGeneratedAudioKeys(trackId: string): {
   };
 }
 
-async function downloadVoiceSwapOutput(url: string): Promise<Buffer> {
+export async function downloadVoiceSwapOutput(url: string): Promise<Buffer> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60_000);
   try {
@@ -77,7 +77,7 @@ async function downloadVoiceSwapOutput(url: string): Promise<Buffer> {
   }
 }
 
-async function mixVoiceSwapAudioInMemory(
+export async function mixVoiceSwapAudioInMemory(
   instrumental: Buffer,
   converted: Buffer,
 ): Promise<Buffer> {
@@ -403,7 +403,7 @@ export function extractInteractionLyrics(body: InteractionResponse): string | nu
  * serves Lyria 3 on Vertex — :predict/:generateContent are not supported).
  * Lyria 3 requires location "global". Returns raw audio bytes (MP3).
  */
-async function generateLyriaAudio(
+export async function generateLyriaAudio(
   input: string,
 ): Promise<{ audio: Buffer; mimeType: string; model: string; responseLyrics?: string }> {
   const creds = getGcpCredentials();

@@ -11,7 +11,8 @@ import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { getUsageUser } from "../lib/usage";
 import { isVertexConfigured } from "../geminiVertex";
-import { generateAndMasterTrack, hashLyrics, remixTrack, type VocalMode } from "../services/mlkOrchestrator";
+import { generateAndMasterTrack, generateLyriaAudio, hashLyrics, remixTrack, type VocalMode } from "../services/mlkOrchestrator";
+import { dispatchGeneration, failPipelineJob } from "../services/generationPipeline";
 import { verifyLyrics } from "../services/lyricGuard";
 import { isAdminAutomationAuthenticated, ADMIN_AUTOMATION_EMAIL } from "../lib/adminAuth";
 import { db, usersTable } from "@workspace/db";
@@ -213,32 +214,63 @@ mlkGenerateRouter.post(
 
     res.status(202).json({ success: true, jobId, status: "queued" });
 
-    // Background pipeline — the HTTP request is already answered. Failures
-    // fail the job row (and refund credits) instead of hitting a proxy timeout.
+    // Webhook-chained pipeline — the HTTP request is already answered. Lyria
+    // (Vertex) runs here, then Demucs/RVC advance via /api/webhooks/replicate;
+    // no request ever waits on a Replicate prediction.
     void (async () => {
       try {
-        const stageProgress = {
-          demucs: ["processing_demucs", 25],
-          rvc: ["processing_rvc", 60],
-          mlk_master: ["processing_mlk_master", 85],
-        } as const;
-        const result = await runGeneration(prepared, async (stage) => {
-          const [jobStage, progress] = stageProgress[stage];
-          await db.update(masterJobsTable).set({
-            status: "processing",
-            stage: jobStage,
-            progress,
-            startedAt: stage === "demucs" ? new Date() : undefined,
-          }).where(eq(masterJobsTable.id, jobId));
-        });
+        const origin = `https://${req.get("host")}`;
+        const stylePrompt =
+          prepared.body.stylePrompt?.trim() ||
+          (prepared.vocalMode === "instrumental"
+            ? "Modern instrumental, rich arrangement, clean professional mix."
+            : "Full song with vocals, modern production, clean mix, structured verses and chorus.");
+        const lyriaInput =
+          prepared.vocalMode === "instrumental"
+            ? `${stylePrompt}\n\nInstrumental only — no vocals, no singing, no spoken words, no humming.`
+            : prepared.vocalMode === "random"
+              ? `${stylePrompt}\n\nWrite and sing your own original lyrics that fit this style.`
+              : `${stylePrompt}\n\nSing these exact lyrics, word for word:\n${prepared.text}`;
+        const lyria = await generateLyriaAudio(lyriaInput);
         await db.update(masterJobsTable).set({
-          status: "completed",
-          stage: "done",
-          progress: 100,
-          outputObjectKey: result.trackId,
-          outputUrl: `/api/tracks/${result.trackId}/stream`,
-          completedAt: new Date(),
+          startedAt: new Date(),
+          requestConfig: {
+            title: prepared.body.title ?? null,
+            artistName: prepared.body.artistName ?? null,
+            stylePrompt,
+            vocalMode: prepared.vocalMode,
+            durationS: prepared.body.durationS ?? null,
+            creditReference: prepared.creditReference,
+            creditsSpent: prepared.creditsSpent,
+            lyrics: prepared.vocalMode === "lyrics" ? prepared.text : (lyria.responseLyrics ?? null),
+            origin,
+          },
         }).where(eq(masterJobsTable.id, jobId));
+
+        if (prepared.vocalMode === "instrumental") {
+          // No voice work needed — master directly and finish inline.
+          const result = await runGeneration(prepared);
+          await db.update(masterJobsTable).set({
+            status: "completed",
+            stage: "done",
+            progress: 100,
+            outputObjectKey: result.trackId,
+            outputUrl: `/api/tracks/${result.trackId}/stream`,
+            completedAt: new Date(),
+          }).where(eq(masterJobsTable.id, jobId));
+          return;
+        }
+
+        await dispatchGeneration({ jobId, audio: lyria.audio, config: {
+          title: prepared.body.title ?? null,
+          artistName: prepared.body.artistName ?? null,
+          stylePrompt,
+          vocalMode: prepared.vocalMode,
+          creditReference: prepared.creditReference,
+          creditsSpent: prepared.creditsSpent,
+          lyrics: prepared.vocalMode === "lyrics" ? prepared.text : (lyria.responseLyrics ?? null),
+          origin,
+        } });
       } catch (err) {
         req.log.error({ err, jobId }, "MLK v3.5 background generation failed");
         if (prepared.creditsSpent) {
