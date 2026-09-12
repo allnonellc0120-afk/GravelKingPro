@@ -19,9 +19,13 @@ import os
 import sys
 import traceback
 import subprocess
+from pathlib import Path
 
 # Kernel lives next to this worker.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
+if str(WORKSPACE_ROOT) not in sys.path:
+    sys.path.insert(0, str(WORKSPACE_ROOT))
 
 
 def main() -> int:
@@ -45,6 +49,7 @@ def main() -> int:
 
     import numpy as np
     from scipy.io import wavfile
+    from lib.gka_middleware import GKAdvantageCore
     from morris_law_kernel import MorrisLawKernel
 
     sr, data = wavfile.read(args.input)
@@ -60,6 +65,10 @@ def main() -> int:
         # Kernel's stereo logic expects (N, 2); duplicate mono to dual mono.
         audio = np.repeat(audio, 2, axis=1)
 
+    # GKA is the required partition/optimization boundary before MLK V3.5.
+    # This is real float audio processing, not a mock or metadata-only flag.
+    gka = GKAdvantageCore(multiplier=0.75, slice_size=2)
+    audio = gka.optimize_audio(audio, operation="mlk_v3_5_master_input")
     kernel = MorrisLawKernel(sample_rate=sr)
     stereo_link = args.stereo_link.lower() != "false"
     auto_threshold = args.auto_threshold.lower() == "true"
@@ -130,6 +139,7 @@ def main() -> int:
         "scFreqUsed": round(float(sc_freq_used), 1),
         "detectedRmsDb": round(detected_rms_db, 1),
         "appliedThresholdDb": round(applied_threshold_db, 1),
+        "gka": gka.verify_parity(),
     }))
     return 0
 

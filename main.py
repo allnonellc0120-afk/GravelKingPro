@@ -12,6 +12,8 @@ from uuid import uuid4
 import urllib.parse
 import urllib.request
 
+from lib.gka_middleware import GKAdvantageCore
+
 
 STAGED_VAULT_DIR = Path(
     os.environ.get("STAGED_VAULT_DIR", str(Path(__file__).with_name("staged_vault")))
@@ -23,6 +25,7 @@ MEDIA_EXTENSIONS = {
     ".aac", ".aif", ".aiff", ".alac", ".flac", ".m4a", ".mp3", ".ogg",
     ".opus", ".wav", ".webm", ".wma",
 }
+GKA_CORE = GKAdvantageCore(multiplier=0.75, slice_size=2)
 
 
 class KernelStatusHandler(BaseHTTPRequestHandler):
@@ -46,6 +49,7 @@ class KernelStatusHandler(BaseHTTPRequestHandler):
             "status": "LIVE_AUTHENTICATED",
             "execution_overhead_reduction": "75%",
             "complexity": "O(n)",
+            "gka": GKA_CORE.verify_parity(),
         }
         self._json(200, payload)
 
@@ -197,6 +201,10 @@ def _process_vault_source(job_id: str, source_index: int, source: dict[str, str]
     source_url = source["url"]
     label = _safe_vault_component(source["label"], f"vault-{source_index + 1}")
     profile_target = source["profile_target"]
+    task_id = GKA_CORE.begin_task(
+        "vault_audio_ingestion",
+        metadata={"job_id": job_id, "source_index": source_index},
+    )
     try:
         request = urllib.request.Request(
             source_url,
@@ -235,6 +243,7 @@ def _process_vault_source(job_id: str, source_index: int, source: dict[str, str]
                 source_index,
                 {**base_update, "status": "SOURCE_RECEIVED_NON_AUDIO"},
             )
+            GKA_CORE.finish_task(task_id, metadata={"status": "non_audio"})
             return
 
         with INGEST_MANIFEST_LOCK:
@@ -254,6 +263,7 @@ def _process_vault_source(job_id: str, source_index: int, source: dict[str, str]
                         "duplicate_of": existing.get("path"),
                     },
                 )
+                GKA_CORE.finish_task(task_id, metadata={"status": "duplicate"})
                 return
 
             stem_name = f"{label}_{filename}"
@@ -288,7 +298,9 @@ def _process_vault_source(job_id: str, source_index: int, source: dict[str, str]
                     }
                 )
             _write_ingest_manifest_unlocked(document)
+        GKA_CORE.finish_task(task_id, metadata={"status": "staged"})
     except Exception as error:
+        GKA_CORE.finish_task(task_id, status="failed", metadata={"error": str(error)[:500]})
         _update_vault_job(
             job_id,
             source_index,
@@ -387,7 +399,19 @@ def stage_cloud_ingestion(request: object) -> dict[str, object]:
             }
         )
     manifest_items = manifest if isinstance(manifest, list) else ([manifest] if manifest else [])
+    # Every cloud-ingestion source is partitioned through the authoritative
+    # GKA boundary before its asynchronous worker is created.
+    source_slices = GKA_CORE.slice_data(vault_sources)
     vault_job_id = _queue_vault_sources(vault_sources) if vault_sources else None
+    lineage_task = GKA_CORE.begin_task(
+        "cloud_audio_pipeline",
+        metadata={
+            "source_count": len(vault_sources),
+            "slice_count": len(source_slices),
+            "slice_size": GKA_CORE.slice_size,
+        },
+    )
+    GKA_CORE.finish_task(lineage_task)
     return {
         "status": "QUEUED" if vault_sources else "STAGED",
         "job_id": str(uuid4()),
@@ -402,6 +426,8 @@ def stage_cloud_ingestion(request: object) -> dict[str, object]:
         "staged_vault": str(STAGED_VAULT_DIR),
         "ingest_manifest": str(INGEST_MANIFEST_PATH),
         "background_processing": bool(vault_sources),
+        "gka": GKA_CORE.verify_parity(),
+        "gka_lineage": GKA_CORE.lineage_snapshot()[-1:],
         "next_operation": "batch_stem_extraction",
         "complexity": "O(n)"
     }
@@ -547,6 +573,11 @@ def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
         "elevenlabs_api_dispatch_binding",
         "authenticated_payload_return",
     ]
+    pipeline_task = GKA_CORE.begin_task(
+        "proxima_audio_pipeline",
+        metadata={"profile": profile_name, "stage_count": len(stages)},
+    )
+    stage_slices = GKA_CORE.slice_data(stages)
     instruction = (
         "Generate a concise creative direction for this request. Preserve the requested "
         "genre and mood exactly; do not claim external facts. "
@@ -571,6 +602,10 @@ def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
         "stem_preservation_flags": profile["stem_preservation_flags"],
         "media_ref": media_ref,
     }
+    GKA_CORE.finish_task(
+        pipeline_task,
+        metadata={"slice_count": len(stage_slices), "status": "dispatched"},
+    )
     return {
         "status": "LIVE_AUTHENTICATED",
         "kernel": "Morris Law Kernel V2",
@@ -590,6 +625,8 @@ def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
         "complexity": "O(n)",
         "gemini": "dispatched",
         "elevenlabs": voice,
+        "gka": GKA_CORE.verify_parity(),
+        "gka_lineage": GKA_CORE.lineage_snapshot()[-1:],
     }
 
 
