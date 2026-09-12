@@ -41,6 +41,8 @@ export interface VoiceConvertInput {
   audioUrl: string;
   /** Optional URL for a custom RVC .pth/.zip model weights file. */
   modelWeightsUrl?: string;
+  /** Replicate webhook URL — completion is delivered there, never polled here. */
+  webhook?: string;
   /** Pitch shift in semitones. Defaults to 0. */
   pitchShift?: number;
   /** RVC index mix rate. Defaults to the calibrated outlaw baritone value. */
@@ -157,7 +159,13 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     replicateFetch("/predictions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, input: modelInput }),
+      body: JSON.stringify({
+        version,
+        input: modelInput,
+        ...(input.webhook
+          ? { webhook: input.webhook, webhook_events_filter: ["completed"] }
+          : {}),
+      }),
     }),
   );
   // Dispatch only. Waiting belongs to the background prediction worker so a
@@ -370,6 +378,7 @@ export async function createPrediction(
   owner: string,
   name: string,
   input: Record<string, unknown>,
+  webhook?: string,
 ): Promise<string> {
   let version: string;
   try {
@@ -387,7 +396,10 @@ export async function createPrediction(
       replicateFetch(`/models/${owner}/${name}/predictions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify({
+          input,
+          ...(webhook ? { webhook, webhook_events_filter: ["completed"] } : {}),
+        }),
       }),
     );
   }
@@ -396,7 +408,11 @@ export async function createPrediction(
     replicateFetch(`/predictions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version, input }),
+      body: JSON.stringify({
+        version,
+        input,
+        ...(webhook ? { webhook, webhook_events_filter: ["completed"] } : {}),
+      }),
     }),
   );
 }
