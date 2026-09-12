@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "export NODE_ENV=development PORT=${PORT:-8080} && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --max-old-space-size=2048 --enable-source-maps ./dist/index.mjs",
     "test:rvc": "node --experimental-strip-types ./scripts/test-rvc.ts",
