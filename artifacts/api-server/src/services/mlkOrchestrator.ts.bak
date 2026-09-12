@@ -21,9 +21,7 @@ import { sanitizeStylePrompt, rewriteBlockedPrompt } from "./promptSanitizer";
 import { convertToGravelKingVoice, runModel, uploadFile } from "../replicateClient";
 
 const objectStorage = new ObjectStorageService();
-const VOICE_SWAP_TIMEOUT_MS = 600_000;
-const DEFAULT_RVC_MODEL_WEIGHTS_URL =
-  "https://www.dropbox.com/scl/fi/k7ujxiy2bzt4jcnijlr8c/VoiceAudio.wav?rlkey=48iwn7qo57itnps5e0d6dqkeb&dl=1";
+const VOICE_SWAP_TIMEOUT_MS = 180_000;
 
 const LYRIA_MODEL = "lyria-3-pro-preview";
 
@@ -161,9 +159,9 @@ export async function tryGravelKingVoiceSwap(
   const conversion = await withVoiceSwapTimeout(convertToGravelKingVoice({
     audioUrl: await uploadFile(vocals, "gk_vocal.wav", "audio/wav"),
     modelWeightsUrl:
-      modelWeightsUrl?.trim() ||
-      process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"]?.trim() ||
-      DEFAULT_RVC_MODEL_WEIGHTS_URL,
+      modelWeightsUrl ??
+      process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] ??
+      undefined,
     pitchShift: 0,
     indexRate: 0.78,
     protect: 0.02,
