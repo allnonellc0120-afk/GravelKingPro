@@ -117,9 +117,9 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     ? requireHttpUrl(input.modelWeightsUrl, "modelWeightsUrl")
     : undefined;
   const pitchShift = input.pitchShift ?? 0;
-  const indexRate = input.indexRate ?? 0.90;
+  const indexRate = input.indexRate ?? 0.78;
   const protect = input.protect ?? 0.10;
-  const filterRadius = input.filterRadius ?? 1;
+  const filterRadius = input.filterRadius ?? 3;
 
   if (!Number.isFinite(pitchShift) || pitchShift < -24 || pitchShift > 24) {
     throw new Error("Replicate RVC pitchShift must be between -24 and 24 semitones");
