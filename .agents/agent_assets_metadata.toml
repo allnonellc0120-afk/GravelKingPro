@@ -1793,3 +1793,31 @@ mtime_ms = 1789190544502
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/31eaca0b-25cc-4bde-9815-9f8a60e87e7d/d8625487-9bb1-4e79-b06f-b619ba84c3df"
 storage_version_token = "1789190557024138"
 content_type = "audio/mpeg"
+
+[[outputs]]
+id = "Rg3lhzTtOcPY5HFLrzccQ"
+uri = "file://attached_assets/insane_gravelking_trained_voice_mlkv35.wav"
+type = "audio"
+title = "Insane — GravelKing Trained Voice + MLK V3.5 (WAV)"
+description = "Canonical GravelKing trained RVC voice conversion, verified vocal/instrumental remix, and Morris Law Kernel V3.5 master. 24-bit stereo WAV at 48 kHz."
+logical_id = "4bface62-b0f4-4821-bb2f-7f85be67d12c"
+content_hash = "sha256:3782ce6e33f3e4e1c9935bdeb5c8fabd3083ec822a45bdb542f53d5723b6c002"
+size = 60292328
+mtime_ms = 1789202555380
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/4bface62-b0f4-4821-bb2f-7f85be67d12c/8e713117-997f-452e-a7da-e3e6af0f0e17"
+storage_version_token = "1789202581338005"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "m1btmyQb5IeShjYrTL9zr"
+uri = "file://attached_assets/insane_gravelking_trained_voice_mlkv35.mp3"
+type = "audio"
+title = "Insane — GravelKing Trained Voice + MLK V3.5 (MP3)"
+description = "Canonical GravelKing trained RVC voice conversion, verified vocal/instrumental remix, and Morris Law Kernel V3.5 master. 320 kbps stereo MP3 at 48 kHz."
+logical_id = "84a0c39b-31ba-4bed-87e7-9a66f84a419c"
+content_hash = "sha256:dc70a21571681b5203ac0e99fc7f5df857b40bc580e3995327efe1bd503ae23c"
+size = 8376045
+mtime_ms = 1789202559588
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/84a0c39b-31ba-4bed-87e7-9a66f84a419c/0d3ce7af-a60c-46d5-b8fb-2a08c66b299d"
+storage_version_token = "1789202582553883"
+content_type = "audio/mpeg"

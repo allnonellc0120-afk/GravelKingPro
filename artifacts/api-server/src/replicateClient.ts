@@ -161,7 +161,7 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
       body: JSON.stringify({ version, input: modelInput }),
     }),
   );
-  const output = await pollPrediction(predictionId, 180_000);
+  const output = await pollPrediction(predictionId, 600_000);
   return { outputUrl: outputUrl(output), predictionId };
 }
 
