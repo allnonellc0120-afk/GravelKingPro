@@ -9,6 +9,8 @@ import Replicate from "replicate";
 const REPLICATE_BASE = "https://api.replicate.com/v1";
 export const DEFAULT_RVC_MODEL =
   "zsxkib/realistic-voice-cloning:0a9c7c558af4c0f20667c1bd1260ce32a2879944a0b9e44e1398660c077b1550";
+export const ACTIVE_RVC_VOICE_PRESET_ID = "gravelking_outlaw_baritone";
+export const ACTIVE_RVC_VOICE_LABEL = "GravelKing Outlaw Baritone";
 
 function getToken(): string | undefined {
   return process.env["REPLICATE_API_TOKEN"];
@@ -41,7 +43,7 @@ export interface VoiceConvertInput {
   modelWeightsUrl?: string;
   /** Pitch shift in semitones. Defaults to 0. */
   pitchShift?: number;
-  /** RVC index mix rate. Defaults to 0.8. */
+  /** RVC index mix rate. Defaults to the calibrated outlaw baritone value. */
   indexRate?: number;
   /** RVC median-filter radius for F0 estimation. */
   filterRadius?: number;

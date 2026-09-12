@@ -25,8 +25,10 @@ import {
   GRAVELKING_RVC_INDEX_KEY,
   GRAVELKING_RVC_MODEL_KEY,
   GRAVELKING_RVC_MODEL_FILENAME,
+  LEGACY_GRAVELKING_RVC_MODEL_FILENAME,
   rvcModelStreamSignature,
 } from "../services/rvcModelAccess";
+import { STUDIO_VOICE_REGISTRY, getStudioVoiceRegistry } from "../services/studioVoiceRegistry";
 import { CREDIT_COSTS, grantCredits, resolveCreditUser, spendCredits } from "../lib/credits";
 import {
   getJaxSession,
@@ -56,8 +58,15 @@ function writeSse(res: Response, event: string, payload: unknown) {
 }
 
 jaxRouter.get(
-  "/jax/rvc-model/:expiresAt/:signature/gravelking_v2.zip",
+  "/jax/rvc-model/:expiresAt/:signature/:filename",
   async (req: Request, res: Response) => {
+    if (
+      req.params.filename !== GRAVELKING_RVC_MODEL_FILENAME &&
+      req.params.filename !== LEGACY_GRAVELKING_RVC_MODEL_FILENAME
+    ) {
+      res.status(404).end();
+      return;
+    }
     const expiresAt = Number(req.params.expiresAt);
     if (!Number.isSafeInteger(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
       res.status(403).json({ error: "Model URL expired" });
@@ -133,7 +142,16 @@ export function getConfiguredAdminVoiceDiagnostic() {
 
 export const JAX_VOICE_PRESETS = {
   admin: { label: configuredAdminVoiceLabel, voiceId: () => process.env.JAX_VOICE_ID?.trim() ?? "" },
-  adam: { label: "JAX Baritone (Deep & Resonant)", voiceId: () => "pNInz6obpgDQGcFmaJgB" },
+  gravelking_outlaw_baritone: {
+    presetId: STUDIO_VOICE_REGISTRY.gravelking_outlaw_baritone.presetId,
+    label: STUDIO_VOICE_REGISTRY.gravelking_outlaw_baritone.label,
+    voiceId: () => "pNInz6obpgDQGcFmaJgB",
+  },
+  female_soul_lead: {
+    presetId: STUDIO_VOICE_REGISTRY.female_soul_lead.presetId,
+    label: STUDIO_VOICE_REGISTRY.female_soul_lead.label,
+    voiceId: STUDIO_VOICE_REGISTRY.female_soul_lead.voiceId,
+  },
   callum: { label: "JAX Gritty Blues / Rough", voiceId: () => "N2lVS1w4EtoT3dr4eOWO" },
   antoni: { label: "JAX Smooth / Younger Conversational", voiceId: () => "ErXwobaYiN019PkySvjV" },
   josh: { label: "JAX Heavy Low-End / Narrator", voiceId: () => "TxGEqnHWrfWFTfGW9XjX" },
@@ -147,6 +165,10 @@ export function getJaxVoiceMetadata() {
     label: key === "admin" ? JAX_VOICE_PRESETS.admin.label() : String(preset.label),
   })).filter((preset) => preset.key !== "admin" || Boolean(JAX_VOICE_PRESETS.admin.voiceId()));
 }
+
+jaxRouter.get("/jax/voice-registry", (_req: Request, res: Response) => {
+  res.json({ voices: getStudioVoiceRegistry() });
+});
 
 jaxRouter.get("/jax/voices", (_req: Request, res: Response) => {
   res.json({ voices: getJaxVoiceMetadata() });
@@ -677,7 +699,7 @@ jaxRouter.post("/jax/tts", rateLimit({
     return;
   }
   if (!voiceId || !allowedVoiceIds.includes(voiceId)) {
-    res.status(400).json({ error: "Select a supported male JAX voice preset." });
+    res.status(400).json({ error: "Select a supported JAX voice preset." });
     return;
   }
   ttsUsage.set(ttsKey, { day: today, count: ttsCount + 1 });

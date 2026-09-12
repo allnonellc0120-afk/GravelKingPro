@@ -162,6 +162,7 @@ export async function tryGravelKingVoiceSwap(
       modelWeightsUrl ??
       process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] ??
       undefined,
+    pitchShift: 0,
     indexRate: 0.78,
     protect: 0.02,
     filterRadius: 3,

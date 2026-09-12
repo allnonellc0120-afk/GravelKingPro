@@ -1,8 +1,12 @@
 import { createHmac } from "node:crypto";
 
-export const GRAVELKING_RVC_MODEL_KEY = "models/gravelking_v2.pth";
-export const GRAVELKING_RVC_INDEX_KEY = "models/gravelking_v2.index";
-export const GRAVELKING_RVC_MODEL_FILENAME = "gravelking_v2.zip";
+/** Stable storage keys for the validated GravelKing Outlaw Baritone weights. */
+export const GRAVELKING_OUTLAW_MODEL_KEY = "models/gravelking_v2.pth";
+export const GRAVELKING_OUTLAW_INDEX_KEY = "models/gravelking_v2.index";
+export const GRAVELKING_RVC_MODEL_KEY = GRAVELKING_OUTLAW_MODEL_KEY;
+export const GRAVELKING_RVC_INDEX_KEY = GRAVELKING_OUTLAW_INDEX_KEY;
+export const GRAVELKING_RVC_MODEL_FILENAME = "gravelking_outlaw_baritone.zip";
+export const LEGACY_GRAVELKING_RVC_MODEL_FILENAME = "gravelking_v2.zip";
 
 function normalizeOrigin(value: string | undefined): string | null {
   if (!value?.trim()) return null;
