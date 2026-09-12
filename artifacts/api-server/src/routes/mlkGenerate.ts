@@ -36,6 +36,7 @@ interface GenerationRequestBody {
   stylePrompt?: string;
   vocalMode?: string;
   durationS?: number;
+  isExplicit?: boolean;
   lyricAudit?: { finalLyricsHash?: string; authorshipScore?: number; ledger?: unknown[] };
 }
 
@@ -164,7 +165,10 @@ async function runGeneration(prepared: PreparedGeneration) {
       ? {
           finalLyricsHash: serverLyricHash,
           authorshipScore: Math.max(0, Math.min(100, Number(body.lyricAudit.authorshipScore) || 0)),
-          ledger: body.lyricAudit.ledger.slice(0, 500),
+           ledger: [
+             ...body.lyricAudit.ledger.slice(0, 499),
+             { metadata: { parental_advisory: body.isExplicit === true } },
+           ],
         }
       : undefined,
     modelWeightsUrl: prepared.modelWeightsUrl,

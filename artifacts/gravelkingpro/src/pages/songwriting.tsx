@@ -524,6 +524,7 @@ export default function SongwritingStudio() {
   const [generatorBusy, setGeneratorBusy] = useState(false);
   const [generatorMessage, setGeneratorMessage] = useState("");
   const [generatorProgress, setGeneratorProgress] = useState<number | null>(null);
+  const [isExplicit, setIsExplicit] = useState(false);
   const [regeneratingMessageId, setRegeneratingMessageId] = useState<string | null>(null);
   const [stage2Hash, setStage2Hash] = useState("");
   const [stage3Hash, setStage3Hash] = useState("");
@@ -962,12 +963,13 @@ export default function SongwritingStudio() {
       if (!selected.length) return;
       const requestedLines = selected.map((index) => `${index + 1}. ${lines[index]}`).join("\n");
       const prompt = `Regenerate only the requested lyric lines below. Return exactly one replacement line for each requested line, in the same order, with no numbering, commentary, or code fences. Do not return any other lines.\n\nREQUESTED LINES:\n${requestedLines}`;
-      const result = await fetch("/api/jax/generate", {
+      const result = await fetch("/api/chat/jax", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          prompt,
+          message: prompt,
+          is_explicit: isExplicit,
           artistProfile,
           history: chatMessages.slice(-2).map((item) => ({ role: item.role, content: item.content })),
         }),
@@ -1047,12 +1049,13 @@ export default function SongwritingStudio() {
     setGenerating(true);
     setGenerationError("");
     try {
-      const result = await fetch("/api/jax/generate", {
+      const result = await fetch("/api/chat/jax", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         credentials: "include",
         body: JSON.stringify({
-          prompt: submittedPrompt,
+          message: submittedPrompt,
+          is_explicit: isExplicit,
           artistProfile,
           history: chatMessages.slice(-2).map((m) => ({ role: m.role, content: m.content })),
           stream: true,
@@ -1311,11 +1314,11 @@ export default function SongwritingStudio() {
   };
 
   const askJax = async (fillPrompt: string): Promise<string> => {
-    const result = await fetch("/api/jax/generate", {
+    const result = await fetch("/api/chat/jax", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ prompt: fillPrompt, artistProfile, history: chatMessages.slice(-2).map((m) => ({ role: m.role, content: m.content })) }),
+      body: JSON.stringify({ message: fillPrompt, is_explicit: isExplicit, artistProfile, history: chatMessages.slice(-2).map((m) => ({ role: m.role, content: m.content })) }),
     });
     const data = await result.json() as { text?: string; error?: string };
     if (!result.ok || !data.text?.trim()) throw new Error(data.error || "JAX could not fill in the missing piece.");
@@ -1400,7 +1403,7 @@ export default function SongwritingStudio() {
       const state = await submitGenerationJob({
         kind: "generate",
         dedupeKey: `${await sha256Text(lyrics)}:${await sha256Text(style)}`,
-        body: { text: lyrics, title: draft.title, stylePrompt: style, vocalMode: "lyrics", durationS: 120, lyricAudit },
+        body: { text: lyrics, title: draft.title, stylePrompt: style, vocalMode: "lyrics", durationS: 120, isExplicit, lyricAudit },
         onProgress: (job) => {
           if (job.status === "processing") {
             const pct = typeof job.progress === "number" ? job.progress : 5;
@@ -1505,7 +1508,7 @@ export default function SongwritingStudio() {
                   </div>
                 )}
             </div>
-             <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-1 pt-2 text-xs text-muted-foreground"><span>{remaining !== null ? `${remaining} prompts left today` : "Send a question to interrupt JAX playback."}</span><span>{autoVoice ? "Auto-play is on · Change voice in Settings" : "Auto-play is paused · Change voice in Settings"}</span></div></div></div></div>
+             <div className="shrink-0 border-t border-white/10 bg-[#08090c]/95 px-4 py-4 backdrop-blur sm:px-8"><div className="mx-auto max-w-4xl"><div className="rounded-2xl border border-white/15 bg-white/[0.04] p-2 shadow-2xl"><div className="flex items-end gap-2"><Textarea id="chat-input-field" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void generate(); } }} placeholder="Message JAX…" className="min-h-12 max-h-40 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0" /><Button type="button" size="icon" variant="ghost" onClick={toggleListening} className={listening ? "text-rose-300" : "text-muted-foreground"} aria-label={listening ? "Stop microphone" : "Use microphone"}>{listening ? "●" : "Mic"}</Button><Button type="button" size="icon" onClick={() => void generate()} disabled={!prompt.trim() || generating} className="bg-violet-500 text-white" aria-label="Send message">↑</Button></div><div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-1 pt-2 text-xs text-muted-foreground"><label className="flex items-center gap-2"><span>Explicit: {isExplicit ? "ON" : "OFF"}</span><Switch checked={isExplicit} onCheckedChange={setIsExplicit} aria-label="Explicit content mode" /></label><span>{remaining !== null ? `${remaining} prompts left today` : "Send a question to interrupt JAX playback."}</span><span>{autoVoice ? "Auto-play is on · Change voice in Settings" : "Auto-play is paused · Change voice in Settings"}</span></div></div></div></div>
           </main>
         </div>
       </div>

@@ -83,6 +83,14 @@ export interface GenerationConfig {
    * maxOutputTokens; pass { thinkingBudget: 0 } when a tight token cap must go
    * entirely to the answer. */
   thinkingConfig?: { thinkingBudget: number };
+  safetySettings?: Array<{
+    category:
+      | "HARM_CATEGORY_HARASSMENT"
+      | "HARM_CATEGORY_HATE_SPEECH"
+      | "HARM_CATEGORY_SEXUALLY_EXPLICIT"
+      | "HARM_CATEGORY_DANGEROUS_CONTENT";
+    threshold: "BLOCK_NONE";
+  }>;
 }
 
 interface VertexResponse {
@@ -102,7 +110,7 @@ export async function generateVertexContent(
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
   const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
-  const { tools, ...vertexGenerationConfig } = generationConfig;
+  const { tools, safetySettings, ...vertexGenerationConfig } = generationConfig;
 
   const res = await fetch(url, {
     method: "POST",
@@ -114,6 +122,7 @@ export async function generateVertexContent(
       contents: [{ role: "user", parts }],
       generationConfig: { maxOutputTokens: 8192, ...vertexGenerationConfig },
       ...(tools ? { tools } : {}),
+      ...(safetySettings ? { safetySettings } : {}),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -153,7 +162,7 @@ export async function generateVertexTextStream(
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
   const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:streamGenerateContent?alt=sse`;
-  const { tools, ...vertexGenerationConfig } = generationConfig;
+  const { tools, safetySettings, ...vertexGenerationConfig } = generationConfig;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -165,6 +174,7 @@ export async function generateVertexTextStream(
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 8192, ...vertexGenerationConfig },
       ...(tools ? { tools } : {}),
+      ...(safetySettings ? { safetySettings } : {}),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
