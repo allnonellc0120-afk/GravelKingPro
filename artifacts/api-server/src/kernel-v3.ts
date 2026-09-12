@@ -317,6 +317,7 @@ export function applyMLKv3(wavBuf: Buffer, multiplier: number = 0.75): { buf: Bu
 export async function applyMLKv3Fast(
   input: string | Buffer,
   multiplier: number = 0.75,
+  target?: { lufs: number; ceilingDb: number },
 ): Promise<{ buf: Buffer; parity: string }> {
   const id      = randomUUID();
   const inPath  = typeof input === "string" ? input : `/tmp/gkp_mlk_in_${id}.wav`;
@@ -336,13 +337,7 @@ export async function applyMLKv3Fast(
 
   // dynaudnorm is chained to the amix output with ',' (not ';') so it receives a
   // labeled input — ffmpeg rejects the graph otherwise.
-  const filter = [
-    `asplit=3[low][mid][high]`,
-    `[low]lowpass=f=250,volume=${lowMult}[l]`,
-    `[mid]highpass=f=250,lowpass=f=4000,volume=${midMult}[m]`,
-    `[high]highpass=f=4000,volume=${highMult}[h]`,
-    `[l][m][h]amix=inputs=3:normalize=0,dynaudnorm=p=0.9:m=10:s=5`,
-  ].join(";");
+  const filter = buildMLKv3FastFilter(multiplier, target);
 
   try {
     await execFileAsync("ffmpeg", [
@@ -350,6 +345,7 @@ export async function applyMLKv3Fast(
       "-filter_complex", filter,
       "-ac", "2",
       "-acodec", "pcm_s16le",
+      "-map", "[gkaout]",
       outPath,
     ], { maxBuffer: 200 * 1024 * 1024, timeout: 180_000 });
 
@@ -360,4 +356,30 @@ export async function applyMLKv3Fast(
       await unlink(inPath).catch(() => {});
     }
   }
+}
+
+/**
+ * Build the one-pass MLK/GKA carve graph. Supplying inputLabel lets a caller
+ * append the same validated graph to an existing ffmpeg mix graph so DAW
+ * exports avoid a second process.
+ */
+export function buildMLKv3FastFilter(
+  multiplier: number = 0.75,
+  target?: { lufs: number; ceilingDb: number },
+  inputLabel = "",
+): string {
+  const lowMult = Math.min(2.0, multiplier * 1.15).toFixed(4);
+  const midMult = multiplier.toFixed(4);
+  const highMult = Math.max(0.1, multiplier * 0.80).toFixed(4);
+  const targetFilter = target
+    ? `,loudnorm=I=${target.lufs}:TP=${target.ceilingDb}:LRA=11:linear=false`
+    : "";
+  const dynamicFilter = target ? "" : ",dynaudnorm=p=0.9:m=10:s=5";
+  return [
+    `${inputLabel}asplit=3[gkalow][gkamid][gkahigh]`,
+    `[gkalow]lowpass=f=250,volume=${lowMult}[gka_l]`,
+    `[gkamid]highpass=f=250,lowpass=f=4000,volume=${midMult}[gka_m]`,
+    `[gkahigh]highpass=f=4000,volume=${highMult}[gka_h]`,
+    `[gka_l][gka_m][gka_h]amix=inputs=3:normalize=0${dynamicFilter}${targetFilter}[gkaout]`,
+  ].join(";");
 }

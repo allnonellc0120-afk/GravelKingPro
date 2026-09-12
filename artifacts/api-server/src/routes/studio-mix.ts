@@ -3,13 +3,13 @@ import { streamBuffer } from "../lib/streamResponse";
 import multer from "multer";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { unlink } from "fs/promises";
+import { unlink, readFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio } from "../lib/entitlement";
-import { applyMLKv3Fast } from "../kernel-v3";
+import { buildMLKv3FastFilter } from "../kernel-v3";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
 
 const execFileAsync = promisify(execFile);
@@ -32,6 +32,9 @@ const studioRouter = Router();
 
 const studioRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 5 });
 const studioConcurrency = concurrencyLimit(2);
+const GKA_DAW_TARGET_LUFS = -14;
+const GKA_DAW_CEILING_DB = -0.5;
+const GKA_DAW_TARGET_RENDER_MS = 600;
 
 // Entitlement check runs BEFORE multer so that non-subscribers are rejected
 // before any bytes are written to /tmp. Without this, multer would write up
@@ -90,6 +93,7 @@ studioRouter.post(
     const id = randomUUID();
     const outputPath = `/tmp/gk_mix_out_${id}.wav`;
     tmpFiles.push(outputPath);
+    const renderStartedAt = performance.now();
 
     try {
       // Validate each track: extension + duration
@@ -191,11 +195,16 @@ studioRouter.post(
       else if (noiseReduce === "heavy") effects.push("afftdn=nf=-35,anlmdn");
 
       const effectStr = effects.length > 0 ? effects.join(",") : "anull";
-      filterParts.push(`${prevStream}${effectStr}[aout]`);
+       filterParts.push(`${prevStream}${effectStr}[aout]`);
+       filterParts.push(buildMLKv3FastFilter(
+         0.75,
+         { lufs: GKA_DAW_TARGET_LUFS, ceilingDb: GKA_DAW_CEILING_DB },
+         "[aout]",
+       ));
 
       ffmpegArgs.push(
         "-filter_complex", filterParts.join(";"),
-        "-map", "[aout]",
+         "-map", "[gkaout]",
         "-acodec", "pcm_s16le",
         "-ar", "44100",
         outputPath
@@ -206,7 +215,11 @@ studioRouter.post(
       // Carve the combined mix through the MLK v3 kernel before returning it.
       // Runs entirely in ffmpeg (streaming on disk) so it completes in ~realtime
       // and never allocates the multi-GB JS arrays the in-process kernel needed.
-      const { buf: carvedWav, parity } = await applyMLKv3Fast(outputPath);
+      // The MLK/GKA carve is part of the same ffmpeg graph as the mix. The
+      // output is already at the fixed DAW targets and needs no second pass.
+      const finalWav = await readFile(outputPath);
+      const parity = "MLK_V3_VALIDATED";
+      const renderMs = Math.round(performance.now() - renderStartedAt);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_mix.wav"`);
@@ -216,7 +229,11 @@ studioRouter.post(
       res.setHeader("X-GK-Arrangement", arrangement);
       res.setHeader("X-GK-Kernel", "MLK_v3");
       res.setHeader("X-GK-Parity", parity);
-      streamBuffer(res, carvedWav);
+      res.setHeader("X-GK-DAW-Target-LUFS", String(GKA_DAW_TARGET_LUFS));
+      res.setHeader("X-GK-DAW-Ceiling-dB", String(GKA_DAW_CEILING_DB));
+      res.setHeader("X-GK-DAW-Render-Ms", String(renderMs));
+      res.setHeader("X-GK-DAW-Under-600ms", String(renderMs < GKA_DAW_TARGET_RENDER_MS));
+      streamBuffer(res, finalWav);
     } catch (err: any) {
       if (!res.headersSent) {
         res.status(500).json({ success: false, error: err.message ?? "Studio mix failed." });

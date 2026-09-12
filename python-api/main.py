@@ -13,14 +13,22 @@ All processing uses temporary files with immediate cleanup after delivery.
 Output files are read into memory before cleanup, then returned via StreamingResponse.
 """
 import os
+import asyncio
+from pathlib import Path
 import shutil
 import tempfile
 import subprocess
 import zipfile
+import sys
 from typing import List, Dict
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
+
+WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
+if str(WORKSPACE_ROOT) not in sys.path:
+    sys.path.insert(0, str(WORKSPACE_ROOT))
+from lib.gka_middleware import GKAdvantageCore
 
 app = FastAPI(
     title="GravelKing Audio Engine",
@@ -31,27 +39,51 @@ app = FastAPI(
 # ── Configuration ─────────────────────────────────────────────────────────────
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 FFMPEG_TIMEOUT = 180  # seconds
+GKA_CORE = GKAdvantageCore(multiplier=0.75, slice_size=2)
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 
-def run_ffmpeg(args: List[str], timeout: int = FFMPEG_TIMEOUT) -> None:
+async def run_ffmpeg(
+    args: List[str],
+    timeout: int = FFMPEG_TIMEOUT,
+    task_name: str = "ffmpeg_audio_pipeline",
+) -> None:
     """Run ffmpeg with given arguments. Raises HTTPException on failure."""
     cmd = ["ffmpeg", "-y"] + args
+    task_id = GKA_CORE.begin_task(task_name, metadata={"command": cmd[:2]})
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        result = await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
         if result.returncode != 0:
             raise HTTPException(status_code=500, detail=f"ffmpeg failed: {result.stderr}")
+        GKA_CORE.finish_task(task_id)
     except subprocess.TimeoutExpired:
+        GKA_CORE.finish_task(task_id, status="failed", metadata={"error": "timeout"})
         raise HTTPException(status_code=504, detail=f"ffmpeg timed out after {timeout}s")
+    except Exception as error:
+        if GKA_CORE.lineage_snapshot() and any(
+            task.get("task_id") == task_id and task.get("status") == "running"
+            for task in GKA_CORE.lineage_snapshot()
+        ):
+            GKA_CORE.finish_task(task_id, status="failed", metadata={"error": str(error)[:500]})
+        raise
 
 
 async def get_audio_info(file_path: str) -> Dict[str, int]:
     """Probe audio file for sample rate, channels, duration."""
     try:
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            subprocess.run,
             ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", file_path],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode != 0:
             return {"sample_rate": 44100, "channels": 2, "duration": 0}
@@ -141,7 +173,7 @@ async def separate_vocals(
 
     try:
         if quality == "high" and is_stereo:
-            run_ffmpeg([
+            await run_ffmpeg([
                 "-i", input_path,
                 "-filter_complex",
                 "[0:a]pan=mono|c0=0.5*c0+0.5*c1[mono];"
@@ -152,7 +184,7 @@ async def separate_vocals(
             ])
         else:
             if is_stereo:
-                run_ffmpeg([
+                await run_ffmpeg([
                     "-i", input_path,
                     "-filter_complex",
                     "[0:a]pan=mono|c0=0.5*c0+0.5*c1[mono];"
@@ -162,7 +194,7 @@ async def separate_vocals(
                     "-map", "[inst]", inst_path,
                 ])
             else:
-                run_ffmpeg([
+                await run_ffmpeg([
                     "-i", input_path,
                     "-filter_complex",
                     "[0:a]highpass=f=180,lowpass=f=5000[voc];"
@@ -240,16 +272,16 @@ async def separate_stems(
             out_file = os.path.join(output_dir, f"{spec['name']}.{ext}")
             if format == "mp3":
                 tmp_wav = os.path.join(output_dir, f"{spec['name']}_tmp.wav")
-                run_ffmpeg([
+                await run_ffmpeg([
                     "-i", input_path, "-af", spec["filter"],
                     "-ac", "2" if is_stereo else "1", "-acodec", "pcm_s16le", tmp_wav,
                 ])
-                run_ffmpeg([
+                await run_ffmpeg([
                     "-i", tmp_wav, "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100", out_file,
                 ], timeout=60)
                 os.remove(tmp_wav)
             else:
-                run_ffmpeg([
+                await run_ffmpeg([
                     "-i", input_path, "-af", spec["filter"],
                     "-ac", "2" if is_stereo else "1", "-acodec", "pcm_s16le", out_file,
                 ])
@@ -298,7 +330,7 @@ async def denoise_audio(
         nr_amount = int(strength * 100)
         filter_str = f"afftdn=nr={nr_amount}:nf=-25:tn=1" if profile == "music" else f"afftdn=nr={nr_amount}:nf=-40:tn=1"
 
-        run_ffmpeg([
+        await run_ffmpeg([
             "-i", input_path, "-af", filter_str,
             "-acodec", "pcm_s16le", "-ar", str(info["sample_rate"]), output_path,
         ])
@@ -338,10 +370,13 @@ async def normalize_audio(
         sample_rate = info["sample_rate"]
 
         # Pass 1: analyze
-        analyze = subprocess.run(
+        analyze = await asyncio.to_thread(
+            subprocess.run,
             ["ffmpeg", "-y", "-i", input_path,
              "-af", f"loudnorm=I={target}:TP={true_peak}:print_format=json", "-f", "null", "-"],
-            capture_output=True, text=True, timeout=FFMPEG_TIMEOUT,
+            capture_output=True,
+            text=True,
+            timeout=FFMPEG_TIMEOUT,
         )
 
         import json
@@ -374,7 +409,7 @@ async def normalize_audio(
             f"offset={target_offset}"
         )
 
-        run_ffmpeg([
+        await run_ffmpeg([
             "-i", input_path, "-af", filter_str,
             "-acodec", "pcm_s16le", "-ar", str(sample_rate), output_path,
         ])
@@ -425,7 +460,7 @@ async def master_audio(
             filter_chain = f"afftdn=nr=50:nf=-40:tn=1,{filter_chain}"
         filter_chain = f"{filter_chain},alimiter=limit=0.95:level=disabled"
 
-        run_ffmpeg([
+        await run_ffmpeg([
             "-i", input_path, "-af", filter_chain,
             "-acodec", "pcm_s16le", "-ar", str(sample_rate), output_path,
         ])
@@ -467,6 +502,7 @@ async def separate_audio(
     suffix     = os.path.splitext(audio.filename or "input.wav")[1] or ".wav"
     input_path = None
     out_dir    = None
+    task_id = None
 
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -494,12 +530,26 @@ async def separate_audio(
                 input_path,
             ]
 
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if proc.returncode != 0:
-            raise HTTPException(
-                status_code=500,
-                detail=f"demucs failed: {proc.stderr[-400:]}",
+        task_id = GKA_CORE.begin_task(
+            "demucs_stem_separation",
+            metadata={"mode": mode, "model": "htdemucs", "slice_size": GKA_CORE.slice_size},
+        )
+        try:
+            proc = await asyncio.to_thread(
+                subprocess.run,
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=600,
             )
+            if proc.returncode != 0:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"demucs failed: {proc.stderr[-400:]}",
+                )
+        except Exception as error:
+            GKA_CORE.finish_task(task_id, status="failed", metadata={"error": str(error)[:500]})
+            raise
 
         track_name = os.path.splitext(os.path.basename(input_path))[0]
         stem_dir   = os.path.join(out_dir, "htdemucs", track_name)
@@ -511,25 +561,44 @@ async def separate_audio(
             stem_name = fname.replace(".wav", "")
             with open(os.path.join(stem_dir, fname), "rb") as fh:
                 stems[stem_name] = base64.b64encode(fh.read()).decode()
+        stem_slices = GKA_CORE.slice_data(sorted(stems))
 
         if mode == "stem_split" and "vocals" in stems:
             non_vocal_names = [n for n in stems if n != "vocals"]
             if len(non_vocal_names) > 1:
                 inst_out  = os.path.join(out_dir, "instrumental.wav")
                 mix_args  = sum([["-i", os.path.join(stem_dir, f"{n}.wav")] for n in non_vocal_names], [])
-                subprocess.run(
+                await asyncio.to_thread(
+                    subprocess.run,
                     ["ffmpeg", "-y"] + mix_args + [
                         "-filter_complex", f"amix=inputs={len(non_vocal_names)}:normalize=0",
                         "-acodec", "pcm_s16le", inst_out,
                     ],
-                    capture_output=True, timeout=120,
+                    capture_output=True,
+                    timeout=120,
                 )
                 if os.path.exists(inst_out):
                     with open(inst_out, "rb") as fh:
                         stems["instrumental"] = base64.b64encode(fh.read()).decode()
 
-        return JSONResponse({"stems": stems, "model": "htdemucs"})
+        GKA_CORE.finish_task(
+            task_id,
+            metadata={"stem_count": len(stems), "slice_count": len(stem_slices)},
+        )
+        return JSONResponse({
+            "stems": stems,
+            "model": "htdemucs",
+            "gka": GKA_CORE.verify_parity(),
+            "lineage_task_id": task_id,
+        })
 
+    except Exception as error:
+        if task_id is not None and any(
+            task.get("task_id") == task_id and task.get("status") == "running"
+            for task in GKA_CORE.lineage_snapshot()
+        ):
+            GKA_CORE.finish_task(task_id, status="failed", metadata={"error": str(error)[:500]})
+        raise
     finally:
         if input_path and os.path.exists(input_path):
             os.unlink(input_path)

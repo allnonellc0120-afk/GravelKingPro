@@ -9,6 +9,10 @@ import {
   base64ToAudioBuffer,
 } from "./projectStorage";
 
+const GKA_DAW_TARGET_LUFS = -14;
+const GKA_DAW_CEILING_DB = -0.5;
+const GKA_DAW_TARGET_RENDER_MS = 600;
+
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 function toAudioParamValue(key: string, raw: number): number {
@@ -738,6 +742,7 @@ export function useDAW() {
     if (maxDur <= 0) return;
     const ctx = getCtx();
     const sr = ctx.sampleRate;
+    const renderStartedAt = performance.now();
 
     toast({ title: "Exporting…", description: "Rendering mix offline — this may take a moment." });
 
@@ -771,6 +776,7 @@ export function useDAW() {
     }
     const rendered = await offCtx.startRendering();
     const wavBlob = audioBufferToWav(rendered);
+    const offlineRenderMs = Math.round(performance.now() - renderStartedAt);
 
     // Step 2: POST rendered WAV to server merge endpoint for final processing
     const form = new FormData();
@@ -780,6 +786,9 @@ export function useDAW() {
     form.append("semitones", "0");
     form.append("noiseReduce", "off");
     form.append("voicePreset", "normal");
+    form.append("targetLufs", String(GKA_DAW_TARGET_LUFS));
+    form.append("ceilingDb", String(GKA_DAW_CEILING_DB));
+    form.append("renderTargetMs", String(GKA_DAW_TARGET_RENDER_MS));
 
     const res = await fetch("/api/kernel/studio-mix", {
       method: "POST",
@@ -793,7 +802,12 @@ export function useDAW() {
     }
     const finalBlob = await res.blob();
     downloadBlob(finalBlob, "gravelking_mix.wav");
-    toast({ title: "Export complete", description: "Mix downloaded as WAV." });
+    const serverRenderMs = Number(res.headers.get("X-GK-DAW-Render-Ms") ?? 0);
+    const totalRenderMs = offlineRenderMs + (Number.isFinite(serverRenderMs) ? serverRenderMs : 0);
+    toast({
+      title: "Export complete",
+      description: `Mix downloaded as WAV (${totalRenderMs}ms render target: <${GKA_DAW_TARGET_RENDER_MS}ms).`,
+    });
   }, [masterPlugins, toast]);
 
   // ── cleanup on unmount ──
