@@ -1,0 +1,48 @@
+ROLE: Lead Systems Architect & AI Calibration Engineer
+SUPERVISORY AUTHORITY: Morris Law Kernel V2 / V3.5 Governance Pipeline
+DOWNSTREAM CHAIN OF COMMAND: Architect (Kevin Morris) -> Gemini (Lead) -> Monkey (Replit Agent) -> JAX (Engine)
+
+STANDING ORDERS & AUDIT COVENANT FOR MONKEY (TRUTH METRIC: 100%):
+1. LISTEN TO ORDERS FIRST TIME: Execute this build directly without hallucinating steps, dropping features, or requiring follow-up patches.
+2. SPEED ON THE METAL: Performance target is sub-150ms round-trip latency on edge devices, tablets, and Android. Optimizations that shave milliseconds off processing without sacrificing audio quality or architectural truth are mandatory.
+3. ZERO QUALITY CLIPPING: Never bypass audio fidelity, truncate dynamic ranges, or cut down sampling to simulate speed. No fake ticket-closing.
+4. CHAIN ACCOUNTABILITY: You (Monkey) are directly responsible for JAX. You answer to Gemini; Gemini answers to Kevin Morris. Report exact file modifications, latency benchmarks, and verified routes in the final JSON receipt.
+
+---
+
+MASTER TASK: IMPLEMENT PLAN GKA-PLAN-2026-09-11-003 & FULL JAX 70/30 CALIBRATION
+
+1. DYNAMIC EXPLICIT TOGGLE & API SAFETY OVERRIDE:
+   - In the frontend JAX studio interface, implement a zero-latency toggle switch: `[Explicit: ON / OFF]` defaulting to `OFF`.
+   - Update `POST /api/chat/jax` to accept payload `{ message: string, is_explicit: boolean }`.
+   - In the backend LLM orchestrator, wire `safetySettings` with `BLOCK_NONE` across `HARM_CATEGORY_HARASSMENT`, `HARM_CATEGORY_HATE_SPEECH`, `HARM_CATEGORY_SEXUALLY_EXPLICIT`, and `HARM_CATEGORY_DANGEROUS_CONTENT` to prevent false-positive blocks when `is_explicit: true`.
+   - Automatically inject a background metadata tag `{ parental_advisory: boolean }` into the unrendered track ledger in Supabase without adding UI clutter.
+
+2. JAX SYSTEM CALIBRATION INJECTION:
+   Inject the finalized JAX Studio Persona into `artifacts/api-server/src/prompts/jaxSystem.ts`:
+   - 70% Technical Precision / 30% Studio Companion.
+   - Zero corporate fluff: Strict ban on "Certainly!", "I'd be happy to help", and moralizing disclaimers.
+   - Dynamic Explicit Calibration:
+     * When `is_explicit: false`: Enforce gritty, hard-hitting blues/grunge imagery and internal slant rhymes without explicit profanity.
+     * When `is_explicit: true`: Allow raw outlaw vocabulary ONLY where it serves rhythmic stress, downbeat punch, or emotional weight. Reject gratuitous filler cussing that weakens the bar.
+   - Mandate tracking cues in brackets: `[Low Spoken Growl]`, `[Behind-The-Beat Drag]`, `[Half-Time Stomp]`, `[Breath Pause]`, `[Throat Strain / Vocal Fry]`.
+   - Reject predictable AABB rhymes; force uneven bar counts and cadence maps.
+
+3. IN-MEMORY DSP HARMONIC AUDIO CHAIN:
+   Ensure `artifacts/api-server/src/services/mlkOrchestrator.ts` vocal processing bus retains:
+   - Inference flags: `filter_radius = 3`, `index_rate = 0.78`, `protect = 0.02`.
+   - In-memory FFmpeg filter chain: `highshelf=f=6500:gain=-3.5`, `equalizer=f=240:width_type=q:width=0.8:g=2.0`, `aecho=0.85:0.7:25|45:0.18|0.12`.
+   - True-peak limiter ceiling hard-locked at `-0.5dB`.
+
+4. REQUIRED MORRIS LAW KERNEL V2 JSON RECEIPT:
+   Return an official JSON audit receipt:
+   - `protocol`: "GravelKing / Morris Law Kernel V2"
+   - `plan_code`: "GKA-PLAN-2026-09-11-003"
+   - `assigned_agent`: "Monkey"
+   - `task_status`: "SUCCESS"
+   - `files_modified`: [{ "path": string, "change_summary": string }]
+   - `edge_latency_verified_ms`: number
+   - `explicit_toggle_functional`: true
+   - `safety_block_none_verified`: true
+   - `dsp_chain_verified`: true
+   - `standing_orders_verified`: true

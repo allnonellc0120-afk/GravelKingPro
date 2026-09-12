@@ -83,7 +83,11 @@ async function mixVoiceSwapAudioInMemory(
     // peaks rather than only the source sample grid.
     "-filter_complex",
     "[0:a]aresample=192000[bed];" +
-      "[1:a]volume=-2.5dB,aresample=192000[vox];" +
+      "[1:a]volume=-2.5dB," +
+      "highshelf=f=6500:gain=-3.5," +
+      "equalizer=f=240:width_type=q:width=0.8:g=2.0," +
+      "aecho=0.85:0.7:25|45:0.18|0.12," +
+      "aresample=192000[vox];" +
       "[bed][vox]amix=inputs=2:duration=longest:dropout_transition=0[mix];" +
       "[mix]alimiter=limit=0.9440608763:attack=5:release=50:level=disabled,aresample=48000[out]",
     "-map", "[out]",
@@ -158,9 +162,9 @@ export async function tryGravelKingVoiceSwap(
       modelWeightsUrl ??
       process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] ??
       undefined,
-    indexRate: 0.96,
+    indexRate: 0.78,
     protect: 0.02,
-    filterRadius: 1,
+    filterRadius: 3,
   }));
   logger.info(
     { predictionId: conversion.predictionId },

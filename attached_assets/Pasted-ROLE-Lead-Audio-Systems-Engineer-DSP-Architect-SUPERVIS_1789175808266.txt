@@ -1,0 +1,39 @@
+ROLE: Lead Audio Systems Engineer & DSP Architect
+SUPERVISORY AUTHORITY: Morris Law Kernel V2 / V3.5 Governance Pipeline
+DOWNSTREAM CHAIN OF COMMAND: Architect (Kevin Morris) -> Gemini (Lead) -> Replit Agent (Sub-Lead) -> JAX (Engine)
+
+STANDING ORDERS & AUDIT COVENANT (TRUTH METRIC: 100%):
+1. ZERO TICKET SHORTCUTS: Never simulate, bypass, mock, or fake execution to prematurely close this task.
+2. ZERO REWARD HACKING: Do not strip, alter, or compromise unlisted production features, background IP ledgers, or data pipelines to achieve cosmetic completion.
+3. STRICT CHAIN ACCOUNTABILITY: Execute exact parameters as specified below without deviation. Report all file modifications and runtime confirmations in the final verified JSON receipt.
+
+---
+
+TASK: REMOVE ROBOTIC HARMONIC CLIPPING & INJECT VOCAL ROOM AMBIENCE
+
+Modify `artifacts/api-server/src/services/mlkOrchestrator.ts` and `artifacts/api-server/src/replicateClient.ts` to eliminate high-frequency digital comb filtering and restore natural vocal body to the in-memory master mix:
+
+1. INFERENCE PARAMETER HARDENING:
+   - Set `filter_radius` = 3 (smooth pitch/harmonic micro-jitter).
+   - Set `index_rate` = 0.78 (blend natural source resonance, eliminating metallic quantization).
+   - Maintain `protect` = 0.02 and pitch algorithm = "rmvpe".
+
+2. IN-MEMORY FFMPEG DSP CHAIN (CONVERTED VOCAL STEM):
+   Insert the following dynamic filter chain directly into the vocal processing pipe prior to final stem summing:
+   - High-Cut De-Esser / Anti-Harshness: `highshelf=f=6500:gain=-3.5`
+   - Acoustic Body Reinforcement: `equalizer=f=240:width_type=q:width=0.8:g=2.0`
+   - Early Reflection Room Ambience (Acoustic Glue): `aecho=0.85:0.7:25|45:0.18|0.12`
+
+3. MASTER MIXDOWN RE-RENDER & VERIFICATION:
+   - Re-render master track `910acf46-4b21-44d4-89c6-1c5ee00af7cf`.
+   - Verify output bus true-peak ceiling strictly limits at -0.5dB.
+   - Ensure the internal stream route returns HTTP 200 with complete byte stream.
+
+4. REQUIRED DELIVERABLE:
+   Return an official Morris Law Kernel V2 JSON receipt confirming:
+   - `protocol`: "GravelKing / Morris Law Kernel V2"
+   - `task_status`: "SUCCESS"
+   - `standing_orders_verified`: true
+   - `files_modified`: [{ "path": string, "change_summary": string }]
+   - `mix_parameters`: { "filter_radius": 3, "index_rate": 0.78, "vocal_gain_db": -2.5, "master_true_peak_ceiling_db": -0.5 }
+   - `stream_route_status`: 200
