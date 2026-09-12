@@ -184,7 +184,7 @@ async function runGeneration(prepared: PreparedGeneration) {
  * immediately. Clients poll GET /api/tracks/:jobId/status.
  */
 mlkGenerateRouter.post(
-  "/tracks/generate",
+  ["/tracks/generate", "/generate/mlk"],
   generateRateLimit,
   generateConcurrency,
   async (req: Request, res: Response) => {
@@ -263,7 +263,7 @@ mlkGenerateRouter.post(
  * Returns processing | ready | failed. On ready, includes the track id and
  * internal stream URL. Only the job owner (or admin automation) may read it.
  */
-mlkGenerateRouter.get("/tracks/:id/status", async (req: Request, res: Response) => {
+mlkGenerateRouter.get(["/tracks/:id/status", "/jobs/:id"], async (req: Request, res: Response) => {
   const jobId = String(req.params.id);
   const [job] = await db
     .select()
@@ -284,10 +284,15 @@ mlkGenerateRouter.get("/tracks/:id/status", async (req: Request, res: Response) 
 
   if (job.status === "completed") {
     res.json({
+      id: jobId,
       status: "ready",
       jobId,
+      current_stage: 3,
+      progress_percent: 100,
       trackId: job.outputObjectKey,
       streamUrl: job.outputUrl,
+      final_master_wav_url: job.outputUrl,
+      final_master_mp3_url: job.outputUrl,
     });
     return;
   }
@@ -295,7 +300,15 @@ mlkGenerateRouter.get("/tracks/:id/status", async (req: Request, res: Response) 
     res.json({ status: "failed", jobId, error: job.error ?? "Generation failed." });
     return;
   }
-  res.json({ status: "processing", jobId, stage: job.stage, progress: job.progress });
+  res.json({
+    id: jobId,
+    status: job.status === "queued" ? "queued" : "processing",
+    jobId,
+    current_stage: job.stage === "processing_demucs" ? 1 : job.stage === "processing_rvc" ? 2 : 3,
+    progress_percent: job.progress,
+    stage: job.stage,
+    progress: job.progress,
+  });
 });
 
 /**
@@ -452,7 +465,7 @@ async function prepareRemix(req: Request, res: Response): Promise<PreparedRemix 
  * the pipeline while the client polls GET /api/tracks/:jobId/status.
  */
 mlkGenerateRouter.post(
-  "/tracks/remix",
+  ["/tracks/remix"],
   generateRateLimit,
   generateConcurrency,
   async (req: Request, res: Response) => {
