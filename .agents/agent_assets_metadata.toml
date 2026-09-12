@@ -1765,3 +1765,31 @@ mtime_ms = 1789157655082
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/209ee06e-74d8-48be-9874-3d3281b9d3cf/aa505c20-c25a-4896-bd2b-2dddbbf7a5ff"
 storage_version_token = "1789157662684894"
 content_type = "audio/mpeg"
+
+[[outputs]]
+id = "8_ke1YhRyME_ZXL_6Kfav"
+uri = "file://attached_assets/insane_mlkv3_original_vocals.wav"
+type = "audio"
+title = "Insane — MLK V3.5 Master (WAV)"
+description = "Original vocals and lyrics preserved; rendered through the Morris Law Kernel V3.5 natural-body master."
+logical_id = "e880a631-71cf-4150-9c11-2d5adfe13586"
+content_hash = "sha256:7bf4597018e11e23c4929b3ab05d222ea1b023ec4b6506a0205dc57247ebc44b"
+size = 55381676
+mtime_ms = 1789190540862
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/e880a631-71cf-4150-9c11-2d5adfe13586/7e047d10-e959-4baf-9640-e19aa27c19b8"
+storage_version_token = "1789190555855146"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "G5LoaDUfViOXQ_1gFG2hH"
+uri = "file://attached_assets/insane_mlkv3_original_vocals.mp3"
+type = "audio"
+title = "Insane — MLK V3.5 Master (MP3)"
+description = "Original vocals and lyrics preserved; rendered through the Morris Law Kernel V3.5 natural-body master."
+logical_id = "31eaca0b-25cc-4bde-9815-9f8a60e87e7d"
+content_hash = "sha256:d957daacf1cff26fed95c4048136989916b7fb02ec8df761effe292979e1ab29"
+size = 8374901
+mtime_ms = 1789190544502
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/31eaca0b-25cc-4bde-9815-9f8a60e87e7d/d8625487-9bb1-4e79-b06f-b619ba84c3df"
+storage_version_token = "1789190557024138"
+content_type = "audio/mpeg"
