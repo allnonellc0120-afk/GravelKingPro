@@ -78,7 +78,15 @@ async function mixVoiceSwapAudioInMemory(
     "-hide_banner", "-loglevel", "error",
     "-i", "pipe:0",
     "-i", "pipe:3",
-    "-filter_complex", "amix=inputs=2:duration=longest:dropout_transition=0",
+    // Trim the converted vocal by exactly 2.5 dB, then oversample before the
+    // final limiter so the -0.5 dB ceiling is enforced against inter-sample
+    // peaks rather than only the source sample grid.
+    "-filter_complex",
+    "[0:a]aresample=192000[bed];" +
+      "[1:a]volume=-2.5dB,aresample=192000[vox];" +
+      "[bed][vox]amix=inputs=2:duration=longest:dropout_transition=0[mix];" +
+      "[mix]alimiter=limit=0.9440608763:attack=5:release=50:level=disabled,aresample=48000[out]",
+    "-map", "[out]",
     "-acodec", "pcm_s16le", "-f", "wav", "pipe:1",
   ], { stdio: ["pipe", "pipe", "pipe", "pipe"] });
   const chunks: Buffer[] = [];
@@ -150,8 +158,9 @@ export async function tryGravelKingVoiceSwap(
       modelWeightsUrl ??
       process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"] ??
       undefined,
-    indexRate: 0.90,
-    protect: 0.10,
+    indexRate: 0.96,
+    protect: 0.02,
+    filterRadius: 1,
   }));
   logger.info(
     { predictionId: conversion.predictionId },

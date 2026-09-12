@@ -43,6 +43,8 @@ export interface VoiceConvertInput {
   pitchShift?: number;
   /** RVC index mix rate. Defaults to 0.8. */
   indexRate?: number;
+  /** RVC median-filter radius for F0 estimation. */
+  filterRadius?: number;
   /** RVC protection amount for consonants/clean source detail. */
   protect?: number;
 }
@@ -117,6 +119,7 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
   const pitchShift = input.pitchShift ?? 0;
   const indexRate = input.indexRate ?? 0.90;
   const protect = input.protect ?? 0.10;
+  const filterRadius = input.filterRadius ?? 1;
 
   if (!Number.isFinite(pitchShift) || pitchShift < -24 || pitchShift > 24) {
     throw new Error("Replicate RVC pitchShift must be between -24 and 24 semitones");
@@ -126,6 +129,9 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
   }
   if (!Number.isFinite(protect) || protect < 0 || protect > 1) {
     throw new Error("Replicate RVC protect must be between 0 and 1");
+  }
+  if (!Number.isInteger(filterRadius) || filterRadius < 0 || filterRadius > 7) {
+    throw new Error("Replicate RVC filterRadius must be an integer between 0 and 7");
   }
 
   const modelInput: Record<string, string | number> = {
@@ -139,7 +145,7 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
         ? `+${pitchShift}`
         : `${pitchShift}`,
     index_rate: indexRate,
-    filter_radius: 3,
+    filter_radius: filterRadius,
     rms_mix_rate: 0.25,
     protect,
   };
