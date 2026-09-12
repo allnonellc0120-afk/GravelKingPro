@@ -96,14 +96,16 @@ const DEFAULT_ARTIST_PROFILE: ArtistProfile = {
   vocabularyHabits: "",
 };
 const JAX_VOICE_STORAGE_KEY = "mlk_jax_selected_voice";
-const DEFAULT_JAX_VOICE_ID = "ErXwobaYiN019PkySvjV";
+const DEFAULT_JAX_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
 const LEGACY_DEFAULT_JAX_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
+const CITY_RAIN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 type JaxVoicePreset = readonly [string, string];
 const DEFAULT_JAX_VOICE_PRESETS: JaxVoicePreset[] = [
   ["admin", "Admin Configured Voice"],
-  [DEFAULT_JAX_VOICE_ID, "JAX Smooth / Younger Conversational"],
+  [DEFAULT_JAX_VOICE_ID, "Voice: GravelKing (Baritone)"],
+  [CITY_RAIN_VOICE_ID, "Voice: City Rain (Female Lead)"],
+  ["ErXwobaYiN019PkySvjV", "JAX Smooth / Younger Conversational"],
   ["N2lVS1w4EtoT3dr4eOWO", "JAX Gritty Blues / Rough"],
-  [LEGACY_DEFAULT_JAX_VOICE_ID, "JAX Baritone (Deep & Resonant)"],
   ["TxGEqnHWrfWFTfGW9XjX", "JAX Heavy Low-End / Narrator"],
   ["pqHfZKP75CvOlQylNhV4", "JAX Classic Vintage"],
 ] as const;
