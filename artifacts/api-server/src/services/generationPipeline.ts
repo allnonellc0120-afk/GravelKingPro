@@ -191,7 +191,7 @@ export async function handleRvcWebhook(jobId: string, output: unknown): Promise<
   const mp3Path = `/tmp/gk_pipe_${workId}_master.mp3`;
   try {
     await writeFile(inPath, mixed);
-    const pyWorker = fileURLToPath(new URL("../../python/mlk_master.py", import.meta.url));
+    const pyWorker = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
     await execFileAsync("python3", [
       pyWorker,
       "--input", inPath,
