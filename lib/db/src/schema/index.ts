@@ -19,4 +19,5 @@ export * from "./investors";
 export * from "./system";
 export * from "./credits";
 export * from "./master_jobs";
+export * from "./generation_jobs";
 export * from "./artist_profiles";

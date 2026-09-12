@@ -374,6 +374,30 @@ async function migrateAppSchema() {
       CREATE INDEX IF NOT EXISTS promo_referrals_code_status_idx
         ON promo_referrals(promo_code_used, status)
     `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS generation_jobs (
+        id varchar(64) PRIMARY KEY,
+        user_id text NOT NULL,
+        status varchar(32) NOT NULL DEFAULT 'queued',
+        current_stage integer NOT NULL DEFAULT 1,
+        progress_percent integer NOT NULL DEFAULT 0,
+        lyrics text,
+        style_prompt text,
+        original_audio_url text,
+        demucs_vocal_url text,
+        demucs_instrumental_url text,
+        rvc_vocal_url text,
+        final_master_wav_url text,
+        final_master_mp3_url text,
+        error_message text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS generation_jobs_user_created_idx
+        ON generation_jobs(user_id, created_at)
+    `);
 
     logger.info("App schema migration complete");
   } catch (err: unknown) {
