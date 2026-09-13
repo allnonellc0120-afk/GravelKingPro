@@ -14,6 +14,12 @@ import os
 import json
 import argparse
 import logging
+from pathlib import Path
+
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+if str(WORKSPACE_ROOT) not in sys.path:
+    sys.path.insert(0, str(WORKSPACE_ROOT))
+from lib.gka_middleware import GKAdvantageCore
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -22,6 +28,7 @@ logging.basicConfig(
 )
 logging.getLogger("audio_separator").setLevel(logging.WARNING)
 logging.getLogger("separator").setLevel(logging.WARNING)
+GKA_CORE = GKAdvantageCore(multiplier=0.75, slice_size=2)
 
 
 def build_separator(model_dir: str, output_dir: str, single_stem: str | None = None):
@@ -65,44 +72,52 @@ def main() -> None:
 
     MODEL = "UVR-MDX-NET-Inst_HQ_3.onnx"
 
-    if args.mode == "voice_remove":
-        sep = build_separator(args.model_dir, args.out, single_stem="Instrumental")
-        sep.load_model(MODEL)
-        output_files = sep.separate(args.input)
+    with GKA_CORE.task(
+        "uvr_separation",
+        metadata={"mode": args.mode, "model": MODEL, "input": args.input},
+    ):
+        if args.mode == "voice_remove":
+            sep = build_separator(args.model_dir, args.out, single_stem="Instrumental")
+            sep.load_model(MODEL)
+            output_files = sep.separate(args.input)
 
-        if not output_files:
-            json.dump({"error": "UVR produced no output files"}, sys.stdout)
-            sys.exit(1)
+            if not output_files:
+                raise RuntimeError("UVR produced no output files")
 
-        instrumental = (
-            find_stem(output_files, ["instrumental", "inst_", "no_vocals"])
-            or output_files[0]
-        )
-        json.dump(
-            {"instrumental": instrumental, "model": MODEL.replace(".onnx", "")},
-            sys.stdout,
-        )
+            instrumental = (
+                find_stem(output_files, ["instrumental", "inst_", "no_vocals"])
+                or output_files[0]
+            )
+            result = {
+                "instrumental": instrumental,
+                "model": MODEL.replace(".onnx", ""),
+            }
 
-    elif args.mode == "stem_split":
-        sep = build_separator(args.model_dir, args.out)
-        sep.load_model(MODEL)
-        output_files = sep.separate(args.input)
+        elif args.mode == "stem_split":
+            sep = build_separator(args.model_dir, args.out)
+            sep.load_model(MODEL)
+            output_files = sep.separate(args.input)
 
-        stems: dict[str, str] = {}
-        for f in output_files:
-            bn = os.path.basename(f).lower()
-            if "instrumental" in bn or "inst_" in bn or "no_vocals" in bn:
-                stems["instrumental"] = f
-            elif "vocals" in bn or "vocal" in bn:
-                stems["vocals"] = f
-            else:
-                label = bn.replace(".wav", "").strip("() ")
-                stems[label] = f
+            stems: dict[str, str] = {}
+            for f in output_files:
+                bn = os.path.basename(f).lower()
+                if "instrumental" in bn or "inst_" in bn or "no_vocals" in bn:
+                    stems["instrumental"] = f
+                elif "vocals" in bn or "vocal" in bn:
+                    stems["vocals"] = f
+                else:
+                    label = bn.replace(".wav", "").strip("() ")
+                    stems[label] = f
 
-        json.dump(
-            {"stems": stems, "files": output_files, "model": MODEL.replace(".onnx", "")},
-            sys.stdout,
-        )
+            result = {
+                "stems": stems,
+                "files": output_files,
+                "model": MODEL.replace(".onnx", ""),
+            }
+
+    result["gka"] = GKA_CORE.verify_parity()
+    result["gka_lineage"] = GKA_CORE.lineage_snapshot()[-1:]
+    json.dump(result, sys.stdout)
 
 
 if __name__ == "__main__":
