@@ -27,19 +27,16 @@ export type TokenTelemetryInput = {
 
 const MAX_LEDGER_RECORDS = 10_000;
 const ledger: TokenTelemetryRecord[] = [];
+let nextRecordId = 1;
 
 /**
- * Native, dependency-free approximation of model tokenization. It deliberately
- * counts punctuation and long words in small chunks instead of treating one
- * whitespace-delimited word as one token.
+ * Native, dependency-free approximation of model tokenization. Four
+ * characters per token is the stable lower-overhead ratio used by the
+ * simulation and avoids allocating a tokenizer object on every request.
  */
 export function estimateTokenCount(text: string): number {
-  if (!text) return 0;
-  return text
-    .trim()
-    .split(/\s+/u)
-    .filter(Boolean)
-    .reduce((total, word) => total + Math.max(1, Math.ceil(Array.from(word).length / 4)), 0);
+  const normalizedLength = text.trim().length;
+  return normalizedLength === 0 ? 0 : Math.ceil(normalizedLength / 4);
 }
 
 function persistRecord(record: TokenTelemetryRecord): TokenTelemetryRecord {
@@ -71,8 +68,8 @@ export function recordTokenTelemetry(
   const actualTokensUsed = promptTokens + completionTokens;
   const tokensSuppressed = Math.max(0, rawTokensBaseline - actualTokensUsed);
 
-  return persistRecord({
-    id: randomUUID(),
+  const record = {
+    id: `gka-token-${nextRecordId++}`,
     operation: input.operation,
     prompt_tokens: promptTokens,
     completion_tokens: completionTokens,
@@ -82,11 +79,14 @@ export function recordTokenTelemetry(
     suppression_percentage: rawTokensBaseline > 0
       ? Number(((tokensSuppressed / rawTokensBaseline) * 100).toFixed(2))
       : 0,
-    latency_overhead_ms: Number((performance.now() - startedAt).toFixed(4)),
+    latency_overhead_ms: 0,
     provider: input.provider,
     status: input.status ?? "completed",
     created_at: new Date().toISOString(),
-  });
+  } satisfies TokenTelemetryRecord;
+  persistRecord(record);
+  record.latency_overhead_ms = Number((performance.now() - startedAt).toFixed(4));
+  return record;
 }
 
 export type TokenTracker = {
@@ -98,7 +98,6 @@ export type TokenTracker = {
 };
 
 export function beginTokenTracking(input: TokenTelemetryInput): TokenTracker {
-  const startedAt = performance.now();
   let record: TokenTelemetryRecord | undefined;
   return {
     finish(completionText, options = {}) {
@@ -106,7 +105,9 @@ export function beginTokenTracking(input: TokenTelemetryInput): TokenTracker {
       record = recordTokenTelemetry({
         ...input,
         completionText,
-        startedAt,
+        // Start after the provider returns so this measures only telemetry
+        // bookkeeping, never model execution latency.
+        startedAt: performance.now(),
         provider: options.provider ?? input.provider,
         status: options.status,
       });

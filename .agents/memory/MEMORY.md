@@ -98,3 +98,4 @@
 - [MLK primary generation routes](mlk-primary-generation-routes.md) — `/api/tracks/generate` and `/api/tracks/remix` are MLK aliases; JAX remains explicit secondary tooling
 - [RVC model URL filename constraint](rvc-model-url-filename.md) — Replicate RVC crashes ENAMETOOLONG on GCS signed URLs; only the clean-path HMAC URL ending in /gravelking_v2.zip works
 - [GKA runtime boundary](gka-runtime-boundary.md) — Python audio services bind to gka_spec.json through GKAdvantageCore; Node studio fast path mirrors the same multiplier/slice and DAW targets
+- [JAX token telemetry](jax-token-telemetry.md) — native bounded ledger tracks prompt/completion savings; keep bookkeeping under 1ms and never persist prompt contents
