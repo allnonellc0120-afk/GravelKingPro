@@ -51,29 +51,43 @@ def normalize_message(message: object) -> dict[str, str]:
 
 def carve_context(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     """Preserve instructions and the active turn while carving stale history."""
-    if len(messages) <= 5:
+    if len(messages) <= 2:
         return messages
 
-    protected = [
-        message for message in messages
-        if message["role"] in {"system", "developer"}
-    ]
-    recent = messages[-4:]
-    recent_ids = {id(message) for message in recent}
-    older = [
-        message for message in messages
-        if id(message) not in recent_ids and message["role"] not in {"system", "developer"}
-    ]
+    protected: list[dict[str, str]] = []
+    seen_instruction_text: set[str] = set()
+    for message in messages:
+        if message["role"] not in {"system", "developer"}:
+            continue
+        normalized = " ".join(message["content"].split())
+        if normalized and normalized not in seen_instruction_text:
+            protected.append({"role": message["role"], "content": normalized})
+            seen_instruction_text.add(normalized)
 
-    # GKA partitions context in the configured slice size before selecting the
-    # newest slices. This preserves the kernel's authoritative boundary.
-    older_slices = GKA_CORE.slice_data(older)
-    selected_older = older_slices[-1] if older_slices else []
-    return protected + selected_older + recent
+    # Starting on Turn 2, discard historical assistant turns and duplicate
+    # user context. The active user turn is the only conversational slice
+    # needed for this audit proxy; the full history remains in the baseline.
+    active = next(
+        (message for message in reversed(messages) if message["role"] not in {"system", "developer"}),
+        None,
+    )
+    if active is None:
+        return protected
+    return protected + [{
+        "role": active["role"],
+        "content": " ".join(active["content"].split()),
+    }]
+
+
+def raw_prompt(messages: list[dict[str, str]]) -> str:
+    return "\n".join(f"{message['role'].upper()}: {message['content']}" for message in messages)
 
 
 def compact_prompt(messages: list[dict[str, str]]) -> str:
-    return "\n".join(f"{message['role'].upper()}: {message['content']}" for message in messages)
+    return "\n".join(
+        f"{message['role'].upper()}: {' '.join(message['content'].split())}"
+        for message in messages
+    )
 
 
 def live_provider_dispatch(prompt: str) -> str:
@@ -161,7 +175,8 @@ class CustomerZeroHandler(BaseHTTPRequestHandler):
                 if response_schema is not None
                 else ""
             )
-            raw_prompt = compact_prompt(messages) + schema_context
+            raw_prompt_text = raw_prompt(messages)
+            raw_prompt = raw_prompt_text + schema_context
             carved_prompt = compact_prompt(carved_messages) + schema_context
             baseline_tokens = estimate_tokens(raw_prompt)
             processed_tokens = estimate_tokens(carved_prompt)
