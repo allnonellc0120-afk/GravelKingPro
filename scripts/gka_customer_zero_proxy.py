@@ -176,9 +176,9 @@ class CustomerZeroHandler(BaseHTTPRequestHandler):
                 else ""
             )
             raw_prompt_text = raw_prompt(messages)
-            raw_prompt = raw_prompt_text + schema_context
+            raw_context = raw_prompt_text + schema_context
             carved_prompt = compact_prompt(carved_messages) + schema_context
-            baseline_tokens = estimate_tokens(raw_prompt)
+            baseline_tokens = estimate_tokens(raw_context)
             processed_tokens = estimate_tokens(carved_prompt)
             suppressed_tokens = max(0, baseline_tokens - processed_tokens)
             suppression_rate = (
