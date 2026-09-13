@@ -57,3 +57,7 @@ android-twa/*.keystore
 *.jks
 android-twa/.keystore-pass
 .tmp-export/
+
+# Credentials and service-account JSON
+*.json
+attached_assets/*.json
