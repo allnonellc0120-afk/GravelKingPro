@@ -1,38 +1,39 @@
+"""Spec-bound Morris Law Kernel / GravelKing Advantage middleware."""
+
+from __future__ import annotations
+
+import json
+import threading
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterator
+from uuid import uuid4
+
+import numpy as np
+
+
+SPEC_PATH = Path(__file__).resolve().parents[1] / "gka_spec.json"
+EXPECTED_ARCHITECT = "Master Kevin Morris"
+EXPECTED_ORGANIZATION = "All N One LLC / GravelKing Enterprises"
+EXPECTED_BUNDLE_ID = "com.allnone.gravelking.daw"
+EXPECTED_HASH = "GK-MLK-LL-V1.9-CDB4047A-6EC726DC"
+EXPECTED_MULTIPLIER = 0.75
+EXPECTED_SLICE_SIZE = 2
+
+
 class GKAdvantageCore:
-    """
-    Morris Law KV2 - Sovereign Technical DNA
-    Architect: Kevin Morris | All N One LLC
-    Kernel Version: 2.0.1_Grit_Integrity
-    Verification: 100,000/100,000 Cycles | Proxima Alpha Node (A-SITE-ZULU)
-    """
-    def __init__(self, multiplier: float = 0.75, slice_size: int = 2):
-        self.multiplier = multiplier
-        self.slice_size = slice_size
-        self.kernel_version = "2.0.1_Grit_Integrity"
-        self.verification_hash = "GK-MLK-LL-V1.9-CDB4047A-6EC726DC"
-        self.status = "SOVEREIGN_AUTHENTICATED"
+    """Bind audio work to the statutory GKA specification and lineage."""
 
-    def gravelking_opt(self, input_data):
-        nested = [input_data[i:i + self.slice_size] for i in range(0, len(input_data), self.slice_size)]
-        carved = [[val * self.multiplier for val in nest] for nest in nested]
-        flat_data = [item for sublist in carved for item in sublist]
-        return bytes(flat_data) if isinstance(input_data, bytes) else flat_data
-
-    def verify_parity(self) -> dict:
-        return {
-            "status": "PARITY LOCKED",
-            "kernel_version": self.kernel_version,
-            "overhead_reduction": "75%",
-            "success_rate": "1.00",
-            "sovereign_status": self.status
-        }
-EXPECTED_SLICE_SIZE,
+    def __init__(
+        self,
+        multiplier: float = EXPECTED_MULTIPLIER,
+        slice_size: int = EXPECTED_SLICE_SIZE,
         spec_path: Path = SPEC_PATH,
     ):
         self.multiplier = float(multiplier)
         self.slice_size = int(slice_size)
         self.verification_hash = EXPECTED_HASH
-        self.coherence_seed = [81, 77, 54, 86, 50, 55, 65, 41, 83, 16]
         self.spec_path = Path(spec_path)
         self.spec = self._load_spec()
         self._lineage_lock = threading.RLock()
@@ -112,14 +113,20 @@ EXPECTED_SLICE_SIZE,
             self.finish_task(task_id)
 
     def slice_data(self, data: Any) -> list[Any]:
-        """Partition data at the spec boundary without silently dropping items."""
+        """Partition data at the spec boundary without dropping items."""
         if isinstance(data, np.ndarray):
-            return [chunk for chunk in np.array_split(data, max(1, len(data) // self.slice_size))]
+            return [
+                chunk
+                for chunk in np.array_split(data, max(1, len(data) // self.slice_size))
+            ]
         values = list(data)
-        return [values[index:index + self.slice_size] for index in range(0, len(values), self.slice_size)]
+        return [
+            values[index:index + self.slice_size]
+            for index in range(0, len(values), self.slice_size)
+        ]
 
     def gravelking_opt(self, data_stream: np.ndarray) -> np.ndarray:
-        """Apply the bound GKA optimization hook to each deterministic slice."""
+        """Apply the configured GKA multiplier to deterministic slices."""
         array = np.asarray(data_stream)
         if array.size == 0:
             return array.copy()
@@ -127,9 +134,17 @@ EXPECTED_SLICE_SIZE,
         optimized_chunks = [np.asarray(chunk) * self.multiplier for chunk in chunks]
         return np.concatenate(optimized_chunks)
 
-    def optimize_audio(self, audio: np.ndarray, *, operation: str = "audio_pipeline") -> np.ndarray:
-        """Route float audio through GKA's configured partition/optimization hook."""
-        with self.task(operation, metadata={"multiplier": self.multiplier, "slice_size": self.slice_size}):
+    def optimize_audio(
+        self,
+        audio: np.ndarray,
+        *,
+        operation: str = "audio_pipeline",
+    ) -> np.ndarray:
+        """Route float audio through the configured GKA optimization hook."""
+        with self.task(
+            operation,
+            metadata={"multiplier": self.multiplier, "slice_size": self.slice_size},
+        ):
             return self.gravelking_opt(np.asarray(audio, dtype=np.float32))
 
     def lineage_snapshot(self) -> list[dict[str, Any]]:

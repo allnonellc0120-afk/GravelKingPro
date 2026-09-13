@@ -2,8 +2,16 @@ import streamlit as st
 import numpy as np
 import soundfile as sf
 import io
+import sys
+from pathlib import Path
+
+WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
+if str(WORKSPACE_ROOT) not in sys.path:
+    sys.path.insert(0, str(WORKSPACE_ROOT))
+
 from morris_law_kernel import MorrisLawKernel, IntelligentMultiBandIsolator
 from lyric_detector import add_to_vault, preflight_scan
+from lib.gka_middleware import GKAdvantageCore
 from verification_api import (
     GRAVELKING_VERIFY_URL,
     VerificationBackendError,
@@ -15,6 +23,7 @@ st.title("GravelKing Pro — Morris Law Kernel v3.5 + IP Protection")
 
 kernel = MorrisLawKernel()
 isolator = IntelligentMultiBandIsolator()
+gka = GKAdvantageCore(multiplier=0.75, slice_size=2)
 
 tab1, tab2, tab3, tab4 = st.tabs(
     ["Mastering", "Stem/Voice Isolation", "IP Protection", "Lyric Pre-Flight"]
@@ -39,9 +48,20 @@ with tab1:
             intensity = st.slider("Intensity", 0, 100, 65)
             if st.button("Master"):
                 try:
-                    k = MorrisLawKernel(sample_rate=sr)
-                    processed = k.process(audio.astype(np.float32), preset=preset,
-                                          intensity=float(intensity))
+                    with gka.task(
+                        "streamlit_mlk_master",
+                        metadata={"preset": preset, "sample_rate": sr},
+                    ):
+                        k = MorrisLawKernel(sample_rate=sr)
+                        optimized = gka.optimize_audio(
+                            audio.astype(np.float32),
+                            operation="streamlit_mlk_master_input",
+                        )
+                        processed = k.process(
+                            optimized,
+                            preset=preset,
+                            intensity=float(intensity),
+                        )
                 except ValueError as exc:
                     st.error(f"Cannot master this file: {exc}")
                 else:
@@ -71,8 +91,16 @@ with tab2:
             strength = st.slider("Strength", 0.0, 1.0, 0.85)
             if st.button("Isolate"):
                 try:
-                    iso = IntelligentMultiBandIsolator(sample_rate=sr2)
-                    result = iso.isolate_stem(audio2.astype(np.float32), stem, strength)
+                    with gka.task(
+                        "streamlit_stem_isolation",
+                        metadata={"stem": stem, "sample_rate": sr2},
+                    ):
+                        iso = IntelligentMultiBandIsolator(sample_rate=sr2)
+                        optimized = gka.optimize_audio(
+                            audio2.astype(np.float32),
+                            operation="streamlit_stem_isolation_input",
+                        )
+                        result = iso.isolate_stem(optimized, stem, strength)
                 except ValueError as exc:
                     st.error(f"Cannot isolate from this file: {exc}")
                 else:

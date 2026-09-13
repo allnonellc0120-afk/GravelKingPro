@@ -5,13 +5,21 @@ from __future__ import annotations
 import hmac
 import logging
 import os
+import asyncio
+import sys
 import subprocess
 import tempfile
+from pathlib import Path
+
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+if str(WORKSPACE_ROOT) not in sys.path:
+    sys.path.insert(0, str(WORKSPACE_ROOT))
 
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from acrcloud import ACRCloudUnavailable, identify_audio
+from lib.gka_middleware import GKAdvantageCore
 
 logger = logging.getLogger("gkp-fingerprint")
 app = FastAPI(
@@ -22,6 +30,7 @@ app = FastAPI(
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 SAMPLE_SECONDS = 12
+GKA_CORE = GKAdvantageCore(multiplier=0.75, slice_size=2)
 
 
 def _authorize(presented_key: str | None) -> None:
@@ -34,33 +43,38 @@ def _authorize(presented_key: str | None) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def _make_sample(source_path: str) -> bytes:
+def _make_sample(source_path: str, parent_id: str | None = None) -> bytes:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as out:
         sample_path = out.name
     try:
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                source_path,
-                "-t",
-                str(SAMPLE_SECONDS),
-                "-vn",
-                "-ac",
-                "1",
-                "-ar",
-                "8000",
-                "-c:a",
-                "pcm_s16le",
-                sample_path,
-            ],
-            capture_output=True,
-            check=True,
-            timeout=30,
-        )
-        with open(sample_path, "rb") as sample_file:
-            return sample_file.read()
+        with GKA_CORE.task(
+            "fingerprint_sample_transcode",
+            parent_id=parent_id,
+            metadata={"sample_seconds": SAMPLE_SECONDS, "sample_rate": 8000},
+        ):
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    source_path,
+                    "-t",
+                    str(SAMPLE_SECONDS),
+                    "-vn",
+                    "-ac",
+                    "1",
+                    "-ar",
+                    "8000",
+                    "-c:a",
+                    "pcm_s16le",
+                    sample_path,
+                ],
+                capture_output=True,
+                check=True,
+                timeout=30,
+            )
+            with open(sample_path, "rb") as sample_file:
+                return sample_file.read()
     except (subprocess.SubprocessError, OSError) as exc:
         raise HTTPException(status_code=422, detail="Audio could not be scanned") from exc
     finally:
@@ -107,9 +121,16 @@ async def scan(
                     raise HTTPException(status_code=413, detail="Audio sample is too large")
                 source.write(chunk)
 
-        sample = _make_sample(source_path)
-        result = await identify_audio(sample)
-        return JSONResponse(result)
+        with GKA_CORE.task(
+            "fingerprint_scan",
+            metadata={"filename": audio.filename or "upload.wav", "provider": "acrcloud"},
+        ) as scan_task:
+            sample = await asyncio.to_thread(_make_sample, source_path, scan_task)
+            result = await identify_audio(sample)
+            response = dict(result)
+            response["gka"] = GKA_CORE.verify_parity()
+            response["gka_lineage"] = GKA_CORE.lineage_snapshot()[-2:]
+        return JSONResponse(response)
     except HTTPException:
         raise
     except ACRCloudUnavailable as exc:

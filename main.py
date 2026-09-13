@@ -470,9 +470,13 @@ def gemini_dispatch(prompt: str, media: dict[str, object]) -> str:
 
 
 def elevenlabs_dispatch(text: str) -> dict[str, object]:
-    if not os.environ.get("ELEVENLABS_API_KEY"):
-        return elevenlabs_connector_dispatch(text)
-    bridge = """
+    with GKA_CORE.task(
+        "elevenlabs_tts_dispatch",
+        metadata={"text_length": min(len(text), 10_000), "provider": "elevenlabs"},
+    ):
+        if not os.environ.get("ELEVENLABS_API_KEY"):
+            return elevenlabs_connector_dispatch(text)
+        bridge = """
 import { ReplitConnectors } from "@replit/connectors-sdk";
 const input = JSON.parse(await new Promise((resolve) => {
   let data = ""; process.stdin.on("data", (chunk) => data += chunk);
@@ -487,29 +491,33 @@ const response = await connectors.proxy("elevenlabs", "/v1/text-to-speech/JBFqnC
 const bytes = (await response.arrayBuffer()).byteLength;
 console.log(JSON.stringify({ok: response.ok, status: response.status, bytes}));
 """
-    try:
-        node_command = [shutil.which("node") or "pnpm", *([] if shutil.which("node") else ["exec", "node"])]
-        result = subprocess.run(
-            [*node_command, "--input-type=module", "-e", bridge],
-            input=json.dumps({"text": text[:10_000]}),
-            capture_output=True,
-            text=True,
-            timeout=90,
-            check=False,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip()[-400:])
-        response = json.loads(result.stdout.strip().splitlines()[-1])
-    except Exception as error:
-        raise RuntimeError(f"ElevenLabs dispatch failed: {error}") from error
-    if not response.get("ok"):
-        raise RuntimeError(f"ElevenLabs dispatch returned HTTP {response.get('status')}.")
-    return response
+        try:
+            node_command = [shutil.which("node") or "pnpm", *([] if shutil.which("node") else ["exec", "node"])]
+            result = subprocess.run(
+                [*node_command, "--input-type=module", "-e", bridge],
+                input=json.dumps({"text": text[:10_000]}),
+                capture_output=True,
+                text=True,
+                timeout=90,
+                check=False,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip()[-400:])
+            response = json.loads(result.stdout.strip().splitlines()[-1])
+        except Exception as error:
+            raise RuntimeError(f"ElevenLabs dispatch failed: {error}") from error
+        if not response.get("ok"):
+            raise RuntimeError(f"ElevenLabs dispatch returned HTTP {response.get('status')}.")
+        return response
 
 
 def elevenlabs_connector_dispatch(text: str) -> dict[str, object]:
     """Use the existing authorized Replit connection when no raw key is exposed."""
-    bridge = """
+    with GKA_CORE.task(
+        "elevenlabs_connector_tts_dispatch",
+        metadata={"text_length": min(len(text), 10_000), "provider": "elevenlabs_connector"},
+    ):
+        bridge = """
 import { ReplitConnectors } from "@replit/connectors-sdk";
 const input = JSON.parse(await new Promise((resolve) => {
   let data = ""; process.stdin.on("data", (chunk) => data += chunk);
@@ -524,25 +532,25 @@ const response = await connectors.proxy("elevenlabs", "/v1/text-to-speech/JBFqnC
 const bytes = (await response.arrayBuffer()).byteLength;
 console.log(JSON.stringify({ok: response.ok, status: response.status, bytes}));
 """
-    try:
-        node = shutil.which("node")
-        command = [node] if node else ["pnpm", "exec", "node"]
-        result = subprocess.run(
-            [*command, "--input-type=module", "-e", bridge],
-            input=json.dumps({"text": text[:10_000]}),
-            capture_output=True,
-            text=True,
-            timeout=90,
-            check=False,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip()[-400:])
-        response = json.loads(result.stdout.strip().splitlines()[-1])
-    except Exception as error:
-        raise RuntimeError(f"ElevenLabs managed dispatch failed: {error}") from error
-    if not response.get("ok"):
-        raise RuntimeError(f"ElevenLabs managed dispatch returned HTTP {response.get('status')}.")
-    return response
+        try:
+            node = shutil.which("node")
+            command = [node] if node else ["pnpm", "exec", "node"]
+            result = subprocess.run(
+                [*command, "--input-type=module", "-e", bridge],
+                input=json.dumps({"text": text[:10_000]}),
+                capture_output=True,
+                text=True,
+                timeout=90,
+                check=False,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip()[-400:])
+            response = json.loads(result.stdout.strip().splitlines()[-1])
+        except Exception as error:
+            raise RuntimeError(f"ElevenLabs managed dispatch failed: {error}") from error
+        if not response.get("ok"):
+            raise RuntimeError(f"ElevenLabs managed dispatch returned HTTP {response.get('status')}.")
+        return response
 
 
 def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
