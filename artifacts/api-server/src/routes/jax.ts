@@ -4,6 +4,7 @@ import { buildJaxSystemPrompt } from "../prompts/jaxSystem";
 import { rateLimit } from "../lib/rateLimiter";
 import {
   beginTokenTracking,
+  getTokenTelemetryLedgerSummary,
   tokenTrackerMiddleware,
   type TokenTracker,
 } from "../middleware/tokenTracker";
@@ -344,6 +345,35 @@ jaxRouter.delete("/jax/sessions/:sessionId", async (req: Request, res: Response)
   res.json({ ok: true });
 });
 
+jaxRouter.get("/jax/telemetry/ledger", async (req: Request, res: Response) => {
+  const adminBypass = isAdminAutomationAuthenticated(req);
+  const authenticatedClientId = req.dbUser?.id;
+  const requestedClientId =
+    typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
+
+  if (!adminBypass && !authenticatedClientId) {
+    res.status(401).json({ error: "Sign in to view token telemetry." });
+    return;
+  }
+  if (
+    requestedClientId &&
+    !adminBypass &&
+    requestedClientId !== authenticatedClientId
+  ) {
+    res.status(403).json({ error: "You may only view your own token telemetry." });
+    return;
+  }
+
+  try {
+    const clientId = requestedClientId || authenticatedClientId;
+    const summary = await getTokenTelemetryLedgerSummary(clientId);
+    res.json(summary);
+  } catch (error) {
+    req.log.error({ error }, "Token telemetry ledger read failed");
+    res.status(500).json({ error: "Token telemetry ledger is unavailable." });
+  }
+});
+
 jaxRouter.post(
   ["/jax/generate", "/chat/jax"],
   rateLimit({ windowMs: 60_000, max: 12 }),
@@ -420,11 +450,16 @@ jaxRouter.post(
     : "";
   const fullPrompt = `${system}${history ? `\n\nConversation so far:\n${history}\n` : ""}\nArtist: ${prompt}\nJAX:`;
   const operation = /\bremix\b/i.test(prompt) ? "jax_remix" : "jax_generate";
+  const clientId =
+    typeof req.body?.clientId === "string" && req.body.clientId.trim()
+      ? req.body.clientId.trim().slice(0, 200)
+      : user?.id ?? (adminBypass ? "admin" : undefined);
   const tokenTracker: TokenTracker = beginTokenTracking({
     operation,
     rawBaselineText: `${system}\n\nConversation so far:\n${rawHistory}\nArtist: ${prompt}\nJAX:`,
     actualPromptText: fullPrompt,
     maxOutputTokens: 2048,
+    clientId,
   });
   const wantsStream = req.body?.stream === true || req.headers.accept?.includes("text/event-stream") === true;
   try {
