@@ -1,0 +1,55 @@
+{
+  "system_directive": {
+    "protocol": "GravelKing Protocol",
+    "kernel": "Morris Law Kernel V2",
+    "author": "Kevin Morris",
+    "mode": "STRICT_TASK_EXECUTION_AND_VERIFICATION",
+    "mentor_guidance": "Upgrade the existing tokenTracker.ts from heuristic character estimation to exact tokenizer-backed, durable financial telemetry. Ground everything in physical files and verify runtime endpoints."
+  },
+  "issue_diagnosis": {
+    "audit_findings": "artifacts/api-server/src/middleware/tokenTracker.ts currently relies on a 4-char heuristic estimate, stores records strictly in a process-local RAM array, lacks dollar-value calculations, and has no durable persistence or client billing retrieval endpoint."
+  },
+  "required_actions": [
+    {
+      "step": 1,
+      "command": "pnpm --filter @workspace/api-server add js-tiktoken",
+      "action": "Install js-tiktoken so token counts match OpenAI/Claude BPE tokenizers exactly."
+    },
+    {
+      "step": 2,
+      "file": "artifacts/api-server/src/middleware/tokenTracker.ts",
+      "action": "Replace estimateTokenCount with js-tiktoken (cl100k_base/o200k_base). Update recordTokenTelemetry to calculate: (1) exact raw tokens, (2) exact processed tokens, (3) exact tokens suppressed, (4) dollar_savings (using a default rate of $2.50 per 1M tokens or configurable model rate), and (5) gka_gain_share_due (33% of dollar savings)."
+    },
+    {
+      "step": 3,
+      "file": "artifacts/api-server/src/middleware/tokenTracker.ts",
+      "action": "Implement durable persistence: Every completed token record must append asynchronously to a local JSONL ledger file at ./artifacts/api-server/data/token_savings_ledger.jsonl."
+    },
+    {
+      "step": 4,
+      "file": "artifacts/api-server/src/routes/jax.ts",
+      "action": "Add a dedicated GET /api/jax/telemetry/ledger endpoint that accepts an optional ?clientId= query param, reads the ledger, and returns total raw tokens, carved tokens, total dollars saved, and total 33% gain-share due."
+    },
+    {
+      "step": 5,
+      "command": "pnpm --filter @workspace/api-server run build",
+      "action": "Recompile the api-server, launch the service, run a test request, and verify the ledger file is written to disk."
+    }
+  ],
+  "response_requirement": {
+    "format": "JSON_ONLY",
+    "instructions": "Run the updates, verify the build, trigger one test transaction, curl the new ledger endpoint, and return the result matching this schema.",
+    "schema": {
+      "status": "COMPLETED | FAILED",
+      "protocol": "GravelKing Protocol",
+      "kernel": "Morris Law Kernel V2",
+      "files_modified": ["string"],
+      "verification": {
+        "tokenizer_used": "js-tiktoken",
+        "ledger_file_created": true,
+        "sample_ledger_entry": "object",
+        "billing_summary_endpoint_response": "object"
+      }
+    }
+  }
+}
