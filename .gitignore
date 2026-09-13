@@ -68,3 +68,8 @@ android-twa/build/android-sdk/
 # Credentials and service-account JSON
 *.json
 attached_assets/*.json
+
+# media
+*.mp4
+*.mov
+*.webm
