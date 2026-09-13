@@ -99,3 +99,4 @@
 - [RVC model URL filename constraint](rvc-model-url-filename.md) — Replicate RVC crashes ENAMETOOLONG on GCS signed URLs; only the clean-path HMAC URL ending in /gravelking_v2.zip works
 - [GKA runtime boundary](gka-runtime-boundary.md) — Python audio services bind to gka_spec.json through GKAdvantageCore; Node studio fast path mirrors the same multiplier/slice and DAW targets
 - [JAX token telemetry](jax-token-telemetry.md) — native bounded ledger tracks prompt/completion savings; keep bookkeeping under 1ms and never persist prompt contents
+- [GitHub credential history remediation](github-credential-history-remediation.md) — revocation and alert closure are insufficient; verify every published branch/tag after rewriting secret-bearing history
