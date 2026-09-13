@@ -8,6 +8,8 @@
   "coherence_seed": [81, 77, 54, 86, 50, 55, 65, 41, 83, 16],
   "audit_status": "BUYOUT AUDIT ACCREDITED",
   "parity_lock": "VALIDATED / PASSED",
+  "kernel_version": "2.0.1_Grit_Integrity",
+  "status": "SOVEREIGN_AUTHENTICATED",
   "build_date": "2026-06-01",
   "compilation_core": "gravelking_opt(O(N))",
   "runtime_optimization_hooks": {
