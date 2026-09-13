@@ -531,7 +531,9 @@ jaxRouter.post(
       return;
     }
 
-    if (isVertexConfigured()) {
+    if (process.env.NODE_ENV === "test" && process.env.JAX_TEST_RESPONSE) {
+      text = process.env.JAX_TEST_RESPONSE;
+    } else if (isVertexConfigured()) {
       try {
         text = await generateVertexText(fullPrompt, {
           maxOutputTokens: 2048,

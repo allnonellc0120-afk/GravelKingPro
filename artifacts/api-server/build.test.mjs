@@ -42,6 +42,7 @@ async function buildTest() {
       path.resolve(artifactDir, "src/__tests__/investor-alerts.test.ts"),
       path.resolve(artifactDir, "src/__tests__/jax-voice-metadata.test.ts"),
       path.resolve(artifactDir, "src/__tests__/token-telemetry.test.ts"),
+      path.resolve(artifactDir, "src/__tests__/jax-telemetry-ledger.test.ts"),
     ],
     platform: "node",
     bundle: true,
