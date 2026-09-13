@@ -18,3 +18,9 @@ For multi-turn context suppression, the raw baseline must retain the complete co
 **Why:** retaining the full prior conversation made early turns show zero suppression and reduced the audited four-turn benchmark below target.
 
 **How to apply:** validate cumulative suppression on a sequential four-turn loop, not only on a single long request; preserve response text and final JSON structure independently from context carving.
+
+Zero-account telemetry access is capability-based and fail-closed: hash the presented token, map it to exactly one client ID, and scope every ledger read to that mapped ID. Duplicate token mappings are invalid.
+
+**Why:** any missing, empty, invalid, or ambiguous token must return 401 rather than exposing global or cross-client financial telemetry.
+
+**How to apply:** keep capability mappings in environment-managed JSON (prefer SHA-256 hashes), strip query strings from request logs, return `Cache-Control: no-store`, and never call ledger readers without the mapped client ID from the live route.

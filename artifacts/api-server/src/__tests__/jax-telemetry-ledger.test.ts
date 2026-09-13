@@ -24,6 +24,12 @@ const adminHeaders = {
 };
 const clientId = "enterprise-multi-turn-ledger-test";
 const otherClientId = "enterprise-isolation-ledger-test";
+const clientToken = "gka_live_client_test_token_00000001";
+const otherClientToken = "gka_live_other_test_token_00000002";
+process.env.GKA_LIVE_TELEMETRY_CLIENTS = JSON.stringify([
+  { clientId, token: clientToken },
+  { clientId: otherClientId, token: otherClientToken },
+]);
 const responseText = process.env.JAX_TEST_RESPONSE;
 const turns = [
   "Create a TypeScript function that adds two numbers.",
@@ -116,6 +122,54 @@ try {
     totalDollarsSaved: otherClientRecord.dollar_savings,
     totalGkaGainShareDue: otherClientRecord.gka_gain_share_due,
   });
+
+  for (const query of ["", "?token=", "?token=invalid-token"]) {
+    const unauthorized = await fetch(`${base}/api/telemetry/live${query}`);
+    assert.equal(unauthorized.status, 401);
+    assert.deepEqual(await unauthorized.json(), { error: "Unauthorized" });
+  }
+
+  const duplicateToken = "gka_live_duplicate_test_token_00003";
+  process.env.GKA_LIVE_TELEMETRY_CLIENTS = JSON.stringify([
+    { clientId, token: duplicateToken },
+    { clientId: otherClientId, token: duplicateToken },
+  ]);
+  const duplicateTokenResponse = await fetch(
+    `${base}/api/telemetry/live?token=${encodeURIComponent(duplicateToken)}`,
+  );
+  assert.equal(duplicateTokenResponse.status, 401);
+  process.env.GKA_LIVE_TELEMETRY_CLIENTS = JSON.stringify([
+    { clientId, token: clientToken },
+    { clientId: otherClientId, token: otherClientToken },
+  ]);
+
+  const liveResponse = await fetch(
+    `${base}/api/telemetry/live?token=${encodeURIComponent(clientToken)}&limit=500`,
+  );
+  assert.equal(liveResponse.status, 200);
+  assert.equal(liveResponse.headers.get("cache-control"), "no-store, private");
+  const live = await liveResponse.json() as {
+    clientId: string;
+    summary: typeof summary;
+    records: Array<{ client_id: string }>;
+  };
+  assert.equal(live.clientId, clientId);
+  assert.deepEqual(live.summary, summary);
+  assert.equal(live.records.length, 4);
+  assert.ok(live.records.every((record) => record.client_id === clientId));
+  assert.doesNotMatch(JSON.stringify(live), new RegExp(otherClientId));
+
+  const otherLiveResponse = await fetch(`${base}/api/telemetry/live`, {
+    headers: { Authorization: `Bearer ${otherClientToken}` },
+  });
+  assert.equal(otherLiveResponse.status, 200);
+  const otherLive = await otherLiveResponse.json() as {
+    clientId: string;
+    records: Array<{ client_id: string }>;
+  };
+  assert.equal(otherLive.clientId, otherClientId);
+  assert.equal(otherLive.records.length, 1);
+  assert.ok(otherLive.records.every((record) => record.client_id === otherClientId));
   console.log("JAX multi-turn telemetry ledger regression checks passed");
 } finally {
   server.close();

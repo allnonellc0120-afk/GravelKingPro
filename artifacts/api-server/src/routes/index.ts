@@ -32,6 +32,7 @@ import investorsRouter from "./investors";
 import promoRouter from "./promos";
 import jaxRouter from "./jax";
 import replicateWebhookRouter from "./replicateWebhook";
+import telemetryRouter from "./telemetry";
 
 const router: IRouter = Router();
 
@@ -67,6 +68,7 @@ router.use(referralsRouter);
 router.use(investorsRouter);
 router.use(promoRouter);
 router.use(jaxRouter);
+router.use(telemetryRouter);
 router.use(replicateWebhookRouter);
 
 export default router;

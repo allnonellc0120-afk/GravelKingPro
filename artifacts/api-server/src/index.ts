@@ -7,6 +7,7 @@ import { submitSitemapToGSC } from "./lib/googleSearchConsole";
 import { scheduleOverdueAlerts } from "./lib/investorAlerts";
 import { scheduleInvestorOutreachDispatcher } from "./lib/investorOutreach";
 import { scheduleIndexNowSubmission } from "./lib/indexNow";
+import { scheduleTelemetryReports } from "./lib/telemetryReports";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -496,6 +497,7 @@ await submitSitemapOnStartup();
 scheduleOverdueAlerts();
 scheduleInvestorOutreachDispatcher();
 scheduleIndexNowSubmission();
+scheduleTelemetryReports();
 
 app.listen(port, (err) => {
   if (err) {

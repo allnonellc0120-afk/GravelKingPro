@@ -1849,3 +1849,17 @@ mtime_ms = 1789328292465
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/50927d38-65b5-4e9b-b0a2-588414c2f107/fe915e6e-6341-4f86-ad5a-446da92e1713"
 storage_version_token = "1789328313805681"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "o6GGiLXnxl53cJ24lhdcw"
+uri = "file://artifacts/pre_push_audit_dump.json"
+type = "unspecified"
+title = "GravelKing Pre-Push Security Audit Dump"
+description = "Structured JSON containing 12 core production source files with byte counts and SHA-256 hashes. Secrets, environment values, ledger data, credentials, and node_modules are excluded."
+logical_id = "c6b91b9c-d5a5-4db1-9219-29e20e8fd1c6"
+content_hash = "sha256:ba76073272415ec450d0153018488ef75413e37bd6750af96c285ed28eb02bfc"
+size = 107525
+mtime_ms = 1789332822577
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/c6b91b9c-d5a5-4db1-9219-29e20e8fd1c6/160d99c2-ef74-4df6-8fa1-132c0992626d"
+storage_version_token = "1789332908359406"
+content_type = "application/octet-stream"
