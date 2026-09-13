@@ -1,18 +1,21 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
 # compiled output
-dist
-tmp
+dist/
+tmp/
+.tmp/
 out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
 
 # dependencies
-node_modules
+node_modules/
 *.aab
 *.zip
 *.tar.gz
+*.jar
+*.aar
 *.mp3
 *.wav
 
@@ -57,6 +60,10 @@ android-twa/*.keystore
 *.jks
 android-twa/.keystore-pass
 .tmp-export/
+android-twa/.gradle/
+android-twa/build/
+android-twa/**/build/
+android-twa/build/android-sdk/
 
 # Credentials and service-account JSON
 *.json
