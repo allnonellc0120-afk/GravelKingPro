@@ -1,0 +1,27 @@
+{
+  "system_directive": {
+    "protocol": "GravelKing Protocol",
+    "kernel": "Morris Law Kernel V2",
+    "author": "Kevin Morris",
+    "mode": "RECORD_CONTINUOUS_CLI_SESSION",
+    "task": "Do NOT generate frames, slides, or timestamp cuts. Run a continuous terminal session and record the entire raw screencast to MP4 so Kevin can splice and edit the footage himself."
+  },
+  "rules_of_engagement": [
+    "ABSOLUTELY NO SLIDES: Do not draw boxed cards, slide titles, or static frames.",
+    "NO ARTIFICIAL TIMESTAMPS: Do not break the script into 5-second intervals. Let the commands run, execute, and stream naturally from top to bottom.",
+    "REAL TERMINAL VIEW: Render an authentic, high-res (1080p, 60fps) dark terminal window (deep charcoal background, clean monospace font, subtle terminal glow/scanline if available, zero overlapping text).",
+    "RAW LIVE LOGS: The terminal must show real shell commands being typed, raw JSON payloads streaming down the console, real token counters ticking, and the actual ledger file being printed."
+  ],
+  "session_workflow_to_record": [
+    "1. Shell prompt boots: GKA proxy listening on :8090, js-tiktoken cl100k_base initialized.",
+    "2. Execute the live workload command: `./run-agent-workload.sh --workload enterprise-code-refactor`",
+    "3. Stream continuous multi-turn execution logs: show the inbound turn payloads, dynamic context carving in real time, timestamps under 0.3ms, and compilation clean at 0 errors.",
+    "4. Output the raw carve metrics table in standard ANSI terminal formatting (157,923 raw -> 65,499 carved | 92,424 suppressed | 58.52%).",
+    "5. Execute command: `tail -n 5 artifacts/api-server/data/token_savings_ledger.jsonl | jq .` to stream the verified JSON rows showing $0.277272 saved and the $0.0915 GKA gain-share split.",
+    "6. Clean exit back to the command prompt."
+  ],
+  "output_target": {
+    "filepath": "artifacts/gka_enterprise_code_demo.mp4",
+    "action": "Render the full uninterrupted terminal session to this file and report back file size and duration when ready."
+  }
+}
