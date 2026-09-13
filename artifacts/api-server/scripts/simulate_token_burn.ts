@@ -130,12 +130,44 @@ if (records.some((record) => record.tokens_suppressed !== Math.max(0, record.raw
   throw new Error("Suppressed token arithmetic is inconsistent.");
 }
 
-console.log("GKA TELEMETRY FORMAT");
-console.log("Cycle | Scenario                                 | RawBase | Prompt | Completion | Actual | Suppressed | Suppress% | Overhead");
+const totalBaselineTokens = records.reduce((sum, record) => sum + record.raw_tokens_baseline, 0);
+const totalActualTokens = records.reduce((sum, record) => sum + record.actual_tokens_used, 0);
+const totalSuppressedTokens = records.reduce((sum, record) => sum + record.tokens_suppressed, 0);
+const overallSlashEfficiency = totalBaselineTokens > 0
+  ? (totalSuppressedTokens / totalBaselineTokens) * 100
+  : 0;
+const blendedRatePerMillion = 10;
+const costBefore = (totalBaselineTokens / 1_000_000) * blendedRatePerMillion;
+const costAfter = (totalActualTokens / 1_000_000) * blendedRatePerMillion;
+const netCashSaved = costBefore - costAfter;
+const maximumOverhead = Math.max(...records.map((record) => record.latency_overhead_ms));
+
+console.log("GKA TOKEN SLASH TELEMETRY AUDIT");
+console.log("Cycle | Prompt Workflow                         | Without GKA: Raw Tokens | With GKA: Actual Tokens | Tokens Slashed | Slash Rate | Overhead");
 for (let index = 0; index < scenarios.length; index += 1) {
-  console.log(formatRecord(scenarios[index], records[index]));
+  const scenario = scenarios[index];
+  const record = records[index];
+  console.log([
+    String(scenario.cycle).padStart(5),
+    scenario.name.padEnd(40),
+    String(record.raw_tokens_baseline).padStart(23),
+    String(record.actual_tokens_used).padStart(23),
+    String(record.tokens_suppressed).padStart(14),
+    `${record.suppression_percentage.toFixed(2)}%`.padStart(10),
+    `${record.latency_overhead_ms.toFixed(4)}ms`.padStart(10),
+  ].join(" | "));
 }
 console.log("");
+console.log("AGGREGATE DOLLAR & EFFICIENCY LEDGER");
+console.log(`Total baseline tokens: ${totalBaselineTokens}`);
+console.log(`Total optimized tokens: ${totalActualTokens}`);
+console.log(`Total tokens slashed: ${totalSuppressedTokens}`);
+console.log(`Overall slash efficiency: ${overallSlashEfficiency.toFixed(2)}%`);
+console.log(`Blended rate: $${blendedRatePerMillion.toFixed(2)} / 1M tokens`);
+console.log(`Cost before GKA: $${costBefore.toFixed(6)}`);
+console.log(`Cost after GKA: $${costAfter.toFixed(6)}`);
+console.log(`Net cash saved: $${netCashSaved.toFixed(6)}`);
+console.log(`Maximum measured overhead latency: ${maximumOverhead.toFixed(4)}ms (contract <1.0ms)`);
 console.log(`Ledger records: ${getTokenTelemetryLedger().length}`);
 console.log(`Measured token estimator: native/zero-dependency (${estimateTokenCount("GKA") > 0 ? "active" : "inactive"})`);
 console.log("[REPLIT-SELF-AUDIT: COMPLETE // 0 ERRORS // RUNTIME GREEN]");
