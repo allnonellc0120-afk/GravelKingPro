@@ -24,3 +24,7 @@ description: How the promo video artifact maps product/marketing requirements to
 - **Browser-captured logo exports need a painted pre-roll.** Playwright video recording begins before the navigated page paints, so export pages should paint a dark inline pre-roll before navigating to the animated scene; otherwise frame 0 can be an unintended white flash.
   **Why:** the recorder attaches at browser-context creation, before the scene page's CSS and assets are available.
   **How to apply:** use an inline dark `setContent` pre-roll, wait briefly, then navigate to the export route and QA frame 0 plus a mid-scene frame.
+
+- **Playwright 1.61 video export needs the system FFmpeg bridged into the cache.** With `XDG_CACHE_HOME=/home/runner/workspace/.cache`, create `ms-playwright/ffmpeg-1011/ffmpeg-linux` as a direct executable symlink; a nested `ffmpeg-linux/ffmpeg` directory fails.
+  **Why:** the recorder launches the revision path itself and does not use the system `ffmpeg` from PATH.
+  **How to apply:** ensure the direct symlink before `chromium.launch`, then probe duration and at least one contact sheet after muxing.

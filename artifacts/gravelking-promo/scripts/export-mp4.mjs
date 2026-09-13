@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Export the GravelKing Pro Lyrics Generator promo to MP4.
- * Usage: node scripts/export-mp4.mjs [output.mp4] [vertical]
+ * Export the GravelKing Advantage Customer Zero promo to MP4.
+ * Usage: node scripts/export-mp4.mjs [output.mp4]
  */
 import { chromium } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +17,7 @@ const dist = path.resolve(root, 'dist/public');
 const isVertical = process.argv[3] === 'vertical';
 const isWorkflow = process.argv[3] === 'workflow';
 const isLogo = process.argv[3] === 'logo';
+const isGka = !isVertical && !isWorkflow && !isLogo;
 
 let output = process.argv[2];
 if (!output) {
@@ -26,7 +28,7 @@ if (!output) {
   } else if (isVertical) {
     output = 'public/videos/gravelkingpro_lyrics_generator_59s_9x16.mp4';
   } else {
-    output = 'public/videos/gravelkingpro_lyrics_generator_59s_16x9.mp4';
+    output = 'public/videos/gka_customer_zero_27s_16x9.mp4';
   }
 }
 output = path.resolve(root, output);
@@ -39,7 +41,7 @@ for (const entry of fs.readdirSync(tmpDir)) {
 
 let WIDTH = 1920;
 let HEIGHT = 1080;
-let DURATION_MS = 59000;
+let DURATION_MS = 27000;
 
 if (isLogo) {
   WIDTH = 1080;
@@ -52,6 +54,10 @@ if (isLogo) {
 } else if (isVertical) {
   WIDTH = 1080;
   HEIGHT = 1920;
+} else if (isGka) {
+  WIDTH = 1920;
+  HEIGHT = 1080;
+  DURATION_MS = 27000;
 }
 
 const SCALED_WIDTH = WIDTH;
@@ -75,6 +81,25 @@ function findChromium() {
   const found = CANDIDATE_CHROMIUMS.find(p => fs.existsSync(p));
   if (found) return found;
   return undefined;
+}
+
+function ensurePlaywrightFfmpeg() {
+  const systemFfmpeg = execFileSync('which', ['ffmpeg'], { encoding: 'utf8' }).trim();
+  const browserCache = process.env.PLAYWRIGHT_BROWSERS_PATH && process.env.PLAYWRIGHT_BROWSERS_PATH !== '0'
+    ? process.env.PLAYWRIGHT_BROWSERS_PATH
+    : path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'ms-playwright');
+  const bundledPath = path.join(
+    browserCache,
+    'ffmpeg-1011',
+    'ffmpeg-linux',
+  );
+  if (fs.existsSync(bundledPath) && fs.lstatSync(bundledPath).isDirectory()) {
+    fs.rmSync(bundledPath, { recursive: true, force: true });
+  }
+  if (!fs.existsSync(bundledPath)) {
+    fs.mkdirSync(path.dirname(bundledPath), { recursive: true });
+    fs.symlinkSync(systemFfmpeg, bundledPath);
+  }
 }
 
 async function startStaticServer() {
@@ -143,6 +168,21 @@ async function mixAudio() {
       '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
       audioPath,
     ], { stdio: 'inherit' });
+  } else if (isGka) {
+    execFileSync('ffmpeg', [
+      '-y', '-f', 'lavfi', '-i',
+      'aevalsrc=0.045*sin(2*PI*55*t)+0.018*sin(2*PI*110*t)+0.008*sin(2*PI*220*t):s=48000:d=27',
+      '-t', '27',
+      '-filter_complex', `
+        [0:a]pan=stereo|c0=c0|c1=c0,
+        acompressor=threshold=-18dB:ratio=2.2:attack=8:release=120:makeup=2,
+        loudnorm=I=-16:TP=-1.5:LRA=9,
+        afade=t=in:st=0:d=0.5,afade=t=out:st=25.5:d=1.5[aout]
+      `,
+      '-map', '[aout]',
+      '-c:a', 'aac', '-b:a', '256k', '-ar', '48000',
+      audioPath,
+    ], { stdio: 'inherit' });
   } else {
     execFileSync('ffmpeg', [
       '-y', '-stream_loop', '-1', '-i', soundtrack, 
@@ -173,6 +213,7 @@ async function mixAudio() {
 
 async function recordVideo() {
   const server = await startStaticServer();
+  ensurePlaywrightFfmpeg();
   const chromiumPath = findChromium();
   const browser = await chromium.launch({
     executablePath: chromiumPath,
@@ -212,6 +253,7 @@ async function recordVideo() {
   await page.setContent('<!doctype html><html><head><style>html,body{margin:0;width:100%;height:100%;background:#050608}</style></head><body></body></html>');
   await page.waitForTimeout(250);
   await page.goto(`http://127.0.0.1:${EXPORT_PORT}/?export=1${formatQuery}`, { waitUntil: 'networkidle', timeout: 60000 });
+  const recordedVideo = page.video();
 
   // Wait for the first frame to render.
   await page.waitForTimeout(1000);
@@ -236,12 +278,22 @@ async function recordVideo() {
   }
   await page.waitForTimeout(500);
   try { await ctx.close(); } catch {}
+  const recordedPath = await recordedVideo?.path().catch(() => undefined);
   try { await browser.close(); } catch {}
   await new Promise((r, e) => server.close(err => (err ? e(err) : r())));
 
-  const videoFile = fs.readdirSync(tmpDir).find(f => f.endsWith('.webm'));
-  if (!videoFile) throw new Error('No recorded video file found');
-  return path.join(tmpDir, videoFile);
+  if (recordedPath && fs.existsSync(recordedPath)) return recordedPath;
+  const videoFiles = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(entryPath);
+      else if (entry.name.endsWith('.webm')) videoFiles.push(entryPath);
+    }
+  };
+  walk(tmpDir);
+  if (!videoFiles.length) throw new Error('No recorded video file found');
+  return videoFiles[0];
 }
 
 async function combine(videoPath, audioPath) {

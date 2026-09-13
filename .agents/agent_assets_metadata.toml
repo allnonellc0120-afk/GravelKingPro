@@ -1821,3 +1821,17 @@ mtime_ms = 1789202559588
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/84a0c39b-31ba-4bed-87e7-9a66f84a419c/0d3ce7af-a60c-46d5-b8fb-2a08c66b299d"
 storage_version_token = "1789202582553883"
 content_type = "audio/mpeg"
+
+[[outputs]]
+id = "kCuV1DiARIx65TFd5pkUF"
+uri = "file://artifacts/gravelking-promo/public/videos/gka_customer_zero_27s_16x9.mp4"
+type = "video"
+title = "GKA Customer Zero Audit — 27s MP4"
+description = "Terminal-style GravelKing Advantage promo with the four-turn benchmark: 2,108 baseline tokens, 420 processed, 80.08% suppression, 0.2577 ms overhead, and 100% output fidelity."
+logical_id = "02cdc78a-20e8-461f-8276-8ba9897bea30"
+content_hash = "sha256:ae24acc0a00b49cedb7c37f82c1b5a186ce2ad7364ee83737f5f0105a78a4c5e"
+size = 14341048
+mtime_ms = 1789321652910
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/02cdc78a-20e8-461f-8276-8ba9897bea30/c001c373-1da6-48ae-a762-455e97c8ec29"
+storage_version_token = "1789321712123968"
+content_type = "video/mp4"
