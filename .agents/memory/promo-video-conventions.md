@@ -25,6 +25,10 @@ description: How the promo video artifact maps product/marketing requirements to
   **Why:** the enterprise proof is metric-heavy; static cards keep every number readable for the full dwell while avoiding animation capture failures.
   **How to apply:** render each card to PNG, encode exactly 150 frames at 30 fps, concat the nine segments, then mux a separate 45-second AAC bed and probe frame count plus contact-sheet readability.
 
+- **Continuous Playwright terminal captures must register the child-process close promise before consuming stdout.**
+  **Why:** the workload can exit between the stdout iterator finishing and a later `close` listener, leaving the browser recording alive indefinitely.
+  **How to apply:** create the `close` promise immediately after spawning the workload, then consume and render its output; shorten pre-roll so the first captured frame already shows the terminal boot.
+
 - **Browser-captured logo exports need a painted pre-roll.** Playwright video recording begins before the navigated page paints, so export pages should paint a dark inline pre-roll before navigating to the animated scene; otherwise frame 0 can be an unintended white flash.
   **Why:** the recorder attaches at browser-context creation, before the scene page's CSS and assets are available.
   **How to apply:** use an inline dark `setContent` pre-roll, wait briefly, then navigate to the export route and QA frame 0 plus a mid-scene frame.

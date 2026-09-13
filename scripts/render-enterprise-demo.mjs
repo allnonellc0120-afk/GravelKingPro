@@ -133,7 +133,7 @@ async function recordTerminal() {
   const page = await context.newPage();
   page.on("pageerror", (error) => console.error("Browser page error:", error.message));
   await page.setContent(terminalHtml(), { waitUntil: "load" });
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(200);
 
   await page.evaluate(() => window.writeTerminalLine("GKA // CUSTOMER ZERO // CONTINUOUS CLI SESSION"));
   await page.evaluate(() => window.writeTerminalLine("Morris Law Kernel V2 · js-tiktoken cl100k_base initialized"));
@@ -144,6 +144,7 @@ async function recordTerminal() {
     env: { ...process.env, TERM: "xterm-256color", COLUMNS: "110", LINES: "36" },
     stdio: ["ignore", "pipe", "pipe"],
   });
+  const childClosed = new Promise((resolve) => child.once("close", resolve));
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
   const lines = createInterface({ input: child.stdout });
@@ -152,7 +153,7 @@ async function recordTerminal() {
     const pause = line.startsWith("$ ") ? 240 : (line.startsWith("{") || line.startsWith("  ") ? 42 : 115);
     await page.waitForTimeout(pause);
   }
-  const exitCode = await new Promise((resolve) => child.once("close", resolve));
+  const exitCode = child.exitCode ?? await childClosed;
   if (exitCode !== 0) throw new Error(`Workload command failed (${exitCode}): ${stderr}`);
 
   await page.evaluate(() => window.writeTerminalLine(""));
