@@ -450,16 +450,29 @@ jaxRouter.post(
     : "";
   const fullPrompt = `${system}${history ? `\n\nConversation so far:\n${history}\n` : ""}\nArtist: ${prompt}\nJAX:`;
   const operation = /\bremix\b/i.test(prompt) ? "jax_remix" : "jax_generate";
+  const requestedClientId =
+    typeof req.body?.clientId === "string"
+      ? req.body.clientId
+      : typeof req.body?.client_id === "string"
+        ? req.body.client_id
+        : "";
   const clientId =
-    typeof req.body?.clientId === "string" && req.body.clientId.trim()
-      ? req.body.clientId.trim().slice(0, 200)
+    requestedClientId.trim()
+      ? requestedClientId.trim().slice(0, 200)
       : user?.id ?? (adminBypass ? "admin" : undefined);
+  const modelRatePerMillionUsd =
+    typeof req.body?.modelRatePerMillionUsd === "number" &&
+    Number.isFinite(req.body.modelRatePerMillionUsd) &&
+    req.body.modelRatePerMillionUsd >= 0
+      ? req.body.modelRatePerMillionUsd
+      : undefined;
   const tokenTracker: TokenTracker = beginTokenTracking({
     operation,
     rawBaselineText: `${system}\n\nConversation so far:\n${rawHistory}\nArtist: ${prompt}\nJAX:`,
     actualPromptText: fullPrompt,
     maxOutputTokens: 2048,
     clientId,
+    modelRatePerMillionUsd,
   });
   const wantsStream = req.body?.stream === true || req.headers.accept?.includes("text/event-stream") === true;
   try {

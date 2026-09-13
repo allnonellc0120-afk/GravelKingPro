@@ -109,7 +109,10 @@ app.use(
   }),
 );
 app.use(cookieParser());
-app.use(express.json());
+// JAX enterprise sessions may intentionally retransmit a multi-file codebase
+// and accumulated diagnostics on every turn. Keep this aligned with the GKA
+// proxy's 2 MB request ceiling while preserving an explicit finite limit.
+app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Clerk session validation — resolves the publishable key from the request host
