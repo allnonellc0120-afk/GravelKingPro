@@ -23,6 +23,7 @@ const adminHeaders = {
   "x-admin-user": "Allnonellc0120@gmail.com",
 };
 const clientId = "enterprise-multi-turn-ledger-test";
+const otherClientId = "enterprise-isolation-ledger-test";
 const responseText = process.env.JAX_TEST_RESPONSE;
 const turns = [
   "Create a TypeScript function that adds two numbers.",
@@ -53,12 +54,38 @@ try {
     history.push({ role: "user", content: prompt }, { role: "jax", content: responseText });
   }
 
+  const otherClientResponse = await fetch(`${base}/api/jax/generate`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({
+      message: "Record this telemetry for a separate enterprise client.",
+      clientId: otherClientId,
+      modelRatePerMillionUsd: 3,
+    }),
+  });
+  assert.equal(otherClientResponse.status, 200);
+  const otherClientBody = await otherClientResponse.json() as {
+    text: string;
+    tokenTelemetry: { completion_tokens: number };
+  };
+  assert.equal(otherClientBody.text, responseText);
+  assert.equal(otherClientBody.tokenTelemetry.completion_tokens, 2);
+
   await new Promise((resolve) => setTimeout(resolve, 25));
   const lines = (await readFile(process.env.GKA_TOKEN_LEDGER_PATH!, "utf8")).trim().split("\n");
-  assert.equal(lines.length, 4);
-  assert.ok(lines.every((line) => JSON.parse(line).client_id === clientId));
+  const records = lines.map((line) => JSON.parse(line) as {
+    client_id: string;
+    raw_prompt_tokens: number;
+    processed_prompt_tokens: number;
+    tokens_suppressed: number;
+    dollar_savings: number;
+    gka_gain_share_due: number;
+  });
+  assert.equal(records.length, 5);
+  assert.equal(records.filter((record) => record.client_id === clientId).length, 4);
+  assert.equal(records.filter((record) => record.client_id === otherClientId).length, 1);
 
-  const ledgerResponse = await fetch(`${base}/api/jax/telemetry/ledger?clientId=${clientId}`, {
+  const ledgerResponse = await fetch(`${base}/api/jax/telemetry/ledger?clientId=${encodeURIComponent(clientId)}`, {
     headers: adminHeaders,
   });
   assert.equal(ledgerResponse.status, 200);
@@ -71,6 +98,24 @@ try {
     totalTokensSuppressed: 56, totalDollarsSaved: 0.000168, totalGkaGainShareDue: 0.000056,
   });
   assert.equal(Number((summary.totalGkaGainShareDue / summary.totalDollarsSaved).toFixed(2)), 0.33);
+
+  const otherClientRecord = records.find((record) => record.client_id === otherClientId);
+  assert.ok(otherClientRecord);
+  const otherLedgerResponse = await fetch(
+    `${base}/api/jax/telemetry/ledger?clientId=${encodeURIComponent(otherClientId)}`,
+    { headers: adminHeaders },
+  );
+  assert.equal(otherLedgerResponse.status, 200);
+  const otherSummary = await otherLedgerResponse.json() as typeof summary;
+  assert.deepEqual(otherSummary, {
+    clientId: otherClientId,
+    recordCount: 1,
+    totalRawTokens: otherClientRecord.raw_prompt_tokens,
+    totalCarvedTokens: otherClientRecord.processed_prompt_tokens,
+    totalTokensSuppressed: otherClientRecord.tokens_suppressed,
+    totalDollarsSaved: otherClientRecord.dollar_savings,
+    totalGkaGainShareDue: otherClientRecord.gka_gain_share_due,
+  });
   console.log("JAX multi-turn telemetry ledger regression checks passed");
 } finally {
   server.close();
