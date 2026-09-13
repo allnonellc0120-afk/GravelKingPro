@@ -2,6 +2,11 @@ import { Router, type Request, type Response } from "express";
 import { generateVertexText, generateVertexTextStream, isVertexConfigured } from "../geminiVertex";
 import { buildJaxSystemPrompt } from "../prompts/jaxSystem";
 import { rateLimit } from "../lib/rateLimiter";
+import {
+  beginTokenTracking,
+  tokenTrackerMiddleware,
+  type TokenTracker,
+} from "../middleware/tokenTracker";
 import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { randomUUID, createHash, timingSafeEqual } from "crypto";
@@ -339,7 +344,11 @@ jaxRouter.delete("/jax/sessions/:sessionId", async (req: Request, res: Response)
   res.json({ ok: true });
 });
 
-jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max: 12 }), async (req: Request, res: Response) => {
+jaxRouter.post(
+  ["/jax/generate", "/chat/jax"],
+  rateLimit({ windowMs: 60_000, max: 12 }),
+  tokenTrackerMiddleware,
+  async (req: Request, res: Response) => {
   const adminBypass = isAdminAutomationAuthenticated(req);
   const user = req.dbUser;
   if (!user && !adminBypass) {
@@ -371,7 +380,7 @@ jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max
   const [artistProfileRow] = user
     ? await db.select().from(artistProfilesTable).where(eq(artistProfilesTable.userId, user.id)).limit(1)
     : [];
-  const artistProfile = artistProfileRow?.memoryEnabled
+  const rawArtistProfile = artistProfileRow?.memoryEnabled
     ? JSON.stringify({
         bio: artistProfileRow.bio,
         genre: artistProfileRow.genre,
@@ -384,8 +393,9 @@ jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max
         lyricalCadence: artistProfileRow.lyricalCadence,
         vocalStyle: artistProfileRow.vocalStyle,
         vocabularyHabits: artistProfileRow.vocabularyHabits,
-      }).slice(0, 24_000)
+      })
     : "{}";
+  const artistProfile = rawArtistProfile.slice(0, 24_000);
   const system = buildJaxSystemPrompt({ isExplicit, artistProfile });
   const safetySettings = isExplicit
     ? [
@@ -395,6 +405,12 @@ jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max
         { category: "HARM_CATEGORY_DANGEROUS_CONTENT" as const, threshold: "BLOCK_NONE" as const },
       ]
     : undefined;
+  const rawHistory = Array.isArray(req.body?.history)
+    ? req.body.history
+        .filter((m: any) => m && typeof m.content === "string" && (m.role === "user" || m.role === "jax"))
+        .map((m: any) => `${m.role === "user" ? "Artist" : "JAX"}: ${m.content.slice(0, 100_000)}`)
+        .join("\n")
+    : "";
   const history = Array.isArray(req.body?.history)
     ? req.body.history
         .filter((m: any) => m && typeof m.content === "string" && (m.role === "user" || m.role === "jax"))
@@ -403,6 +419,13 @@ jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max
         .join("\n")
     : "";
   const fullPrompt = `${system}${history ? `\n\nConversation so far:\n${history}\n` : ""}\nArtist: ${prompt}\nJAX:`;
+  const operation = /\bremix\b/i.test(prompt) ? "jax_remix" : "jax_generate";
+  const tokenTracker: TokenTracker = beginTokenTracking({
+    operation,
+    rawBaselineText: `${system}\n\nConversation so far:\n${rawHistory}\nArtist: ${prompt}\nJAX:`,
+    actualPromptText: fullPrompt,
+    maxOutputTokens: 2048,
+  });
   const wantsStream = req.body?.stream === true || req.headers.accept?.includes("text/event-stream") === true;
   try {
     let text = "";
@@ -453,7 +476,8 @@ jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max
       const durationMs = Date.now() - startedAt;
       const ttftMs = firstTokenAt ? firstTokenAt - startedAt : null;
       const ttftDeltaMs = ttftMs === null ? null : ttftMs - 45_000;
-      writeSse(res, "done", { remaining, durationMs, ttftMs, ttftDeltaMs });
+      const tokenTelemetry = tokenTracker.finish(text, { provider: "vertex_stream" });
+      writeSse(res, "done", { remaining, durationMs, ttftMs, ttftDeltaMs, tokenTelemetry });
       req.log.info({ durationMs, ttftMs, ttftDeltaMs, historyMessages: 2 }, "JAX SSE generation completed");
       res.end();
       return;
@@ -503,8 +527,10 @@ jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max
       }
     }
     if (!text.trim()) throw new Error("No text provider returned a response");
-    res.json({ text: text.trim(), remaining });
+    const tokenTelemetry = tokenTracker.finish(text, { provider: "vertex" });
+    res.json({ text: text.trim(), remaining, tokenTelemetry });
   } catch (error) {
+    tokenTracker.finish("", { provider: "vertex", status: "failed" });
     req.log.error({ error }, "JAX generation failed");
     if (wantsStream && res.headersSent) {
       writeSse(res, "error", { error: "JAX could not reach the writing service right now. Your prompt and draft are still safe; please try again shortly." });
@@ -513,7 +539,8 @@ jaxRouter.post(["/jax/generate", "/chat/jax"], rateLimit({ windowMs: 60_000, max
     }
     res.status(503).json({ error: "JAX could not reach the writing service right now. Your prompt and draft are still safe; please try again shortly." });
   }
-});
+  },
+);
 
 /**
  * POST /api/jax/generate-music — ElevenLabs music generator, a second engine
