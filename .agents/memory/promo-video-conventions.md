@@ -21,6 +21,10 @@ description: How the promo video artifact maps product/marketing requirements to
 
 - **Never name a bash array `LINES`** — the terminal-height env var silently clobbers it, so every drawtext beat renders empty (video looks fine but has no headlines). Use a name like `BEATTXT`, and QA at least one extracted frame per format before concat.
 
+- **Readable enterprise audit demos can use static FFmpeg-rendered SVG cards.** Nine 1920×1080 cards at five seconds each provide reliable 45-second timing, large typography, and deterministic frame legibility without browser-capture timing drift.
+  **Why:** the enterprise proof is metric-heavy; static cards keep every number readable for the full dwell while avoiding animation capture failures.
+  **How to apply:** render each card to PNG, encode exactly 150 frames at 30 fps, concat the nine segments, then mux a separate 45-second AAC bed and probe frame count plus contact-sheet readability.
+
 - **Browser-captured logo exports need a painted pre-roll.** Playwright video recording begins before the navigated page paints, so export pages should paint a dark inline pre-roll before navigating to the animated scene; otherwise frame 0 can be an unintended white flash.
   **Why:** the recorder attaches at browser-context creation, before the scene page's CSS and assets are available.
   **How to apply:** use an inline dark `setContent` pre-roll, wait briefly, then navigate to the export route and QA frame 0 plus a mid-scene frame.
