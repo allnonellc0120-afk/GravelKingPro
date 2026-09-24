@@ -1,4 +1,4 @@
-# Data Room Checklist — Morris Law Kernel v3.5 + IP Protection System
+# Data Room Checklist — Morris Law Kernel V4 + IP Protection System
 
 Use this checklist when speaking with serious potential licensees, investors, or acquisition interest. Have these items ready (even in draft form).
 

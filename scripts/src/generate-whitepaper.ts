@@ -95,7 +95,7 @@ async function createWhitePaper() {
 
     page.drawText(label, { x: col1, y: boxY + 56, size: 10, font: fontBold, color: white });
     page.drawText("Raw", { x: col2, y: boxY + 56, size: 9, font: font, color: textLight });
-    page.drawText("MLK v3", { x: col3, y: boxY + 56, size: 9, font: font, color: accent });
+    page.drawText("MLK V4 (Morris Law Kernel V4)", { x: col3, y: boxY + 56, size: 9, font: font, color: accent });
     page.drawText("Delta", { x: col4, y: boxY + 56, size: 9, font: font, color: textLight });
 
     page.drawText(rawVal, { x: col2, y: boxY + 34, size: 16, font: fontBold, color: red });
@@ -109,8 +109,8 @@ async function createWhitePaper() {
   let page = addPage();
   page.drawText("GRAVELKING", { x: margin, y: pageH - 200, size: 42, font: fontBold, color: white });
   page.drawText("PRODUCTIONS", { x: margin, y: pageH - 248, size: 42, font: fontBold, color: accent });
-  page.drawText("MLK v3 White Paper", { x: margin, y: pageH - 300, size: 18, font: fontItalic, color: white });
-  page.drawText("A Technical & Creative Overview of the Morris Law Kernel V3", { x: margin, y: pageH - 330, size: 13, font: font, color: textLight });
+  page.drawText("MLK V4 (Morris Law Kernel V4) White Paper", { x: margin, y: pageH - 300, size: 18, font: fontItalic, color: white });
+  page.drawText("A Technical & Creative Overview of the Morris Law Kernel V4", { x: margin, y: pageH - 330, size: 13, font: font, color: textLight });
   page.drawText("Kevin Morris, Chief Architect  |  All N One LLC", { x: margin, y: margin + 30, size: 10, font: font, color: textLight });
   page.drawText("June 2026", { x: margin, y: margin + 14, size: 10, font: font, color: textLight });
 
@@ -122,46 +122,46 @@ async function createWhitePaper() {
   drawParagraph(page, "Today, Kevin performs live on StarMaker under the handle KevJamm84 at The Juke Joint party room, every Friday and Saturday night at 8 PM CST. The GravelKing brand represents that same grit, transformed into professional-grade audio technology.");
   drawParagraph(page, "All N One LLC is the entity behind GravelKing Productions and the GravelKing Pro application suite.");
 
-  // ===== WHAT IS MLK v3 =====
+  // ===== WHAT IS MLK V4 (Morris Law Kernel V4) =====
   page = addPage();
-  drawHeader(page, "What Is MLK v3?");
-  drawParagraph(page, "MLK v3, the Morris Law Kernel V3, is a multi-band amplitude carving engine with phase-coherent recombination and adaptive peak normalization. It is the core signal processing engine behind every GravelKing Pro audio output.");
-  drawParagraph(page, "Unlike traditional compression or limiting, MLK v3 operates on three parallel frequency bands: low, mid, and high. Each band receives its own amplitude carving, optimized for its frequency characteristics. The bass band is gently boosted, the mid band is preserved, and the high band is carefully controlled.");
+  drawHeader(page, "What Is MLK V4 (Morris Law Kernel V4)?");
+  drawParagraph(page, "MLK V4 (Morris Law Kernel V4), the Morris Law Kernel V4, is a multi-band amplitude carving engine with phase-coherent recombination and adaptive peak normalization. It is the core signal processing engine behind every GravelKing Pro audio output.");
+  drawParagraph(page, "Unlike traditional compression or limiting, MLK V4 (Morris Law Kernel V4) operates on three parallel frequency bands: low, mid, and high. Each band receives its own amplitude carving, optimized for its frequency characteristics. The bass band is gently boosted, the mid band is preserved, and the high band is carefully controlled.");
   drawParagraph(page, "After per-band carving, the three bands are recombined with phase coherence preserved, then the entire signal is adaptively normalized to a safe mastering ceiling of 0.92 peak amplitude. This prevents clipping while maximizing loudness and clarity.");
   drawParagraph(page, "The result: a polished, broadcast-ready signal that is louder, clearer, and more consistent than the raw input, without the artifacts that traditional compressors introduce.");
 
   // ===== THE NUMBERS =====
   page = addPage();
-  drawHeader(page, "Measured Performance: Raw vs. MLK v3");
-  drawParagraph(page, "The following data is drawn from real-time benchmark runs against the standard test clip (8,192 samples, 44.1kHz, dual percussive grains). Each measurement represents the actual performance of the MLK v3 engine in production.");
+  drawHeader(page, "Measured Performance: Raw vs. MLK V4 (Morris Law Kernel V4)");
+  drawParagraph(page, "The following data is drawn from real-time benchmark runs against the standard test clip (8,192 samples, 44.1kHz, dual percussive grains). Each measurement represents the actual performance of the MLK V4 (Morris Law Kernel V4) engine in production.");
 
-  drawStatBox(page, "Peak Amplitude (Headroom Risk)", "0.95", "0.92", "-3.2%", "Clipped on raw; MLK v3 sits at safe ceiling");
-  drawStatBox(page, "Processing Speed (Real-time Ratio)", "~0x", "6.7x", "N/A", "Raw is passthrough; MLK v3 processes 6.7x real-time");
-  drawStatBox(page, "Gain Change (dB)", "0.00", "-1.32", "Controlled", "MLK v3 normalizes; raw gain drifts uncontrolled");
-  drawStatBox(page, "Headroom Efficiency", "96.8%", "100%", "+3.2%", "MLK v3 locks at 0.92; raw overshoots unpredictably");
-  drawStatBox(page, "Parity Validation", "BASELINE", "VALIDATED", "VERIFIED", "MLK v3 guarantees output integrity; raw is unverified");
+  drawStatBox(page, "Peak Amplitude (Headroom Risk)", "0.95", "0.92", "-3.2%", "Clipped on raw; MLK V4 (Morris Law Kernel V4) sits at safe ceiling");
+  drawStatBox(page, "Processing Speed (Real-time Ratio)", "~0x", "6.7x", "N/A", "Raw is passthrough; MLK V4 (Morris Law Kernel V4) processes 6.7x real-time");
+  drawStatBox(page, "Gain Change (dB)", "0.00", "-1.32", "Controlled", "MLK V4 (Morris Law Kernel V4) normalizes; raw gain drifts uncontrolled");
+  drawStatBox(page, "Headroom Efficiency", "96.8%", "100%", "+3.2%", "MLK V4 (Morris Law Kernel V4) locks at 0.92; raw overshoots unpredictably");
+  drawStatBox(page, "Parity Validation", "BASELINE", "VALIDATED", "VERIFIED", "MLK V4 (Morris Law Kernel V4) guarantees output integrity; raw is unverified");
 
   // ===== FEATURES =====
   page = addPage();
   drawHeader(page, "GravelKing Pro: The Complete Suite");
-  drawParagraph(page, "GravelKing Pro is the professional audio platform that puts MLK v3 at the center of every workflow.");
+  drawParagraph(page, "GravelKing Pro is the professional audio platform that puts MLK V4 (Morris Law Kernel V4) at the center of every workflow.");
   drawSubHeader(page, "Core Tools");
-  drawParagraph(page, "Kernel Dashboard — Real-time MLK v3 processing with live telemetry, routing configuration, and before/after comparison.");
-  drawParagraph(page, "Audio Studio — Upload and process your own tracks with MLK v3 applied. Get WAV downloads with full multi-band carving.");
-  drawParagraph(page, "Mix Studio — Full multi-track DAW with synchronized zoom, waveform scrubbing, and MLK v3 on every export.");
-  drawParagraph(page, "One-Click Master — Automatic mastering with MLK v3 normalization. Instant broadcast-ready output.");
+  drawParagraph(page, "Kernel Dashboard — Real-time MLK V4 (Morris Law Kernel V4) processing with live telemetry, routing configuration, and before/after comparison.");
+  drawParagraph(page, "Audio Studio — Upload and process your own tracks with MLK V4 (Morris Law Kernel V4) applied. Get WAV downloads with full multi-band carving.");
+  drawParagraph(page, "Mix Studio — Full multi-track DAW with synchronized zoom, waveform scrubbing, and MLK V4 (Morris Law Kernel V4) on every export.");
+  drawParagraph(page, "One-Click Master — Automatic mastering with MLK V4 (Morris Law Kernel V4) normalization. Instant broadcast-ready output.");
   drawParagraph(page, "Stem Separation — AI-powered voice removal and stem splitting. Free-tier preview, unlimited for Studio subscribers.");
   drawSubHeader(page, "Studio Features");
   drawParagraph(page, "Live Vocal Monitor — Real-time input with gain staging and clipping detection.");
-  drawParagraph(page, "Plugin Rack — Studio-quality effects chain with MLK v3 as the final stage.");
+  drawParagraph(page, "Plugin Rack — Studio-quality effects chain with MLK V4 (Morris Law Kernel V4) as the final stage.");
   drawParagraph(page, "Beat Library — Original GravelKing productions beats, fully tagged and previewable.");
 
   // ===== CONCLUSION =====
   page = addPage();
   drawHeader(page, "Conclusion");
-  drawParagraph(page, "MLK v3 is not a filter. It is not a preset. It is a mathematically verified, multi-band amplitude carving engine that transforms raw audio into broadcast-ready output with guaranteed integrity.");
-  drawParagraph(page, "For independent artists, producers, and engineers, GravelKing Pro puts that same engine at the center of every workflow. From the first upload to the final master, MLK v3 ensures your signal is as strong as the grit that inspired it.");
-  drawParagraph(page, "The GravelKing name came from the grit. The MLK v3 engine came from the discipline. Together, they are GravelKing Productions.");
+  drawParagraph(page, "MLK V4 (Morris Law Kernel V4) is not a filter. It is not a preset. It is a mathematically verified, multi-band amplitude carving engine that transforms raw audio into broadcast-ready output with guaranteed integrity.");
+  drawParagraph(page, "For independent artists, producers, and engineers, GravelKing Pro puts that same engine at the center of every workflow. From the first upload to the final master, MLK V4 (Morris Law Kernel V4) ensures your signal is as strong as the grit that inspired it.");
+  drawParagraph(page, "The GravelKing name came from the grit. The MLK V4 (Morris Law Kernel V4) engine came from the discipline. Together, they are GravelKing Productions.");
   drawParagraph(page, "Download GravelKing Pro at gravelkingpro.com.");
   drawParagraph(page, "Follow Kevin Morris live: StarMaker, KevJamm84, The Juke Joint party room, Friday & Saturday nights at 8 PM CST.");
 

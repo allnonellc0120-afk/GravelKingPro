@@ -1,7 +1,7 @@
-# PITCH DECK: Morris Law Kernel v3.5 + IP Protection System
+# PITCH DECK: Morris Law Kernel V4 + IP Protection System
 
 ## Slide 1: Title
-**Morris Law Kernel v3.5**  
+**Morris Law Kernel V4**  
 The First Adaptive Mastering Engine with Court-Grade IP Protection  
 GravelKing Productions | July 2026
 
@@ -19,7 +19,7 @@ One integrated system that delivers:
 - Verification reports suitable for copyright office and courts
 
 ## Slide 4: How It Works
-1. Audio → MLK v3 DSP Kernel (adaptive mastering)
+1. Audio → MLK V4 (Morris Law Kernel V4) DSP Kernel (adaptive mastering)
 2. Robust hybrid watermark embedding
 3. Cryptographic provenance record (user + brand + timestamp + hashes)
 4. Optional blockchain anchoring

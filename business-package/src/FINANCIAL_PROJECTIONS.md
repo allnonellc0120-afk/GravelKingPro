@@ -1,4 +1,4 @@
-# FINANCIAL PROJECTIONS — Morris Law Kernel v3.5 + IP Protection System
+# FINANCIAL PROJECTIONS — Morris Law Kernel V4 + IP Protection System
 
 **Date:** July 2026  
 **Assumptions:** Bootstrapped, conservative estimates. Focus on licensing, pilots, and early adoption.

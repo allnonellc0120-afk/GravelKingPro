@@ -1,20 +1,20 @@
 ---
 name: Vocal effects recording pattern
-description: How to bake vocal monitor effects into a recording take via MediaStreamAudioDestinationNode; shared preset module; improved reverb IR.
+description: Vocal Booth keeps effect monitoring separate from clean dry stem capture; shared preset module; improved reverb IR.
 ---
 
 ## Rule
-To bake monitoring effects into a recording, route `mic source → buildEffectChain(ctx, src, preset, destNode) → MediaRecorder(destNode.stream)`. Never connect the chain to `ctx.destination` in the recording context (that causes feedback); let LiveVocalMonitor own speaker output via its own AudioContext.
+The Vocal Booth must keep monitoring and capture separate: route the raw microphone stream directly to MediaRecorder for a clean dry stem, while LiveVocalMonitor owns the parallel dry/wet speaker buses in its own AudioContext.
 
-**Why:** MediaRecorder only captures what flows into the MediaStream it wraps. The raw mic stream has no effects. A `MediaStreamAudioDestinationNode` creates a capturable stream from any AudioContext chain output.
+**Why:** Clean vocal stems are needed for later mix/master processing; baking monitor reverb or echo into the take makes those effects irreversible and can contaminate downstream mixes.
 
 ## How to apply
 - Shared module: `artifacts/gravelkingpro/src/lib/daw/vocalPresets.ts`
   - `VOCAL_PRESETS` — preset definitions (id, EQ/comp params, reverb/echo params)
   - `buildEffectChain(ctx, source, preset, destination): AnalyserNode` — builds chain and returns analyser for metering
-- Recorder: `useVocalBoothRecorder.start(deviceId?, preset?)` — if `preset && preset.id !== "raw"`, creates `destNode = ctx.createMediaStreamDestination()`, calls `buildEffectChain(ctx, src, preset, destNode)`, records from `destNode.stream`
-- Monitor: `LiveVocalMonitor({ onPresetChange })` — calls `buildEffectChain(ctx, src, p, ctx.destination)` for speaker output; reports active preset to parent via `onPresetChange`
-- Parent (`VocalBoothInner`): lifts `monitorPreset` state, wires to `recorder.start(undefined, monitorPreset ?? undefined)`
+- Recorder: `useVocalBoothRecorder.start(deviceId?)` — records the original mic MediaStream and uses a separate analyser only for metering.
+- Monitor: `LiveVocalMonitor({ onPresetChange })` — splits source into `dryGain → destination` and `sendGain → buildEffectChain → wetGain → destination`.
+- Both paths use `{ latencyHint: "interactive", sampleRate: 44100 }` and browser input DSP disabled.
 
 ## Reverb IR quality
 The original white-noise IR sounded harsh (metallic high-frequency content). The improved IR:

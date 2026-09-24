@@ -23,7 +23,7 @@ A conversational AI songwriting partner (Google Gemini 2.5 Flash, running on ded
 ### 2.2 Vocal Booth
 A focused recording workspace: record vocals over the generated backing track, then clip, splice, duplicate, layer, and pan stems. It is deliberately not a DAW — four operations, zero learning curve, built for phones and iPads.
 
-### 2.3 The Foundry — Morris Law Kernel v3.5 Mastering
+### 2.3 The Foundry — Morris Law Kernel V4 Mastering
 A proprietary multi-band mastering kernel (Python DSP worker) that masters the track to streaming targets (−14 LUFS reference). No plug-ins, no presets to learn — one pass, broadcast-ready output.
 
 ### 2.4 Converter
@@ -49,7 +49,7 @@ Certificates are **free to stamp**; the official document is unlocked per-track 
 - **Web:** React + Vite PWA; Express API server; PostgreSQL (Drizzle); Stripe Payment Element (embedded, Apple Pay / Google Pay, zero redirects).
 - **Mobile:** Android via Play Billing TWA; subscriptions verified server-side (subscriptionsv2).
 - **AI:** Vertex AI Gemini (lyrics/JAX), ElevenLabs (voice + music generation), Lyria on Vertex (composition).
-- **DSP:** Morris Law Kernel v3.5 Python worker — the sole mastering path; no fallback compromises.
+- **DSP:** Morris Law Kernel V4 Python worker — the sole mastering path; no fallback compromises.
 - **Trust:** split-key HMAC certificates, server-side payment verification before any byte is processed, atomic quota accounting.
 
 ## 5. Market

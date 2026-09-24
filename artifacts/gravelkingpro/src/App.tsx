@@ -8,7 +8,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppProvider } from "@/lib/context";
 import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
+import { Navigation } from "@/components/Navigation";
+import ArtistPage from "@/pages/artist";
 import Pricing from "@/pages/pricing";
 import Report from "@/pages/report";
 import Mastering from "@/pages/mastering";
@@ -27,6 +28,8 @@ import ConvertPage from "@/pages/convert";
 import SongwritingStudio from "@/pages/songwriting";
 import ProtectedLyrics from "@/pages/protected-lyrics";
 import VocalBooth from "@/pages/vocal-booth";
+import TrackPrepPage from "@/pages/workshop";
+import MainStage from "@/pages/main-stage";
 import AdminLabel from "@/pages/admin-label";
 import AdminOps from "@/pages/admin-ops";
 import AdminOrders from "@/pages/admin-orders";
@@ -47,6 +50,11 @@ import PromotersPage from "@/pages/promoters";
 import AdminPromoters from "@/pages/admin-promoters";
 import AdminDecks from "@/pages/admin-decks";
 import AdminInvestors from "@/pages/admin-investors";
+import AdminControl from "@/pages/admin-control";
+import DuetRoom from "@/pages/duet";
+import { Layout } from "@/components/layout";
+import { Archive, AudioLines, Mic2, Sparkles, UserRound } from "lucide-react";
+import { Link } from "wouter";
 
 /**
  * Referral link capture: if the URL carries ?ref=CODE, report it to the server
@@ -177,7 +185,7 @@ function ClerkQueryClientCacheInvalidator() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={CoreLanding} />
       <Route path="/mastering" component={Mastering} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/report" component={Report} />
@@ -185,6 +193,7 @@ function Router() {
       <Route path="/contact" component={Contact} />
       <Route path="/download" component={DownloadPage} />
       <Route path="/account" component={Account} />
+      <Route path="/artist" component={ArtistPage} />
       <Route path="/admin" component={AdminAnalytics} />
       <Route path="/admin/waitlist" component={AdminWaitlist} />
       <Route path="/admin/tracks" component={AdminTracks} />
@@ -193,6 +202,7 @@ function Router() {
       <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/admin/emails" component={AdminEmails} />
       <Route path="/admin/integration-demo" component={AdminIntegrationDemo} />
+      <Route path="/admin/control" component={AdminControl} />
       <Route path="/label" component={LabelPage} />
       <Route path="/label/:artist" component={LabelArtistPage} />
       <Route path="/library" component={LibraryPage} />
@@ -201,6 +211,10 @@ function Router() {
       <Route path="/songwriting" component={SongwritingStudio} />
       <Route path="/protected-lyrics" component={ProtectedLyrics} />
       <Route path="/vocal-booth" component={VocalBooth} />
+      <Route path="/studio/track-prep" component={TrackPrepPage} />
+      <Route path="/stage/duet/:roomId" component={MainStage} />
+      <Route path="/main-stage" component={MainStage} />
+      <Route path="/duet" component={DuetRoom} />
       <Route path="/pitch" component={PitchPage} />
       <Route path="/verify" component={VerifyPage} />
       <Route path="/whitepaper" component={WhitepaperPage} />
@@ -222,6 +236,37 @@ function Router() {
       <Route path="/admin/decks" component={AdminDecks} />
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+function CoreLanding() {
+  const destinations = [
+    { href: "/mastering", label: "Studio", detail: "Build and finish", icon: AudioLines },
+    { href: "/main-stage", label: "Main Stage", detail: "Perform and monitor", icon: Mic2 },
+    { href: "/songwriting", label: "Jax", detail: "Write and revise", icon: Sparkles },
+    { href: "/library", label: "Vault", detail: "Keep your work", icon: Archive },
+    { href: "/artist", label: "Artist", detail: "Profile and pass", icon: UserRound },
+  ];
+
+  return (
+    <Layout>
+      <main className="mx-auto flex min-h-[calc(100vh-10rem)] max-w-5xl flex-col justify-center py-10">
+        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300/80">Studio control surface</p>
+        <h1 className="mt-4 max-w-2xl text-4xl font-black tracking-tight text-zinc-100 sm:text-6xl">
+          GravelKing <span className="text-amber-300">Pro</span>
+        </h1>
+        <p className="mt-4 text-sm text-zinc-500">Choose a workspace.</p>
+        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {destinations.map(({ href, label, detail, icon: Icon }) => (
+            <Link key={href} href={href} className="studio-card group rounded-2xl border border-white/10 p-5 transition-colors hover:border-amber-300/40 hover:bg-amber-300/5">
+              <Icon className="h-5 w-5 text-amber-300" />
+              <p className="mt-7 text-lg font-bold text-zinc-100">{label}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-zinc-600 group-hover:text-zinc-400">{detail}</p>
+            </Link>
+          ))}
+        </div>
+      </main>
+    </Layout>
   );
 }
 
@@ -261,7 +306,10 @@ function ClerkProviderWithRoutes() {
             <RouteSeo />
             <PageTracker />
             <RefCapture />
-            <Router />
+            <div className="phase-one-app">
+              <Router />
+              <Navigation />
+            </div>
             <Toaster />
           </AppProvider>
         </TooltipProvider>

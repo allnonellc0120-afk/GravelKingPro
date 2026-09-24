@@ -34,7 +34,7 @@ const PLAN_PRODUCT_NAMES: Record<PlanId, string> = {
 };
 
 const PRO_FEATURES = [
-  { label: "The Foundry mastering", highlight: "Morris Law Kernel v3.5 presets" },
+  { label: "The Foundry mastering", highlight: "MLK V4 (Morris Law Kernel V4) presets" },
   { label: "10 WAV exports per rolling week", highlight: "Release-ready 44.1kHz output" },
   { label: "800 credits each paid billing period", highlight: "40 generated songs, or 10 masters, or a mix" },
   { label: "Unlimited MP3 exports", highlight: "No MP3 export cap" },
@@ -46,7 +46,7 @@ const PRO_FEATURES = [
 ];
 
 const STUDIO_FEATURES = [
-  { label: "The Foundry mastering", highlight: "Morris Law Kernel v3.5 with adjustable EQ, compression, and limiting" },
+  { label: "The Foundry mastering", highlight: "MLK V4 (Morris Law Kernel V4) with adjustable EQ, compression, and limiting" },
   { label: "Vocal Booth editing", highlight: "Record, clip, splice, and layer your performances" },
   { label: "JAX songwriting companion", highlight: "Develop lyrics, document co-writers, and preserve your creative timeline" },
   { label: "Unlimited included JAX certificates", highlight: "Shareable authorship and IP records" },
@@ -693,10 +693,10 @@ export default function Pricing() {
               <CardContent className="flex-1">
                 <ul className="space-y-2.5 text-sm text-muted-foreground">
                   <FeatureRow yes>Everything in King</FeatureRow>
-                  <FeatureRow yes>Unlimited MLK V3.5 optimizer runs</FeatureRow>
+                  <FeatureRow yes>Unlimited MLK V4 optimizer runs</FeatureRow>
                   <FeatureRow yes>Up to 100 devices optimized</FeatureRow>
                   <FeatureRow yes>White-label WAV &amp; PDF exports</FeatureRow>
-                  <FeatureRow yes>Morris Law V3.5 access</FeatureRow>
+                  <FeatureRow yes>MLK V4 access</FeatureRow>
                   <FeatureRow yes>Custom benchmark reports</FeatureRow>
                   <FeatureRow yes={false}>Commercial resale or scaling</FeatureRow>
                 </ul>

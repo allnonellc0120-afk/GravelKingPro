@@ -18,7 +18,9 @@ const upload = multer({
     destination: "/tmp",
     filename: (_req, file, cb) => cb(null, `gk_conv_${randomUUID()}.${sanitizeExt(file.originalname)}`),
   }),
-  limits: { fileSize: 200 * 1024 * 1024 },
+  // The converter also accepts video containers and must honor the public
+  // 250 MB upload contract before ffmpeg extracts their first audio stream.
+  limits: { fileSize: 250 * 1024 * 1024 },
 });
 
 const convertRouter = Router();

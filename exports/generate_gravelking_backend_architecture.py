@@ -183,7 +183,7 @@ box(325, 565, 300, 155, "NODE.JS / EXPRESS API",
     "• ACR status controls stamping only",
     CYAN, "LIVE API")
 box(700, 595, 210, 125, "LOCAL PYTHON DSP", 
-    "<b>python/mlk_master.py</b><br/>Morris Law Kernel v3.5<br/>EQ • saturation • sidechain compression • loudness • limiting<br/><br/>"
+    "<b>python/mlk_master.py</b><br/>Morris Law Kernel V4<br/>EQ • saturation • sidechain compression • loudness • limiting<br/><br/>"
     "<font color='#F7B955'>Ordinary mastering does not use Cloud Run.</font>",
     AMBER, "SUBPROCESS")
 box(970, 595, 180, 125, "VERTEX AI", 
@@ -243,7 +243,7 @@ box(x[1], 545, 170, 140, "NODE INGEST",
 box(x[2], 545, 170, 140, "FORMAT PRE-PASS", 
     "ffmpeg auto-detect<br/>Normalize → WAV<br/>Duration guard<br/>Optional denoise<br/>Optional 30 s preview",
     CYAN, "LOCAL")
-box(x[3], 545, 170, 140, "MLK V3.5", 
+box(x[3], 545, 170, 140, "MLK V4 (Morris Law Kernel V4)", 
     "<b>Local Python subprocess</b><br/>python/mlk_master.py<br/>No Cloud Run fallback<br/>Failure here fails only this master request",
     AMBER, "DSP")
 box(x[4], 545, 170, 140, "RESULT", 

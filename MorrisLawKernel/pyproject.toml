@@ -1,7 +1,7 @@
 [project]
 name = "morrislawkernel"
 version = "3.5.0"
-description = "Morris Law Kernel v3.5 — production audio DSP + court-grade split-key IP protection (GravelKing Pro moat)"
+description = "Morris Law Kernel V4 — production audio DSP + court-grade split-key IP protection (GravelKing Pro moat)"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Kevin Morris / GravelKing Productions" }]

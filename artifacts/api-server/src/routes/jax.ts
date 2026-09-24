@@ -1,39 +1,32 @@
 import { Router, type Request, type Response } from "express";
-import { generateVertexText, generateVertexTextStream, isVertexConfigured } from "../geminiVertex";
-import { buildJaxSystemPrompt } from "../prompts/jaxSystem";
+import { buildJaxSystemPrompt, classifyJaxIntent } from "../prompts/jaxSystem";
+import { getAdminRuntimeConfig } from "../lib/adminRuntimeConfig";
 import { rateLimit } from "../lib/rateLimiter";
 import {
   beginTokenTracking,
+  getTokenTelemetryLedgerSummary,
   tokenTrackerMiddleware,
   type TokenTracker,
 } from "../middleware/tokenTracker";
-import { isAdminAutomationAuthenticated, requireAdmin } from "../lib/adminAuth";
-import { ReplitConnectors } from "@replit/connectors-sdk";
-import { randomUUID, createHash, timingSafeEqual } from "crypto";
-import { db, artistProfilesTable, tracksTable, purchasedTracksTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  ADMIN_AUTOMATION_EMAIL,
+  isAdminAutomationAuthenticated,
+  requireAdmin,
+} from "../lib/adminAuth";
+import { randomUUID, timingSafeEqual } from "crypto";
+import { db, artistProfilesTable, usersTable, type User } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { generateAndMasterTrack } from "../services/mlkOrchestrator";
 import {
   getObjectFileWithFallback,
-  ObjectStorageService,
-  saveObjectWithFallback,
 } from "../lib/objectStorage";
-import {
-  buildCoverArtBuffer,
-  buildGeneratedAudioKeys,
-  buildGeneratedPreviewBuffer,
-  tryGravelKingVoiceSwap,
-  saveGeneratedAudioArtifacts,
-} from "../services/mlkOrchestrator";
 import {
   buildSignedRvcModelStreamUrl,
   resolveRvcModelOrigin,
-  GRAVELKING_RVC_INDEX_KEY,
-  GRAVELKING_RVC_MODEL_KEY,
   GRAVELKING_RVC_MODEL_FILENAME,
   LEGACY_GRAVELKING_RVC_MODEL_FILENAME,
   rvcModelStreamSignature,
 } from "../services/rvcModelAccess";
-import { STUDIO_VOICE_REGISTRY, getStudioVoiceRegistry } from "../services/studioVoiceRegistry";
 import { CREDIT_COSTS, grantCredits, resolveCreditUser, spendCredits } from "../lib/credits";
 import {
   getJaxSession,
@@ -45,18 +38,27 @@ import {
 } from "../lib/firestore";
 import { authorshipScore } from "@workspace/authorship";
 import { zipSync } from "fflate";
-const objectStorage = new ObjectStorageService();
+import { generateWithMlkPython } from "../services/mlkPythonClient";
+import { generateVertexTextWithTrace, isVertexConfigured } from "../geminiVertex";
 const jaxRouter = Router();
-const connectors = new ReplitConnectors();
 const DAILY_FREE_LIMIT = 5;
-const DAILY_TTS_LIMIT = 30;
 const usage = new Map<string, { day: string; count: number }>();
-const ttsUsage = new Map<string, { day: string; count: number }>();
 const ARTIST_PROFILE_FIELDS = [
   "bio", "genre", "subGenres", "tempo", "stylisticRules", "lifeEvents",
   "emotionalHistory", "storytellingThemes", "lyricalCadence", "vocalStyle",
   "vocabularyHabits",
 ] as const;
+
+async function resolveJaxUser(req: Request, adminBypass: boolean): Promise<User | null> {
+  if (req.dbUser) return req.dbUser;
+  if (!adminBypass) return null;
+  const [adminUser] = await db
+    .select()
+    .from(usersTable)
+    .where(sql`lower(${usersTable.email}) = lower(${ADMIN_AUTOMATION_EMAIL})`)
+    .limit(1);
+  return adminUser ?? null;
+}
 
 function writeSse(res: Response, event: string, payload: unknown) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
@@ -88,8 +90,8 @@ jaxRouter.get(
     }
     const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
     const [weightsFile, indexFile] = await Promise.all([
-      getObjectFileWithFallback(bucketId, GRAVELKING_RVC_MODEL_KEY),
-      getObjectFileWithFallback(bucketId, GRAVELKING_RVC_INDEX_KEY),
+      getObjectFileWithFallback(bucketId, getAdminRuntimeConfig().rvc.modelKey),
+      getObjectFileWithFallback(bucketId, getAdminRuntimeConfig().rvc.indexKey),
     ]);
     if (!weightsFile || !indexFile) {
       res.status(404).json({ error: "RVC model package is incomplete" });
@@ -126,53 +128,46 @@ function profileResponse(profile: typeof artistProfilesTable.$inferSelect | null
     vocabularyHabits: "",
   };
 }
-const elevenLabs = new ReplitConnectors();
-const GEORGE_PREMADE_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
-
 export function configuredAdminVoiceLabel() {
-  return JAX_VOICE_PRESETS.admin.voiceId() === GEORGE_PREMADE_VOICE_ID
-    ? "George (Premade)"
-    : "Admin Configured Voice";
+  return "JAX GravelKing Outlaw Baritone (MLK/RVC)";
 }
 
 export function getConfiguredAdminVoiceDiagnostic() {
-  const configuredVoiceId = JAX_VOICE_PRESETS.admin.voiceId();
-  const isGeorgePremade = configuredVoiceId === GEORGE_PREMADE_VOICE_ID;
   return {
-    configuredVoiceId,
-    resolvedLabel: isGeorgePremade ? "George (Premade)" : "Admin Configured Voice",
-    isGeorgePremade,
+    configuredVoiceId: "gravelking_outlaw_baritone",
+    resolvedLabel: configuredAdminVoiceLabel(),
+    pipeline: "MLK/RVC native inference",
+    engine: "Morris Law Kernel V2",
   };
 }
 
 export const JAX_VOICE_PRESETS = {
-  admin: { label: configuredAdminVoiceLabel, voiceId: () => process.env.JAX_VOICE_ID?.trim() ?? "" },
   gravelking_outlaw_baritone: {
-    presetId: STUDIO_VOICE_REGISTRY.gravelking_outlaw_baritone.presetId,
-    label: STUDIO_VOICE_REGISTRY.gravelking_outlaw_baritone.label,
-    voiceId: () => "pNInz6obpgDQGcFmaJgB",
+    presetId: "gravelking_outlaw_baritone",
+    label: configuredAdminVoiceLabel(),
+    voiceId: () => "gravelking_outlaw_baritone",
+    pipeline: "MLK/RVC native inference",
   },
-  female_soul_lead: {
-    presetId: STUDIO_VOICE_REGISTRY.female_soul_lead.presetId,
-    label: STUDIO_VOICE_REGISTRY.female_soul_lead.label,
-    voiceId: STUDIO_VOICE_REGISTRY.female_soul_lead.voiceId,
-  },
-  callum: { label: "JAX Gritty Blues / Rough", voiceId: () => "N2lVS1w4EtoT3dr4eOWO" },
-  antoni: { label: "JAX Smooth / Younger Conversational", voiceId: () => "ErXwobaYiN019PkySvjV" },
-  josh: { label: "JAX Heavy Low-End / Narrator", voiceId: () => "TxGEqnHWrfWFTfGW9XjX" },
-  bill: { label: "JAX Classic Vintage", voiceId: () => "pqHfZKP75CvOlQylNhV4" },
 } as const;
 
 export function getJaxVoiceMetadata() {
   return Object.entries(JAX_VOICE_PRESETS).map(([key, preset]) => ({
     key,
-    voiceId: key === "admin" ? "admin" : preset.voiceId(),
-    label: key === "admin" ? JAX_VOICE_PRESETS.admin.label() : String(preset.label),
-  })).filter((preset) => preset.key !== "admin" || Boolean(JAX_VOICE_PRESETS.admin.voiceId()));
+    voiceId: preset.voiceId(),
+    label: String(preset.label),
+    pipeline: preset.pipeline,
+    engine: "Morris Law Kernel V2",
+  }));
 }
 
 jaxRouter.get("/jax/voice-registry", (_req: Request, res: Response) => {
-  res.json({ voices: getStudioVoiceRegistry() });
+  res.json({
+    engine: "Morris Law Kernel V2",
+    pipeline: "MLK/RVC native inference",
+    defaultVoice: "gravelking_outlaw_baritone",
+    voiceAsset: "gravelking_outlaw_baritone.zip",
+    voices: getJaxVoiceMetadata(),
+  });
 });
 
 jaxRouter.get("/jax/voices", (_req: Request, res: Response) => {
@@ -227,6 +222,38 @@ jaxRouter.delete("/jax/artist-profile", async (req: Request, res: Response) => {
 jaxRouter.get("/admin/jax/voice-config", async (req: Request, res: Response) => {
   if (!await requireAdmin(req, res)) return;
   res.json(getConfiguredAdminVoiceDiagnostic());
+});
+
+/** Development-only Vertex allowlist proxy smoke call; never exposed in production. */
+jaxRouter.post("/admin/jax/vertex-proxy-smoke", async (req: Request, res: Response) => {
+  if (process.env.NODE_ENV !== "development") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!await requireAdmin(req, res)) return;
+  if (!isVertexConfigured()) {
+    res.status(503).json({ error: "Vertex is not configured" });
+    return;
+  }
+  const prompt = typeof req.body?.prompt === "string" && req.body.prompt.trim()
+    ? req.body.prompt.trim().slice(0, 2_000)
+    : "Return exactly: GK_PROXY_SMOKE_OK";
+  try {
+    const result = await generateVertexTextWithTrace(prompt, {
+      maxOutputTokens: 16,
+      temperature: 0,
+      thinkingConfig: { thinkingBudget: 0 },
+    });
+    if (!result.traceId) {
+      res.status(502).json({ error: "Vertex response did not include an interception trace ID" });
+      return;
+    }
+    res.json({ ok: true, text: result.text, traceId: result.traceId });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    req.log.error({ err: error, detail }, "Vertex allowlist proxy smoke failed");
+    res.status(502).json({ error: "Vertex allowlist proxy smoke failed" });
+  }
 });
 
 function dayKey() {
@@ -344,13 +371,42 @@ jaxRouter.delete("/jax/sessions/:sessionId", async (req: Request, res: Response)
   res.json({ ok: true });
 });
 
+jaxRouter.get("/jax/telemetry/ledger", async (req: Request, res: Response) => {
+  const adminBypass = isAdminAutomationAuthenticated(req);
+  const authenticatedClientId = req.dbUser?.id;
+  const requestedClientId =
+    typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
+
+  if (!adminBypass && !authenticatedClientId) {
+    res.status(401).json({ error: "Sign in to view token telemetry." });
+    return;
+  }
+  if (
+    requestedClientId &&
+    !adminBypass &&
+    requestedClientId !== authenticatedClientId
+  ) {
+    res.status(403).json({ error: "You may only view your own token telemetry." });
+    return;
+  }
+
+  try {
+    const clientId = requestedClientId || authenticatedClientId;
+    const summary = await getTokenTelemetryLedgerSummary(clientId);
+    res.json(summary);
+  } catch (error) {
+    req.log.error({ error }, "Token telemetry ledger read failed");
+    res.status(500).json({ error: "Token telemetry ledger is unavailable." });
+  }
+});
+
 jaxRouter.post(
   ["/jax/generate", "/chat/jax"],
   rateLimit({ windowMs: 60_000, max: 12 }),
   tokenTrackerMiddleware,
   async (req: Request, res: Response) => {
   const adminBypass = isAdminAutomationAuthenticated(req);
-  const user = req.dbUser;
+  const user = await resolveJaxUser(req, adminBypass);
   if (!user && !adminBypass) {
     res.status(401).json({ error: "Sign in to chat with JAX." });
     return;
@@ -396,15 +452,8 @@ jaxRouter.post(
       })
     : "{}";
   const artistProfile = rawArtistProfile.slice(0, 24_000);
-  const system = buildJaxSystemPrompt({ isExplicit, artistProfile });
-  const safetySettings = isExplicit
-    ? [
-        { category: "HARM_CATEGORY_HARASSMENT" as const, threshold: "BLOCK_NONE" as const },
-        { category: "HARM_CATEGORY_HATE_SPEECH" as const, threshold: "BLOCK_NONE" as const },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT" as const, threshold: "BLOCK_NONE" as const },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT" as const, threshold: "BLOCK_NONE" as const },
-      ]
-    : undefined;
+  const intent = classifyJaxIntent(prompt);
+  const system = buildJaxSystemPrompt({ isExplicit, artistProfile, intent });
   const rawHistory = Array.isArray(req.body?.history)
     ? req.body.history
         .filter((m: any) => m && typeof m.content === "string" && (m.role === "user" || m.role === "jax"))
@@ -420,22 +469,44 @@ jaxRouter.post(
     : "";
   const fullPrompt = `${system}${history ? `\n\nConversation so far:\n${history}\n` : ""}\nArtist: ${prompt}\nJAX:`;
   const operation = /\bremix\b/i.test(prompt) ? "jax_remix" : "jax_generate";
+  const requestedClientId =
+    typeof req.body?.clientId === "string"
+      ? req.body.clientId
+      : typeof req.body?.client_id === "string"
+        ? req.body.client_id
+        : "";
+  const clientId =
+    requestedClientId.trim()
+      ? requestedClientId.trim().slice(0, 200)
+      : user?.id ?? (adminBypass ? "admin" : undefined);
+  const modelRatePerMillionUsd =
+    typeof req.body?.modelRatePerMillionUsd === "number" &&
+    Number.isFinite(req.body.modelRatePerMillionUsd) &&
+    req.body.modelRatePerMillionUsd >= 0
+      ? req.body.modelRatePerMillionUsd
+      : undefined;
   const tokenTracker: TokenTracker = beginTokenTracking({
     operation,
     rawBaselineText: `${system}\n\nConversation so far:\n${rawHistory}\nArtist: ${prompt}\nJAX:`,
     actualPromptText: fullPrompt,
     maxOutputTokens: 2048,
+    clientId,
+    modelRatePerMillionUsd,
   });
   const wantsStream = req.body?.stream === true || req.headers.accept?.includes("text/event-stream") === true;
   try {
     let text = "";
-    const lyricRequest = /\b(lyrics?|verse|chorus|bridge|pre-chorus|write a song|songwriting|rewrite|revise)\b/i.test(prompt);
-    const needsGrounding = /\b(current|today|news|fact|facts|reference|referenced)\b/i.test(prompt);
     const remaining = unlimited ? null : DAILY_FREE_LIMIT - count - 1;
+    const startedAt = Date.now();
+    if (process.env.NODE_ENV === "test" && process.env.JAX_TEST_RESPONSE) {
+      text = process.env.JAX_TEST_RESPONSE.trim();
+    } else {
+      const mlk = await generateWithMlkPython(fullPrompt);
+      text = (mlk.generated_lyrics ?? mlk.output ?? "").trim();
+    }
+    if (!text) throw new Error("Morris Law Kernel returned no generated text");
+
     if (wantsStream) {
-      const startedAt = Date.now();
-      let firstTokenAt: number | null = null;
-      let streamedText = "";
       res.status(200);
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -443,95 +514,22 @@ jaxRouter.post(
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders();
       writeSse(res, "ready", { remaining });
-
-      const emitText = (delta: string) => {
-        if (!firstTokenAt) firstTokenAt = Date.now();
-        streamedText += delta;
-        writeSse(res, "token", { text: delta });
-      };
-
-      if (isVertexConfigured()) {
-        try {
-          text = await generateVertexTextStream(fullPrompt, {
-            maxOutputTokens: 2048,
-            responseMimeType: "text/plain",
-            thinkingConfig: { thinkingBudget: 0 },
-            ...(needsGrounding ? { tools: [{ googleSearch: {} }] } : {}),
-            ...(safetySettings ? { safetySettings } : {}),
-          }, emitText);
-        } catch (vertexError) {
-          if (streamedText) throw vertexError;
-          req.log.warn({ err: vertexError }, "JAX grounded Vertex stream failed; retrying without search");
-        }
-        if (!text.trim()) {
-          text = await generateVertexTextStream(fullPrompt, {
-            maxOutputTokens: 2048,
-            responseMimeType: "text/plain",
-            ...(safetySettings ? { safetySettings } : {}),
-          }, emitText);
-        }
-      }
-      if (!text.trim()) throw new Error("No text provider returned a response");
-
+      writeSse(res, "token", { text });
       const durationMs = Date.now() - startedAt;
-      const ttftMs = firstTokenAt ? firstTokenAt - startedAt : null;
-      const ttftDeltaMs = ttftMs === null ? null : ttftMs - 45_000;
-      const tokenTelemetry = tokenTracker.finish(text, { provider: "vertex_stream" });
-      writeSse(res, "done", { remaining, durationMs, ttftMs, ttftDeltaMs, tokenTelemetry });
-      req.log.info({ durationMs, ttftMs, ttftDeltaMs, historyMessages: 2 }, "JAX SSE generation completed");
+      const tokenTelemetry = tokenTracker.finish(text, { provider: "mlk_python_stream" });
+      writeSse(res, "done", { remaining, durationMs, ttftMs: durationMs, ttftDeltaMs: durationMs - 45_000, tokenTelemetry });
+      req.log.info({ durationMs, historyMessages: 2, engine: "mlk_python", intent }, "JAX MLK SSE generation completed");
       res.end();
       return;
     }
-
-    if (isVertexConfigured()) {
-      try {
-        text = await generateVertexText(fullPrompt, {
-          maxOutputTokens: 2048,
-          responseMimeType: "text/plain",
-          tools: [{ googleSearch: {} }],
-          ...(safetySettings ? { safetySettings } : {}),
-        });
-      } catch (vertexError) {
-        req.log.warn({ err: vertexError }, "JAX grounded Vertex call failed; retrying without search");
-      }
-      if (!text.trim()) {
-        try {
-          // A grounded request can occasionally fail independently of the text
-          // model. Retrying the same live prompt keeps JAX useful without ever
-          // substituting a canned answer.
-          text = await generateVertexText(fullPrompt, {
-            maxOutputTokens: 2048,
-            responseMimeType: "text/plain",
-              ...(safetySettings ? { safetySettings } : {}),
-          });
-        } catch (retryError) {
-          req.log.warn({ err: retryError }, "JAX fallback Vertex call failed");
-        }
-      }
-      if (lyricRequest && text.trim() && !/```lyrics\b[\s\S]*```/i.test(text)) {
-        try {
-          // Keep this as a second live model call rather than inventing or
-          // wrapping text on the server. This preserves authorship boundaries
-          // and gives the client the format it needs for the lyric canvas.
-          text = await generateVertexText(
-            `${fullPrompt}\n\nFORMAT CORRECTION: Your response must contain the complete requested lyrics now. Return exactly one Markdown block beginning with \`\`\`lyrics and ending with \`\`\`, with no introduction or questions outside that block.`,
-            {
-              maxOutputTokens: 2048,
-              responseMimeType: "text/plain",
-              ...(safetySettings ? { safetySettings } : {}),
-            },
-          );
-        } catch (repairError) {
-          req.log.warn({ err: repairError }, "JAX lyric format repair failed");
-        }
-      }
-    }
-    if (!text.trim()) throw new Error("No text provider returned a response");
-    const tokenTelemetry = tokenTracker.finish(text, { provider: "vertex" });
-    res.json({ text: text.trim(), remaining, tokenTelemetry });
+    const tokenTelemetry = tokenTracker.finish(text, { provider: "mlk_python" });
+    res.json({ text: text.trim(), remaining, tokenTelemetry, intent });
   } catch (error) {
-    tokenTracker.finish("", { provider: "vertex", status: "failed" });
-    req.log.error({ error }, "JAX generation failed");
+    tokenTracker.finish("", { provider: "mlk_python", status: "failed" });
+    req.log.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      "JAX generation failed",
+    );
     if (wantsStream && res.headersSent) {
       writeSse(res, "error", { error: "JAX could not reach the writing service right now. Your prompt and draft are still safe; please try again shortly." });
       res.end();
@@ -543,11 +541,11 @@ jaxRouter.post(
 );
 
 /**
- * POST /api/jax/generate-music — ElevenLabs music generator, a second engine
- * alongside the Vertex/Lyria path in /api/mlk/v35/generate-master.
- * Gated to Pro/King (monthly/node_auditor) tiers with admin bypass.
- * Client smart-fills missing lyrics/style via /api/jax/generate first; this
- * route composes the final prompt and streams back an MP3 take.
+ * POST /api/jax/generate-music — JAX's MLK primary audio path.
+ *
+ * This delegates to the same Vertex Lyria → GravelKing RVC → MLK vault
+ * orchestrator used by the primary generation routes. There is deliberately
+ * no provider fallback here.
  */
 const musicUsage = new Map<string, { day: string; count: number }>();
 const DAILY_MUSIC_LIMIT = 10;
@@ -558,9 +556,9 @@ jaxRouter.post("/jax/generate-music", rateLimit({
   message: "Too many music generations. Please wait a few minutes and try again.",
 }), async (req: Request, res: Response) => {
   const adminBypass = isAdminAutomationAuthenticated(req);
-  const user = req.dbUser;
+  const user = await resolveJaxUser(req, adminBypass);
   if (!user && !adminBypass) {
-    res.status(401).json({ error: "Sign in to generate music with ElevenLabs." });
+    res.status(401).json({ error: "Sign in to generate music with the MLK engine." });
     return;
   }
 
@@ -569,7 +567,7 @@ jaxRouter.post("/jax/generate-music", rateLimit({
   const priorMusic = musicUsage.get(musicKey);
   const musicCount = priorMusic?.day === today ? priorMusic.count : 0;
   if (!adminBypass && user?.isDeveloper !== true && musicCount >= DAILY_MUSIC_LIMIT) {
-    res.status(429).json({ error: "Your daily ElevenLabs generations are used. Try again tomorrow." });
+    res.status(429).json({ error: "Your daily MLK generations are used. Try again tomorrow." });
     return;
   }
 
@@ -580,11 +578,16 @@ jaxRouter.post("/jax/generate-music", rateLimit({
   const style = typeof req.body?.style === "string" ? req.body.style.trim() : "";
   const title = typeof req.body?.title === "string" ? req.body.title.trim().slice(0, 200) : "";
   if (!lyrics && !style) {
-    res.status(400).json({ error: "Provide lyrics or a style so ElevenLabs knows what to write." });
+    res.status(400).json({ error: "Provide lyrics or a style so the MLK engine knows what to create." });
     return;
   }
 
   const creditUser = adminBypass ? null : await resolveCreditUser(req);
+  const ownerUserId = user?.id ?? creditUser?.id;
+  if (!ownerUserId) {
+    res.status(403).json({ error: "A bound account is required for MLK vault generation." });
+    return;
+  }
   const creditReference = `song:${randomUUID()}`;
   let creditsSpent = false;
   if (!adminBypass && !creditUser?.isDeveloper) {
@@ -604,148 +607,48 @@ jaxRouter.post("/jax/generate-music", rateLimit({
   }
   musicUsage.set(musicKey, { day: today, count: musicCount + 1 });
   try {
-    const promptParts: string[] = [];
-    if (style) promptParts.push(`Musical style: ${style}.`);
-    if (title) promptParts.push(`Song title: ${title}.`);
-    if (lyrics) promptParts.push(`Sing these original lyrics:\n${lyrics.slice(0, 4000)}`);
-    const response = await elevenLabs.proxy("elevenlabs", "/v1/music", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
-      body: JSON.stringify({
-        prompt: promptParts.join("\n\n").slice(0, 6000),
-        music_length_ms: 120_000,
-        model_id: "music_v1",
-      }),
+    const result = await generateAndMasterTrack(null, lyrics, ownerUserId, {
+      title: title || undefined,
+      artistName: "JAX",
+      stylePrompt: style || undefined,
+      vocalMode: lyrics ? "lyrics" : "random",
+      targetDurationS: 120,
+      modelWeightsUrl: buildSignedRvcModelStreamUrl(
+        resolveRvcModelOrigin(`${req.protocol}://${req.get("host")}`),
+        3600,
+      ),
+      lyricAudit: lyrics && lyricAudit?.finalLyricsHash && Array.isArray(lyricAudit.ledger)
+        ? {
+            finalLyricsHash: lyricAudit.finalLyricsHash,
+            authorshipScore: Math.max(0, Math.min(100, Number(lyricAudit.authorshipScore) || 0)),
+            ledger: lyricAudit.ledger.slice(0, 500),
+          }
+        : undefined,
     });
-    if (!response.ok) {
-      if (creditsSpent && creditUser) {
-        await grantCredits(creditUser.id, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
-      }
-      req.log.warn({ status: response.status }, "ElevenLabs music generation rejected request");
-      res.status(502).json({ error: "JAX could not finish this take. Adjust the lyrics or style and try again." });
-      return;
-    }
-
-    const mp3 = Buffer.from(await response.arrayBuffer());
-    const trackTitle = title || "JAX Take";
-
-    // Save the take to the user's vault so it behaves like every other
-    // library track — playable in-app, and openable in the Mastering tool
-    // via ?gkTrack=<id> (the MLK pipeline does the same).
-    const trackId = randomUUID();
-    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "";
-    // Convention (see mlkOrchestrator): audioFullKey names the WAV slot; the
-    // full MP3 sits beside it with the same basename. The stream/download
-    // routes derive the .mp3 key from audioFullKey, so no schema change.
-    const { audioFullKey, audioFullMp3Key, audioPreviewKey } = buildGeneratedAudioKeys(trackId);
-    const coverArtKey = `tracks/${trackId}/cover_art.png`;
-    const modelWeightsUrl = buildSignedRvcModelStreamUrl(
-      resolveRvcModelOrigin(`${req.protocol}://${req.get("host")}`),
-      3600,
-    );
-    const voiceSwap = await tryGravelKingVoiceSwap(mp3, modelWeightsUrl);
-    const finalAudio = voiceSwap.audio;
-    req.log.info(
-      { trackId, predictionId: voiceSwap.predictionId, mixed: voiceSwap.mixed },
-      "[Jax Voice Swap: REQUIRED SUCCESS]",
-    );
-    await saveGeneratedAudioArtifacts(
-      {
-        bucketId,
-        keys: { audioFullKey, audioFullMp3Key, audioPreviewKey },
-        fullWav: finalAudio,
-        fullMp3: mp3,
-        previewMp3: buildGeneratedPreviewBuffer(finalAudio, "audio/wav"),
-        coverArt: buildCoverArtBuffer(trackId),
-      },
-      {
-        savePrivate: (id, key, body, contentType) => saveObjectWithFallback(id, key, body, { contentType }),
-        savePublic: (key, body, contentType) => objectStorage.savePublicObject(key, body, contentType),
-      },
-    );
-    await db.transaction(async (tx) => {
-      await tx.insert(tracksTable).values({
-        id: trackId,
-        title: trackTitle,
-        artistName: "JAX",
-        audioFullKey,
-        audioPreviewKey,
-        coverArtKey,
-        // PRIVATE: generated takes land ONLY in the creator's library.
-        status: "private",
-        price: 0,
-        submittedByUserId: user?.id ?? null,
-        lyricsText: lyrics || null,
-        finalLyricsHash: lyrics ? createHash("sha256").update(lyrics.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim(), "utf8").digest("hex") : null,
-        lyricsAuthorshipScore: Math.max(0, Math.min(100, Number(lyricAudit?.authorshipScore) || 0)),
-        lyricsAuthorshipLedger: Array.isArray(lyricAudit?.ledger) ? lyricAudit.ledger.slice(0, 500) : null,
-        finalLyricsLabel: lyrics ? "Certified Final Rendered Lyrics" : null,
-      });
-      if (user?.id) {
-        await tx.insert(purchasedTracksTable).values({
-          userId: user.id,
-          trackId,
-          stripeCheckoutSessionId: `jax-music-${trackId}`,
-        });
-      }
-    });
-    res.json({ success: true, trackId, title: trackTitle });
+    res.json({ success: true, trackId: result.trackId, title: result.title, engine: "mlk-primary" });
   } catch (error) {
     if (creditsSpent && creditUser) {
       await grantCredits(creditUser.id, CREDIT_COSTS.song, "failed_song_refund", `refund:${creditReference}`);
     }
-    req.log.error({ error }, "ElevenLabs music generation failed");
-    res.status(502).json({ error: "JAX music generation is temporarily unavailable." });
+    req.log.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      "MLK primary JAX music generation failed",
+    );
+    res.status(502).json({ error: "JAX MLK music generation is temporarily unavailable." });
   }
 });
 
-jaxRouter.post("/jax/tts", rateLimit({
-  windowMs: 60_000,
-  max: 6,
-  message: "Too many voice playback requests. Please wait a moment and try again.",
-}), async (req: Request, res: Response) => {
-  const adminBypass = isAdminAutomationAuthenticated(req);
-  if (!req.dbUser && !adminBypass) {
-    res.status(401).json({ error: "Sign in to use JAX voice playback." });
-    return;
-  }
-  const ttsKey = adminBypass ? `admin:${req.ip}` : `user:${req.dbUser?.id}`;
-  const today = dayKey();
-  const priorTts = ttsUsage.get(ttsKey);
-  const ttsCount = priorTts?.day === today ? priorTts.count : 0;
-  if (ttsCount >= DAILY_TTS_LIMIT) {
-    res.status(429).json({ error: "Your daily JAX voice playback limit is used. Try again tomorrow." });
-    return;
-  }
-  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
-  const requestedVoiceId = typeof req.body?.voiceId === "string" ? req.body.voiceId.trim() : "";
-  const voiceId = requestedVoiceId === "admin" ? JAX_VOICE_PRESETS.admin.voiceId() : requestedVoiceId;
-  const allowedVoiceIds = Object.values(JAX_VOICE_PRESETS).map((preset) => preset.voiceId()).filter(Boolean);
-  if (!text || text.length > 10_000) {
-    res.status(400).json({ error: "Text must be between 1 and 10,000 characters." });
-    return;
-  }
-  if (!voiceId || !allowedVoiceIds.includes(voiceId)) {
-    res.status(400).json({ error: "Select a supported JAX voice preset." });
-    return;
-  }
-  ttsUsage.set(ttsKey, { day: today, count: ttsCount + 1 });
-  try {
-    const response = await connectors.proxy("elevenlabs", `/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
-      body: JSON.stringify({ text, model_id: "eleven_multilingual_v2", output_format: "mp3_44100_128" }),
-    });
-    if (!response.ok) {
-      req.log.warn({ status: response.status, voiceId }, "JAX TTS provider rejected request");
-      res.status(502).json({ error: "JAX voice provider rejected this playback request." });
-      return;
-    }
-    res.type("audio/mpeg").send(Buffer.from(await response.arrayBuffer()));
-  } catch (error) {
-    req.log.error({ error }, "JAX TTS request failed");
-    res.status(502).json({ error: "JAX voice playback is temporarily unavailable." });
-  }
+/**
+ * Text playback is intentionally not synthesized by the API server. The
+ * GravelKing voice identity is produced by the MLK/RVC music pipeline, which
+ * requires generated source audio; this endpoint remains explicit rather than
+ * silently routing text through another provider.
+ */
+jaxRouter.post("/jax/tts", (_req: Request, res: Response) => {
+  res.status(410).json({
+    error: "JAX text playback is unavailable. Generate a track through the MLK engine.",
+    code: "MLK_TRACK_AUDIO_REQUIRED",
+  });
 });
 
 export default jaxRouter;

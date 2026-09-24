@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   VOCAL_PRESETS,
-  buildEffectChain,
   type VocalPresetId,
   type VocalPreset,
 } from "@/lib/daw/vocalPresets";
+import { buildGkaMonitorGraph, createGkaMonitorContext } from "@/lib/audio/gkaMonitor";
 
 interface Props {
   /**
@@ -32,20 +32,27 @@ export function LiveVocalMonitor({ onPresetChange, stopSignal }: Props) {
   const [preset, setPreset] = useState<VocalPresetId>("raw");
   const [error, setError] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
+  const [latencyReport, setLatencyReport] = useState<string | null>(null);
 
   const ctxRef    = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef    = useRef<number>(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const graphNodesRef = useRef<AudioNode[]>([]);
 
   const stopMonitor = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
+    for (const node of graphNodesRef.current) {
+      try { node.disconnect(); } catch { /* already disconnected */ }
+    }
+    graphNodesRef.current = [];
     streamRef.current?.getTracks().forEach(t => t.stop());
     ctxRef.current?.close();
     streamRef.current = null;
     ctxRef.current    = null;
     analyserRef.current = null;
+    setLatencyReport(null);
     setActive(false);
     setLevel(0);
     onPresetChange?.(null);
@@ -56,15 +63,32 @@ export function LiveVocalMonitor({ onPresetChange, stopSignal }: Props) {
     setError(null);
     const p = VOCAL_PRESETS.find(v => v.id === presetId)!;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      });
+      const audioConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        latency: 0,
+      } as MediaTrackConstraints;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       streamRef.current = stream;
-      const ctx = new AudioContext();
+      const ctx = createGkaMonitorContext();
       ctxRef.current = ctx;
-      const source = ctx.createMediaStreamSource(stream);
-      // Route through shared effect chain to speakers (ctx.destination).
-      const analyser = buildEffectChain(ctx, source, p, ctx.destination);
+      if (ctx.state === "suspended") await ctx.resume();
+      const tuningByPreset: Record<VocalPresetId, { saturation: number; subharmonic: number }> = {
+        raw: { saturation: 0.04, subharmonic: 0.025 },
+        warm: { saturation: 0.42, subharmonic: 0.11 },
+        broadcast: { saturation: 0.32, subharmonic: 0.075 },
+        space: { saturation: 0.28, subharmonic: 0.065 },
+        echo: { saturation: 0.3, subharmonic: 0.07 },
+        studio: { saturation: 0.36, subharmonic: 0.09 },
+      };
+      const graph = await buildGkaMonitorGraph(ctx, stream, tuningByPreset[presetId], (message) => setError(message));
+      const analyser = graph.analyser;
+      graphNodesRef.current = graph.nodes;
+      const latency = graph.softwareLatency;
+      setLatencyReport(
+        `Browser software latency: base ${latency.baseLatencyMs?.toFixed(1) ?? "n/a"} ms · output ${latency.outputLatencyMs?.toFixed(1) ?? "n/a"} ms · quantum ${latency.quantumMs.toFixed(2)} ms · ${latency.estimatedSoftwareRoundTripMs == null ? "round-trip estimate unavailable" : `software round-trip estimate ${latency.estimatedSoftwareRoundTripMs.toFixed(1)} ms (${latency.under10Ms ? "under" : "over"} 10 ms)`}; hardware round-trip is not measured`,
+      );
       analyserRef.current = analyser;
       setActive(true);
       onPresetChange?.(p);
@@ -97,6 +121,7 @@ export function LiveVocalMonitor({ onPresetChange, stopSignal }: Props) {
     } catch (e: unknown) {
       const name = (e as { name?: string })?.name;
       const msg  = (e as { message?: string })?.message ?? "Unknown error";
+      stopMonitor();
       setError(name === "NotAllowedError" ? "Microphone access denied — allow it in your browser settings." : msg);
       onPresetChange?.(null);
     }
@@ -130,10 +155,18 @@ export function LiveVocalMonitor({ onPresetChange, stopSignal }: Props) {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="space-y-2"
+            className="audio-reactive space-y-2 rounded-2xl p-2"
+            data-audio-active="true"
+            style={{
+              "--audio-level": level,
+              "--audio-ring": `${Math.round(level * 7)}px`,
+              "--audio-ring-wide": `${Math.round(level * 12)}px`,
+              "--audio-opacity": `${0.14 + level * 0.34}`,
+              "--audio-secondary-opacity": `${0.08 + level * 0.18}`,
+            } as React.CSSProperties}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+              <span className="performer-badge flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold text-emerald-300 uppercase tracking-widest">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Live · {p.label}
               </span>
@@ -142,6 +175,7 @@ export function LiveVocalMonitor({ onPresetChange, stopSignal }: Props) {
                 Baked into recording
               </span>
             </div>
+            {latencyReport && <p className="text-[9px] text-muted-foreground">{latencyReport}</p>}
             <canvas
               ref={canvasRef}
               width={320}

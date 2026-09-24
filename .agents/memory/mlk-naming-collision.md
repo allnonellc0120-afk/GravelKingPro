@@ -1,12 +1,12 @@
 ---
-name: Two distinct "MLK v3.5" products
+name: Two distinct "MLK V4 (Morris Law Kernel V4)" products
 description: Naming collision between the audio Morris Law Kernel and the matrix-multiplication licensing site
 ---
 
-The repo contains TWO unrelated products both branded "MLK v3.5":
+The repo contains TWO unrelated products both branded "MLK V4 (Morris Law Kernel V4)":
 
-1. **Morris Law Kernel v3.5 (audio)** — adaptive mastering + watermarking + cryptographic IP provenance. Lives in MorrisLawKernel/ (showcase repo), powers GravelKing Pro, and is the subject of the business-package/ docs and artifacts/mlk-pitch-deck.
-2. **MLK V3.5 Licensing Platform** (artifacts/mlk-licensing) — a *matrix multiplication* kernel site (FP64/AVX-512/HFT copy, light theme).
+1. **Morris Law Kernel V4 (audio)** — adaptive mastering + watermarking + cryptographic IP provenance. Lives in MorrisLawKernel/ (showcase repo), powers GravelKing Pro, and is the subject of the business-package/ docs and artifacts/mlk-pitch-deck.
+2. **MLK V4 (Morris Law Kernel V4) Licensing Platform** (artifacts/mlk-licensing) — a *matrix multiplication* kernel site (FP64/AVX-512/HFT copy, light theme).
 
 **Why:** A screenshot of mlk-licensing nearly ended up in the audio pitch deck — wrong product, would have been dishonest.
 **How to apply:** Never mix assets, screenshots, or copy between the two. When the user says "MLK", determine which product from context (audio/mastering vs matrix/HPC).

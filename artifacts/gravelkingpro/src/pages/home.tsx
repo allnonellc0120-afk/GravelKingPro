@@ -89,7 +89,7 @@ export default function Home() {
           <ToolCard
             icon={<Wand2 className="h-5 w-5 text-amber-300" />}
             name="The Foundry"
-            description="Morris Law Kernel V3.5 Audio Mastering Engine for broadcast-ready, high-resolution masters."
+            description="MLK V4 (Morris Law Kernel V4) audio mastering engine for broadcast-ready, high-resolution masters."
             detail="Presets, adaptive processing, WAV and MP3 delivery"
             href="/mastering"
             accent="amber"
@@ -126,7 +126,7 @@ export default function Home() {
 
         <section className="mt-10 grid gap-4 border-t border-white/10 pt-7 text-sm text-muted-foreground sm:grid-cols-3">
           <div className="flex items-center gap-3"><ShieldCheck className="h-4 w-4 text-emerald-400" /> Authorship-aware workflows</div>
-          <div className="flex items-center gap-3"><Wand2 className="h-4 w-4 text-amber-400" /> Morris Kernel V3.5 processing</div>
+          <div className="flex items-center gap-3"><Wand2 className="h-4 w-4 text-amber-400" /> MLK V4 processing</div>
           <div className="flex items-center gap-3"><ArrowRight className="h-4 w-4 text-sky-400" /> Built for phone and tablet</div>
         </section>
       </main>

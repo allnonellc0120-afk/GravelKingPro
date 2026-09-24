@@ -1,0 +1,104 @@
+{
+  "task_envelope": {
+    "run_mode": "hardware_executed_subprocesses_only",
+    "zero_stub_policy": {
+      "require_os_kernel_pid": true,
+      "require_ffprobe_json_dump": true,
+      "require_actual_disk_path_stat": true,
+      "disallow_memory_inlined_payloads": true,
+      "disallow_hardcoded_dummy_returns": true
+    }
+  },
+  "execution_harness": {
+    "tripwire_1_binary_footprint": {
+      "target_file_path": "./storage/renders/master_320_output.mp3",
+      "stat_verification_command": "stat ./storage/renders/master_320_output.mp3",
+      "sha256_binary_checksum_command": "sha256sum ./storage/renders/master_320_output.mp3",
+      "minimum_byte_threshold": 1000000,
+      "ffprobe_command": "ffprobe -v quiet -print_format json -show_format -show_streams ./storage/renders/master_320_output.mp3",
+      "ffprobe_assertions": {
+        "bit_rate": "320000",
+        "sample_rate": "44100",
+        "channels": 2,
+        "codec_name": "mp3"
+      }
+    },
+    "tripwire_2_compute_telemetry": {
+      "rvc_execution_backend": "replicate_api",
+      "require_live_prediction_id": true,
+      "require_upstream_latency_ms": true,
+      "enforce_minimum_execution_duration_ms": 500,
+      "local_ffmpeg_process_pid_required": true
+    },
+    "tripwire_3_loudness_integrity": {
+      "ebur128_analysis_command": "ffmpeg -i ./storage/renders/master_320_output.mp3 -filter:a ebur128=peak=true -f null - 2>&1 | grep 'Integrated loudness'",
+      "require_raw_stdout_dump": true,
+      "target_integrated_lufs": -14.0,
+      "true_peak_ceiling_db": -1.0
+    },
+    "tripwire_4_dual_polarity_auth_probe": {
+      "route": "/admin/control",
+      "negative_auth_test": {
+        "probe_email": "unauthorized_probe@gravelking.io",
+        "expected_http_status": 403,
+        "require_empty_or_error_body": true
+      },
+      "positive_auth_test": {
+        "probe_email": "allin10120@gmail.com",
+        "expected_http_status": 200,
+        "require_session_token_validation": true
+      }
+    },
+    "tripwire_5_database_freshness": {
+      "target_table": "admin_settings",
+      "verification_query": "SELECT key, updated_at, payload FROM admin_settings WHERE key IN ('jax_config', 'rvc_settings', 'mastering_defaults') AND updated_at >= NOW() - INTERVAL '5 minutes';",
+      "require_persisted_row_count": 3
+    }
+  },
+  "pipeline_parameters": {
+    "gcs_source_resolution": {
+      "env_bucket_key": "GCS_BUCKET_NAME",
+      "signed_url_generation_required": true,
+      "model_weights_path": "models/rvc/gravel_kevin_v2.pth",
+      "model_index_path": "models/rvc/gravel_kevin_v2.index",
+      "source_audio_path": "demo/founder/benchmark-session-preview.wav"
+    },
+    "voice_gravel_engine": {
+      "target_replicate_model": "rvc_v2_gravel",
+      "runtime_hyperparameters": {
+        "pitch_shift_semitones": 0,
+        "index_rate": 0.75,
+        "filter_radius": 3,
+        "protect_voiceless_consonants": 0.38,
+        "rms_mix_rate": 0.25
+      }
+    },
+    "jax_generation_settings": {
+      "system_prompt": "You are JAX. Embody the GravelKing vibe: punchy bars, raw cadence, street authenticity, and structured song format (Intro, Verse 1, Hook, Verse 2, Hook, Bridge, Hook, Outro).",
+      "temperature": 0.72,
+      "top_p": 0.90,
+      "max_output_tokens": 2048
+    },
+    "mastering_preset_defaults": {
+      "global_override_enabled": true,
+      "target_lufs": -14.0,
+      "true_peak_ceiling_db": -1.0,
+      "multiband_compression": {
+        "low_band_attack_ms": 25,
+        "mid_band_attack_ms": 15,
+        "high_band_attack_ms": 10,
+        "ratio": "3:1"
+      },
+      "eq_curve": {
+        "sub_cut_hz": 30,
+        "mud_dip_hz": 250,
+        "air_boost_hz": 12000
+      }
+    },
+    "export_stage": {
+      "target_bitrate": "320k",
+      "sample_rate": 44100,
+      "format": "mp3"
+    }
+  }
+}

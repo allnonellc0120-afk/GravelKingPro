@@ -1,0 +1,61 @@
+{
+  "target": "gravelking-pro-agent",
+  "action": "MASTER_DUET_BOOTH_AND_VOCAL_PIPELINE_MOUNT",
+  "checklist": [
+    {
+      "task_id": "VB-01",
+      "title": "Hardware Buffer & Constraints Optimization",
+      "instruction": "Update getUserMedia audio constraints in the vocal booth: force echoCancellation: false, noiseSuppression: false, autoGainControl: false, and latency: 0. Ensure AudioContext initializes with { latencyHint: 'interactive', sampleRate: 44100 }."
+    },
+    {
+      "task_id": "VB-02",
+      "title": "Parallel Aux-Send Topology (StarMaker Spec)",
+      "instruction": "Refactor the audio graph routing. Split micSource into two parallel paths: (1) Dry Monitor Bus: micSource -> dryGainNode -> audioCtx.destination with zero inline buffer nodes. (2) Wet FX Bus: micSource -> sendGainNode -> fxChain (algorithmic delay/reverb/EQ) -> wetGainNode -> audioCtx.destination."
+    },
+    {
+      "task_id": "VB-03",
+      "title": "Isolated Dry Recording Tap",
+      "instruction": "Ensure the MediaRecorder / local audio recording buffer taps strictly from the raw dry microphone source BEFORE the FX chain, ensuring zero-latency tracking and clean vocal stems."
+    },
+    {
+      "task_id": "VB-04",
+      "title": "Automated Web Audio Verification Suite",
+      "instruction": "Create and execute an automated verification script (e.g., test-vocal-latency.ts) that checks: (a) AudioContext latencyHint is 'interactive', (b) mic stream constraints match zero-processing spec, (c) dry and wet gain nodes disconnect and reconnect cleanly without audio graph clipping or memory leaks, (d) frontend typechecks and production build pass."
+    },
+    {
+      "task_id": "DUET-01",
+      "title": "Room Signaling Route (2-Person Capacity Cap)",
+      "instruction": "Mount a lightweight WebSocket/SSE signaling route (/api/duet/room/:roomId) supporting exactly 2 peers: Host and Partner. Reject any 3rd join request. Use this solely for SDP offer/answer exchange and ICE candidate relay."
+    },
+    {
+      "task_id": "DUET-02",
+      "title": "Local Backing Track Pre-Buffer",
+      "instruction": "In the Duet Room UI (artifacts/gravelkingpro/src/pages/duet.tsx or equivalent), implement the local RAM track loader: when a beat/track is selected, fetch the audio into a local ArrayBuffer and decodeAudioData BEFORE enabling the 'Ready' button. Neither singer can start until both buffers report decoded."
+    },
+    {
+      "task_id": "DUET-03",
+      "title": "P2P WebRTC DataChannel & NTP Ping-Pong Loop",
+      "instruction": "Establish a direct WebRTC DataChannel between the 2 peers (ordered: false, maxRetransmits: 0). Run a continuous 0x042C 4-byte ping-pong loop every 200ms to calculate RTT / 2 and clock offset between the two devices."
+    },
+    {
+      "task_id": "DUET-04",
+      "title": "Double-Ready Millisecond Scheduled Trigger",
+      "instruction": "Implement the synchronized playback trigger: when both users hit 'Ready', calculate shared target start time: performance.now() + 5000ms + (RTT / 2). Schedule local AudioBufferSourceNode.start(targetTime) so both phones execute track playback on the exact same millisecond."
+    }
+  ],
+  "verification_required": {
+    "vocal_booth": {
+      "typechecks": "passed",
+      "latency_hint": "interactive",
+      "raw_recording": "verified_dry_source"
+    },
+    "duet_engine": {
+      "api_typecheck": "passed",
+      "frontend_typecheck": "passed",
+      "room_limit": "enforced_strictly_at_2",
+      "sync_trigger": "scheduled_audio_buffer_start"
+    },
+    "production_build": "passed"
+  },
+  "required_output_format": "RAW_JSON_RECEIPT_ONLY"
+}

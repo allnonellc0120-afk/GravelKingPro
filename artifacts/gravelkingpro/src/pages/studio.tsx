@@ -15,9 +15,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/lib/context";
 import { Link } from "wouter";
-import { getWaveformPoints } from "@/lib/audioKernel";
+import { getWaveformPoints } from "@/lib/GK-Client-DSP";
 import { downloadBlob } from "@/lib/download";
-import { compressAudioFile } from "@/lib/audioCompressor";
+import { compressAudioFile } from "@/lib/GK-Client-DSP-compressor";
 import { WaveformScrubber, type WaveformScrubberHandle } from "@/components/waveform-scrubber";
 import { StudioPluginRack, DEFAULT_PLUGIN_STATE, type PluginState } from "@/components/studio-plugin-rack";
 import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
@@ -580,7 +580,7 @@ export default function Studio() {
     // Stop mix state when the longest stem ends
     const maxDuration = Math.max(...activeBlobs.map(s => {
       const len = s.blob.size;
-      return len / (44100 * 2 * 2);
+      return len / (48000 * 2 * 3);
     }));
     setTimeout(() => {
       stemSourcesRef.current = [];

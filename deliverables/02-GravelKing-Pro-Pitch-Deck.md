@@ -22,7 +22,7 @@ That's when they need two things: **it has to sound like a record, and they have
 ## Slide 4 — The Product (4 tools, one flow)
 1. **JAX** — AI songwriting companion with keystroke-level authorship capture.
 2. **Vocal Booth** — record, clip, splice, layer, pan. No DAW learning curve.
-3. **The Foundry** — Morris Law Kernel v3.5 mastering to streaming loudness.
+3. **The Foundry** — Morris Law Kernel V4 mastering to streaming loudness.
 4. **Converter** — every format your release needs.
 Then: **IP Provenance Certificate** — court-ready PDF, HMAC-signed, watermarked into the audio itself.
 

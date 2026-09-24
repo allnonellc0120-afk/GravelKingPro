@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { TrackState, PluginDef, PluginType, Region, TRACK_COLORS, PLUGIN_DEFAULTS } from "./types";
-import { getWaveformPoints, audioBufferToWav } from "@/lib/audioKernel";
+import { getWaveformPoints, audioBufferToWav } from "@/lib/GK-Client-DSP";
 import { useToast } from "@/hooks/use-toast";
 import { downloadBlob } from "@/lib/download";
 import {
@@ -741,7 +741,7 @@ export function useDAW() {
     const maxDur = all.reduce((m, t) => Math.max(m, t.startOffset + t.duration), 0);
     if (maxDur <= 0) return;
     const ctx = getCtx();
-    const sr = ctx.sampleRate;
+    const sr = 48_000;
     const renderStartedAt = performance.now();
 
     toast({ title: "Exporting…", description: "Rendering mix offline — this may take a moment." });

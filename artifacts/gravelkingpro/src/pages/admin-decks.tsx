@@ -22,8 +22,8 @@ interface DeckEntry {
 
 const DECKS: DeckEntry[] = [
   {
-    title: "Morris Law Kernel v3.5 — Pitch Deck",
-    description: "Full investor / partner pitch deck for the MLK v3.5 audio AI engine. Covers architecture, benchmarks, market, and licensing model.",
+    title: "Morris Law Kernel V4 — Pitch Deck",
+    description: "Full investor / partner pitch deck for the MLK V4 audio engine. Covers architecture, benchmarks, market, and licensing model.",
     type: "slides",
     href: "/mlk-pitch-deck",
     external: true,
@@ -33,7 +33,7 @@ const DECKS: DeckEntry[] = [
     note: "Registered artifact — opens in the slides preview. Share the direct link with investors only.",
   },
   {
-    title: "MLK V3.5 Licensing Platform",
+    title: "MLK V4 Licensing Platform",
     description: "Partner-facing licensing site for the Morris Law Kernel matrix-multiplication engine. Separate from the audio GravelKing product.",
     type: "web",
     href: "/mlk-licensing",

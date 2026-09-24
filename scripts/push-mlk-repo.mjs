@@ -93,7 +93,7 @@ if (!DRY) {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: `Morris Law Kernel V3.5 — remove deleted file (${entry.path})`,
+            message: `Morris Law Kernel V4 — remove deleted file (${entry.path})`,
             sha: entry.sha,
           }),
         },
@@ -133,7 +133,7 @@ if (failed === 0) {
     // GET existing sha (required for updates)
     const get = await gh(`/repos/${OWNER}/${REPO}/contents/${repoPath}`);
     const body = {
-      message: `Morris Law Kernel V3.5 — sync from GravelKing Pro (${f})`,
+      message: `Morris Law Kernel V4 — sync from GravelKing Pro (${f})`,
       content,
     };
     if (get.status === 200 && get.json?.sha) body.sha = get.json.sha;

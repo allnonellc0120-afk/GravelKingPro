@@ -1,5 +1,5 @@
 """
-Morris Law Kernel V3.5 — honest local benchmark.
+Morris Law Kernel V4 — honest local benchmark.
 
 Measures REAL performance on THIS machine and prints exactly what it finds:
 no fabricated numbers, no hardware claims beyond what Python can detect.
@@ -61,7 +61,7 @@ def main() -> None:
     ap.add_argument("--block", type=int, default=512)
     args = ap.parse_args()
 
-    print("Morris Law Kernel V3.5 — local benchmark (measured, not claimed)")
+    print("Morris Law Kernel V4 — local benchmark (measured, not claimed)")
     print(f"  platform     : {platform.platform()}")
     print(f"  python       : {platform.python_version()}")
     print(f"  numpy/scipy  : {np.__version__} / {scipy.__version__}")

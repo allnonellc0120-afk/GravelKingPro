@@ -3,7 +3,7 @@
  * orchestration endpoints.
  *
  * Thin controller over services/mlkOrchestrator.generateAndMasterTrack:
- * lyric hash → Vertex AI Lyria → REAL MLK v3.5 kernel → Dual-Anchor cert →
+ * lyric hash → Vertex AI Lyria → REAL MLK V4 kernel → Dual-Anchor cert →
  * user vault. Reuses existing session auth patterns; no new global config.
  */
 import { Router, Request, Response } from "express";
@@ -21,6 +21,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { CREDIT_COSTS, grantCredits, spendCredits } from "../lib/credits";
 import { buildSignedRvcModelStreamUrl, resolveRvcModelOrigin } from "../services/rvcModelAccess";
+import { publishGenerationJobEvent, subscribeToGenerationJob } from "../services/generationEvents";
 
 const mlkGenerateRouter = Router();
 
@@ -50,6 +51,17 @@ interface PreparedGeneration {
   creditsSpent: boolean;
   creditBalance?: number;
   modelWeightsUrl: string;
+}
+
+interface GenerationJobState {
+  id?: string;
+  status: "queued" | "processing" | "ready" | "failed";
+  jobId: string;
+  stage?: string;
+  progress?: number;
+  trackId?: string | null;
+  streamUrl?: string | null;
+  error?: string;
 }
 
 /**
@@ -186,7 +198,7 @@ async function runGeneration(
  * Validation, copyright screening, and the credit spend happen synchronously
  * (so bad requests fail fast), then the pipeline is handed to a durable
  * background job row and the client gets { jobId, status: "processing" }
- * immediately. Clients poll GET /api/tracks/:jobId/status.
+ * immediately. Clients follow GET /api/tracks/:jobId/events.
  */
 mlkGenerateRouter.post(
   ["/tracks/generate", "/generate/mlk"],
@@ -211,6 +223,7 @@ mlkGenerateRouter.post(
         creditReference: prepared.creditReference,
       },
     });
+    publishGenerationJobEvent({ jobId, status: "queued", stage: "queued", progress: 5 });
 
     res.status(202).json({ success: true, jobId, status: "queued" });
 
@@ -220,6 +233,18 @@ mlkGenerateRouter.post(
     void (async () => {
       try {
         const origin = `https://${req.get("host")}`;
+        await db.update(masterJobsTable).set({
+          status: "processing",
+          stage: "generating_lyria",
+          progress: 10,
+          startedAt: new Date(),
+        }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "processing",
+          stage: "generating_lyria",
+          progress: 10,
+        });
         const stylePrompt =
           prepared.body.stylePrompt?.trim() ||
           (prepared.vocalMode === "instrumental"
@@ -231,9 +256,11 @@ mlkGenerateRouter.post(
             : prepared.vocalMode === "random"
               ? `${stylePrompt}\n\nWrite and sing your own original lyrics that fit this style.`
               : `${stylePrompt}\n\nSing these exact lyrics, word for word:\n${prepared.text}`;
+        const lyriaStartedAt = performance.now();
         const lyria = await generateLyriaAudio(lyriaInput);
+        const lyriaDurationMs = Math.round(performance.now() - lyriaStartedAt);
+        req.log.info({ jobId, durationMs: lyriaDurationMs }, "[generation] Lyria completed");
         await db.update(masterJobsTable).set({
-          startedAt: new Date(),
           requestConfig: {
             title: prepared.body.title ?? null,
             artistName: prepared.body.artistName ?? null,
@@ -246,6 +273,12 @@ mlkGenerateRouter.post(
             origin,
           },
         }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "processing",
+          stage: "generating_lyria",
+          progress: 20,
+        });
 
         if (prepared.vocalMode === "instrumental") {
           // No voice work needed — master directly and finish inline.
@@ -258,6 +291,14 @@ mlkGenerateRouter.post(
             outputUrl: `/api/tracks/${result.trackId}/stream`,
             completedAt: new Date(),
           }).where(eq(masterJobsTable.id, jobId));
+          publishGenerationJobEvent({
+            jobId,
+            status: "completed",
+            stage: "done",
+            progress: 100,
+            outputObjectKey: result.trackId,
+            outputUrl: `/api/tracks/${result.trackId}/stream`,
+          });
           return;
         }
 
@@ -272,7 +313,7 @@ mlkGenerateRouter.post(
           origin,
         } });
       } catch (err) {
-        req.log.error({ err, jobId }, "MLK v3.5 background generation failed");
+        req.log.error({ err, jobId }, "MLK V4 background generation failed");
         if (prepared.creditsSpent) {
           await grantCredits(
             prepared.userId,
@@ -288,13 +329,124 @@ mlkGenerateRouter.post(
           error: userFacingGenerationError(message).error,
           completedAt: new Date(),
         }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "failed",
+          stage: "failed",
+          error: userFacingGenerationError(message).error,
+        });
       }
     })();
   },
 );
 
+function generationState(job: typeof masterJobsTable.$inferSelect): GenerationJobState & {
+  current_stage?: number;
+  progress_percent?: number;
+  final_master_wav_url?: string | null;
+  final_master_mp3_url?: string | null;
+} {
+  if (job.status === "completed") {
+    return {
+      id: job.id,
+      status: "ready",
+      jobId: job.id,
+      current_stage: 3,
+      progress_percent: 100,
+      trackId: job.outputObjectKey,
+      streamUrl: job.outputUrl,
+      final_master_wav_url: job.outputUrl,
+      final_master_mp3_url: job.outputUrl,
+    };
+  }
+  if (job.status === "failed") {
+    return { status: "failed", jobId: job.id, error: job.error ?? "Generation failed." };
+  }
+  return {
+    id: job.id,
+    status: job.status === "queued" ? "queued" : "processing",
+    jobId: job.id,
+    current_stage: job.stage === "processing_demucs" ? 1 : job.stage === "processing_rvc" ? 2 : 3,
+    progress_percent: job.progress,
+    stage: job.stage,
+    progress: job.progress,
+  };
+}
+
 /**
- * GET /api/tracks/:id/status — generation job polling.
+ * GET /api/tracks/:id/events — live generation stage events.
+ * Every event is emitted after a durable job transition; there is no client
+ * timer that invents progress.
+ */
+mlkGenerateRouter.get("/tracks/:id/events", async (req: Request, res: Response) => {
+  const jobId = String(req.params.id);
+  const [job] = await db
+    .select()
+    .from(masterJobsTable)
+    .where(and(eq(masterJobsTable.id, jobId), eq(masterJobsTable.type, "generation")))
+    .limit(1);
+  if (!job) {
+    res.status(404).json({ error: "Generation job not found." });
+    return;
+  }
+  if (!isAdminAutomationAuthenticated(req)) {
+    const user = await getUsageUser(req, res);
+    if (job.userId && job.userId !== user.id) {
+      res.status(403).json({ error: "This generation job belongs to another account." });
+      return;
+    }
+  }
+
+  res.status(200);
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const send = (event: GenerationJobState): void => {
+    if (!res.writableEnded && !res.destroyed) {
+      res.write(`event: job\ndata: ${JSON.stringify(event)}\n\n`);
+    }
+  };
+  const initial = generationState(job);
+  send(initial);
+  if (initial.status === "ready" || initial.status === "failed") {
+    res.end();
+    return;
+  }
+
+  let current = initial;
+  const unsubscribe = subscribeToGenerationJob(jobId, (event) => {
+    const merged = {
+      ...current,
+      ...(typeof event.status === "string" ? { status: event.status === "completed" ? "ready" : event.status } : {}),
+      ...(typeof event.stage === "string" ? { stage: event.stage } : {}),
+      ...(typeof event.progress === "number" ? { progress: event.progress, progress_percent: event.progress } : {}),
+      ...(typeof event.error === "string" ? { error: event.error } : {}),
+      ...(event.outputObjectKey ? { trackId: event.outputObjectKey } : {}),
+      ...(event.outputUrl ? { streamUrl: event.outputUrl, final_master_wav_url: event.outputUrl, final_master_mp3_url: event.outputUrl } : {}),
+      ...(event.status === "completed" ? { status: "ready", current_stage: 3, progress: 100, progress_percent: 100 } : {}),
+    } as GenerationJobState & { progress_percent?: number; current_stage?: number };
+    current = merged;
+    send(merged);
+    if (merged.status === "ready" || merged.status === "failed") {
+      unsubscribe();
+      res.end();
+    }
+  });
+  const keepAlive = setInterval(() => {
+    if (res.writableEnded || res.destroyed) return;
+    res.write(": keep-alive\n\n");
+  }, 15_000);
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    unsubscribe();
+  });
+});
+
+/**
+ * GET /api/tracks/:id/status — generation job status compatibility endpoint.
  * Returns processing | ready | failed. On ready, includes the track id and
  * internal stream URL. Only the job owner (or admin automation) may read it.
  */
@@ -317,33 +469,7 @@ mlkGenerateRouter.get(["/tracks/:id/status", "/jobs/:id"], async (req: Request, 
     }
   }
 
-  if (job.status === "completed") {
-    res.json({
-      id: jobId,
-      status: "ready",
-      jobId,
-      current_stage: 3,
-      progress_percent: 100,
-      trackId: job.outputObjectKey,
-      streamUrl: job.outputUrl,
-      final_master_wav_url: job.outputUrl,
-      final_master_mp3_url: job.outputUrl,
-    });
-    return;
-  }
-  if (job.status === "failed") {
-    res.json({ status: "failed", jobId, error: job.error ?? "Generation failed." });
-    return;
-  }
-  res.json({
-    id: jobId,
-    status: job.status === "queued" ? "queued" : "processing",
-    jobId,
-    current_stage: job.stage === "processing_demucs" ? 1 : job.stage === "processing_rvc" ? 2 : 3,
-    progress_percent: job.progress,
-    stage: job.stage,
-    progress: job.progress,
-  });
+  res.json(generationState(job));
 });
 
 /**
@@ -372,7 +498,7 @@ mlkGenerateRouter.post(
       }
       const message = err instanceof Error ? err.message : String(err);
       // Full raw error (stack, upstream JSON) stays in the server logs ONLY.
-      req.log.error({ err }, "MLK v3.5 generate-master failed");
+      req.log.error({ err }, "MLK V4 generate-master failed");
       const friendly = userFacingGenerationError(message);
       res.status(friendly.status).json({ error: friendly.error, ...(friendly.code ? { code: friendly.code } : {}) });
     }
@@ -409,7 +535,7 @@ function userFacingGenerationError(message: string): { status: number; error: st
 }
 
 /**
- * POST /api/mlk/v35/remix and /api/tracks/remix — MLK v3.5 Remix Engine.
+ * POST /api/mlk/v4/remix and /api/tracks/remix — MLK V4 Remix Engine.
  *
  * Takes an existing vault track, anchors on its original style prompt, blends
  * the user's new twist, regenerates via Lyria, masters through the real MLK
@@ -421,6 +547,7 @@ interface RemixRequestBody {
   twist?: string;
   vocalsOn?: boolean;
   artistName?: string;
+  certify?: boolean;
 }
 
 interface PreparedRemix {
@@ -429,6 +556,7 @@ interface PreparedRemix {
   twist: string;
   vocalsOn: boolean;
   artistName?: string;
+  certify: boolean;
   creditReference: string;
   creditsSpent: boolean;
 }
@@ -489,6 +617,7 @@ async function prepareRemix(req: Request, res: Response): Promise<PreparedRemix 
     twist: (body.twist ?? "").toString(),
     vocalsOn: body.vocalsOn === true,
     artistName: body.artistName,
+    certify: body.certify === true,
     creditReference,
     creditsSpent,
   };
@@ -518,6 +647,7 @@ mlkGenerateRouter.post(
       requestConfig: {
         remixOf: prepared.parentTrackId,
         vocalsOn: prepared.vocalsOn,
+        certify: prepared.certify,
         creditReference: prepared.creditReference,
       },
     });
@@ -532,29 +662,64 @@ mlkGenerateRouter.post(
           progress: 25,
           startedAt: new Date(),
         }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "processing",
+          stage: "processing_demucs",
+          progress: 25,
+        });
         await db.update(masterJobsTable).set({
           stage: "processing_rvc",
           progress: 60,
         }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "processing",
+          stage: "processing_rvc",
+          progress: 60,
+        });
         const result = await remixTrack(prepared.parentTrackId, prepared.userId, {
           twist: prepared.twist,
           vocalsOn: prepared.vocalsOn,
           artistName: prepared.artistName,
+          certify: prepared.certify,
         });
         await db.update(masterJobsTable).set({
           stage: "processing_mlk_master",
           progress: 85,
         }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "processing",
+          stage: "processing_mlk_master",
+          progress: 85,
+        });
         await db.update(masterJobsTable).set({
           status: "completed",
           stage: "done",
           progress: 100,
           outputObjectKey: result.trackId,
           outputUrl: `/api/tracks/${result.trackId}/stream`,
+          requestConfig: {
+            remixOf: prepared.parentTrackId,
+            vocalsOn: prepared.vocalsOn,
+            certify: prepared.certify,
+            certificationStatus: result.certificationStatus,
+            certId: result.certId,
+            creditReference: prepared.creditReference,
+          },
           completedAt: new Date(),
         }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "completed",
+          stage: "done",
+          progress: 100,
+          outputObjectKey: result.trackId,
+          outputUrl: `/api/tracks/${result.trackId}/stream`,
+        });
       } catch (err) {
-        req.log.error({ err, jobId }, "MLK v3.5 background remix failed");
+        req.log.error({ err, jobId }, "MLK V4 background remix failed");
         if (prepared.creditsSpent) {
           await grantCredits(
             prepared.userId,
@@ -570,6 +735,12 @@ mlkGenerateRouter.post(
           error: userFacingGenerationError(message).error,
           completedAt: new Date(),
         }).where(eq(masterJobsTable.id, jobId));
+        publishGenerationJobEvent({
+          jobId,
+          status: "failed",
+          stage: "failed",
+          error: userFacingGenerationError(message).error,
+        });
       }
     })();
   },
@@ -591,6 +762,7 @@ mlkGenerateRouter.post(
         twist: prepared.twist,
         vocalsOn: prepared.vocalsOn,
         artistName: prepared.artistName,
+        certify: prepared.certify,
       });
       res.json({ success: true, ...result });
     } catch (err) {
@@ -604,7 +776,7 @@ mlkGenerateRouter.post(
       }
       const message = err instanceof Error ? err.message : String(err);
       // Full raw error (stack, upstream JSON) stays in the server logs ONLY.
-      req.log.error({ err }, "MLK v3.5 remix failed");
+      req.log.error({ err }, "MLK V4 remix failed");
       const friendly = userFacingGenerationError(message);
       res.status(friendly.status).json({ error: friendly.error, ...(friendly.code ? { code: friendly.code } : {}) });
     }

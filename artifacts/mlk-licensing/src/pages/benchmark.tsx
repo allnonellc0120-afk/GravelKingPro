@@ -74,7 +74,7 @@ export default function Benchmark() {
   }, [output]);
 
   const handleRun = () => {
-    setOutput(["Initializing MLK V3.5 Environment...", "Checking license entitlement..."]);
+    setOutput(["Initializing MLK V4 (Morris Law Kernel V4) Environment...", "Checking license entitlement..."]);
     setResult(null);
     
     // Simulate terminal delay
@@ -116,7 +116,7 @@ export default function Benchmark() {
           <div>
             <h1 className="text-3xl font-bold uppercase mb-2">Live Benchmark</h1>
             <p className="text-muted-foreground font-mono text-sm max-w-xl">
-              Execute MLK V3.5 against dedicated cloud instances in real-time.
+              Execute MLK V4 (Morris Law Kernel V4) against dedicated cloud instances in real-time.
             </p>
           </div>
           
@@ -267,7 +267,7 @@ export default function Benchmark() {
         </div>
 
         <div className="mt-6 border bg-card p-6 md:p-8">
-          <h2 className="uppercase font-bold text-lg mb-1">How MLK V3.5 Optimizes Your Hardware</h2>
+          <h2 className="uppercase font-bold text-lg mb-1">How MLK V4 (Morris Law Kernel V4) Optimizes Your Hardware</h2>
           <p className="text-sm text-muted-foreground font-mono mb-6">The exact techniques the kernel applies on every run to squeeze peak throughput from the CPU.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
             {OPTIMIZATIONS.map((o, i) => (

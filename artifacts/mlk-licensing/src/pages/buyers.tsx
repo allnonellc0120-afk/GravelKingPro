@@ -71,7 +71,7 @@ const VERIFIED_CONTACTS = [
     bd_url: "https://aws.amazon.com/hpc/",
     dev_url: "https://aws.amazon.com/contact-us/",
     notes: "AWS HPC page and AWS Marketplace seller onboarding. AWS ParallelCluster and Graviton-optimized compute are primary channels.",
-    fit: "MLK V3.5 NUMA-aware + mlockall kernel directly targets Graviton3/Graviton4 and HPC cluster nodes. AWS Marketplace listing is viable.",
+    fit: "MLK V4 (Morris Law Kernel V4) NUMA-aware + mlockall kernel directly targets Graviton3/Graviton4 and HPC cluster nodes. AWS Marketplace listing is viable.",
     email: null,
   },
   {
@@ -89,7 +89,7 @@ const VERIFIED_CONTACTS = [
     bd_url: "https://cloud.google.com/partners",
     dev_url: null,
     notes: "Google Cloud Partner Advantage program. ISV/technology partner track for marketplace listings and co-sell agreements.",
-    fit: "C3/C3D (Sapphire Rapids / EPYC Genoa) instances with AVX-512 are ideal benchmark targets for MLK V3.5.",
+    fit: "C3/C3D (Sapphire Rapids / EPYC Genoa) instances with AVX-512 are ideal benchmark targets for MLK V4 (Morris Law Kernel V4).",
     email: null,
   },
   {
@@ -107,7 +107,7 @@ const VERIFIED_CONTACTS = [
     bd_url: "https://www.fmod.com/contact",
     dev_url: "https://www.fmod.com/licensing",
     notes: "FMOD licensing page and contact page both confirmed accessible. Used in thousands of games; middleware licensing model.",
-    fit: "FMOD real-time mix engine on multi-core platforms would benefit from NUMA-aware CPU affinity from MLK V3.5 architecture.",
+    fit: "FMOD real-time mix engine on multi-core platforms would benefit from NUMA-aware CPU affinity from MLK V4 (Morris Law Kernel V4) architecture.",
     email: null,
   },
   {
@@ -116,7 +116,7 @@ const VERIFIED_CONTACTS = [
     bd_url: "https://juce.com/get-juce/licensing/",
     dev_url: null,
     notes: "JUCE licensing page confirmed accessible (202 response = form-based). Used by 30,000+ audio developers worldwide.",
-    fit: "JUCE DSP module could license or embed MLK V3.5 DGEMM routines for convolution reverb and ML inference blocks.",
+    fit: "JUCE DSP module could license or embed MLK V4 (Morris Law Kernel V4) DGEMM routines for convolution reverb and ML inference blocks.",
     email: null,
   },
 ];
@@ -284,7 +284,7 @@ export default function Buyers() {
               {
                 name: "AWS Marketplace",
                 url: "https://aws.amazon.com/hpc/",
-                action: "List MLK V3.5 as an HPC AMI or container product. AWS Marketplace seller registration at aws.amazon.com/marketplace/sell. Target: ParallelCluster, Graviton3/4 HPC SKUs.",
+                action: "List MLK V4 (Morris Law Kernel V4) as an HPC AMI or container product. AWS Marketplace seller registration at aws.amazon.com/marketplace/sell. Target: ParallelCluster, Graviton3/4 HPC SKUs.",
               },
               {
                 name: "Azure Marketplace",
@@ -336,7 +336,7 @@ export default function Buyers() {
                     name: "Audiokinetic (Wwise)",
                     focus: "Game / Interactive Audio",
                     url: "https://www.audiokinetic.com/en/contact/",
-                    note: "Middleware SDK used in AAA games. MLK V3.5 convolution/DSP speed directly reduces Wwise profiler overhead.",
+                    note: "Middleware SDK used in AAA games. MLK V4 (Morris Law Kernel V4) convolution/DSP speed directly reduces Wwise profiler overhead.",
                   },
                   {
                     name: "FMOD (Firelight)",
@@ -348,7 +348,7 @@ export default function Buyers() {
                     name: "JUCE / Raw Material (Focusrite)",
                     focus: "Audio Plugin Framework",
                     url: "https://juce.com/get-juce/licensing/",
-                    note: "30,000+ developers use JUCE. Embedding MLK V3.5 DGEMM routines in the JUCE DSP module would be a marquee partnership.",
+                    note: "30,000+ developers use JUCE. Embedding MLK V4 (Morris Law Kernel V4) DGEMM routines in the JUCE DSP module would be a marquee partnership.",
                   },
                   {
                     name: "Yamaha Corporation (parent of Steinberg)",
@@ -360,7 +360,7 @@ export default function Buyers() {
                     name: "IK Multimedia",
                     focus: "Audio DSP / Mobile Plugins",
                     url: "https://www.ikmultimedia.com/company/contact/",
-                    note: "Produces T-RackS, AmpliTube, and iOS audio apps. Mobile DSP kernel licensing on ARM64 (MLK V3.5 A16 benchmarks) is a direct fit.",
+                    note: "Produces T-RackS, AmpliTube, and iOS audio apps. Mobile DSP kernel licensing on ARM64 (MLK V4 (Morris Law Kernel V4) A16 benchmarks) is a direct fit.",
                   },
                 ].map((r, i) => (
                   <tr key={i} className="border-b hover:bg-muted/30">

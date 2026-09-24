@@ -7,7 +7,7 @@
  *
  *   dispatchGeneration   Lyria (Vertex) → upload → Demucs prediction (webhook)
  *   handleDemucsWebhook  store stem URLs → RVC prediction (webhook)
- *   handleRvcWebhook     mix + Python MLK V3.5 master → vault save → completed
+ *   handleRvcWebhook     mix + Python MLK V4 master → vault save → completed
  *
  * Stage state lives in masterJobsTable (jobs) so a poll of
  * GET /api/jobs/:id always reflects the true pipeline position.
@@ -40,6 +40,8 @@ import { buildSignedRvcModelStreamUrl, resolveRvcModelOrigin } from "./rvcModelA
 import { saveObjectWithFallback, ObjectStorageService } from "../lib/objectStorage";
 import { CREDIT_COSTS, grantCredits } from "../lib/credits";
 import { logger } from "../lib/logger";
+import { publishGenerationJobEvent } from "./generationEvents";
+import { getAdminRuntimeConfig } from "../lib/adminRuntimeConfig";
 
 const execFileAsync = promisify(execFile);
 const pipelineStorage = new ObjectStorageService();
@@ -62,6 +64,31 @@ interface PipelineRequestConfig {
   [key: string]: unknown;
 }
 
+type GenerationPipelineTestHooks = {
+  convertToGravelKingVoice?: typeof convertToGravelKingVoice;
+  handleRvcWebhook?: (jobId: string, output: unknown) => Promise<void>;
+};
+
+let generationPipelineTestHooks: GenerationPipelineTestHooks = {};
+
+/**
+ * Test-only seam for exercising provider failure transitions without calling
+ * Replicate or writing generated artifacts. Production keeps the real
+ * provider/finalization functions above.
+ */
+export function __setGenerationPipelineTestHooksForTest(
+  hooks: GenerationPipelineTestHooks,
+): () => void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("__setGenerationPipelineTestHooksForTest is not available in production");
+  }
+  const previous = generationPipelineTestHooks;
+  generationPipelineTestHooks = hooks;
+  return () => {
+    generationPipelineTestHooks = previous;
+  };
+}
+
 /** HMAC token so Replicate webhooks can't be forged to advance random jobs. */
 export function pipelineWebhookToken(jobId: string, stage: PipelineStage): string {
   const secret = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
@@ -78,6 +105,20 @@ async function updateJob(
   values: Partial<typeof masterJobsTable.$inferInsert>,
 ): Promise<void> {
   await db.update(masterJobsTable).set(values).where(eq(masterJobsTable.id, jobId));
+  publishGenerationJobEvent({
+    jobId,
+    ...(typeof values.status === "string" ? { status: values.status } : {}),
+    ...(typeof values.stage === "string" ? { stage: values.stage } : {}),
+    ...(typeof values.progress === "number" ? { progress: values.progress } : {}),
+    ...(typeof values.error === "string" || values.error === null ? { error: values.error } : {}),
+    ...(typeof values.outputObjectKey === "string" || values.outputObjectKey === null
+      ? { outputObjectKey: values.outputObjectKey }
+      : {}),
+    ...(typeof values.outputUrl === "string" || values.outputUrl === null
+      ? { outputUrl: values.outputUrl }
+      : {}),
+    ...(values.completedAt instanceof Date ? { completedAt: values.completedAt.toISOString() } : {}),
+  });
 }
 
 async function failJob(jobId: string, message: string): Promise<void> {
@@ -112,6 +153,7 @@ export async function dispatchGeneration(input: {
 }): Promise<void> {
   const { jobId, config } = input;
   const origin = config.origin ?? "";
+  const startedAt = performance.now();
   await updateJob(jobId, { status: "processing", stage: "processing_demucs", progress: 25 });
   const audioUrl = await uploadFile(input.audio, "gk_pipeline_input", "audio/mpeg");
   const predictionId = await createPrediction(
@@ -120,7 +162,11 @@ export async function dispatchGeneration(input: {
     { audio: audioUrl, model: "htdemucs", stem: "vocals", output_format: "wav" },
     webhookUrl(origin, jobId, "demucs"),
   );
-  logger.info({ jobId, predictionId }, "[pipeline] Demucs dispatched — awaiting webhook");
+  const dispatchMs = Math.round(performance.now() - startedAt);
+  logger.info(
+    { jobId, predictionId, dispatchMs, underConversionBudget: dispatchMs < 22_000 },
+    "[pipeline] Demucs dispatched — awaiting webhook",
+  );
 }
 
 /** Stage 2 — Demucs webhook: persist stem URLs, dispatch RVC with webhook. */
@@ -147,24 +193,61 @@ export async function handleDemucsWebhook(jobId: string, output: unknown): Promi
   });
 
   const origin = config.origin ?? "";
-  const conversion = await convertToGravelKingVoice({
-    audioUrl: vocalUrl,
-    modelWeightsUrl: buildSignedRvcModelStreamUrl(resolveRvcModelOrigin(origin), 3600),
-    pitchShift: 0,
-    indexRate: 0.78,
-    protect: 0.02,
-    filterRadius: 3,
-    webhook: webhookUrl(origin, jobId, "rvc"),
-  });
-  logger.info(
-    { jobId, predictionId: conversion.predictionId },
-    "[pipeline] RVC dispatched — awaiting webhook",
+  try {
+    const voice = getAdminRuntimeConfig().rvc;
+    const convertVoice = generationPipelineTestHooks.convertToGravelKingVoice ?? convertToGravelKingVoice;
+    const conversion = await convertVoice({
+      audioUrl: vocalUrl,
+      modelWeightsUrl: buildSignedRvcModelStreamUrl(resolveRvcModelOrigin(origin), 3600),
+      pitchShift: voice.pitchShift,
+      indexRate: voice.indexRate,
+      protect: voice.protect,
+      filterRadius: voice.filterRadius,
+      webhook: webhookUrl(origin, jobId, "rvc"),
+    });
+    logger.info(
+      { jobId, predictionId: conversion.predictionId },
+      "[pipeline] RVC dispatched — awaiting webhook",
+    );
+  } catch (err) {
+    await fallbackRvcToBase(jobId, err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
+ * RVC is optional. When dispatch or execution fails, use the original Demucs
+ * vocal stem with the instrumental bed and continue through the normal vault
+ * save path. A failure in this fallback is still a real pipeline failure and
+ * is allowed to reach the caller for refund/failed-job handling.
+ */
+export async function fallbackRvcToBase(jobId: string, reason: string): Promise<void> {
+  const [job] = await db.select().from(masterJobsTable).where(eq(masterJobsTable.id, jobId)).limit(1);
+  if (!job) throw new Error(`pipeline job ${jobId} not found`);
+  const config = (job.requestConfig ?? {}) as PipelineRequestConfig;
+  if (!config.demucsVocalUrl || !config.demucsInstrumentalUrl) {
+    throw new Error(`pipeline job ${jobId} is missing base-generation stems`);
+  }
+
+  logger.warn(
+    { jobId, reason: reason.slice(0, 500) },
+    "[pipeline] RVC unavailable — continuing with base generation",
   );
+  await updateJob(jobId, {
+    stage: "processing_mlk_master",
+    progress: 75,
+    requestConfig: {
+      ...config,
+      rvcFallback: true,
+      rvcFailure: reason.slice(0, 500),
+    },
+  });
+  const finishRvc = generationPipelineTestHooks.handleRvcWebhook ?? handleRvcWebhook;
+  await finishRvc(jobId, config.demucsVocalUrl);
 }
 
 /**
  * Stage 3 — RVC webhook: download converted vocal + stored instrumental, mix,
- * run the Python MLK V3.5 master chain, save to the vault, mark completed.
+ * run the Python MLK V4 master chain, save to the vault, mark completed.
  * Runs fully in the webhook's background after an immediate 200.
  */
 export async function handleRvcWebhook(jobId: string, output: unknown): Promise<void> {
@@ -184,7 +267,7 @@ export async function handleRvcWebhook(jobId: string, output: unknown): Promise<
   if (converted.length < 1_000) throw new Error("RVC webhook delivered invalid audio");
   const mixed = await mixVoiceSwapAudioInMemory(instrumental, converted);
 
-  // Python MLK V3.5 master — the only DSP path.
+  // Python MLK V4 master — the only DSP path.
   const workId = randomUUID();
   const inPath = `/tmp/gk_pipe_${workId}.wav`;
   const wavPath = `/tmp/gk_pipe_${workId}_master.wav`;
@@ -231,7 +314,7 @@ export async function handleRvcWebhook(jobId: string, output: unknown): Promise<
       },
     );
 
-    const title = (config.title ?? "").toString().trim() || "MLK v3.5 Track";
+    const title = (config.title ?? "").toString().trim() || "MLK V4 Track";
     const artistName = (config.artistName ?? "").toString().trim() || "GravelKing Artist";
     const lyrics = config.lyrics ? String(config.lyrics) : null;
     await db.transaction(async (tx) => {
@@ -262,7 +345,13 @@ export async function handleRvcWebhook(jobId: string, output: unknown): Promise<
       outputUrl: `/api/tracks/${trackId}/stream`,
       completedAt: new Date(),
     });
-    logger.info({ jobId, trackId }, "[pipeline] completed — MLK V3.5 master saved to vault");
+    const totalMs = Math.round(
+      performance.now() - new Date(job.startedAt ?? job.createdAt).getTime(),
+    );
+    logger.info(
+      { jobId, trackId, totalMs, underThirtySecondSla: totalMs < 30_000 },
+      "[pipeline] completed — MLK V4 master saved to vault",
+    );
   } finally {
     await Promise.all([
       unlink(inPath).catch(() => {}),

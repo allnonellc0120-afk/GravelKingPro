@@ -32,6 +32,15 @@ import investorsRouter from "./investors";
 import promoRouter from "./promos";
 import jaxRouter from "./jax";
 import replicateWebhookRouter from "./replicateWebhook";
+import telemetryRouter from "./telemetry";
+import duetRouter from "./duet";
+import userProfileRouter from "./userProfile";
+import karaokeRouter from "./karaoke";
+import adminControlRouter from "./adminControl";
+import featuredContestRouter from "./featuredContest";
+import adminIntelligenceRouter from "./adminIntelligence";
+import adminOperationsRouter from "./adminOperations";
+import adminAudioRouter from "./adminAudio";
 
 const router: IRouter = Router();
 
@@ -67,6 +76,15 @@ router.use(referralsRouter);
 router.use(investorsRouter);
 router.use(promoRouter);
 router.use(jaxRouter);
+router.use(telemetryRouter);
 router.use(replicateWebhookRouter);
+router.use(duetRouter);
+router.use(userProfileRouter);
+router.use(karaokeRouter);
+router.use(adminControlRouter);
+router.use(adminIntelligenceRouter);
+router.use(adminOperationsRouter);
+router.use(adminAudioRouter);
+router.use(featuredContestRouter);
 
 export default router;

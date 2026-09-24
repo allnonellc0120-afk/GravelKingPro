@@ -229,8 +229,8 @@ export async function renderMasteringEqWav(
       throwIfAborted(signal);
       const renderContext = new OfflineAudioContext(
         decodedBuffer.numberOfChannels,
-        decodedBuffer.length,
-        decodedBuffer.sampleRate,
+        Math.ceil(decodedBuffer.duration * 48_000),
+        48_000,
       );
       const renderSource = renderContext.createBufferSource();
       source = renderSource;
@@ -300,7 +300,7 @@ async function audioBufferToWav(
   throwIfAborted(signal);
   const channelCount = buffer.numberOfChannels;
   const frameCount = buffer.length;
-  const bytesPerSample = 2;
+   const bytesPerSample = 3;
   const blockAlign = channelCount * bytesPerSample;
   const dataSize = frameCount * blockAlign;
   const view = new DataView(new ArrayBuffer(44 + dataSize));
@@ -315,7 +315,7 @@ async function audioBufferToWav(
   view.setUint32(24, buffer.sampleRate, true);
   view.setUint32(28, buffer.sampleRate * blockAlign, true);
   view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true);
+   view.setUint16(34, 24, true);
   writeAscii(view, 36, "data");
   view.setUint32(40, dataSize, true);
 
@@ -327,8 +327,11 @@ async function audioBufferToWav(
     if (frame % 16_384 === 0) throwIfAborted(signal);
     for (let channel = 0; channel < channelCount; channel += 1) {
       const sample = Math.max(-1, Math.min(1, channels[channel][frame]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-      offset += bytesPerSample;
+       const value = Math.round(sample < 0 ? sample * 0x800000 : sample * 0x7fffff);
+       view.setUint8(offset, value & 0xff);
+       view.setUint8(offset + 1, (value >> 8) & 0xff);
+       view.setUint8(offset + 2, (value >> 16) & 0xff);
+       offset += bytesPerSample;
     }
     // Encoding used to run as one large synchronous loop. Yielding between
     // chunks lets mobile browsers keep painting the progress UI and respond

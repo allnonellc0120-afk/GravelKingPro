@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { audioBufferToWav } from "@/lib/audioKernel";
-import { type VocalPreset, buildEffectChain } from "./vocalPresets";
+import { audioBufferToWav } from "@/lib/GK-Client-DSP";
+import { type VocalPreset } from "./vocalPresets";
 
 export type BoothRecorderStatus = "idle" | "recording" | "recorded" | "error";
 
@@ -10,6 +10,8 @@ export interface VocalBoothRecorder {
   isRecording: boolean;
   /** Live input level, 0..1 (RMS), for the monitoring meter. */
   level: number;
+  /** The live microphone analyser used by stage visualizations. */
+  analyser: AnalyserNode | null;
   /** Captured vocal take (raw MediaRecorder output, usually WebM/Opus). */
   vocalBlob: Blob | null;
   /** Object URL for previewing the vocal take. Revoked on reset/unmount. */
@@ -17,9 +19,8 @@ export interface VocalBoothRecorder {
   errorMsg: string | null;
   /**
    * Begins capture. Must be called from a user gesture (iOS).
-   * When `preset` is provided (and not "raw"), the selected effect chain is
-   * baked into the recorded take via a MediaStreamAudioDestinationNode.
-   * What you hear in the monitor is what ends up in the file.
+   * The take is always captured from the untouched microphone stream. Monitor
+   * effects are deliberately kept out of the recorded stem.
    */
   start: (deviceId?: string, preset?: VocalPreset) => Promise<boolean>;
   stop: () => void;
@@ -66,6 +67,7 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
 
   const [status, setStatus] = useState<BoothRecorderStatus>("idle");
   const [level, setLevel] = useState(0);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [vocalBlob, setVocalBlob] = useState<Blob | null>(null);
   const [vocalUrl, setVocalUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
       rafRef.current = null;
     }
     setLevel(0);
+    setAnalyser(null);
   }, []);
 
   const teardownAudio = useCallback(() => {
@@ -134,8 +137,13 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
         toast({ title: "Recording unavailable", description: "Your browser does not support recording.", variant: "destructive" });
         return false;
       }
-      // Raw capture (mirrors useDAW): no processing so the carve stays honest.
-      const baseAudio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+      // Raw capture: disable browser DSP so the recorded stem remains honest.
+      const baseAudio = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        latency: 0,
+      };
       const openStream = (id?: string) =>
         navigator.mediaDevices.getUserMedia({ audio: id ? { deviceId: { exact: id }, ...baseAudio } : baseAudio });
 
@@ -154,33 +162,21 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
         streamRef.current = stream;
         chunksRef.current = [];
 
-        // Build the AudioContext. When a non-raw preset is active, route the mic
-        // through the shared effect chain to a MediaStreamAudioDestinationNode so
-        // effects are baked into the recording (what you hear in the monitor is
-        // what ends up in the file). The chain never connects to ctx.destination —
-        // no speaker feedback from this context; LiveVocalMonitor handles that.
-        let recordStream: MediaStream = stream;
+        // Keep MediaRecorder on the original stream. This is the isolated dry
+        // recording tap; LiveVocalMonitor owns the separate speaker monitor bus.
+        const recordStream: MediaStream = stream;
         const Ctor = getAudioContextCtor();
         if (Ctor) {
-          const ctx = new Ctor();
+          const ctx = new Ctor({ latencyHint: "interactive", sampleRate: 48000 });
           if (ctx.state === "suspended") await ctx.resume();
           const src = ctx.createMediaStreamSource(stream);
-          if (preset && preset.id !== "raw") {
-            const destNode = ctx.createMediaStreamDestination();
-            const analyser = buildEffectChain(ctx, src, preset, destNode);
-            ctxRef.current = ctx;
-            analyserRef.current = analyser;
-            runMeter();
-            recordStream = destNode.stream;
-          } else {
-            // Raw path: analyser only — no effects, no speaker output.
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 1024;
-            src.connect(analyser);
-            ctxRef.current = ctx;
-            analyserRef.current = analyser;
-            runMeter();
-          }
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 1024;
+          src.connect(analyser);
+          ctxRef.current = ctx;
+          analyserRef.current = analyser;
+          setAnalyser(analyser);
+          runMeter();
         }
 
         const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -288,6 +284,7 @@ export function useVocalBoothRecorder(): VocalBoothRecorder {
     status,
     isRecording: status === "recording",
     level,
+    analyser,
     vocalBlob,
     vocalUrl,
     errorMsg,

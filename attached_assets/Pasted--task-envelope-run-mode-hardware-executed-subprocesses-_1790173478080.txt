@@ -1,0 +1,90 @@
+{
+  "task_envelope": {
+    "run_mode": "hardware_executed_subprocesses_only",
+    "zero_stub_policy": {
+      "require_os_kernel_pid": true,
+      "require_ffprobe_json_dump": true,
+      "require_actual_disk_path_stat": true,
+      "disallow_memory_inlined_payloads": true,
+      "disallow_hardcoded_dummy_returns": true
+    }
+  },
+  "pipeline_verification": {
+    "target_bitrate_bps": 320000,
+    "codec": "libmp3lame",
+    "lossless_codec": "pcm_s24le",
+    "execution_harness": {
+      "input_raw_pcm_source": "/workspace/storage/renders/raw_test_source.wav",
+      "voice_converted_path": "/workspace/storage/renders/rvc_processed_stage.wav",
+      "mastered_output_path": "/workspace/storage/renders/master_320_output.mp3"
+    },
+    "verification_telemetry_required": {
+      "ffprobe_command": "ffprobe -v quiet -print_format json -show_format -show_streams /workspace/storage/renders/master_320_output.mp3",
+      "os_stat_command": "stat /workspace/storage/renders/master_320_output.mp3",
+      "sha256_binary_checksum": "sha256sum /workspace/storage/renders/master_320_output.mp3",
+      "exact_byte_size_assertion_min": 1000000,
+      "ffprobe_assert_bit_rate_exact": "320000",
+      "ffprobe_assert_sample_rate": "44100",
+      "ffprobe_assert_channels": 2
+    }
+  },
+  "admin_security_enforcement": {
+    "route": "/admin/control",
+    "strict_allowed_identity": "allin10120@gmail.com",
+    "live_token_auth_trap": {
+      "inject_negative_auth_test": {
+        "test_email": "unauthorized_probe@gravelking.io",
+        "expected_response_code": 403,
+        "must_return_empty_body": true
+      },
+      "inject_positive_auth_test": {
+        "test_email": "allin10120@gmail.com",
+        "expected_response_code": 200,
+        "must_validate_db_session_id": true
+      }
+    }
+  },
+  "voice_gravel_engine": {
+    "target_inference_engine": "rvc_v2_tensor_rt",
+    "weights_path": "/workspace/models/rvc/gravel_kevin_v2.pth",
+    "index_path": "/workspace/models/rvc/gravel_kevin_v2.index",
+    "runtime_hyperparameters": {
+      "pitch_shift_semitones": 0,
+      "index_rate": 0.75,
+      "filter_radius": 3,
+      "protect_voiceless_consonants": 0.38,
+      "rms_mix_rate": 0.25
+    },
+    "hardware_telemetry_proof": {
+      "capture_cuda_vram_delta_mb": true,
+      "inference_time_ms_recorded": true,
+      "enforce_minimum_kernel_duration_ms": 400
+    }
+  },
+  "jax_generation_settings": {
+    "system_prompt": "You are JAX. Embody the GravelKing vibe: punchy bars, raw cadence, street authenticity, and structured song format (Intro, Verse 1, Hook, Verse 2, Hook, Bridge, Hook, Outro).",
+    "temperature": 0.72,
+    "top_p": 0.90,
+    "max_output_tokens": 2048,
+    "runtime_persistence_target": "admin_settings.jax_config",
+    "database_verification_query": "SELECT updated_at, payload FROM admin_settings WHERE key = 'jax_config' AND updated_at >= NOW() - INTERVAL '5 minutes';"
+  },
+  "mastering_preset_defaults": {
+    "global_override_enabled": true,
+    "target_lufs": -14.0,
+    "true_peak_ceiling_db": -1.0,
+    "multiband_compression": {
+      "low_band_attack_ms": 25,
+      "mid_band_attack_ms": 15,
+      "high_band_attack_ms": 10,
+      "ratio": "3:1"
+    },
+    "eq_curve": {
+      "sub_cut_hz": 30,
+      "mud_dip_hz": 250,
+      "air_boost_hz": 12000
+    },
+    "output_lufs_analysis_command": "ffmpeg -i /workspace/storage/renders/master_320_output.mp3 -filter:a ebur128=peak=true -f null - 2>&1 | grep 'Integrated loudness'",
+    "ebur128_required_stdout": true
+  }
+}

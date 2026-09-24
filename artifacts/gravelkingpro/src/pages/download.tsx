@@ -221,14 +221,14 @@ export default function DownloadPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 {
-                  title: "MLK v3 White Paper",
+                  title: "MLK V4 (Morris Law Kernel V4) White Paper",
                   desc: "6-page technical document. Brand story, engine architecture, real benchmark numbers.",
                   file: "GravelKingPro_MLKv3_WhitePaper.pdf",
                   icon: <FileText className="w-5 h-5 text-amber-400" />,
                   badge: "6 pages",
                 },
                 {
-                  title: "MLK v3 Pitch Deck",
+                  title: "MLK V4 (Morris Law Kernel V4) Pitch Deck",
                   desc: "7-slide investor/partner deck. Problem, solution, numbers, product suite, opportunity.",
                   file: "GravelKingPro_MLKv3_PitchDeck.pdf",
                   icon: <Film className="w-5 h-5 text-amber-400" />,

@@ -429,7 +429,7 @@ export const getRunMlkBenchmarkUrl = () => {
 
 /**
  * Executes the Morris Law Kernel and returns measured metrics. Full metrics require an active license; demo mode returns limited output.
- * @summary Run the MLK V3.5 benchmark
+ * @summary Run the MLK V4 (Morris Law Kernel V4) benchmark
  */
 export const runMlkBenchmark = async (mlkBenchmarkInput: MlkBenchmarkInput, options?: RequestInit): Promise<MlkBenchmarkResult> => {
 
@@ -478,7 +478,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RunMlkBenchmarkMutationError = ErrorType<void>
 
     /**
- * @summary Run the MLK V3.5 benchmark
+ * @summary Run the MLK V4 (Morris Law Kernel V4) benchmark
  */
 export const useRunMlkBenchmark = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runMlkBenchmark>>, TError,{data: BodyType<MlkBenchmarkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

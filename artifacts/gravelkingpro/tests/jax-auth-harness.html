@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>JAX auth regression harness</title>
+  </head>
+  <body>
+    <output id="generator-state"></output>
+    <script type="module">
+      import { getJaxRequestHeaders } from "/src/lib/jax-auth.ts";
+
+      const testSessionToken = "jax-browser-test-session";
+      const state = { generatorLyrics: "" };
+      const statuses = [];
+
+      async function requestJax(path, body, accept, updateGeneratorLyrics = true) {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: await getJaxRequestHeaders(async () => testSessionToken, accept),
+          credentials: "include",
+          body: JSON.stringify(body),
+        });
+        statuses.push(response.status);
+        const data = await response.json();
+        if (!response.ok || !data.text?.trim()) {
+          throw new Error(data.error || `JAX request failed with ${response.status}`);
+        }
+        if (updateGeneratorLyrics) {
+          state.generatorLyrics = data.text.trim();
+          document.querySelector("#generator-state").textContent = state.generatorLyrics;
+        }
+        return data.text.trim();
+      }
+
+      try {
+        const chatText = await requestJax(
+          "/api/chat/jax",
+          { message: "Write a short chorus.", stream: false },
+          "text/event-stream",
+        );
+        const regeneratedText = await requestJax(
+          "/api/chat/jax",
+          { message: "Regenerate only line 1.", history: [{ role: "jax", content: chatText }] },
+        );
+        await requestJax(
+          "/api/chat/jax",
+          { message: "Describe a fitting style.", history: [{ role: "jax", content: regeneratedText }] },
+          undefined,
+          false,
+        );
+        window.__jaxAuthRegression = {
+          ok: true,
+          statuses,
+          generatorLyrics: state.generatorLyrics,
+        };
+      } catch (error) {
+        window.__jaxAuthRegression = {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+          statuses,
+          generatorLyrics: state.generatorLyrics,
+        };
+      }
+    </script>
+  </body>
+</html>

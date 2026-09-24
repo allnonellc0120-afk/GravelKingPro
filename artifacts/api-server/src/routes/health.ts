@@ -4,6 +4,12 @@ import { HealthCheckResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
+// Keep the deployment's legacy /api probe useful while /api/healthz remains
+// the canonical health endpoint configured for the API artifact.
+router.get("/", (_req, res) => {
+  res.json({ status: "ok", service: "gravelkingpro-api" });
+});
+
 router.get("/healthz", (req, res) => {
   // Server-side handler timing: measured from request arrival (stamped by the
   // first app middleware) so the dashboard can separate "browser → API round

@@ -18,6 +18,7 @@ import {
   isVertexConfigured,
   VERTEX_LOCATION,
   VERTEX_MODEL,
+  vertexV1Url,
 } from "./geminiVertex";
 import { logger } from "./lib/logger";
 
@@ -120,7 +121,9 @@ async function postGenerateContent(
 async function transcribeViaVertex(data: string, mimeType: string): Promise<string> {
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
-  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
+  const url = vertexV1Url(
+    `/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`,
+  );
   return postGenerateContent("Vertex AI Gemini", url, { Authorization: `Bearer ${token}` }, buildRequestBody(data, mimeType));
 }
 

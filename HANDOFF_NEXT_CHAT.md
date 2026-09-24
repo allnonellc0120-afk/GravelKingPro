@@ -9,7 +9,7 @@ Updated: 2026-08-03
 - Main web artifact: `artifacts/gravelkingpro`
 - Shared API artifact: `artifacts/api-server`
 - Mobile artifact: `artifacts/gravelkingpro-mobile`
-- Morris Law Kernel v3.5 is Python-based; the live gateway is Express/Node.js.
+- Morris Law Kernel V4 is Python-based; the live gateway is Express/Node.js.
 - Do not describe the live gateway as FastAPI. A standalone FastAPI verification wrapper exists in `MorrisLawKernel/verification_api.py`, but it is not the current production gateway.
 
 ## Current task state
@@ -52,7 +52,7 @@ Updated: 2026-08-03
   - delivery expiration
 - Controlled load test passed:
   - health: 1,000/1,000 HTTP 200
-  - MLK v3: 500/500 HTTP 200
+  - MLK V4 (Morris Law Kernel V4): 500/500 HTTP 200
   - raw baseline: 1,000/1,000 HTTP 200
   - invalid payloads: 200/200 clean HTTP 400
   - missing routes: 200/200 clean HTTP 404

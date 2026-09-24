@@ -23,7 +23,13 @@ export interface LrcLine {
   text: string;
 }
 
+export interface SyncedLrcLine {
+  time: number;
+  text: string;
+}
+
 const BASE = "https://lrclib.net/api";
+const STANDARD_LRC_TAG = /^\[(\d{2}):(\d{2}(?:\.\d{2,3})?)\](.*)/;
 
 /** Search tracks by query string */
 export async function searchLyrics(query: string): Promise<LrclibTrack[]> {
@@ -58,6 +64,29 @@ export function parseLrc(lrc: string): LrcLine[] {
     lines.push({ timeMs, text: m[4].trim() });
   }
   return lines.sort((a, b) => a.timeMs - b.timeMs);
+}
+
+/**
+ * Parse standard LRCLIB timestamp tags into track-relative seconds.
+ * LRC format: [mm:ss.xx] lyric text
+ */
+export function parseLrcSeconds(lrc: string): SyncedLrcLine[] {
+  return lrc
+    .split("\n")
+    .flatMap((raw): SyncedLrcLine[] => {
+      const match = raw.match(STANDARD_LRC_TAG);
+      if (!match) return [];
+
+      const minutes = parseInt(match[1], 10);
+      const seconds = parseFloat(match[2]);
+      if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return [];
+
+      return [{
+        time: (minutes * 60) + seconds,
+        text: match[3].trim(),
+      }];
+    })
+    .sort((a, b) => a.time - b.time);
 }
 
 export function formatTime(ms: number): string {

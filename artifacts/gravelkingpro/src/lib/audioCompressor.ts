@@ -6,7 +6,7 @@
  */
 
 interface CompressOptions {
-  /** Target sample rate in Hz. Default: 22050 (quarter size of 44.1k stereo). */
+  /** Target sample rate in Hz. Canonical upload format is 48 kHz. */
   targetRate?: number;
   /** Target mono (true) or keep stereo (false). Default: true. */
   mono?: boolean;
@@ -15,13 +15,13 @@ interface CompressOptions {
 }
 
 /**
- * Encode an AudioBuffer as a 16-bit PCM WAV file and return a Blob.
+ * Encode an AudioBuffer as a 24-bit PCM WAV file and return a Blob.
  */
 function encodeWav(buffer: AudioBuffer): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const numSamples = buffer.length;
-  const bytesPerSample = 2;
+  const bytesPerSample = 3;
   const blockAlign = numChannels * bytesPerSample;
   const byteRate = sampleRate * blockAlign;
   const dataSize = numSamples * blockAlign;
@@ -47,7 +47,7 @@ function encodeWav(buffer: AudioBuffer): Blob {
   view.setUint32(offset, sampleRate, true); offset += 4;
   view.setUint32(offset, byteRate, true); offset += 4;
   view.setUint16(offset, blockAlign, true); offset += 2;
-  view.setUint16(offset, 16, true); offset += 2;
+  view.setUint16(offset, 24, true); offset += 2;
   writeString("data");
   view.setUint32(offset, dataSize, true); offset += 4;
 
@@ -61,8 +61,11 @@ function encodeWav(buffer: AudioBuffer): Blob {
     for (let c = 0; c < numChannels; c++) {
       let sample = channels[c][i];
       sample = Math.max(-1, Math.min(1, sample));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-      offset += 2;
+       const value = Math.round(sample < 0 ? sample * 0x800000 : sample * 0x7FFFFF);
+       view.setUint8(offset, value & 0xff);
+       view.setUint8(offset + 1, (value >> 8) & 0xff);
+       view.setUint8(offset + 2, (value >> 16) & 0xff);
+       offset += 3;
     }
   }
 
@@ -77,7 +80,7 @@ export async function compressAudioFile(
   file: File,
   options: CompressOptions = {},
 ): Promise<File> {
-  const { targetRate = 22050, mono = true, onProgress } = options;
+  const { targetRate = 48000, mono = true, onProgress } = options;
 
   onProgress?.(5);
 
@@ -85,7 +88,7 @@ export async function compressAudioFile(
   onProgress?.(15);
 
   const ctx = new AudioContext();
-  const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+  const decoded = await decodeAudioDataSafe(ctx, arrayBuffer);
   onProgress?.(35);
 
   const duration = decoded.duration;
@@ -113,6 +116,30 @@ export async function compressAudioFile(
   await ctx.close().catch(() => {});
 
   return compressedFile;
+}
+
+/**
+ * Chromium/Safari can reject a transferable view into a File buffer when the
+ * file is fragmented or when its byte offset is not zero. Give the decoder a
+ * fresh owned copy on retry. The mastering page no longer needs this path for
+ * ordinary uploads because decoding is server-side, but other audio tools use
+ * the compressor for oversized files.
+ */
+export async function decodeAudioDataSafe(
+  context: BaseAudioContext,
+  bytes: ArrayBuffer,
+): Promise<AudioBuffer> {
+  try {
+    return await context.decodeAudioData(bytes.slice(0));
+  } catch (firstError) {
+    const owned = new Uint8Array(bytes.byteLength);
+    owned.set(new Uint8Array(bytes));
+    try {
+      return await context.decodeAudioData(owned.buffer);
+    } catch {
+      throw firstError;
+    }
+  }
 }
 
 /**

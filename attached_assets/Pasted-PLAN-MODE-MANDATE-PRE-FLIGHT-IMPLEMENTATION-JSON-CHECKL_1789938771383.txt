@@ -1,0 +1,58 @@
+PLAN MODE MANDATE: PRE-FLIGHT IMPLEMENTATION JSON & CHECKLIST
+
+DO NOT WRITE CODE OR EXECUTE CHANGES YET.
+
+Under Morris Law Kernel operating standards, you must remain in PLAN MODE and emit a structured pre-flight plan object before touching any file.
+
+Respond ONLY with a valid JSON object matching this exact schema:
+
+```json
+{
+  "protocol": "GK-SAL_PLAN_LOCK",
+  "task_summary": "Parallel stem duplication, offline multi-stem bounce, touch-scroll horizontal sliders, and MP4 demux mastering fix",
+  "execution_checklist": [
+    {
+      "step_id": 1,
+      "task": "Fix MP4/Video Mastering Pipeline (FFmpeg Demux)",
+      "target_files": ["artifacts/api-server/src/lib/audioGuards.ts", "artifacts/api-server/python/mlk_master.py"],
+      "implementation_details": "Inspect MIME/container; invoke ffmpeg -y -i input -vn -c:a pcm_s24le -ar 44100 to extract clean PCM WAV before MLK V4 processing; enforce 45s hard timeout with SIGKILL.",
+      "completed": false
+    },
+    {
+      "step_id": 2,
+      "task": "Convert Vertical Controls to Horizontal Touch Sliders",
+      "target_files": ["artifacts/gravelkingpro/src/pages/mastering.tsx"],
+      "implementation_details": "Convert fine-tune dials/sliders to horizontal layout; inject CSS touch-action: pan-y to stop touch-drag scrolling.",
+      "completed": false
+    },
+    {
+      "step_id": 3,
+      "task": "Parallel Stem Duplication (Up to 3 Stems)",
+      "target_files": ["artifacts/gravelkingpro/src/pages/mastering.tsx"],
+      "implementation_details": "Add Duplicate Stem button (max 3); share decoded AudioBuffer in memory; instantiate independent StereoPannerNode, 3-band BiquadFilterNodes (100Hz, 2.5kHz, 8kHz), and GainNodes per stem.",
+      "completed": false
+    },
+    {
+      "step_id": 4,
+      "task": "Stem Removal / Trash Can Action",
+      "target_files": ["artifacts/gravelkingpro/src/pages/mastering.tsx"],
+      "implementation_details": "Add trash icon on duplicate stems; cleanly disconnect audio nodes from graph on click and remove from active stem array; protect primary master (Stem 1) from deletion.",
+      "completed": false
+    },
+    {
+      "step_id": 5,
+      "task": "Offline Multi-Stem Mixdown Bounce on Export/Save",
+      "target_files": ["artifacts/gravelkingpro/src/pages/mastering.tsx"],
+      "implementation_details": "Render active stems through OfflineAudioContext; sum all active stem node chains into a 24-bit stereo WAV blob for final export/download.",
+      "completed": false
+    },
+    {
+      "step_id": 6,
+      "task": "Workspace Verification & Production Build",
+      "target_files": ["artifacts/gravelkingpro", "artifacts/api-server"],
+      "implementation_details": "Execute pnpm run build; ensure exit code 0; provide CLI curl receipt verifying MP4 demux transcode.",
+      "completed": false
+    }
+  ],
+  "awaiting_user_approval_to_execute": true
+}

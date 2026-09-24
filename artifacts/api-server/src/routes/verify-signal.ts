@@ -66,7 +66,7 @@ router.post(
       certId: null,
       artist: null,
       certifiedAt: null,
-      kernel: "MLK_v3.5",
+      kernel: "MLK V4 (Morris Law Kernel V4)",
       note: "",
     };
 
@@ -194,7 +194,7 @@ router.post(
 );
 
 // ── GET /api/v1/download-whitepaper (alias: /api/whitepaper.pdf) ──────────────
-// Streams the MLK V3.5 Technical Brief as a styled multi-page PDF document.
+// Streams the MLK V4 Technical Brief as a styled multi-page PDF document.
 const streamWhitepaperPdf = (_req: Request, res: Response) => {
   const pdf = buildWhitepaperPdf();
   res.setHeader("Content-Type", "application/pdf");
@@ -208,12 +208,12 @@ router.get("/v1/download-whitepaper", streamWhitepaperPdf);
 router.get("/whitepaper.pdf", streamWhitepaperPdf);
 
 // ── GET /api/v1/whitepaper-spec ───────────────────────────────────────────────
-// Structured JSON data model of the MLK V3.5 Technical Brief.
+// Structured JSON data model of the MLK V4 Technical Brief.
 // Intended for programmatic partner integration (e.g. PortalBunny API autodiscovery).
 router.get("/v1/whitepaper-spec", (_req: Request, res: Response) => {
   res.json({
     meta: {
-      title: "GravelKing Pro MLK V3.5 — Technical Brief",
+      title: "GravelKing Pro MLK V4 (Morris Law Kernel V4) — Technical Brief",
       version: "3.5.0",
       issuer: "All N One LLC — GravelKing Productions",
       contact: "kevm@gravelkingpro.com",
@@ -222,7 +222,7 @@ router.get("/v1/whitepaper-spec", (_req: Request, res: Response) => {
       publishedAt: "2026-07-22T00:00:00Z",
     },
     technology: {
-      kernel: "MLK_v3.5",
+      kernel: "MLK V4 (Morris Law Kernel V4)",
       method: "LSB dual-anchor steganography",
       anchorA: {
         name: "Nominator",
@@ -265,7 +265,7 @@ router.get("/v1/whitepaper-spec", (_req: Request, res: Response) => {
     api: {
       baseUrl: "https://gravelkingpro.com",
       endpoints: [
-        { method: "POST", path: "/api/v1/ingest", alias: "/api/kernel/master", description: "Submit audio for MLK V3.5 watermarking + mastering. Returns processed stream + X-GK-CertId header.", requiresAuth: true },
+        { method: "POST", path: "/api/v1/ingest", alias: "/api/kernel/master", description: "Submit audio for MLK V4 watermarking + mastering. Returns processed stream + X-GK-CertId header.", requiresAuth: true },
         { method: "POST", path: "/api/v1/verify", alias: "/api/kernel/verify-signal", description: "Public clean-room verification. No auth required. Returns VerifyResult JSON.", requiresAuth: false, medianLatencyMs: 2 },
         { method: "GET", path: "/api/court-cert/:certId", description: "Retrieve structured forensic certificate JSON.", requiresAuth: false },
         { method: "GET", path: "/api/court-cert/:certId.pdf", description: "Download court-ready PDF certificate.", requiresAuth: false },

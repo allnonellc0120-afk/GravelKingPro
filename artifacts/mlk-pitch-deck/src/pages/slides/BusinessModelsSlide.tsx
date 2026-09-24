@@ -55,7 +55,7 @@ export default function BusinessModelsSlide() {
       </div>
 
       <div className="absolute bottom-[4.5vh] left-[6vw] right-[6vw] flex items-center justify-between border-t border-white/10 pt-[1.6vh]">
-        <p className="font-body text-[1vw] tracking-[0.3em] text-muted">MORRIS LAW KERNEL V3.5</p>
+        <p className="font-body text-[1vw] tracking-[0.3em] text-muted">Morris Law Kernel V4</p>
         <p className="font-body text-[1vw] tracking-[0.3em] text-muted">07 / 10</p>
       </div>
     </div>

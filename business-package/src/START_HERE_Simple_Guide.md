@@ -4,7 +4,7 @@ This guide explains, in plain language, what is in your business package and how
 
 ## What you have
 
-You have a complete "go to market" kit for one product: **Morris Law Kernel v3.5** — your audio mastering engine that also stamps songs with proof of who made them.
+You have a complete "go to market" kit for one product: **Morris Law Kernel V4** — your audio mastering engine that also stamps songs with proof of who made them.
 
 Think of the package as three boxes:
 

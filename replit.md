@@ -42,6 +42,7 @@ A gravel-optimisation benchmarking tool with real Stripe subscription payments.
 
 ## Product
 
+- **GKA landing page**: https://site-7pttyhbyr.godaddysites.com/ — GravelKing Advantage positioning: reduce AI token costs up to 80% with zero drift, proxy plumbing, strict schema fidelity, and a five-team free pilot.
 - **Starter (free)**: basic analysis, standard report
 - **Pro ($39.99/mo)**: full real-time metrics, unlimited runs, PDF reports, WAV downloads, priority support
 - **Node Auditor ($499/mo)**: enterprise benchmarking, 1T scale, Morris Law V2 access

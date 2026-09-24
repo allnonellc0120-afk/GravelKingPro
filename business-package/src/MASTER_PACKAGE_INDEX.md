@@ -1,6 +1,6 @@
 # GRAVELKING PRODUCTIONS — MASTER PACKAGE INDEX (v3.5)
 
-**Project:** Morris Law Kernel v3.5 + Court-Grade IP Protection System  
+**Project:** Morris Law Kernel V4 + Court-Grade IP Protection System  
 **Date:** July 25, 2026  
 **Owner:** Kevin Morris / GravelKing Productions
 
@@ -57,4 +57,4 @@ This document serves as the central index for the complete package. All files re
 
 ---
 
-**This is the complete, professional-grade package for Morris Law Kernel v3.5 + IP Protection System.**
+**This is the complete, professional-grade package for Morris Law Kernel V4 + IP Protection System.**

@@ -23,10 +23,10 @@ GravelKing Pro combines:
 - A dual-anchor cryptographic certificate system
 - PostgreSQL plus Firestore certificate backup
 
-The current code uses the labels **MLK v3**, **MLK v3.5**, and **Morris Law Kernel v3.5** in different layers:
+The current code uses the labels **MLK V4 (Morris Law Kernel V4)**, **MLK V4 (Morris Law Kernel V4)**, and **Morris Law Kernel V4** in different layers:
 
 - `kernel-v3.ts` contains the JavaScript/FFmpeg three-band carve and LSB transport helpers.
-- The primary mastering route invokes a local Python worker identified as MLK v3.5.
+- The primary mastering route invokes a local Python worker identified as MLK V4 (Morris Law Kernel V4).
 - API response headers identify mastered output as `MLK_v3.5`.
 
 The Python worker is the sole mastering DSP path in the reviewed master route. FFmpeg is used for ingestion, trimming, denoising, normalization between formats, previews, conversion, and container/codec work.
@@ -99,7 +99,7 @@ The JAX music route creates a private full track and a public 30-second preview,
 
 ### 3.1 Three-Band Carve
 
-The shared MLK v3 implementation divides audio into:
+The shared MLK V4 (Morris Law Kernel V4) implementation divides audio into:
 
 - Low band
 - Mid band
@@ -221,7 +221,7 @@ The server mix route:
 - Supports speed and pitch changes
 - Supports light or heavy noise reduction
 - Returns a PCM WAV
-- Passes the final mix through the fast MLK v3 carve
+- Passes the final mix through the fast MLK V4 (Morris Law Kernel V4) carve
 
 MIDI is rejected because the server route does not include a soundfont synthesizer.
 

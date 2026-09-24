@@ -1,0 +1,30 @@
+CRITICAL PRODUCTION FIX: STRIP LAUNCHSTAG, MOBILE TRANSPORT DOCK LAYOUT & MASTERING PIPELINE
+
+Fix these blocking mobile visual and audio engineering issues immediately:
+
+1. COMPLETELY PURGE LAUNCHSTAG BADGE FROM CODEBASE:
+   - The "FEATURED ON Launchstag" badge is still active and blocking the bottom dock.
+   - Search the entire repository for "launchstag", its external script tag (<script src="...launchstag..."), or any imported widget component.
+   - Remove it completely from index.html, App.tsx, and all layout components. Do not let it mount.
+
+2. MOBILE RESPONSIVE FIX: BOTTOM TRANSPORT DOCK (UNSQUASH CONTROLS):
+   - Problem: On iPhone/mobile screens (portrait), the bottom controls are crushed into the bottom-left corner—time displays, volume fader, and buttons overlap into an unusable mess.
+   - Fix:
+     * Split the mobile bottom dock into a clean 2-row layout using flex-col or a responsive CSS grid:
+       - Row 1: Scrubber timeline, current time / total duration (full width, easy tap targets).
+       - Row 2: Transport controls spaced cleanly: [ Play/Pause ] [ Volume Fader ] [ Mic Monitor ] [ Record Take ].
+     * Ensure touch targets are at least 44x44px and nothing is clipped or overlapping on narrow screens (max-w-[430px]).
+
+3. RESOLVE "413 REQUEST ENTITY TOO LARGE" & ADD VIDEO-TO-AUDIO EXTRACTION:
+   - Problem: Uploading a video from the camera roll to master crashes the server with a raw 413 error.
+   - Fix:
+     * Increase Express/backend payload limit to 250MB (`express.json({ limit: '250mb' })`, `express.urlencoded({ limit: '250mb', extended: true })`, and multer upload ceiling).
+     * If an uploaded file is a video (.mov, .mp4, .m4v), immediately extract and compress/demux the audio stream into PCM WAV or 320kbps MP3 before running the MLK mastering chain, discarding the video stream.
+
+4. FIX ZERO-BYTE WAV & FAILED MP3 DOWNLOADS:
+   - Problem: When stems are duplicated in Studio, "Download WAV" delivers a 0 KB file and "Download MP3" fails.
+   - Fix:
+     * Ensure the mixdown/stem-duplication route flushes the full rendered audio buffer into the encoder.
+     * Ensure WAV file generation writes non-zero RIFF headers and MP3 encoding returns valid binary streams with proper attachment headers.
+
+Run `PORT=5000 BASE_PATH=/ pnpm run build`, confirm exit code 0, test on an iPhone portrait viewport, and verify the dock is clear and functional.

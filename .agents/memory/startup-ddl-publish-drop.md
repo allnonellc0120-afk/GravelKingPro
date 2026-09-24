@@ -10,4 +10,5 @@ Publish diffs the **Drizzle schema (as pushed to the dev DB)** against productio
 **How to apply:**
 - Every operational/bookkeeping table the server creates at startup must also be defined in `lib/db/src/schema/` and exported from the schema index.
 - After adding it, run the dev push (`pnpm --filter @workspace/db run push-force`). Drizzle prompts "created or renamed?" — pick **create table**; the prompt needs a PTY (use a small Python `pty.fork` driver; plain shell and `script` time out).
+- A piped newline through `script` is not a reliable selector for Drizzle's interactive menu; use a real PTY driver or apply the idempotent migration through the existing bootstrap path.
 - Always run `explainSchemaDiff()` before declaring republish-ready and require `tablesToRemove` to be empty unless the drop is explicitly intended.

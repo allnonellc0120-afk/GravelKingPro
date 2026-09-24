@@ -88,7 +88,10 @@ function PaymentForm({ intentType, onSuccess, onCancel, submitLabel }: Omit<Stri
            fields: {
              billingDetails: {
                address: "auto",
-               phone: "never",
+                // Do not opt out of phone collection unless confirmPayment
+                // supplies payment_method_data.billing_details.phone. "auto"
+                // lets Stripe collect it only for payment methods that need it.
+                phone: "auto",
              },
            },
          }}

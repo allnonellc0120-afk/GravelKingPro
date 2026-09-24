@@ -79,7 +79,7 @@ Hi [First Name],
 
 I noticed [Company Name] is doing interesting work in [their space].
 
-We’ve built Morris Law Kernel v3.5 — a production-ready adaptive mastering engine with built-in court-grade IP protection (cryptographic signing, perceptual hashing, and verification API).
+We’ve built Morris Law Kernel V4 — a production-ready adaptive mastering engine with built-in court-grade IP protection (cryptographic signing, perceptual hashing, and verification API).
 
 It could be a strong differentiator for platforms that want to offer both superior sound quality and real ownership tools to creators.
 

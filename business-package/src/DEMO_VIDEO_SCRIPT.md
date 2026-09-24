@@ -1,4 +1,4 @@
-# Demo Video Script — Morris Law Kernel v3.5 + IP Protection (2–4 minutes)
+# Demo Video Script — Morris Law Kernel V4 + IP Protection (2–4 minutes)
 
 ## Video Style
 - Screen recording + voiceover (Loom or similar)
@@ -24,7 +24,7 @@ There’s been no good middle ground — until now."
 ### 1:00 – 2:30 | The Solution – Live Demo
 **Show the Streamlit app (app.py)**
 
-"Here’s Morris Law Kernel v3.5 in action.
+"Here’s Morris Law Kernel V4 in action.
 
 [Upload audio]
 

@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://gravelkingpro.com/sitemap.xml
+Sitemap: https://gravelkingpro.com/news/sitemap.xml

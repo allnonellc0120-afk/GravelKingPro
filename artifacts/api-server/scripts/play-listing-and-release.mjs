@@ -43,7 +43,7 @@ await j(await fetch(`${E}/listings/en-US`, {
 
 FEATURES
 
-• AI Mastering — powered by the Morris Law Kernel v3.5 multi-band mastering engine. Upload a track, get a professional master.
+• AI Mastering — powered by the Morris Law Kernel V4 multi-band mastering engine. Upload a track, get a professional master.
 • Vocal Booth — record vocals with live effects and precise karaoke-style synced lyrics.
 • Karaoke DAW — a full in-browser studio with EQ, effects, and stem workflows.
 • IP Rights Certification — get a cryptographic authorship certificate for your music that no one can dispute.

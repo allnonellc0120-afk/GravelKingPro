@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { styleAuthorshipScore } from "@workspace/authorship";
 import { BeforeAfterDemo } from "@/components/before-after-demo";
 import { MasteringEqPanel } from "@/components/mastering-eq";
+import { StemRack } from "@/components/stem-rack";
 import { Layout } from "@/components/layout";
 import { ToolHelp } from "@/components/tool-help";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,8 +25,7 @@ import {
   renderMasteringEqWav,
   type MasteringEqExportStage,
 } from "@/lib/mastering-eq";
-import { compressAudioFile, shouldCompress } from "@/lib/audioCompressor";
-import { EmailGate, useEmailGate } from "@/components/email-gate";
+import { useEmailGate } from "@/components/email-gate";
 import { StripePaymentForm } from "@/components/stripe-payment-form";
 import { ExportQuotaBadge } from "@/components/export-quota-badge";
 import { formatResetDate, useExportQuota } from "@/hooks/use-export-quota";
@@ -227,7 +227,7 @@ export default function Mastering() {
   // Lyric Studio generate card).
   const hasProAccess = hasSplits || isDeveloper;
   // Set when the loaded input came from the user's vault (?gkTrack=…) — only
-  // those tracks can be remixed through the MLK v3.5 Remix Engine.
+  // those tracks can be remixed through the MLK V4 Remix Engine.
   const [gkLoaded, setGkLoaded] = useState<{ id: string; title: string } | null>(null);
   const [remixOpen, setRemixOpen] = useState(false);
   // Direct upload is preserved but collapsed — the primary entry is
@@ -275,6 +275,7 @@ export default function Mastering() {
   const { balance: creditsBalance, refresh: refreshCredits } = useCredits();
   const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
   const [exportingMp3, setExportingMp3] = useState(false);
+  const [masterJobId, setMasterJobId] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -306,9 +307,11 @@ export default function Mastering() {
       return true;
     }
     if (job.status !== "completed") {
+      setMasterJobId(jobId);
       setState("processing");
       return false;
     }
+    setMasterJobId(jobId);
     const download = payload.downloadUrl ?? `/api/jobs/${encodeURIComponent(jobId)}/download`;
     setDownloadHref(download);
     const audioResponse = await fetch(download, { credentials: "include" });
@@ -358,6 +361,7 @@ export default function Mastering() {
   ) => {
     setFileName(file.name);
     setResultUrl(null);
+    setMasterJobId(null);
     setCertId(null);
     setErrorMsg("");
     setEqOpen(false);
@@ -365,33 +369,13 @@ export default function Mastering() {
     setPostEqGain(0);
     setExportError("");
 
-    let uploadFile = file;
-
-    // If the file is large, compress client-side before upload so it sails
-    // through the production proxy limit (~30 MB).
-    if (shouldCompress(file)) {
-      setState("compressing");
-      setProgress(5);
-      try {
-        uploadFile = await compressAudioFile(file, {
-          targetRate: 22050,
-          mono: true,
-          onProgress: (pct) => setProgress(Math.round(pct * 0.4)), // 0–40%
-        });
-      } catch (err: any) {
-        setState("error");
-        const msg = err.message ?? "Compression failed";
-        setErrorMsg(msg);
-        toast({ title: "Pre-processing failed", description: msg, variant: "destructive" });
-        return;
-      }
-    }
-
     setState("processing");
-    setProgress(40);
+    setProgress(5);
 
     const fd = new FormData();
-    fd.append("audio", uploadFile);
+    // Preserve the original bytes and filename. The server's ffmpeg ingest
+    // pass handles containers/codecs that browser AudioContext cannot decode.
+    fd.append("audio", file);
     fd.append("mode", "master");
     fd.append("preset", selectedPreset);
     fd.append("denoise", String(denoise));
@@ -472,6 +456,7 @@ export default function Mastering() {
       if (rem !== null) setRemaining(parseInt(rem));
       const certificationStatus = resp.headers.get("X-GK-Certification");
       const serverJobId = resp.headers.get("X-GK-Master-Job-Id");
+      setMasterJobId(serverJobId);
       if (serverJobId) localStorage.setItem(ACTIVE_MASTER_JOB_KEY, serverJobId);
       if (certify && certificationStatus === "sealed-local") {
         toast({
@@ -545,7 +530,7 @@ export default function Mastering() {
     setState("idle");
   };
 
-  // MLK v3.5 generate-master handoff: when the Lyric Studio finishes an
+  // MLK V4 generate-master handoff: when the Lyric Studio finishes an
   // in-house generation it redirects here with ?gkTrack=<vault track id>.
   // Pull the generated audio from the user's vault and preload it as the
   // selected input — the existing Mastering Tool UI handles everything else
@@ -666,15 +651,39 @@ export default function Mastering() {
   const downloadMp3 = async () => {
     if (!resultUrl || exportingMp3) return;
     setExportingMp3(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 5 * 60_000);
     try {
-      const mastered = await fetch(resultUrl).then((response) => response.blob());
-      const body = new FormData();
-      body.append("audio", mastered, "gravelking_mastered.wav");
-      const response = await fetch("/api/kernel/export-result-mp3", {
-        method: "POST",
-        credentials: "include",
-        body,
-      });
+      let response: Response;
+      if (masterJobId) {
+        // The server already has the finalized WAV in private object storage.
+        // Send the job id instead of uploading the full WAV a second time.
+        response = await fetch("/api/kernel/export-result-mp3", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ masterJobId }),
+          signal: controller.signal,
+        });
+      } else {
+        // Compatibility path for older/recovered results that predate the
+        // durable job id handoff.
+        const masteredResponse = await fetch(resultUrl, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (!masteredResponse.ok) {
+          throw new Error(`Could not load mastered audio (HTTP ${masteredResponse.status}).`);
+        }
+        const body = new FormData();
+        body.append("audio", await masteredResponse.blob(), "gravelking_mastered.wav");
+        response = await fetch("/api/kernel/export-result-mp3", {
+          method: "POST",
+          credentials: "include",
+          body,
+          signal: controller.signal,
+        });
+      }
       if (!response.ok) {
         const data = await response.json().catch(() => ({})) as {
           error?: string;
@@ -696,12 +705,21 @@ export default function Mastering() {
       downloadBlob(mp3, `gravelking_mastered_${preset}.mp3`);
       await refreshCredits();
     } catch (error) {
+      if (controller.signal.aborted) {
+        toast({
+          title: "MP3 export timed out",
+          description: "Please try again while keeping the app open.",
+          variant: "destructive",
+        });
+        return;
+      }
       toast({
         title: "MP3 download failed",
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
     } finally {
+      window.clearTimeout(timeoutId);
       setExportingMp3(false);
     }
   };
@@ -731,13 +749,6 @@ export default function Mastering() {
     setExportingEq(false);
   };
 
-  if (emailGate.gated) {
-    return (
-      <Layout>
-        <EmailGate tool="mastering" onUnlocked={emailGate.unlock} />
-      </Layout>
-    );
-  }
 
   const busy = state === "compressing" || state === "processing";
   const selectedPreset = PRESETS.find(p => p.id === preset)!;
@@ -746,6 +757,18 @@ export default function Mastering() {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto space-y-6">
+        <Link href="/studio/track-prep" data-testid="studio-track-prep-launch" className="group flex items-center justify-between gap-4 rounded-2xl border border-amber-300/35 bg-gradient-to-r from-amber-400/15 via-amber-300/5 to-transparent p-5 transition-colors hover:border-amber-300/60 hover:from-amber-400/25">
+          <div className="flex items-center gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-400 text-xl shadow-[0_0_20px_rgba(251,191,36,0.3)]">🎙️</span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300/80">Main Stage prep</p>
+              <p className="mt-0.5 text-base font-black tracking-tight text-foreground">Track &amp; Lyric Prep</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Upload stems, time lyrics, and prep songs for Main Stage</p>
+            </div>
+          </div>
+          <Download className="h-5 w-5 shrink-0 rotate-[-90deg] text-amber-300 transition-transform group-hover:translate-x-1" />
+        </Link>
+
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Wand2 className="w-5 h-5 text-sky-400" />
@@ -764,24 +787,24 @@ export default function Mastering() {
                 "Choose a preset that matches the genre or feel.",
                 "Preview the master, then download it.",
               ]}
-              note="Runs locally with MLK v3 — your audio is never uploaded to a third party."
+              note="Runs locally with MLK V4 (Morris Law Kernel V4) — your audio is never uploaded to a third party."
             />
           </div>
            <p className="text-sm text-muted-foreground">
-            Apply a professional mastering chain with optional denoise. Runs locally with MLK v3 — no upload to third parties.
+            Apply a professional mastering chain with optional denoise. Runs locally with MLK V4 (Morris Law Kernel V4) — no upload to third parties.
           </p>
            <p className="mt-2 text-xs text-sky-300">
              Wallet: {creditsBalance === null ? "sign in to view your balance" : `${creditsBalance} credits`} · MP3: 50 credits · WAV: 100 credits · Certificate: free with Pro
            </p>
         </div>
 
-        {/* MLK v3.5 Remix Engine — only for tracks loaded from the user's vault */}
+        {/* MLK V4 Remix Engine — only for tracks loaded from the user's vault */}
         {gkLoaded && (
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate">“{gkLoaded.title}”</p>
               <p className="text-[11px] text-muted-foreground">
-                Generated with MLK v3.5 — spin a new variation that keeps its identity, with a child IP cert linked to the original.
+                Generated with MLK V4 — spin a new variation that keeps its identity, with a child IP cert linked to the original.
               </p>
             </div>
             <Button
@@ -789,7 +812,7 @@ export default function Mastering() {
                 if (!hasProAccess) {
                   toast({
                     title: "GravelKing Pro required",
-                    description: "Upgrade to GravelKing Pro to remix tracks with MLK v3.5.",
+                    description: "Upgrade to GravelKing Pro to remix tracks with MLK V4.",
                     variant: "destructive",
                   });
                   return;
@@ -802,7 +825,7 @@ export default function Mastering() {
                 : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed hover:bg-muted"}`}
             >
               <Shuffle className="w-4 h-4 mr-2" />
-              Remix Track with MLK v3.5{!hasProAccess && " — Pro"}
+              Remix Track with MLK V4{!hasProAccess && " — Pro"}
             </Button>
           </div>
         )}
@@ -869,7 +892,7 @@ export default function Mastering() {
                 </CardContent>
               </Card>
             )}
-            <input ref={fileInputRef} type="file" accept=".mp3,.wav,.flac,.m4a,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv,.ogg,.aiff,.aac" className="hidden" onChange={(e) => handleFile(e.target.files)} />
+            <input ref={fileInputRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,.aiff,.mp4,.mov,.m4v,.avi,.mkv,.webm,.wmv,.flv" className="hidden" onChange={(e) => handleFile(e.target.files)} />
           </motion.div>
         ) : null}
 
@@ -914,9 +937,9 @@ export default function Mastering() {
             <div className="p-3 rounded-lg border border-sky-500/20 bg-sky-500/5 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-sky-300">Kernel Intensity</p>
+                  <p className="text-sm font-medium text-sky-300">Mastering Drive / Loudness Power</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    How hard the MLK v3 mastering chain pushes the signal. 75 is the tuned default.
+                    How much the MLK V4 mastering chain shapes the signal. 75 is the tuned default.
                   </p>
                 </div>
                 <span className="text-2xl font-black text-sky-300 leading-none tabular-nums">{intensity}</span>
@@ -929,6 +952,7 @@ export default function Mastering() {
                 step={1}
                 data-testid="slider-master-intensity"
                 className="w-full"
+                 style={{ touchAction: "pan-y" }}
               />
               <div className="flex justify-between text-[10px] text-muted-foreground/50 select-none">
                 <span>Subtle</span>
@@ -937,10 +961,10 @@ export default function Mastering() {
               </div>
             </div>
 
-            {/* Sidechain compressor */}
+            {/* Bass clarity and punch */}
             <div className="p-3 rounded-lg border border-violet-500/20 bg-violet-500/5 space-y-3">
               <div>
-                <p className="text-sm font-medium text-violet-300">Sidechain Compressor</p>
+                <p className="text-sm font-medium text-violet-300">Bass Clarity &amp; Punch (Prevents Mud)</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Filters the detector signal so bass/kick don't pump the compressor. Recommended: Highpass at 160 Hz.
                 </p>
@@ -965,7 +989,7 @@ export default function Mastering() {
               {sidechainFilter !== "none" && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">Detector cutoff frequency</p>
+                    <p className="text-xs text-muted-foreground">Bass Focus Range</p>
                     <span className="text-sm font-black text-violet-300 tabular-nums">{sidechainFreq} Hz</span>
                   </div>
                   <Slider
@@ -976,6 +1000,7 @@ export default function Mastering() {
                     step={5}
                     data-testid="slider-sidechain-freq"
                     className="w-full"
+                   style={{ touchAction: "pan-y" }}
                   />
                   <div className="flex justify-between text-[10px] text-muted-foreground/50 select-none">
                     <span>60 Hz</span>
@@ -987,7 +1012,7 @@ export default function Mastering() {
               {/* Adaptive mode */}
               {sidechainFilter !== "none" && (
                 <div className="space-y-1 pt-1">
-                  <p className="text-xs font-medium text-violet-300/80">Adaptive Mode</p>
+                  <p className="text-xs font-medium text-violet-300/80">Smart Low-End Smoothing</p>
                   <div className="flex gap-2">
                     {(["bass_aware","off"] as const).map(opt => (
                       <button
@@ -999,7 +1024,7 @@ export default function Mastering() {
                             : "border-border/30 bg-card/20 text-muted-foreground hover:border-border/60"
                         }`}
                       >
-                        {opt === "bass_aware" ? "Bass Aware ✦" : "Fixed"}
+                        {opt === "bass_aware" ? "Smart ✦" : "Fixed"}
                       </button>
                     ))}
                   </div>
@@ -1011,7 +1036,7 @@ export default function Mastering() {
                 </div>
               )}
 
-              {/* Auto threshold */}
+              {/* Automatic punch balancing */}
               {sidechainFilter !== "none" && (
                 <div className="space-y-2 pt-1 border-t border-violet-500/10">
                   <div className="flex items-center gap-3">
@@ -1023,7 +1048,7 @@ export default function Mastering() {
                       className="w-4 h-4 accent-violet-500"
                     />
                     <label htmlFor="autothreshold" className="text-xs font-medium cursor-pointer text-violet-300">
-                      Auto Threshold <span className="text-muted-foreground/60 font-normal">— measured from your track's RMS (set-and-forget)</span>
+                      Automatic Punch Balancing <span className="text-muted-foreground/60 font-normal">— measured from your track's loudness (set-and-forget)</span>
                     </label>
                   </div>
                   {autoThreshold && (
@@ -1040,6 +1065,7 @@ export default function Mastering() {
                         step={0.5}
                         data-testid="slider-auto-threshold-offset"
                         className="w-full"
+                         style={{ touchAction: "pan-y" }}
                       />
                       <div className="flex justify-between text-[10px] text-muted-foreground/50 select-none">
                         <span>−30 dB (gentle)</span>
@@ -1051,7 +1077,7 @@ export default function Mastering() {
                 </div>
               )}
 
-              {/* Stereo link */}
+              {/* Balanced left/right mastering */}
               <div className="flex items-center gap-3 pt-1">
                 <input
                   type="checkbox"
@@ -1061,7 +1087,7 @@ export default function Mastering() {
                   className="w-4 h-4 accent-violet-500"
                 />
                 <label htmlFor="stereolink" className="text-xs cursor-pointer text-muted-foreground">
-                  Stereo link <span className="text-muted-foreground/60">— both channels compress together (recommended for mastering)</span>
+                  Balanced Left/Right Mastering <span className="text-muted-foreground/60">— both channels stay in sync (recommended for mastering)</span>
                 </label>
               </div>
             </div>
@@ -1303,7 +1329,7 @@ export default function Mastering() {
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
                     <BeforeAfterDemo
                       before={{ label: "Before", sub: "Your original upload", src: beforeUrl }}
-                      after={{ label: "After", sub: `MLK v3 — ${selectedPreset.label}`, src: resultUrl }}
+                      after={{ label: "After", sub: `MLK V4 (Morris Law Kernel V4) — ${selectedPreset.label}`, src: resultUrl }}
                       bandGains={eqBandGains}
                       postEqGain={postEqGain}
                       heading="Hear the difference"
@@ -1329,6 +1355,8 @@ export default function Mastering() {
                     />
                   </div>
                 )}
+
+                <StemRack sourceUrl={resultUrl} fileName={fileName} />
 
                 {certId && <CertUnlockCard certId={certId} />}
 
@@ -1450,7 +1478,7 @@ export default function Mastering() {
           {[
             { label: "11 presets", desc: "Platform-tuned targets" },
             { label: "100% local", desc: "Runs on your server" },
-            { label: "MLK v3", desc: "Multi-band processing" },
+            { label: "MLK V4 (Morris Law Kernel V4)", desc: "Multi-band processing" },
           ].map((i) => (
             <div key={i.label} className="p-3 rounded-lg border border-border/20 bg-card/30 space-y-1">
               <p className="font-medium text-foreground/80">{i.label}</p>
@@ -1465,7 +1493,7 @@ export default function Mastering() {
             <h2 className="text-base font-semibold text-foreground/90">How audio mastering works</h2>
             <p className="text-muted-foreground leading-relaxed">
               GravelKing Pro applies the{" "}
-              <strong className="text-foreground/70">MLK v3 multi-band kernel</strong> server-side
+              <strong className="text-foreground/70">MLK V4 (Morris Law Kernel V4) multi-band kernel</strong> server-side
               to your uploaded audio. The process runs a loudness pass targeting your chosen preset's
               LUFS standard, applies multi-band compression and EQ shaping, optionally runs a
               spectral denoise sweep, and returns a fully processed WAV — all without requiring

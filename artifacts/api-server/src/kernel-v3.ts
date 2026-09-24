@@ -15,7 +15,7 @@ export interface MLKv3Stats {
 }
 
 /**
- * MLK v3 — Morris Law Kernel V3
+ * MLK V4 (Morris Law Kernel V4) — Morris Law Kernel V4
  * Multi-band amplitude carving with phase-coherent recombination and adaptive normalization.
  * Extends gravelking_opt with 3-band parallel processing.
  */
@@ -111,7 +111,7 @@ export function float32ToBuffer(samples: Float32Array): Buffer {
 
 // ── Shared WAV helper ─────────────────────────────────────────────────────────
 // Every audio route that produces a WAV runs its output through `applyMLKv3` so
-// the whole app applies the GravelKing MLK v3 protocol consistently.
+// the whole app applies the GravelKing MLK V4 (Morris Law Kernel V4) protocol consistently.
 
 interface WavFormat {
   numChannels:   number;
@@ -174,6 +174,26 @@ export function isValidWav(buf: Buffer): boolean {
   }
 }
 
+/** Certification outputs must remain canonical 48 kHz, 24-bit PCM WAV. */
+export function assertCanonicalPcm24Wav(buf: Buffer): void {
+  const { numChannels, sampleRate, bitsPerSample, dataOffset, dataSize } = parseWav(buf);
+  if (numChannels < 1 || sampleRate !== 48_000 || bitsPerSample !== 24) {
+    throw new Error(
+      `Expected canonical PCM24 WAV (48 kHz), received ${numChannels}ch/${sampleRate}Hz/${bitsPerSample}-bit`,
+    );
+  }
+  if (dataSize % (numChannels * 3) !== 0) {
+    throw new Error("24-bit WAV data is not aligned to complete sample frames");
+  }
+  const pcm = buf.subarray(dataOffset, dataOffset + dataSize);
+  for (let offset = 0; offset + 3 <= pcm.length; offset += 3) {
+    const sample = pcm.readIntLE(offset, 3);
+    if (sample < -8_388_608 || sample > 8_388_607) {
+      throw new Error("24-bit watermark output contains a clipped sample boundary");
+    }
+  }
+}
+
 // ── LSB Watermark — opaque bit transport ─────────────────────────────────────
 //
 // This module ONLY moves bytes in/out of audio sample LSBs.
@@ -194,25 +214,27 @@ export function isValidWav(buf: Buffer): boolean {
 const GKP_MAGIC = Buffer.from("GKPW\x03"); // 5 bytes, format version 3
 
 /** Read `bytes` bytes from PCM LSBs starting at `startSample`. */
-function lsbRead(pcm: Buffer, startSample: number, bytes: number): Buffer {
+function lsbRead(pcm: Buffer, startSample: number, bytes: number, sampleBytes: number): Buffer {
   const out = Buffer.alloc(bytes);
   for (let b = 0; b < bytes * 8; b++) {
-    const off = (startSample + b) * 2;
-    if (off + 2 > pcm.length) break;
+    const off = (startSample + b) * sampleBytes;
+    if (off + sampleBytes > pcm.length) break;
     const byteIdx = b >> 3;
     const bitIdx  = 7 - (b & 7);
-    out[byteIdx]  = (out[byteIdx] & ~(1 << bitIdx)) | ((pcm.readInt16LE(off) & 1) << bitIdx);
+    out[byteIdx]  = (out[byteIdx] & ~(1 << bitIdx)) |
+      ((pcm.readIntLE(off, sampleBytes) & 1) << bitIdx);
   }
   return out;
 }
 
 /** Write `data` bytes into PCM LSBs starting at `startSample`. Mutates pcm. */
-function lsbWrite(pcm: Buffer, startSample: number, data: Buffer): void {
+function lsbWrite(pcm: Buffer, startSample: number, data: Buffer, sampleBytes: number): void {
   for (let b = 0; b < data.length * 8; b++) {
-    const off = (startSample + b) * 2;
-    if (off + 2 > pcm.length) break;
+    const off = (startSample + b) * sampleBytes;
+    if (off + sampleBytes > pcm.length) break;
     const bitVal = (data[b >> 3] >> (7 - (b & 7))) & 1;
-    pcm.writeInt16LE((pcm.readInt16LE(off) & ~1) | bitVal, off);
+    const sample = pcm.readIntLE(off, sampleBytes);
+    pcm.writeIntLE((sample & ~1) | bitVal, off, sampleBytes);
   }
 }
 
@@ -223,17 +245,23 @@ function lsbWrite(pcm: Buffer, startSample: number, data: Buffer): void {
  */
 export function embedLsbPayload(wavBuf: Buffer, payload: Buffer): Buffer {
   const { numChannels, sampleRate, bitsPerSample, dataOffset, dataSize } = parseWav(wavBuf);
+  if (bitsPerSample !== 16 && bitsPerSample !== 24) {
+    throw new Error(`Certification watermark requires 16-bit or 24-bit PCM, received ${bitsPerSample}-bit audio`);
+  }
+  const sampleBytes = bitsPerSample / 8;
 
   const frame = Buffer.alloc(GKP_MAGIC.length + 2 + payload.length);
   GKP_MAGIC.copy(frame, 0);
   frame.writeUInt16BE(payload.length, GKP_MAGIC.length);
   payload.copy(frame, GKP_MAGIC.length + 2);
 
-  if (Math.floor(dataSize / 2) < frame.length * 8) return wavBuf; // too short
+  if (Math.floor(dataSize / sampleBytes) < frame.length * 8) return wavBuf; // too short
 
   const pcm = Buffer.from(wavBuf.subarray(dataOffset, dataOffset + dataSize));
-  lsbWrite(pcm, 0, frame);
-  return Buffer.concat([buildWavHeader(numChannels, sampleRate, bitsPerSample, pcm.length), pcm]);
+  lsbWrite(pcm, 0, frame, sampleBytes);
+  const stamped = Buffer.concat([buildWavHeader(numChannels, sampleRate, bitsPerSample, pcm.length), pcm]);
+  if (bitsPerSample === 24 && sampleRate === 48_000) assertCanonicalPcm24Wav(stamped);
+  return stamped;
 }
 
 /**
@@ -243,18 +271,20 @@ export function embedLsbPayload(wavBuf: Buffer, payload: Buffer): Buffer {
  */
 export function extractLsbPayload(wavBuf: Buffer): Buffer | null {
   try {
-    const { dataOffset, dataSize } = parseWav(wavBuf);
+    const { dataOffset, dataSize, bitsPerSample } = parseWav(wavBuf);
     const pcm        = wavBuf.subarray(dataOffset, dataOffset + dataSize);
     const hdrSize    = GKP_MAGIC.length + 2;
-    if (Math.floor(dataSize / 2) < hdrSize * 8) return null;
+    const sampleBytes = bitsPerSample / 8;
+    if (sampleBytes !== 2 && sampleBytes !== 3) return null;
+    if (Math.floor(dataSize / sampleBytes) < hdrSize * 8) return null;
 
-    const hdr = lsbRead(pcm, 0, hdrSize);
+    const hdr = lsbRead(pcm, 0, hdrSize, sampleBytes);
     if (!hdr.subarray(0, GKP_MAGIC.length).equals(GKP_MAGIC)) return null;
 
     const len = hdr.readUInt16BE(GKP_MAGIC.length);
-    if (Math.floor(dataSize / 2) < (hdrSize + len) * 8) return null;
+    if (Math.floor(dataSize / sampleBytes) < (hdrSize + len) * 8) return null;
 
-    return lsbRead(pcm, hdrSize * 8, len);
+    return lsbRead(pcm, hdrSize * 8, len, sampleBytes);
   } catch {
     return null;
   }
@@ -287,7 +317,7 @@ function buildWavHeader(
 }
 
 /**
- * Apply the MLK v3 kernel to a pcm_s16le WAV buffer: parse the WAV, carve the
+ * Apply the MLK V4 (Morris Law Kernel V4) kernel to a pcm_s16le WAV buffer: parse the WAV, carve the
  * PCM payload through `mlk_v3`, and re-encode with a canonical header. This is
  * the single shared entry point used by every audio route.
  */
@@ -304,7 +334,7 @@ export function applyMLKv3(wavBuf: Buffer, multiplier: number = 0.75): { buf: Bu
 }
 
 /**
- * Fast MLK v3 carve, run entirely in ffmpeg: 3-band split (low/mid/high) →
+ * Fast MLK V4 (Morris Law Kernel V4) carve, run entirely in ffmpeg: 3-band split (low/mid/high) →
  * per-band gain → recombine → adaptive normalization. This is the canonical
  * hot-path carve used by every audio route (separation, mastering, studio mix).
  *

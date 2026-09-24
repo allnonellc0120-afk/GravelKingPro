@@ -1,0 +1,79 @@
+{
+  "target": "gravelking-pro-agent",
+  "action": "CONSTRUCT_ACTUAL_VISUAL_CONCERT_STAGE_GRAPHICS",
+  "enforcement_protocol": "STRICT_NO_SHORTCUTS_ZERO_MOCKS",
+  "audit_rules": [
+    "No reward hacking: do not simply change CSS colors or border hex codes and claim the stage is built.",
+    "No lying or simulating: every element must exist as actual DOM/SVG nodes in code.",
+    "No mocks: audio-reactive states and timers must bind to real Web Audio API analysers and browser clocks.",
+    "No placeholders: build real components, not empty container shells."
+  ],
+  "checklist": [
+    {
+      "task_id": "STAGE-ENV-01",
+      "title": "Concert Arena Lighting Truss & Volumetric Spotlights",
+      "instruction": "In artifacts/gravelkingpro/src/components/live-performance-stage.tsx, construct an arena ceiling truss rendering 3 angled SVG/CSS volumetric spotlight beams targeting the stage floor with dynamic opacity and rhythm pulses.",
+      "five_point_test": [
+        "1. DOM check: SVG/CSS spotlight nodes exist and render inside the viewport.",
+        "2. Coordinate check: Spotlight origins anchor at top truss and project downward at distinct angles.",
+        "3. Animation check: Spotlights use hardware-accelerated CSS keyframes (opacity/transform), not static images.",
+        "4. Non-mock check: Pulses react to real playback state without hardcoded mock timeouts.",
+        "5. Zero-asset check: Built entirely with code (SVG/CSS), zero external MP4/PNG image files added."
+      ]
+    },
+    {
+      "task_id": "STAGE-FLOOR-02",
+      "title": "3D Perspective Stage Deck & LED Perimeter",
+      "instruction": "Build an illuminated concert stage floor with 3D perspective (perspective: 600px, rotateX: 45deg) featuring grid deck tiles, ambient light reflections, and perimeter LED border lighting.",
+      "five_point_test": [
+        "1. Transform check: 3D perspective styling is applied and renders with correct depth axes.",
+        "2. Surface check: Floor grid tiles and reflection layers are distinct DOM elements with proper z-indexing.",
+        "3. Perimeter check: LED strip borders are visible at the stage boundaries with glow styling.",
+        "4. Layout check: Renders responsively across mobile screen widths without horizontal viewport overflow.",
+        "5. Performance check: Uses GPU-friendly transform properties without layout thrashing."
+      ]
+    },
+    {
+      "task_id": "STAGE-JUMBOTRON-03",
+      "title": "Curved Jumbotron Teleprompter & Neon Cadence Ribbon",
+      "instruction": "Replace standard flat lyric text with a curved Jumbotron display: dark smoked-glass frame, subtle mesh texture, high-contrast kinetic lyric illumination, and an integrated horizontal Cadence Ribbon with hold bars and breath gaps.",
+      "five_point_test": [
+        "1. Frame check: Jumbotron bezel renders with glassmorphism (backdrop-filter) and rounded housing.",
+        "2. Ribbon check: Cadence blocks calculate width strictly from (endTimeMs - startTimeMs).",
+        "3. Breath check: Gaps between singing segments render as clear empty intervals.",
+        "4. Teleprompter check: Active lyric line scales and illuminates upon crossing the strike cursor.",
+        "5. Sync check: Driven by audioContext.currentTime or audio element clock, zero setInterval drift."
+      ]
+    },
+    {
+      "task_id": "STAGE-RISERS-04",
+      "title": "Performer Stage Risers with Audio-Reactive Rings",
+      "instruction": "Anchor Host and Partner avatars onto 3D metallic stage risers on the deck. Surround each riser with dynamic CSS ring flares bound directly to real live microphone AnalyserNode frequency levels.",
+      "five_point_test": [
+        "1. Structure check: Risers render as distinct beveled pedestals below performer avatars.",
+        "2. Data check: Connects to real Web Audio AnalyserNode getByteFrequencyData output.",
+        "3. Reactivity check: CSS ring scale and glow dynamically alter when mic input is detected.",
+        "4. Duet check: Host and Partner risers maintain independent visual nodes and status badges.",
+        "5. Silence check: Rings rest at baseline scale when mic input is zero (no fake continuous pulsing)."
+      ]
+    },
+    {
+      "task_id": "STAGE-INTEGRATION-05",
+      "title": "Duet & Vocal Booth Stage Integration",
+      "instruction": "Mount live-performance-stage.tsx into artifacts/gravelkingpro/src/pages/duet.tsx (auto-swapping when double-ready finishes) and artifacts/gravelkingpro/src/pages/vocal-booth.tsx (replacing the empty black void in Studio Mode).",
+      "five_point_test": [
+        "1. Duet check: Duet room collapses lobby setup cards and mounts full-screen stage on live start.",
+        "2. Booth check: Vocal Booth 'Studio Mode' renders full concert stage instead of the empty screen.",
+        "3. Audio check: Recording pipeline and low-latency monitoring remain uninterrupted on stage load.",
+        "4. Exit check: Users can cleanly exit the stage back to lobby/booth with controls intact.",
+        "5. Build check: Full TypeScript compilation and production build pass with zero errors."
+      ]
+    }
+  ],
+  "verification_required": {
+    "frontend_typecheck": "passed",
+    "production_build": "passed",
+    "all_five_point_tests": "confirmed_and_signed_off"
+  },
+  "required_output_format": "RAW_JSON_RECEIPT_ONLY"
+}

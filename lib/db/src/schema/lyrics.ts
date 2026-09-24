@@ -23,7 +23,7 @@ export const lyricProjectsTable = pgTable("lyric_projects", {
   // ── Generated content ─────────────────────────────────────────────────────
   aiDraft: text("ai_draft").notNull(),            // original Gemini output — never mutated
   currentContent: text("current_content").notNull(), // full text reconstructed from lines
-  stylePrompt: text("style_prompt"),              // Gemini-generated style prompt for the in-house MLK v3.5 generator
+  stylePrompt: text("style_prompt"),              // Gemini-generated style prompt for the in-house MLK V4 (Morris Law Kernel V4) generator
 
   // ── Line-by-line state (jsonb) ────────────────────────────────────────────
   // Array of LineState objects. Shape:

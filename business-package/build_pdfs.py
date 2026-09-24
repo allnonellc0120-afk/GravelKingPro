@@ -19,7 +19,7 @@ PREAMBLE = (ROOT / "template" / "preamble.typ").read_text()
 # filename stem -> clean display title
 TITLES = {
     "MASTER_PACKAGE_INDEX": "Master Package Index",
-    "WHITE_PAPER_Morris_Law_Kernel_v3.5": "White Paper: Morris Law Kernel v3.5",
+    "WHITE_PAPER_Morris_Law_Kernel_v3.5": "White Paper: Morris Law Kernel V4",
     "ONE_PAGE_EXECUTIVE_SUMMARY": "One-Page Executive Summary",
     "PITCH_DECK_Morris_Law_Kernel_v3.5": "Pitch Deck — Content Outline",
     "PITCH_DECK_VISUALS_DESIGN": "Pitch Deck — Visual Design Guide",

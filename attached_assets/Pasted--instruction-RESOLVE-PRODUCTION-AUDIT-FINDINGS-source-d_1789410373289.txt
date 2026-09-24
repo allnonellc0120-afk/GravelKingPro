@@ -1,0 +1,59 @@
+{
+  "instruction": "RESOLVE_PRODUCTION_AUDIT_FINDINGS",
+  "source_document": "gravelkingpro-production-audit.json",
+  "priority": "HIGH",
+  "execution_rules": {
+    "zero_downtime": true,
+    "no_data_deletion": true,
+    "double_confirm_destructive_actions": true,
+    "preserve_kernel_integrity": "Do NOT mock or alter Morris Law Kernel core logic"
+  },
+  "action_items": [
+    {
+      "finding_id": "public-storage-read-permissions",
+      "severity": "HIGH",
+      "target": "Object Storage Asset Pipeline",
+      "issue": "Deployment identity 'heimdall-production@replit-user-deployments.iam.gserviceaccount.com' lacks storage.objects.get access, throwing 500 errors on public release cover images.",
+      "resolution_steps": [
+        "Check IAM role for deployment identity and ensure it has 'Storage Object Viewer' (roles/storage.objectViewer) on the managed production bucket.",
+        "Update the handler serving '/api/storage/public-objects/*' to gracefully catch missing/unauthorized assets and serve a safe static placeholder image instead of failing with HTTP 500.",
+        "Ensure all public release cover art (e.g. /releases/hope-of-the-free-world/*) is synced to the configured fallback bucket if cloud IAM cannot be edited directly."
+      ]
+    },
+    {
+      "finding_id": "deployment-healthcheck-path",
+      "severity": "MEDIUM",
+      "target": "Deployment / Healthcheck Configuration",
+      "issue": "Deployment orchestrator probes '/api' resulting in 404 logs, while actual health route '/api/healthz' returns 200.",
+      "resolution_steps": [
+        "Update the deployment configuration file (.replit or deployment spec) healthcheck path from '/api' to '/api/healthz'.",
+        "Add a fallback alias in the Express/Node router: GET '/api' -> 200 OK with payload { 'status': 'ok', 'service': 'gravelkingpro-api' } to eliminate noise if external platform healthchecks are immutable."
+      ]
+    },
+    {
+      "finding_id": "standalone-kernel-production-exposure",
+      "severity": "MEDIUM",
+      "target": "API Gateway to Morris Law Kernel Reverse Proxy",
+      "issue": "Python MLK service responds locally on port 5000 at '/api/jax/kernel-status', but the public-facing API on port 8080 returns 404 for this route.",
+      "resolution_steps": [
+        "Do NOT replace the endpoint with mock data.",
+        "In the main Node API server (port 8080), configure a reverse proxy route for GET '/api/jax/kernel-status' targeting 'http://127.0.0.1:5000/api/jax/kernel-status'.",
+        "Verify that upstream requests return the authentic 'LIVE_AUTHENTICATED' JSON response directly from the Python kernel."
+      ]
+    },
+    {
+      "finding_id": "search-console-sitemap-permission",
+      "severity": "LOW",
+      "target": "SEO Automation",
+      "issue": "Google Search Console sitemap ping returns 403.",
+      "resolution_steps": [
+        "Verify service account credentials for Google Search Console API or switch to passive sitemap.xml indexing via robots.txt declaration."
+      ]
+    }
+  ],
+  "verification_plan": [
+    "Run GET /api/healthz and GET /api to verify both return HTTP 200.",
+    "Run GET /api/jax/kernel-status on public domain to confirm reverse proxy passes through port 5000 status.",
+    "Fetch sample cover image /api/storage/public-objects/releases/hope-of-the-free-world/i-wanna-recognize-me-cover.jpg and ensure no 500 error is returned."
+  ]
+}

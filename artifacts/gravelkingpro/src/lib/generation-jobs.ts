@@ -3,7 +3,7 @@
  *
  * Implements the frontend contract for the middle-tier worker:
  *  - POST /api/tracks/generate | /api/tracks/remix → { jobId, status: "processing" } (<500ms ACK)
- *  - Poll GET /api/tracks/:jobId/status until ready | failed
+ *  - Subscribe to GET /api/tracks/:jobId/events until ready | failed
  *  - In-flight jobs are cached in sessionStorage so a re-render or accidental
  *    double-submit resumes the SAME job instead of spending credits twice.
  */
@@ -21,8 +21,7 @@ export interface GenerationJobState {
 }
 
 const JOB_CACHE_PREFIX = "gka:genjob:";
-const POLL_INTERVAL_MS = 2_500;
-const POLL_TIMEOUT_MS = 15 * 60_000;
+const EVENT_TIMEOUT_MS = 15 * 60_000;
 
 function cacheKey(kind: "generate" | "remix", dedupeKey: string): string {
   return `${JOB_CACHE_PREFIX}${kind}:${dedupeKey}`;
@@ -61,23 +60,45 @@ async function fetchJobStatus(jobId: string): Promise<GenerationJobState> {
   return data;
 }
 
-async function pollJob(
+async function followJobEvents(
   jobId: string,
   onProgress?: (state: GenerationJobState) => void,
 ): Promise<GenerationJobState> {
-  const deadline = Date.now() + POLL_TIMEOUT_MS;
-  for (;;) {
-    const state = await fetchJobStatus(jobId);
-    onProgress?.(state);
-    if (state.status === "ready") return state;
-    if (state.status === "failed") {
-      throw new Error(state.error || "Generation failed.");
-    }
-    if (Date.now() > deadline) {
-      throw new Error("Generation is taking longer than expected — check your Library shortly.");
-    }
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-  }
+  const initial = await fetchJobStatus(jobId);
+  onProgress?.(initial);
+  if (initial.status === "ready") return initial;
+  if (initial.status === "failed") throw new Error(initial.error || "Generation failed.");
+
+  return new Promise<GenerationJobState>((resolve, reject) => {
+    const source = new EventSource(`/api/tracks/${encodeURIComponent(jobId)}/events`);
+    const timeout = window.setTimeout(() => {
+      source.close();
+      reject(new Error("Generation is taking longer than expected — check your Library shortly."));
+    }, EVENT_TIMEOUT_MS);
+
+    const finish = (error?: Error, state?: GenerationJobState) => {
+      window.clearTimeout(timeout);
+      source.close();
+      if (error) reject(error);
+      else if (state) resolve(state);
+    };
+
+    source.addEventListener("job", (event) => {
+      try {
+        const state = JSON.parse((event as MessageEvent).data) as GenerationJobState;
+        onProgress?.(state);
+        if (state.status === "ready") finish(undefined, state);
+        else if (state.status === "failed") {
+          finish(new Error(state.error || "Generation failed."));
+        }
+      } catch {
+        finish(new Error("Generation status stream returned invalid data."));
+      }
+    });
+    source.onerror = () => {
+      finish(new Error("The live generation status stream disconnected. Check your Library shortly."));
+    };
+  });
 }
 
 export interface SubmitGenerationOptions {
@@ -97,7 +118,7 @@ export async function submitGenerationJob(opts: SubmitGenerationOptions): Promis
   const cached = readCachedJobId(opts.kind, opts.dedupeKey);
   if (cached) {
     try {
-      const state = await pollJob(cached, opts.onProgress);
+      const state = await followJobEvents(cached, opts.onProgress);
       clearCachedJob(opts.kind, opts.dedupeKey);
       return state;
     } catch {
@@ -128,7 +149,7 @@ export async function submitGenerationJob(opts: SubmitGenerationOptions): Promis
   writeCachedJobId(opts.kind, opts.dedupeKey, data.jobId);
   opts.onProgress?.({ status: data.status === "queued" ? "queued" : "processing", jobId: data.jobId });
   try {
-    const state = await pollJob(data.jobId, opts.onProgress);
+    const state = await followJobEvents(data.jobId, opts.onProgress);
     clearCachedJob(opts.kind, opts.dedupeKey);
     return state;
   } catch (err) {

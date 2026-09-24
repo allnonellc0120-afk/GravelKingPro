@@ -9,6 +9,7 @@ run = ["python3", "main.py"]
 
 [nix]
 channel = "stable-23_11"
+packages = ["ffmpeg-headless", "poetry"]
 
 [workflows]
 runButton = "Project"
@@ -22,6 +23,10 @@ author = "agent"
 task = "workflow.run"
 args = "Morris Law Kernel: Python"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "GK Pro Vertex Allowlist Proxy"
+
 [[workflows.workflow]]
 name = "Morris Law Kernel: Python"
 author = "agent"
@@ -34,11 +39,54 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "GK Pro Vertex Allowlist Proxy"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/api-server run proxy:vertex"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [userenv]
 
 [userenv.shared]
 REPLICATE_RVC_MODEL = "zsxkib/realistic-voice-cloning"
+SENDGRID_FROM_EMAIL = "kevm@gravelkingpro.it.com"
+SENDGRID_MODE = "mock"
+
+[userenv.development]
+GRAVELKING_ARTIST_ID = "customer-zero"
+VITE_API_BASE_URL = "/api"
+VITE_PROXY_GATEWAY = "http://127.0.0.1:8080"
 
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000
+
+[[deployment.responseHeaders]]
+path = "/"
+name = "Cache-Control"
+value = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+
+[[deployment.responseHeaders]]
+path = "/*.html"
+name = "Cache-Control"
+value = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+
+[[deployment.responseHeaders]]
+path = "/sw.js"
+name = "Cache-Control"
+value = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+
+[[deployment.responseHeaders]]
+path = "/manifest.json"
+name = "Cache-Control"
+value = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+
+[[deployment.responseHeaders]]
+path = "/manifest.webmanifest"
+name = "Cache-Control"
+value = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"

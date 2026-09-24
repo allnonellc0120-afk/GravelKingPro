@@ -7,4 +7,11 @@
   {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2006","position":6,"filepath":"src/pages/slides/BusinessModel.tsx","title":"Business model","description":"Current product structure and configurable partner pricing","speakerNotes":""},
   {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2007","position":7,"filepath":"src/pages/slides/PilotProposal.tsx","title":"Pilot proposal","description":"A measured 30-day partner pilot","speakerNotes":""},
   {"id":"b2b0a7f0-3d8e-4d40-9d22-1a0a8f4a2008","position":8,"filepath":"src/pages/slides/PartnershipConversation.tsx","title":"Partnership conversation","description":"Next discussion","speakerNotes":""}
+  ,{"id":"gka0a7f0-3d8e-4d40-9d22-1a0a8f4a2009","position":9,"filepath":"src/pages/slides/GkaProspectSectionCover.tsx","title":"GKA prospecting brief","description":"Fifty AI workflow companies","speakerNotes":""}
+  ,{"id":"gka0a7f0-3d8e-4d40-9d22-1a0a8f4a2010","position":10,"filepath":"src/pages/slides/ProspectTier1.tsx","title":"Voice infrastructure first","description":"Ranks 1–10","speakerNotes":""}
+  ,{"id":"gka0a7f0-3d8e-4d40-9d22-1a0a8f4a2011","position":11,"filepath":"src/pages/slides/ProspectTier2.tsx","title":"Customer support at scale","description":"Ranks 11–20","speakerNotes":""}
+  ,{"id":"gka0a7f0-3d8e-4d40-9d22-1a0a8f4a2012","position":12,"filepath":"src/pages/slides/ProspectTier3.tsx","title":"Agents, research, and growth","description":"Ranks 21–30","speakerNotes":""}
+  ,{"id":"gka0a7f0-3d8e-4d40-9d22-1a0a8f4a2013","position":13,"filepath":"src/pages/slides/ProspectTier4.tsx","title":"Enterprise workflow volume","description":"Ranks 31–40","speakerNotes":""}
+  ,{"id":"gka0a7f0-3d8e-4d40-9d22-1a0a8f4a2014","position":14,"filepath":"src/pages/slides/ProspectTier5.tsx","title":"Code and creative systems","description":"Ranks 41–50","speakerNotes":""}
+  ,{"id":"gka0a7f0-3d8e-4d40-9d22-1a0a8f4a2015","position":15,"filepath":"src/pages/slides/GkaLeadContact.tsx","title":"First outreach target","description":"Retell AI public contact and pilot message","speakerNotes":""}
 ]

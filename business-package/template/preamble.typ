@@ -25,7 +25,7 @@
     #line(length: 100%, stroke: 0.5pt + hairline)
     #v(-0.35em)
     #grid(columns: (1fr, auto),
-      text(size: 8pt, fill: ink-muted)[GravelKing Productions — Morris Law Kernel v3.5],
+      text(size: 8pt, fill: ink-muted)[GravelKing Productions — Morris Law Kernel V4],
       text(size: 8pt, fill: ink-muted)[Page #counter(page).display("1 of 1", both: true)]
     )
   ]
@@ -64,6 +64,6 @@
   #v(0.55em)
   #line(length: 4.8cm, stroke: 2.2pt + brand-green)
   #v(0.5em)
-  #text(size: 9.5pt, fill: ink-muted)[Morris Law Kernel v3.5 + IP Protection System · Kevin Morris · July 2026]
+  #text(size: 9.5pt, fill: ink-muted)[Morris Law Kernel V4 + IP Protection System · Kevin Morris · July 2026]
 ]
 #v(1.1em)

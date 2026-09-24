@@ -1,86 +1,50 @@
+import { useEffect, useState } from "react";
 import VideoTemplate from "@/components/video/VideoTemplate";
-import WorkflowTemplate from "@/components/video/WorkflowTemplate";
-import { Switch, Route, Router, Link } from "wouter";
+import { Switch, Route, Router } from "wouter";
 
 function VideoPlayer() {
-  const isWorkflow = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("video") === "workflow";
+  const [mp4Ready, setMp4Ready] = useState(false);
+  const mp4Path = `${import.meta.env.BASE_URL}videos/gka_main_stage_duet_30s_16x9.mp4`;
 
-  if (isWorkflow) {
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 gap-8 font-sans">
-        <div className="flex flex-col items-center gap-4 w-full max-w-[540px] shrink-0">
-          <h2 className="text-white/80 font-mono text-sm tracking-widest uppercase flex items-center justify-between w-full">
-            <span>4:5 Workflow Promo</span>
-            <Link href="?video=default" className="text-violet-400 hover:text-violet-300 underline">View Original</Link>
-          </h2>
-          <div className="w-full aspect-[4/5] rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0a]">
-            <video 
-              className="w-full h-full object-contain"
-              controls
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
-            >
-              <source src={`${import.meta.env.BASE_URL}videos/gravelkingpro_workflow_45s_4x5.mp4`} type="video/mp4" />
-            </video>
-          </div>
-        </div>
-        <div className="mt-12 text-white/40 text-xs font-mono">
-          GravelKing Pro • Workflow Promo
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    let active = true;
+    fetch(mp4Path, { method: "HEAD" })
+      .then((response) => {
+        if (active && response.ok) setMp4Ready(true);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [mp4Path]);
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 gap-8 font-sans">
-      <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-12 items-center justify-center">
-        <div className="flex flex-col items-center gap-4 w-full lg:w-2/3 max-w-4xl">
-          <h2 className="text-white/80 font-mono text-sm tracking-widest uppercase flex justify-between w-full">
-            <span>16:9 Landscape</span>
-            <Link href="?video=workflow" className="text-violet-400 hover:text-violet-300 underline text-right">View New 4:5 Workflow</Link>
-          </h2>
-          <div className="w-full aspect-video rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0a]">
-            <video 
-              poster={`${import.meta.env.BASE_URL}posters/poster_16x9.jpg`}
-              className="w-full h-full object-contain"
-              controls
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
-            >
-              <source src={`${import.meta.env.BASE_URL}videos/preview_59s_16x9.mp4`} type="video/mp4" />
-              <source src={`${import.meta.env.BASE_URL}videos/preview_59s_16x9.webm`} type="video/webm" />
-            </video>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-4 w-full max-w-[320px] shrink-0">
-          <h2 className="text-white/80 font-mono text-sm tracking-widest uppercase">9:16 Vertical</h2>
-          <div className="w-full aspect-[9/16] rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0a]">
-            <video 
-              poster={`${import.meta.env.BASE_URL}posters/poster_9x16.jpg`}
-              className="w-full h-full object-contain"
-              controls
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
-            >
-              <source src={`${import.meta.env.BASE_URL}videos/preview_59s_9x16.mp4`} type="video/mp4" />
-              <source src={`${import.meta.env.BASE_URL}videos/preview_59s_9x16.webm`} type="video/webm" />
-            </video>
-          </div>
-        </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#030509] p-4 font-sans">
+      <div className="absolute left-6 top-6 z-[60] flex items-center gap-3 gka-mono text-[11px] uppercase tracking-[0.18em] text-cyan-100/65">
+        <span className="h-2 w-2 rounded-full bg-[#8dffb3] shadow-[0_0_10px_#8dffb3]" />
+        GravelKing Pro / Main Stage
       </div>
-      
-      <div className="mt-12 text-white/40 text-xs font-mono">
-        GravelKing Pro • Lyrics Generator Promo
+      <div className="absolute right-6 top-6 z-[60] gka-mono text-[11px] uppercase tracking-[0.18em] text-white/35">
+        Auto-play preview / 30 sec
+      </div>
+      <div className="relative w-full max-w-[1440px] overflow-hidden rounded-2xl border border-cyan-200/15 shadow-[0_0_80px_rgba(98,246,255,.08)]">
+        <VideoTemplate loop muted />
+        <div className="absolute bottom-5 right-5 z-[60]">
+          {mp4Ready ? (
+            <a
+              href={mp4Path}
+              download
+              className="inline-flex items-center gap-2 rounded-full border border-[#8dffb3]/35 bg-[#081a13]/90 px-4 py-2.5 gka-mono text-xs uppercase tracking-[0.12em] text-[#8dffb3] shadow-[0_0_24px_rgba(141,255,179,.12)] transition hover:border-[#8dffb3] hover:bg-[#8dffb3]/10"
+            >
+              Export MP4
+              <span aria-hidden="true">↓</span>
+            </a>
+          ) : (
+            <span className="rounded-full border border-white/10 bg-black/55 px-4 py-2.5 gka-mono text-xs uppercase tracking-[0.12em] text-white/35">
+              MP4 export rendering
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -88,12 +52,8 @@ function VideoPlayer() {
 
 export default function App() {
   const isExport = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("export") === "1";
-  const isWorkflow = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("video") === "workflow";
   
   if (isExport) {
-    if (isWorkflow) {
-      return <WorkflowTemplate loop={false} muted={false} />;
-    }
     return <VideoTemplate loop={false} muted={false} />;
   }
 

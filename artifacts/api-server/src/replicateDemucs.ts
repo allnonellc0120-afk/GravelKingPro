@@ -3,7 +3,7 @@
  *
  * Primary separation engine for voice_remove and stem_split.
  * Uploads audio to Replicate Files API → runs ryan5453/demucs → downloads
- * stems → carves each through MLK v3 (ffmpeg-native applyMLKv3Fast).
+ * stems → carves each through MLK V4 (Morris Law Kernel V4) (ffmpeg-native applyMLKv3Fast).
  *
  * Never crashes the route: callers must try/catch and fall back to DSP.
  */
@@ -239,7 +239,7 @@ export async function replicateStemSplit(
       }),
     );
 
-    // Carve each stem via MLK v3 Fast (ffmpeg-native — never JS applyMLKv3 on large buffers)
+    // Carve each stem via MLK V4 (Morris Law Kernel V4) Fast (ffmpeg-native — never JS applyMLKv3 on large buffers)
     const carvedBufs: Record<string, { buf: Buffer; parity: string }> = {};
     await Promise.all(
       Object.entries(tmpPaths).map(async ([name, p]) => {

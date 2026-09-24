@@ -1,0 +1,19 @@
+Target Length: 59 Seconds
+Audio Style: High-energy beat blending seamlessly with crisp, live radio-ready vocals.
+Visual Style: Dynamic split-screen stage with rolling karaoke/prompter lyrics flowing at the bottom, visual EQ waves, and Jax mastering meter overlays.
+0:00 – 0:08 | The Hook
+ Visual: Close-up of rolling lyrics starting to glide across the screen: "♪ Break the silence, light the flame... ♪" A glitch effect flashes over the screen: "Lag? Off-Key? Weak Audio?" The screen snaps clean as a glowing audio waveform bursts to life.
+ On-Screen Text: CAN YOUR STAGE DO THIS LIVE?
+ Voiceover: "Stop settling for delayed tracks and dry vocals. Real duets happen live—and in sync."
+0:08 – 0:25 | Real-Time Sync & Rolling Lyrics
+ Visual: Split-screen activates showing Person A (left) and Person B (right) wearing headsets. Below them, glowing golden lyrics roll continuously in real-time. As Person A sings their highlighted line, Person B's line lights up right on beat. A ping counter stays locked at 0 ms.
+ Audio: Person A sings a bold lead verse while Person B nods along in time.
+ On-Screen Text: REAL DUET STAGE | LIVE ROLLING LYRICS | ZERO LATENCY
+ Voiceover: "Welcome to the Real Duet Stage. Watch the lyrics roll in real time. Two singers, zero latency, perfect rhythm."
+0:25 – 0:45 | The Flow: Live Vocal Catch & Jax Mastering
+ Visual: The lyrics hit the chorus line in bold neon: "♪ WE RUN THE NIGHT TOGETHER ♪". Person B seamlessly catches the harmony live with Person A without missing a single frame. On screen, a sleek overlay flashes: "JAX MASTERING ACTIVE". EQ knobs twist, dynamic meters jump, and the audio waveform thickens instantly.
+ Audio: The raw dual vocals shift live into a punchy, studio-grade broadcast mix with crisp highs and rich low-end.
+ On-Screen Text: POWERED BY JAX | LIVE STUDIO MASTERING
+ Voiceover: "No waiting. Person B catches the harmony instantly while Jax mastering polishes the mix live into a radio-ready track."
+0:45 – 0:59 | Call to Action
+ Visual: The dual stage zooms out to show the full mobile interface with rolling

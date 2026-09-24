@@ -1,5 +1,5 @@
 """
-Morris Law Kernel V3.5 — FastAPI mastering service.
+Morris Law Kernel V4 — FastAPI mastering service.
 
 Deployable to Cloud Run (see Dockerfile.mlk-api). This is the server-side
 counterpart to the GravelKing Pro mastering route: the API server POSTs a WAV
@@ -10,7 +10,7 @@ measurement headers.
       multipart: audio (WAV), preset, intensity, sidechain_filter,
                  sidechain_freq, stereo_link, adaptive_mode,
                  auto_threshold, auto_offset, target_lufs, ceiling_db
-      response:  audio/wav (PCM 16) + X-MLK-* measurement headers
+       response:  audio/wav (PCM 24) + X-MLK-* measurement headers
 
     GET /healthz → {"ok": true, "numba": bool}
 
@@ -28,8 +28,9 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from morris_law_kernel import MorrisLawKernel, NUMBA_AVAILABLE
+from audio_standards import CANONICAL_SAMPLE_RATE, integrated_lufs, write_pcm24_wav
 
-app = FastAPI(title="Morris Law Kernel V3.5", version="3.5.0")
+app = FastAPI(title="Morris Law Kernel V4", version="3.5.0")
 
 VALID_PRESETS = set(MorrisLawKernel.PRESETS.keys())
 
@@ -97,7 +98,12 @@ async def master(
         if x.shape[1] == 1:
             x = np.repeat(x, 2, axis=1)
 
-        kernel = MorrisLawKernel(sample_rate=sr)
+        if sr != CANONICAL_SAMPLE_RATE:
+            raise HTTPException(
+                status_code=422,
+                detail=f"audio must be normalized to {CANONICAL_SAMPLE_RATE} Hz",
+            )
+        kernel = MorrisLawKernel(sample_rate=CANONICAL_SAMPLE_RATE)
         link = stereo_link.lower() != "false"
         auto = auto_threshold.lower() == "true"
         intensity = float(intensity)
@@ -128,7 +134,7 @@ async def master(
             auto_threshold=auto,
             auto_offset_db=auto_offset,
         )
-        wavfile.write(out_path, sr, (np.clip(out, -1.0, 1.0) * 32767.0).astype(np.int16))
+        write_pcm24_wav(out_path, out, sr)
         with open(out_path, "rb") as f:
             body = f.read()
 
@@ -141,6 +147,10 @@ async def master(
                 "X-MLK-ScFreqUsed": f"{sc_freq:.1f}",
                 "X-MLK-DetectedRmsDb": f"{rms_db:.1f}",
                 "X-MLK-AppliedThresholdDb": f"{thresh_db:.1f}",
+                "X-MLK-SampleRate": str(CANONICAL_SAMPLE_RATE),
+                "X-MLK-BitDepth": "24",
+                "X-MLK-InputLUFS": f"{integrated_lufs(x, sr):.3f}",
+                "X-MLK-OutputLUFS": f"{integrated_lufs(out, sr):.3f}",
             },
         )
     except HTTPException:

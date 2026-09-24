@@ -1,0 +1,24 @@
+Act as our Principal Full-Stack & Audio Systems Engineer. Based on our latest audit ("15. Final assessment"), we need to resolve every architectural weakness across this Replit environment.
+
+Execute the following refactors directly across the codebase:
+
+1. Engine Consolidation & Worker Routing
+- Remove and prune all legacy `kernel-v3` Node/FFmpeg carve paths and obsolete V2 orchestration files.
+- Route the Studio Mix pipeline directly to the canonical Python MLK V4 worker so mixing and mastering share the exact same DSP core.
+- Rename client-side Web Audio DSP modules explicitly to `GK-Client-DSP` to prevent namespace collisions with the backend `MLK-V4` Python worker.
+
+2. Audio Standards & Measurement (BS.1770)
+- Enforce a standard canonical format of 48kHz, 24-bit PCM WAV across all render, export, and mastering worker routes.
+- Replace any estimated or RMS-based LUFS calculations with true ITU-R BS.1770-4 K-weighting (add `pyloudnorm` to pyproject.toml / requirements.txt if needed).
+- Add unit assertions to verify that 24-bit audio streams passing through the certification watermark do not suffer bit-depth truncation or boundary clipping.
+
+3. WebRTC & Multi-User Duet Reliability
+- In the WebRTC initialization configuration, add support for TURN fallback servers under `iceServers` (reading from environment variables like `TURN_URL`, `TURN_USERNAME`, `TURN_CREDENTIAL`).
+- Refactor Duet state: move session sync, room clocks, and participant state out of single-process local memory into your shared storage layer (e.g., Replit DB, Redis, or PostgreSQL) so it is replica-safe.
+- Implement live RTT latency measurement by sending timestamped pings over the data channel/signaling socket, calculating verified transit latency.
+
+4. Telemetry Badges & Verification Suite
+- Remove hardcoded status labels and badges from the UI; only render performance metrics if backed by live socket telemetry.
+- Add an automated test script (`tests/test_audio_pipeline.py`) that runs a deterministic test tone through the DSP pipeline to assert bit-accuracy, loudness targets, and execution latency.
+
+Inspect the repository, apply the code changes, update any required configuration files or dependencies, and verify that the workflow runs without errors.

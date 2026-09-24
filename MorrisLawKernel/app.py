@@ -18,8 +18,8 @@ from verification_api import (
     verify_against_gravelking,
 )
 
-st.set_page_config(page_title="GravelKing Pro | Morris Law Kernel v3.5", layout="wide")
-st.title("GravelKing Pro — Morris Law Kernel v3.5 + IP Protection")
+st.set_page_config(page_title="GravelKing Pro | Morris Law Kernel V4", layout="wide")
+st.title("GravelKing Pro — Morris Law Kernel V4 + IP Protection")
 
 kernel = MorrisLawKernel()
 isolator = IntelligentMultiBandIsolator()

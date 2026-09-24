@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
-import { EmailGate, useEmailGate } from "@/components/email-gate";
 import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Minimize2, Clock } from "lucide-react";
+import { Mic, Square, Play, Pause, Upload, Download, Music, FileText, RotateCcw, Loader2, Volume2, VolumeX, Sparkles, Wand2, Search, Maximize2, Clock } from "lucide-react";
 import { useVocalBoothRecorder, blobToUploadFile } from "@/lib/daw/useVocalBoothRecorder";
-import { type VocalPreset } from "@/lib/daw/vocalPresets";
 import { analyzeGuideTiming, type TimedLine } from "@/lib/daw/stemTiming";
+import { LivePerformanceStage, type StageLyric } from "@/components/live-performance-stage";
 import { searchLyrics, parseLrc, type LrclibTrack } from "@/lib/lrclib";
 import { downloadBlob } from "@/lib/download";
-import { compressAudioFile } from "@/lib/audioCompressor";
-import { LiveVocalMonitor } from "@/components/live-vocal-monitor";
+import { compressAudioFile } from "@/lib/GK-Client-DSP-compressor";
+import { LiveMonitor } from "@/components/stage/LiveMonitor";
+import { Link } from "wouter";
 
 const DEV_BYPASS_KEY = "gk:dev:studio";
 
@@ -47,15 +47,7 @@ export default function VocalBooth() {
     try { return localStorage.getItem(DEV_BYPASS_KEY) === "1"; } catch { return false; }
   });
   const canUseStudio = isPro || devBypass;
-  const emailGate = useEmailGate();
 
-  if (emailGate.gated) {
-    return (
-      <Layout>
-        <EmailGate tool="vocal-booth" onUnlocked={emailGate.unlock} />
-      </Layout>
-    );
-  }
 
   if (!canUseStudio) {
     return (
@@ -86,157 +78,6 @@ export default function VocalBooth() {
   return <VocalBoothInner />;
 }
 
-// ── Waveform helpers (module-scope, stable references) ───────────────────────
-
-/**
- * Decode a File's audio data and compute RMS peak values per bucket.
- * Returns a Float32Array of `buckets` values in [0, 1].
- */
-function computeWaveformPeaks(file: File, buckets: number): Promise<Float32Array> {
-  return new Promise((resolve, reject) => {
-    file.arrayBuffer().then((raw) => {
-      // Slice to transfer ownership safely; AudioContext.decodeAudioData detaches the buffer.
-      const copy = raw.slice(0);
-      const ctx = new AudioContext();
-      ctx.decodeAudioData(copy, (decoded) => {
-        ctx.close();
-        const ch = decoded.getChannelData(0);
-        const peaks = new Float32Array(buckets);
-        const chunkSize = Math.floor(ch.length / buckets);
-        for (let i = 0; i < buckets; i++) {
-          let sum = 0;
-          const start = i * chunkSize;
-          const end = Math.min(start + chunkSize, ch.length);
-          for (let j = start; j < end; j++) {
-            const v = ch[j] ?? 0;
-            sum += v * v;
-          }
-          peaks[i] = Math.sqrt(sum / Math.max(1, end - start));
-        }
-        resolve(peaks);
-      }, reject);
-    }, reject);
-  });
-}
-
-/**
- * Draw the Vocal Booth scrolling waveform on the canvas.
- * Works in canvas pixel coordinates (canvas.width × canvas.height).
- *
- * Top section: pre-computed timeline waveform (faded past, bright amber runway ahead).
- * Bottom strip: live AnalyserNode time-domain data (if analyser is connected).
- */
-function drawBoothWaveform(
-  canvas: HTMLCanvasElement,
-  peaks: Float32Array | null,
-  totalDuration: number,
-  currentTimeSec: number,
-  analyser: AnalyserNode | null,
-): void {
-  const ctx2d = canvas.getContext("2d");
-  if (!ctx2d) return;
-
-  const W = canvas.width;
-  const H = canvas.height;
-
-  ctx2d.clearRect(0, 0, W, H);
-  ctx2d.fillStyle = "#0a0a0a";
-  ctx2d.fillRect(0, 0, W, H);
-
-  if (!peaks || totalDuration <= 0) {
-    // No track — draw a faint center line
-    ctx2d.fillStyle = "rgba(255,255,255,0.06)";
-    ctx2d.fillRect(0, H * 0.5 - 1, W, 2);
-    return;
-  }
-
-  const hasLive = analyser !== null;
-  const waveH = hasLive ? H * 0.68 : H * 0.86;
-  const midY = waveH / 2;
-
-  // Scrolling window: 24 s of audio visible on canvas
-  const windowSec = Math.min(totalDuration, 24);
-  const PLAYHEAD_X = W * 0.28;          // playhead at 28% from left
-  const secPerPx = windowSec / W;
-  const peaksPerSec = peaks.length / totalDuration;
-  const startT = currentTimeSec - PLAYHEAD_X * secPerPx;
-
-  // ── Pre-computed waveform bars ─────────────────────────────────────────────
-  for (let x = 0; x < W; x++) {
-    const t = startT + x * secPerPx;
-    if (t < 0 || t > totalDuration) continue;
-    const idx = Math.min(peaks.length - 1, Math.max(0, Math.floor(t * peaksPerSec)));
-    const peak = peaks[idx] ?? 0;
-    const barH = Math.max(1.5, peak * waveH * 0.88);
-    ctx2d.fillStyle = t <= currentTimeSec ? "rgba(245,158,11,0.22)" : "rgba(245,158,11,0.82)";
-    ctx2d.fillRect(x, midY - barH / 2, 1, barH);
-  }
-
-  // Playhead soft glow
-  const grd = ctx2d.createLinearGradient(PLAYHEAD_X - 28, 0, PLAYHEAD_X + 28, 0);
-  grd.addColorStop(0, "rgba(245,158,11,0)");
-  grd.addColorStop(0.5, "rgba(245,158,11,0.14)");
-  grd.addColorStop(1, "rgba(245,158,11,0)");
-  ctx2d.fillStyle = grd;
-  ctx2d.fillRect(PLAYHEAD_X - 28, 0, 56, waveH);
-
-  // Playhead line
-  ctx2d.strokeStyle = "#f59e0b";
-  ctx2d.lineWidth = 2;
-  ctx2d.beginPath();
-  ctx2d.moveTo(PLAYHEAD_X, 6);
-  ctx2d.lineTo(PLAYHEAD_X, waveH - 6);
-  ctx2d.stroke();
-
-  // "NOW" label at playhead
-  ctx2d.font = `${Math.round(W * 0.0055)}px monospace`;
-  ctx2d.fillStyle = "#f59e0b";
-  ctx2d.fillText("NOW", PLAYHEAD_X + 5, 18);
-
-  // Time ticks
-  const tickStep = windowSec >= 20 ? 10 : 5;
-  const firstTick = Math.ceil(startT / tickStep) * tickStep;
-  ctx2d.font = `${Math.round(W * 0.005)}px monospace`;
-  for (let s = firstTick; s <= startT + windowSec; s += tickStep) {
-    if (s < 0 || s > totalDuration) continue;
-    const tx = (s - startT) / secPerPx;
-    ctx2d.fillStyle = s <= currentTimeSec ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.38)";
-    ctx2d.fillRect(tx, waveH - 12, 1.5, 12);
-    if (tx > 30 && tx < W - 30) {
-      ctx2d.fillText(fmtTime(s), tx + 4, waveH - 1);
-    }
-  }
-
-  // ── Live AnalyserNode strip ─────────────────────────────────────────────────
-  if (hasLive) {
-    const bufLen = analyser.frequencyBinCount;
-    const data = new Uint8Array(bufLen);
-    analyser.getByteTimeDomainData(data);
-
-    const sTop = waveH + 8;
-    const sH = H - sTop - 4;
-    const sMid = sTop + sH / 2;
-
-    ctx2d.fillStyle = "rgba(245,158,11,0.04)";
-    ctx2d.fillRect(0, sTop, W, sH);
-
-    ctx2d.strokeStyle = "rgba(251,191,36,0.65)";
-    ctx2d.lineWidth = 2;
-    ctx2d.beginPath();
-    for (let i = 0; i < bufLen; i++) {
-      const x = (i / (bufLen - 1)) * W;
-      const norm = ((data[i] ?? 128) - 128) / 128;
-      const y = sMid + norm * (sH / 2 - 2);
-      if (i === 0) ctx2d.moveTo(x, y); else ctx2d.lineTo(x, y);
-    }
-    ctx2d.stroke();
-
-    ctx2d.font = `${Math.round(W * 0.0042)}px monospace`;
-    ctx2d.fillStyle = "rgba(255,255,255,0.22)";
-    ctx2d.fillText("LIVE", 6, sTop + 14);
-  }
-}
-
 function VocalBoothInner() {
   const { toast } = useToast();
   const recorder = useVocalBoothRecorder();
@@ -260,7 +101,6 @@ function VocalBoothInner() {
   const [position, setPosition] = useState(0);
 
   // ── vocal monitoring preset (lifted so recorder can bake it in) ──
-  const [monitorPreset, setMonitorPreset] = useState<VocalPreset | null>(null);
   const [monitorStopSignal, setMonitorStopSignal] = useState(0);
 
   // ── mixdown ──
@@ -278,6 +118,7 @@ function VocalBoothInner() {
   const [transcribing, setTranscribing] = useState(false);
   const [tapTimingActive, setTapTimingActive] = useState(false);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
+  const [globalOffsetMs, setGlobalOffsetMs] = useState(0);
 
   const backingRef = useRef<HTMLAudioElement | null>(null);
   const vocalPlaybackRef = useRef<HTMLAudioElement | null>(null);
@@ -289,10 +130,11 @@ function VocalBoothInner() {
   const timedLinesRef = useRef<TimedLine[] | null>(null);
   const activeLineRef = useRef(-1);
 
-  // ── enlarged studio + waveform state ────────────────────────────────────────
-  const [enlarged, setEnlarged] = useState(false);
-  const [waveformPeaks, setWaveformPeaks] = useState<Float32Array | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // ── full-screen Studio Mode state ───────────────────────────────────────────
+  // The live performance stage is the primary Vocal Booth surface. Exit it
+  // only when the creator needs the detailed lyric/track controls.
+  const [enlarged, setEnlarged] = useState(true);
+  const [performanceMode, setPerformanceMode] = useState<"solo" | "duet">("solo");
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
 
@@ -351,31 +193,6 @@ function VocalBoothInner() {
     const g = guideVocalRef.current;
     if (g) g.muted = !guideAudible;
   }, [guideAudible]);
-
-  // Decode backing audio → pre-compute waveform peaks for the Vocal Booth canvas.
-  useEffect(() => {
-    if (!backingFile) { setWaveformPeaks(null); return; }
-    let cancelled = false;
-    computeWaveformPeaks(backingFile, 2000)
-      .then((p) => { if (!cancelled) setWaveformPeaks(p); })
-      .catch(() => { /* non-fatal — canvas shows flat line */ });
-    return () => { cancelled = true; };
-  }, [backingFile]);
-
-  // Run the Vocal Booth canvas draw loop while the studio is enlarged.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!enlarged || !canvas) return;
-    let rafId: number;
-    const draw = () => {
-      const t = backingRef.current?.currentTime ?? 0;
-      drawBoothWaveform(canvas, waveformPeaks, duration, t, analyserRef.current);
-      rafId = requestAnimationFrame(draw);
-    };
-    rafId = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(rafId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enlarged, waveformPeaks, duration]);
 
   // Close enlarged mode on Escape.
   useEffect(() => {
@@ -524,8 +341,22 @@ function VocalBoothInner() {
       }
       const data = (await r.json()) as {
         segments: Array<{ text: string; start: number; end: number }>;
+        lines?: Array<{ id: string; text: string; startTimeMs: number; endTimeMs: number }>;
         fullText: string;
       };
+      if (data.lines?.length) {
+        const nextLines = data.lines.map((line, idx) => ({ idx, t: line.startTimeMs / 1000 }));
+        setLyrics(data.lines.map((line) => line.text).join("\n"));
+        setTimedLines(nextLines);
+        setGlobalOffsetMs(0);
+        setTimingSource("lrc");
+        setLyricSource("auto");
+        toast({
+          title: "Vocals transcribed!",
+          description: `${nextLines.length} lines detected with precise timing.`,
+        });
+        return;
+      }
       if (!data.segments || data.segments.length === 0) {
         toast({
           title: "No clear vocals detected",
@@ -582,6 +413,7 @@ function VocalBoothInner() {
     setTapTimingActive(true);
     setTapTimes([]);
     setTimedLines(null);
+    setGlobalOffsetMs(0);
     setTimingSource(null);
     toast({ title: "Tap timing started", description: "Play the track and tap when each line begins." });
   }, [toast]);
@@ -609,6 +441,39 @@ function VocalBoothInner() {
     setTapTimingActive(false);
     setTapTimes([]);
   }, []);
+
+  const nudgeLine = useCallback((idx: number, deltaMs: number) => {
+    setTimedLines((current) => current?.map((line) => (
+      line.idx === idx ? { ...line, t: Math.max(0, line.t + deltaMs / 1000) } : line
+    )) ?? null);
+  }, []);
+
+  const setGlobalTimingOffset = useCallback((nextOffsetMs: number) => {
+    setGlobalOffsetMs((previous) => {
+      const deltaMs = nextOffsetMs - previous;
+      setTimedLines((current) => current?.map((line) => ({
+        ...line,
+        t: Math.max(0, line.t + deltaMs / 1000),
+      })) ?? null);
+      return nextOffsetMs;
+    });
+  }, []);
+
+  const resetAndRetiming = useCallback(() => {
+    setTapTimingActive(false);
+    setTapTimes([]);
+    setTimedLines(null);
+    setTimingSource(null);
+    setGlobalOffsetMs(0);
+    setActiveLineIdx(-1);
+    activeLineRef.current = -1;
+    backingRef.current?.pause();
+    if (backingRef.current) backingRef.current.currentTime = 0;
+    setPosition(0);
+    setProgress(0);
+    toast({ title: "Re-time mode ready", description: "Playback returned to 0:00. Start tapping each line from the beginning." });
+    startTapTiming();
+  }, [startTapTiming, toast]);
 
   // Spacebar acts as the "▶ Now" tap while tap-timing is active. Only listens
   // during tap timing, ignores spaces typed into inputs, and prevents the page
@@ -802,7 +667,7 @@ function VocalBoothInner() {
     recorder.reset();
     setMonitorStopSignal((n) => n + 1); // release the live-preview mic before the recorder opens its own
     a.currentTime = 0;
-    const ok = await recorder.start(undefined, monitorPreset ?? undefined);
+    const ok = await recorder.start(undefined);
     if (!ok) return;
     // Start backing + guide together so the guide isn't blocked by autoplay.
     const guidePlay = startGuide();
@@ -811,7 +676,7 @@ function VocalBoothInner() {
       recorder.stop();
       toast({ title: "Playback blocked", description: "Tap play once, then try recording again.", variant: "destructive" });
     }
-  }, [backingFile, setupAudioGraph, recorder, startGuide, toast, monitorPreset]);
+  }, [backingFile, setupAudioGraph, recorder, startGuide, toast]);
 
   const stopTake = useCallback(() => {
     recorder.stop();
@@ -830,6 +695,27 @@ function VocalBoothInner() {
     guideVocalRef.current?.pause();
     if (recorder.isRecording) recorder.stop();
   }, [recorder]);
+
+  const stopStagePlayback = useCallback(() => {
+    if (recorder.isRecording) recorder.stop();
+    backingRef.current?.pause();
+    guideVocalRef.current?.pause();
+    if (backingRef.current) backingRef.current.currentTime = 0;
+    if (guideVocalRef.current) guideVocalRef.current.currentTime = 0;
+    setBackingPlaying(false);
+    setIsPreviewing(false);
+    setProgress(0);
+    setPosition(0);
+  }, [recorder]);
+
+  const toggleStagePlayback = useCallback(() => {
+    if (!recorder.isRecording) void toggleBacking();
+  }, [recorder.isRecording, toggleBacking]);
+
+  const toggleStageRecording = useCallback(() => {
+    if (recorder.isRecording) stopTake();
+    else void startTake();
+  }, [recorder.isRecording, startTake, stopTake]);
 
   // Preview vocal + backing together from the top (guide stays muted during preview).
   const previewTake = useCallback(async () => {
@@ -884,6 +770,17 @@ function VocalBoothInner() {
   }, [backingFile, recorder.vocalBlob, toast]);
 
   const meterPct = Math.round(recorder.level * 100);
+  const stageLyrics: StageLyric[] = timedLines?.map((line, index) => {
+    const startTimeMs = Math.max(0, line.t * 1000);
+    const nextStartMs = timedLines[index + 1]?.t != null ? Math.max(startTimeMs, timedLines[index + 1]!.t * 1000) : duration * 1000;
+    const endTimeMs = Math.max(startTimeMs, nextStartMs);
+    return {
+      id: `booth-line-${line.idx}`,
+      text: lyricLines[line.idx] ?? "",
+      startTimeMs,
+      endTimeMs,
+    };
+  }).filter((line) => line.text.trim() && line.endTimeMs > line.startTimeMs) ?? [];
 
   return (
     <Layout>
@@ -902,14 +799,22 @@ function VocalBoothInner() {
               title="Vocal Booth"
               summary="Sing over a backing track with a scrolling teleprompter, record your take, and mix it down with the instrumental."
               steps={[
-                "Upload a backing track — MLK v3 mastering is applied automatically.",
+                "Upload a backing track — MLK V4 (Morris Law Kernel V4) mastering is applied automatically.",
                 "Paste or pick lyrics; toggle the guide vocal to hear the melody.",
                 "Record your take, then mix down to instrumental + your vocal.",
               ]}
               note="Lyric highlighting is energy-based and approximate (no transcription). The mixdown contains only the instrumental and your recorded vocal — never the guide vocal."
             />
           </div>
-          <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">Studio</Badge>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/studio/track-prep"
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/35 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-500/15"
+            >
+              Prepare a stage song
+            </Link>
+            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">Studio</Badge>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-5">
@@ -1065,6 +970,42 @@ function VocalBoothInner() {
               </div>
             )}
 
+            {timedLines && (
+              <div className="rounded-xl border border-border/40 bg-black/20 p-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-amber-300">Live re-timing</span>
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={resetAndRetiming}>
+                    <RotateCcw className="w-3.5 h-3.5" /> Reset / Re-Time All
+                  </Button>
+                </div>
+                <label className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="shrink-0">Global offset</span>
+                  <input
+                    type="range"
+                    min={-5000}
+                    max={5000}
+                    step={100}
+                    value={globalOffsetMs}
+                    onChange={(event) => setGlobalTimingOffset(Number(event.target.value))}
+                    className="min-w-0 flex-1 accent-amber-500"
+                  />
+                  <span className="w-14 text-right font-mono">{globalOffsetMs > 0 ? "+" : ""}{globalOffsetMs}ms</span>
+                </label>
+                <div className="max-h-36 space-y-1 overflow-y-auto">
+                  {timedLines.map((line) => (
+                    <div key={line.idx} className="flex items-center gap-2 text-[11px]">
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                        {line.idx + 1}. {lyricLines[line.idx] ?? ""}
+                      </span>
+                      <span className="w-12 text-right font-mono text-amber-300">{fmtTime(line.t)}</span>
+                      <button type="button" className="rounded border border-border/40 px-1.5 py-0.5 hover:border-amber-500/50" onClick={() => nudgeLine(line.idx, -100)} aria-label={`Move line ${line.idx + 1} earlier by 100 milliseconds`}>−100</button>
+                      <button type="button" className="rounded border border-border/40 px-1.5 py-0.5 hover:border-amber-500/50" onClick={() => nudgeLine(line.idx, 100)} aria-label={`Move line ${line.idx + 1} later by 100 milliseconds`}>+100</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Editable lyrics / teleprompter — hidden in enlarged mode (overlay owns the ref) */}
             {enlarged ? null : recorder.isRecording || backingPlaying ? (
               <div
@@ -1185,7 +1126,7 @@ function VocalBoothInner() {
                   <div className="w-full flex flex-col items-center justify-center gap-2 py-8 text-amber-400">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span className="text-sm font-medium">Mastering your track…</span>
-                    <span className="text-[10px] text-muted-foreground">Running MLK v3 locally — takes a few seconds</span>
+                    <span className="text-[10px] text-muted-foreground">Running MLK V4 (Morris Law Kernel V4) locally — takes a few seconds</span>
                   </div>
                 ) : (
                   <button
@@ -1194,7 +1135,7 @@ function VocalBoothInner() {
                   >
                     <Upload className="w-5 h-5" />
                     <span className="text-sm">Upload a backing track</span>
-                    <span className="text-[10px]">MLK v3 mastering applied automatically</span>
+                    <span className="text-[10px]">MLK V4 (Morris Law Kernel V4) mastering applied automatically</span>
                   </button>
                 )
               ) : (
@@ -1260,9 +1201,9 @@ function VocalBoothInner() {
             <div className="rounded-xl border border-border/40 bg-card/40 p-3 space-y-2">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Live Monitoring</div>
               <p className="text-[10px] text-muted-foreground leading-snug">
-                Pick a preset to hear your voice live through effects. The active preset will also be <strong className="text-white/70">baked into your recording</strong> — use headphones to avoid feedback.
+                Pick a preset to hear your voice live through effects. Your take is always captured as a <strong className="text-white/70">clean dry vocal stem</strong> — use headphones to avoid feedback.
               </p>
-              <LiveVocalMonitor onPresetChange={setMonitorPreset} stopSignal={monitorStopSignal} />
+              <LiveMonitor stopSignal={monitorStopSignal} />
             </div>
 
             {/* Recorder */}
@@ -1343,189 +1284,80 @@ function VocalBoothInner() {
         </div>
       </div>
 
-      {/* ══ Enlarged Studio Mode — fixed fullscreen overlay ══════════════════════
-          Audio elements remain in the normal DOM above (never remounted), so
-          playback and the AudioContext graph survive the transition with zero gap. */}
       {enlarged && (
-        <div className="fixed inset-0 z-50 bg-[#080808] flex flex-col overflow-hidden">
-
-          {/* Top bar */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0">
-                <Mic className="w-3.5 h-3.5 text-amber-500" />
+        <LivePerformanceStage
+          title="Vocal Booth"
+          subtitle="Studio Mode"
+          trackName={backingFile?.name}
+          isPlaying={backingPlaying}
+          currentTimeSec={position}
+          durationSec={duration}
+          lyrics={stageLyrics}
+          backingAnalyser={analyserRef.current}
+          onExit={() => setEnlarged(false)}
+          onTogglePlayback={toggleStagePlayback}
+          onStop={stopStagePlayback}
+          onSeek={seekBacking}
+          onRecord={toggleStageRecording}
+          isRecording={recorder.isRecording}
+          recordDisabled={!backingFile || mastering}
+          performers={[
+            {
+              id: "host",
+              label: recorder.isRecording ? "Live mic" : "Host",
+              name: "You",
+              accent: "gold",
+              analyser: recorder.analyser,
+              status: recorder.isRecording ? "Live mic" : "Host",
+            },
+             ...(performanceMode === "duet"
+               ? [{
+                   id: "partner",
+                   label: "Backing track",
+                   name: "Track",
+                   accent: "violet" as const,
+                   analyser: null,
+                   status: "Backing track",
+                 }]
+               : []),
+          ]}
+          controlSlot={(
+            <div className="flex items-center gap-2">
+              <div className="hidden items-center gap-1 rounded-full border border-white/10 bg-black/20 p-0.5 sm:flex" aria-label="Performance mode">
+                {(["solo", "duet"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setPerformanceMode(mode)}
+                    className={`rounded-full px-2 py-1 text-[10px] uppercase tracking-wider transition-colors ${
+                      performanceMode === mode ? "bg-amber-400 text-zinc-950" : "text-white/50 hover:text-white"
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                ))}
               </div>
-              <span className="text-sm font-semibold shrink-0">Studio Mode</span>
-              {backingFile && (
-                <span className="text-[11px] text-muted-foreground truncate">{backingFile.name}</span>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300 transition-colors hover:bg-amber-500/20"
+              >
+                <Upload className="h-3 w-3" />
+                {backingFile ? "Change track" : "Load track"}
+              </button>
+              {guideVocalUrl && (
+                <button
+                  type="button"
+                  onClick={() => setGuideEnabled((value) => !value)}
+                  className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] transition-colors ${guideEnabled ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-border/50 text-muted-foreground"}`}
+                >
+                  {guideEnabled ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
+                  Guide
+                </button>
               )}
-            </div>
-            <button
-              onClick={() => setEnlarged(false)}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors shrink-0 ml-3"
-              title="Exit Studio Mode (Esc)"
-            >
-              <Minimize2 className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-
-          {/* Vocal Booth waveform canvas
-              2400 × 260 native pixels displayed at CSS height 130 px → crisp on HiDPI.
-              The rAF loop above writes to this canvas every frame while enlarged. */}
-          <div className="px-3 pt-2.5 pb-1 shrink-0">
-            <canvas
-              ref={canvasRef}
-              width={2400}
-              height={260}
-              className="w-full rounded-xl block"
-              style={{ height: 130 }}
-            />
-            {!backingFile && (
-              <p className="text-[10px] text-muted-foreground text-center mt-1">
-                Load a backing track to see the waveform timeline.
-              </p>
-            )}
-            {backingFile && !waveformPeaks && (
-              <p className="text-[10px] text-muted-foreground text-center mt-1 flex items-center justify-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Decoding waveform…
-              </p>
-            )}
-          </div>
-
-          {/* Transport controls */}
-          <div className="px-4 py-2.5 border-b border-white/10 shrink-0 flex items-center gap-3">
-            <button
-              onClick={toggleBacking}
-              disabled={!backingFile || recorder.isRecording}
-              className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-600 text-black flex items-center justify-center disabled:opacity-40 shrink-0"
-              title={backingFile ? "Play / Pause" : "Load a track first"}
-            >
-              {backingPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-            </button>
-            <input
-              type="range" min={0} max={1} step={0.001} value={progress}
-              onChange={(e) => seekBacking(parseFloat(e.target.value))}
-              disabled={recorder.isRecording}
-              className="flex-1 accent-amber-500"
-            />
-            <span className="text-[11px] font-mono text-muted-foreground w-20 text-right shrink-0">
-              {fmtTime(position)} / {fmtTime(duration)}
-            </span>
-            {guideVocalUrl && (
-              <button
-                onClick={() => setGuideEnabled((v) => !v)}
-                className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border transition-colors shrink-0 ${guideEnabled ? "border-amber-500/40 text-amber-400 bg-amber-500/10" : "border-border/50 text-muted-foreground"}`}
-              >
-                {guideEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
-                Guide
-              </button>
-            )}
-          </div>
-
-          {/* Level meter + record button row */}
-          <div className="px-4 py-2 shrink-0 flex items-center gap-4 border-b border-white/10">
-            <div className="flex-1 space-y-0.5 min-w-0">
-              <div className="h-1.5 rounded-full bg-black/60 overflow-hidden">
-                <div
-                  className={`h-full transition-[width] duration-75 ${meterPct > 88 ? "bg-red-500" : meterPct > 60 ? "bg-amber-400" : "bg-emerald-500"}`}
-                  style={{ width: `${recorder.isRecording ? meterPct : 0}%` }}
-                />
-              </div>
-              <div className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                {recorder.isRecording ? "● Recording — sing along" : "Input level"}
-              </div>
-            </div>
-            {!recorder.isRecording && recorder.status !== "recorded" && (
-              <button
-                onClick={startTake}
-                disabled={!backingFile}
-                className="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center disabled:opacity-40 shadow-lg shadow-red-500/30 shrink-0"
-                title={backingFile ? "Start recording" : "Load a track first"}
-              >
-                <Mic className="w-5 h-5" />
-              </button>
-            )}
-            {recorder.isRecording && (
-              <button
-                onClick={stopTake}
-                className="w-12 h-12 rounded-full bg-white text-red-600 flex items-center justify-center animate-pulse shrink-0"
-                title="Stop recording"
-              >
-                <Square className="w-5 h-5 fill-current" />
-              </button>
-            )}
-          </div>
-
-          {/* Post-take actions */}
-          {recorder.status === "recorded" && recorder.vocalUrl && (
-            <div className="px-4 py-2 shrink-0 flex flex-wrap items-center gap-2 border-b border-white/10">
-              <Button onClick={previewTake} size="sm" variant="secondary" className="gap-1.5">
-                <Play className="w-3.5 h-3.5" /> Preview
-              </Button>
-              <Button onClick={stopPreview} size="sm" variant="ghost" className="gap-1.5">
-                <Pause className="w-3.5 h-3.5" /> Stop
-              </Button>
-              <Button onClick={() => { stopPreview(); recorder.reset(); }} size="sm" variant="ghost" className="gap-1.5">
-                <RotateCcw className="w-3.5 h-3.5" /> Re-record
-              </Button>
-              <Button
-                onClick={mixAndExport}
-                disabled={mixing}
-                size="sm"
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2 ml-auto"
-              >
-                {mixing
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Mixing…</>
-                  : <><Download className="w-3.5 h-3.5" /> Mix &amp; Export</>}
-              </Button>
             </div>
           )}
-
-          {/* Full-screen teleprompter — this owns teleprompterRef + lineRefs while enlarged */}
-          <div className="flex-1 overflow-hidden flex flex-col min-h-0 pt-2">
-            {timedLines && (
-              <div className="px-5 pb-1 shrink-0">
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50">
-                  {timingSource === "lrc"
-                    ? "Precise synced timing · lrclib.net"
-                    : "Energy-based · approximate"}
-                </span>
-              </div>
-            )}
-            <div
-              ref={teleprompterRef}
-              className="flex-1 overflow-y-auto scroll-smooth px-6 pb-8"
-            >
-              {lyrics.trim() ? (
-                lyricLines.map((line, i) => {
-                  const isSection = line.trim().startsWith("[");
-                  const isActive = i === activeLineIdx;
-                  return (
-                    <p
-                      key={i}
-                      ref={(el) => { lineRefs.current[i] = el; }}
-                      className={`text-center leading-loose transition-all duration-150 ${
-                        isActive
-                          ? "text-amber-300 font-bold text-4xl py-2"
-                          : isSection
-                            ? "text-amber-400/50 font-semibold text-sm mt-5"
-                            : timedLines
-                              ? "text-white/25 text-2xl py-0.5"
-                              : "text-white/70 text-2xl py-0.5"
-                      }`}
-                    >
-                      {line || "\u00A0"}
-                    </p>
-                  );
-                })
-              ) : (
-                <p className="text-muted-foreground text-sm text-center mt-16">
-                  No lyrics loaded — add them in the normal view then re-enter Studio Mode.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        />
       )}
     </Layout>
   );

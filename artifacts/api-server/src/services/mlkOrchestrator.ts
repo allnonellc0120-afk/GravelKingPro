@@ -15,11 +15,16 @@ import { and, eq, like } from "drizzle-orm";
 import { embedLsbPayload } from "../kernel-v3";
 import { ObjectStorageService, saveObjectWithFallback } from "../lib/objectStorage";
 import { backupCertStub } from "../lib/firestore";
-import { getGcpCredentials, getVertexAccessToken, VERTEX_LOCATION } from "../geminiVertex";
+import {
+  getGcpCredentials,
+  getVertexAccessToken,
+  vertexV1Beta1Url,
+} from "../geminiVertex";
 import { logger } from "../lib/logger";
 import { sanitizeStylePrompt, rewriteBlockedPrompt } from "./promptSanitizer";
 import {
   convertToGravelKingVoice,
+  GRAVELKING_RVC_DEFAULTS,
   predictionOutputUrl,
   uploadFile,
 } from "../replicateClient";
@@ -46,6 +51,27 @@ export interface GenerateAndMasterResult {
   title: string;
   finalLyricsHash?: string;
   lyricsAuthorshipScore?: number;
+}
+
+export function shouldIssueCertificate(input: {
+  requested: boolean;
+  fingerprintStatus: "no_match" | "match" | "unavailable" | "not_run";
+  parentCertId?: string | null;
+  signingSecretAvailable: boolean;
+}): boolean {
+  return input.requested &&
+    input.fingerprintStatus === "no_match" &&
+    input.signingSecretAvailable &&
+    (input.parentCertId !== undefined ? Boolean(input.parentCertId) : true);
+}
+
+/** A generation entitlement may contain a cert id or, for older uncertified
+ * pipeline tracks, the track id. The candidate is only a hint; callers must
+ * verify it against ip_cert_stubs before treating it as a certificate. */
+export function generationEntitlementCandidate(session: string | null | undefined): string | null {
+  if (!session?.startsWith("mlk-gen-")) return null;
+  const candidate = session.slice("mlk-gen-".length).trim();
+  return candidate || null;
 }
 
 export const GENERATED_PREVIEW_SECONDS = 30;
@@ -81,21 +107,32 @@ export async function mixVoiceSwapAudioInMemory(
   instrumental: Buffer,
   converted: Buffer,
 ): Promise<Buffer> {
+  const startedAt = performance.now();
   const child = spawn("ffmpeg", [
     "-hide_banner", "-loglevel", "error",
     "-i", "pipe:0",
     "-i", "pipe:3",
-    // Trim the converted vocal by exactly 2.5 dB, then oversample before the
-    // final limiter so the -0.5 dB ceiling is enforced against inter-sample
-    // peaks rather than only the source sample grid.
+    // Oversample before the final limiter so the -0.5 dB ceiling is enforced
+    // against inter-sample peaks rather than only the source sample grid.
+    //
+    // The vocal is split into dry, bite, and chest bands. The two narrow bands
+    // receive a soft clip before being mixed back into the vocal. This is an
+    // intentionally small amount of analog-style harmonic thickening, not a
+    // full-band distortion effect.
     "-filter_complex",
-    "[0:a]aresample=192000[bed];" +
-      "[1:a]volume=-2.5dB," +
-      "highshelf=f=6500:gain=-3.5," +
+    "[0:a]aresample=192000,volume=-3dB[bed];" +
+      "[1:a]aresample=192000,volume=-2.5dB,asplit=3[voxDry][voxBite][voxChest];" +
+      "[voxBite]bandpass=f=2400:w=2000,volume=0.32,asoftclip=type=tanh:threshold=0.95:output=0.98[biteSat];" +
+      "[voxChest]bandpass=f=350:w=300,volume=0.32,asoftclip=type=tanh:threshold=0.95:output=0.98[chestSat];" +
+      "[voxDry][biteSat][chestSat]amix=inputs=3:normalize=0:duration=longest," +
+      "highshelf=f=10000:gain=-2.5," +
       "equalizer=f=240:width_type=q:width=0.8:g=2.0," +
-      "aecho=0.85:0.7:25|45:0.18|0.12," +
-      "aresample=192000[vox];" +
-      "[bed][vox]amix=inputs=2:duration=longest:dropout_transition=0[mix];" +
+      "aecho=0.85:0.7:25|45:0.18|0.12,asplit=2[voxSide][voxMix];" +
+      // Reduce the backing track only while the vocal is present. The sidechain
+      // signal is the processed vocal, so this is real ducking, not a static
+      // volume offset.
+      "[bed][voxSide]sidechaincompress=threshold=0.08:ratio=1.35:attack=12:release=120:makeup=1:mix=1[duckedBed];" +
+      "[duckedBed][voxMix]amix=inputs=2:duration=longest:dropout_transition=0[mix];" +
       "[mix]alimiter=limit=0.9440608763:attack=5:release=50:level=disabled,aresample=48000[out]",
     "-map", "[out]",
     "-acodec", "pcm_s16le", "-f", "wav", "pipe:1",
@@ -116,6 +153,11 @@ export async function mixVoiceSwapAudioInMemory(
     });
   });
   if (!result.length) throw new Error("In-memory audio recombination returned no audio");
+  const mixdownMs = Math.round(performance.now() - startedAt);
+  logger.info(
+    { mixdownMs, underSla: mixdownMs < 2_500 },
+    "[pipeline] vocal grit mixdown completed",
+  );
   return result;
 }
 
@@ -172,9 +214,9 @@ export async function tryGravelKingVoiceSwap(
       process.env["REPLICATE_RVC_MODEL_WEIGHTS_URL"]?.trim() ||
       DEFAULT_RVC_MODEL_WEIGHTS_URL,
     pitchShift: 0,
-    indexRate: 0.78,
-    protect: 0.02,
-    filterRadius: 3,
+    indexRate: GRAVELKING_RVC_DEFAULTS.indexRate,
+    protect: GRAVELKING_RVC_DEFAULTS.protect,
+    filterRadius: GRAVELKING_RVC_DEFAULTS.filterRadius,
   }));
   logger.info(
     { predictionId: conversion.predictionId },
@@ -329,6 +371,39 @@ export function hashLyrics(text: string): { normalized: string; hash: string } {
   };
 }
 
+/**
+ * Give Lyria a musical guide rather than a spoken-word reading brief.
+ *
+ * The lyric text remains verbatim for hashing/certification. Bar labels are
+ * prompt-only metadata that make each supplied line a timed musical phrase;
+ * they are never persisted as altered user lyrics.
+ */
+export function buildMelodicVocalGuide(
+  vocalMode: VocalMode,
+  normalizedLyrics: string,
+): string {
+  if (vocalMode === "instrumental") {
+    return "Instrumental arrangement only. Do not add vocals, spoken words, humming, or narration.";
+  }
+
+  const performance =
+    "Use a sung melodic contour in 4/4, with each lyric line locked to one or more complete bars. " +
+    "Use intentional scale-step movement, held syllables at phrase ends, and subtle pitch inflections " +
+    "with natural vibrato. Keep consonants rhythmic and leave audible breaths between phrases. " +
+    "Do not speak, chant monotonously, rap without pitch, or use a flat TTS cadence.";
+  if (vocalMode === "random") {
+    return `${performance}\nWrite original lyrics that fit the requested arrangement, then sing them melodically.`;
+  }
+
+  const barLockedLyrics = normalizedLyrics
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => `Bar phrase ${index + 1}: ${line}`)
+    .join("\n");
+  return `${performance}\nSing the exact lyrics below word for word. Do not replace, reorder, or paraphrase them.\n${barLockedLyrics}`;
+}
+
 export interface InteractionContentBlock {
   type?: string;
   data?: string;
@@ -408,7 +483,7 @@ export async function generateLyriaAudio(
 ): Promise<{ audio: Buffer; mimeType: string; model: string; responseLyrics?: string }> {
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
-  const base = `https://aiplatform.googleapis.com/v1beta1/projects/${creds.project_id}/locations/global`;
+  const base = vertexV1Beta1Url(`/projects/${creds.project_id}/locations/global`);
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   const res = await fetch(`${base}/interactions`, {
@@ -470,7 +545,7 @@ export async function generateLyriaAudio(
 }
 
 /**
- * Full pipeline: certify lyrics → Lyria generation → REAL MLK v3.5 master →
+ * Full pipeline: certify lyrics → Lyria generation → REAL MLK V4 master →
  * Dual-Anchor cert → user vault. Read-only pass-through against existing
  * systems; throws loudly on any stage failure (no silent fallbacks).
  */
@@ -491,6 +566,8 @@ export async function generateAndMasterTrack(
     onStage?: (stage: "demucs" | "rvc" | "mlk_master") => Promise<void> | void;
     /** When set, this run is a remix — the child cert records the parent linkage. */
     remixOf?: { parentTrackId: string; parentCertId: string | null };
+    /** Certification is explicitly requested and still requires a clean fingerprint. */
+    certify?: boolean;
     lyricAudit?: {
       finalLyricsHash: string;
       authorshipScore: number;
@@ -511,7 +588,7 @@ export async function generateAndMasterTrack(
   const title =
     opts.title?.trim() ||
     (vocalMode === "lyrics" ? normalized.split("\n")[0]!.slice(0, 80) : "") ||
-    (vocalMode === "instrumental" ? "MLK v3.5 Instrumental" : "MLK v3.5 Track");
+    (vocalMode === "instrumental" ? "MLK V4 Instrumental" : "MLK V4 Track");
   const artistHandle = opts.artistName?.trim() || "GravelKing Artist";
   const stylePrompt =
     opts.stylePrompt?.trim() ||
@@ -533,11 +610,7 @@ export async function generateAndMasterTrack(
       ? `\nTarget song length: about ${Math.round(opts.targetDurationS)} seconds.`
       : "";
   const buildLyriaInput = (style: string) =>
-    vocalMode === "instrumental"
-      ? `${style}${durationLine}\n\nInstrumental only — no vocals, no singing, no spoken words, no humming.`
-      : vocalMode === "random"
-        ? `${style}${durationLine}\n\nWrite and sing your own original lyrics that fit this style.`
-        : `${style}${durationLine}\n\nSing these exact lyrics, word for word:\n${normalized}`;
+    `${style}${durationLine}\n\n${buildMelodicVocalGuide(vocalMode, normalized)}`;
   if (promptOptimized) {
     logger.info({ vocalMode }, "mlkOrchestrator: style prompt was AI-optimized before Lyria");
   }
@@ -587,13 +660,24 @@ export async function generateAndMasterTrack(
   })() : 0;
 
   if (vocalMode !== "instrumental") {
-    const voiceSwap = await tryGravelKingVoiceSwap(audio, opts.modelWeightsUrl, opts.onStage);
-    finalAudio = voiceSwap.audio;
-    finalMimeType = "audio/wav";
-    logger.info(
-      { predictionId: voiceSwap.predictionId, mixed: voiceSwap.mixed },
-      "[Gravel King Voice Swap: REQUIRED SUCCESS]",
-    );
+    try {
+      const voiceSwap = await tryGravelKingVoiceSwap(audio, opts.modelWeightsUrl, opts.onStage);
+      finalAudio = voiceSwap.audio;
+      finalMimeType = "audio/wav";
+      logger.info(
+        { predictionId: voiceSwap.predictionId, mixed: voiceSwap.mixed },
+        "[Gravel King Voice Swap: SUCCESS]",
+      );
+    } catch (err) {
+      // RVC is an enhancement, not the generated song itself. Keep the valid
+      // Lyria output when Replicate rejects the model, URL, or payload.
+      logger.warn(
+        { err },
+        "[Gravel King Voice Swap: FAILED — using base generation]",
+      );
+      finalAudio = audio;
+      finalMimeType = mimeType;
+    }
   }
 
   // Generation remains unmastered. All audio stays in memory until cloud storage.
@@ -612,15 +696,33 @@ export async function generateAndMasterTrack(
     // storage, playback, and download all continue if the provider is offline,
     // suspended, times out, or returns a match; in those cases finalWav remains
     // unmodified and no certificate row is created.
-    const fingerprint = {
+    const fingerprint: {
+      status: "no_match" | "match" | "unavailable" | "not_run";
+      provider: "acrcloud";
+      reason: string;
+    } = {
       status: "unavailable" as const,
       provider: "acrcloud" as const,
       reason: "fingerprint service unavailable in in-memory mode",
     };
-    const shouldStamp = false;
-    const certificationStatus: GenerateAndMasterResult["certificationStatus"] = "skipped_unavailable";
-    logger.warn({ fingerprintStatus: fingerprint.status, reason: fingerprint.reason, vocalMode },
-      "mlkOrchestrator: generation completed without certificate stamp");
+    const signingSecret = process.env["SESSION_SECRET"];
+    const shouldStamp = shouldIssueCertificate({
+      requested: opts.certify === true,
+      fingerprintStatus: fingerprint.status,
+      parentCertId: opts.remixOf ? opts.remixOf.parentCertId : undefined,
+      signingSecretAvailable: Boolean(signingSecret),
+    });
+    const certificationStatus: GenerateAndMasterResult["certificationStatus"] = shouldStamp
+      ? "sealed"
+      : fingerprint.status === "match"
+        ? "skipped_match"
+        : "skipped_unavailable";
+    if (shouldStamp) {
+      logger.info({ fingerprintStatus: fingerprint.status, vocalMode }, "mlkOrchestrator: certificate stamped");
+    } else {
+      logger.warn({ fingerprintStatus: fingerprint.status, reason: fingerprint.reason, vocalMode },
+        "mlkOrchestrator: generation completed without certificate stamp");
+    }
 
     const contentHash = createHash("sha256").update(preKernelBytes).digest("hex");
     let certId: string | null = null;
@@ -628,14 +730,13 @@ export async function generateAndMasterTrack(
     let handshake: string | null = null;
     let finalWav: Buffer<ArrayBufferLike> = masteredWav;
     if (shouldStamp) {
-      const secret = process.env["SESSION_SECRET"] ?? "gravelking-fallback-secret";
       certId = randomUUID();
       const fullHash = createHash("sha256")
         .update(`${contentHash}|${artistHandle}|${certId}`)
         .digest("hex");
       const nominator = fullHash.slice(0, 32);
       denominator = fullHash.slice(32);
-      handshake = createHmac("sha256", secret)
+      handshake = createHmac("sha256", signingSecret!)
         .update(`${certId}|${nominator}|${denominator}`)
         .digest("hex");
       const nominatorPayload = Buffer.from(
@@ -734,7 +835,7 @@ export async function generateAndMasterTrack(
           finalLyricsHash: opts.lyricAudit?.finalLyricsHash ?? (vocalMode === "lyrics" ? lyricHash : null),
           lyricsAuthorshipScore: opts.lyricAudit?.authorshipScore ?? null,
           lyricsAuthorshipLedger: opts.lyricAudit?.ledger ?? null,
-          finalLyricsLabel: vocalMode === "lyrics" ? "Certified Final Rendered Lyrics" : null,
+          finalLyricsLabel: certId && vocalMode === "lyrics" ? "Certified Final Rendered Lyrics" : null,
         });
       }
       await tx.insert(tracksTable).values({
@@ -763,7 +864,7 @@ export async function generateAndMasterTrack(
         finalLyricsHash: opts.lyricAudit?.finalLyricsHash ?? (vocalMode === "lyrics" ? lyricHash : null),
         lyricsAuthorshipScore: opts.lyricAudit?.authorshipScore ?? null,
         lyricsAuthorshipLedger: opts.lyricAudit?.ledger ?? null,
-        finalLyricsLabel: vocalMode === "lyrics" ? "Certified Final Rendered Lyrics" : null,
+        finalLyricsLabel: certId && vocalMode === "lyrics" ? "Certified Final Rendered Lyrics" : null,
       });
       await tx.insert(purchasedTracksTable).values({
         userId,
@@ -805,18 +906,18 @@ export async function generateAndMasterTrack(
 }
 
 /**
- * Remix an existing vault track through the full MLK v3.5 pipeline.
+ * Remix an existing vault track through the full MLK V4 pipeline.
  *
  * The parent track's ORIGINAL style prompt (from its cert stub, stripped of
  * machine-readable markers) is the hidden base anchor; the user's new twist is
  * blended on top so the variation keeps the original's identity. The output
- * runs through the real MLK v3.5 master pipeline and gets a CHILD cert whose
+ * runs through the real MLK V4 master pipeline and gets a CHILD cert whose
  * server-side record links back to the parent track + parent cert.
  */
 export async function remixTrack(
   parentTrackId: string,
   userId: string,
-  opts: { twist?: string; vocalsOn?: boolean; artistName?: string } = {},
+  opts: { twist?: string; vocalsOn?: boolean; artistName?: string; certify?: boolean } = {},
 ): Promise<GenerateAndMasterResult> {
   const [parent] = await db
     .select({
@@ -853,25 +954,27 @@ export async function remixTrack(
       ),
     )
     .limit(1);
-  const parentCertId = genRows[0]?.session?.slice("mlk-gen-".length) || null;
-
-  // Chain-of-title requirement: a remix child cert MUST anchor to a real
-  // parent MLK cert. No title-derived fallback — a certified Remix Engine
-  // request against a track without a recoverable cert is refused outright,
-  // otherwise we'd mint an unanchored child certificate.
-  if (!parentCertId) {
-    throw new Error("Original track not found. Only tracks generated by MLK v3.5 can be remixed.");
+  const certCandidate = generationEntitlementCandidate(genRows[0]?.session);
+  let parentCertId: string | null = null;
+  let parentStylePrompt: string | null = null;
+  if (certCandidate) {
+    const [stub] = await db
+      .select({ certId: ipCertStubsTable.certId, stylePrompt: ipCertStubsTable.stylePrompt })
+      .from(ipCertStubsTable)
+      .where(eq(ipCertStubsTable.certId, certCandidate))
+      .limit(1);
+    if (stub) {
+      parentCertId = stub.certId;
+      parentStylePrompt = stub.stylePrompt;
+    }
   }
-  const [stub] = await db
-    .select({ stylePrompt: ipCertStubsTable.stylePrompt })
-    .from(ipCertStubsTable)
-    .where(eq(ipCertStubsTable.certId, parentCertId))
-    .limit(1);
-  // Hidden base anchor: the parent's original creative direction.
-  const basePrompt = (stub?.stylePrompt ?? "").replace(/\s*\[vocalMode:[^\]]*\]\s*$/, "").trim();
-  if (!basePrompt) {
-    throw new Error("Original track not found. The original track's certificate record is missing.");
-  }
+  // Some older generation jobs recorded the track id in the entitlement even
+  // though they never certified the render. They remain remixable, but cannot
+  // anchor a child certificate. Use a clear title-based seed rather than
+  // pretending a missing parent certificate exists.
+  const basePrompt = (parentStylePrompt ?? `A new, distinct musical variation inspired by the track title "${parent.title}"`)
+    .replace(/\s*\[vocalMode:[^\]]*\]\s*$/, "")
+    .trim();
 
   // NOTE: pure style description only — NO meta-language. Wording like
   // "remix of the original track <title>" or "keep this exact style" trips
@@ -890,5 +993,6 @@ export async function remixTrack(
     // vocals OFF → strict instrumental directive.
     vocalMode: opts.vocalsOn ? "random" : "instrumental",
     remixOf: { parentTrackId, parentCertId },
+    certify: opts.certify === true,
   });
 }

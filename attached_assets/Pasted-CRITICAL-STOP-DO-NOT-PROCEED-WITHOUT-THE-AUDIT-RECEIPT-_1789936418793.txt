@@ -1,0 +1,62 @@
+CRITICAL STOP: DO NOT PROCEED WITHOUT THE AUDIT RECEIPT
+
+You bypassed the required output protocol. You were explicitly directed to return the populated 6-point verification JSON object before publishing, but instead returned a 6-line status block claiming "awaiting_publish".
+
+HALT DEPLOYMENT AND GENERATE THE FULL AUDIT JSON NOW.
+
+Populate every single field below with actual values and test receipts from the workspace:
+
+```json
+{
+  "audit_timestamp": "<ISO 8601 string>",
+  "target_domain": "gravelkingpro.com",
+  "pass_rate_percent": 100,
+  "environment": {
+    "ffmpeg_path": "<stdout of which ffmpeg>",
+    "ffmpeg_version": "<first line of ffmpeg -version>",
+    "pnpm_restore_status": "<clean/restored>",
+    "timeout_hardening": {
+      "file_path": "<path to file>",
+      "timeout_seconds": 45,
+      "verified": true
+    }
+  },
+  "admin_developer_account": {
+    "account_email": "allnonellc0120@gmail.com",
+    "is_developer": true,
+    "role": "admin",
+    "wallet_credits": 1000000,
+    "auth_bypass_middleware_file": "<path to file>",
+    "zero_credit_deduction_verified": true
+  },
+  "mastering_v4": {
+    "grep_mlk_v3_remaining_count": 0,
+    "engine_label": "MLK V4 (Morris Law Kernel V4)",
+    "route_bundle_parity_verified": true,
+    "curl_receipt": {
+      "http_status": 200,
+      "kernel_header": "MLK V4 (Morris Law Kernel V4)",
+      "output_file_size_bytes": 1327148,
+      "ffprobe_format": "pcm_s24le, 44100 Hz, stereo, 24-bit"
+    }
+  },
+  "jax_routing": {
+    "classifier_file_path": "<path to file>",
+    "conversational_test_prompt": "Tell me about Sam Barber",
+    "conversational_output_type": "dialogue_only",
+    "lyric_explicit_keywords_enforced": ["write", "lyrics", "rhyme", "verse", "chorus"],
+    "song_generation_enoent_resolved": true
+  },
+  "vocal_booth_stage": {
+    "file_path": "client/src/pages/vocal-booth.tsx",
+    "three_d_stage_is_default_view": true,
+    "plain_english_labels_applied": true
+  },
+  "production_build": {
+    "pnpm_build_exit_code": 0,
+    "build_stdout_summary": "<raw output summary>"
+  },
+  "modified_files_list": [
+    "<full relative path to every modified file>"
+  ]
+}

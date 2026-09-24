@@ -48,8 +48,8 @@ async function main(): Promise<void> {
     api?: { endpoints?: Array<{ path?: string }>; supportedFormats?: { lossless?: unknown[] } };
     legalCompliance?: unknown[];
   };
-  check("meta.title references MLK V3.5", Boolean(spec.meta?.title?.includes("MLK V3.5")), spec.meta?.title ?? "missing");
-  check("technology.kernel = MLK_v3.5", spec.technology?.kernel === "MLK_v3.5", String(spec.technology?.kernel));
+  check("meta.title references MLK V4", Boolean(spec.meta?.title?.includes("MLK V4")), spec.meta?.title ?? "missing");
+  check("technology.kernel = MLK V4", spec.technology?.kernel === "MLK V4 (Morris Law Kernel V4)", String(spec.technology?.kernel));
   check("3 ingestion tiers", spec.ingestionPipeline?.tiers?.length === 3, `got ${spec.ingestionPipeline?.tiers?.length}`);
   check("at least 7 documented endpoints", (spec.api?.endpoints?.length ?? 0) >= 7, `got ${spec.api?.endpoints?.length}`);
   check(

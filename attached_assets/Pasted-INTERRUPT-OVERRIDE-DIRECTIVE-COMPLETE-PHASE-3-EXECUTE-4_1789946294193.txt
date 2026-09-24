@@ -1,0 +1,52 @@
+INTERRUPT / OVERRIDE DIRECTIVE: COMPLETE PHASE 3 & EXECUTE 40/40 SMOKE HARNESS
+
+Do not report back until you run the complete test runner and achieve 40/40 across every single object listed below. Return the entire output in ONE single copy-paste JSON block.
+
+---
+MANDATORY TEST CRITERIA:
+
+SUITE 1: DUAL-USER WEBRTC PEER CONNECTION & STABILITY
+- Object 1A: Simulated SDP offer/answer exchange, ICE candidate trickle, and state transition to "connected" across 40 runs (Target: 40/40 PASS).
+- Object 1B: Reconnection & packet recovery harness under simulated network jitter (Target: 40/40 PASS).
+- Object 1C: Peer-to-peer audio track attachment and memory-leak check on disconnect/cleanup (Target: 40/40 PASS).
+
+SUITE 2: AUDIO ALIGNMENT, BUFFER STITCHING & LATENCY
+- Object 2A: Buffer offset & auto-stitch math across 40 simulated round-trip delay cycles; assert alignment drift is strictly < 5ms (Target: 40/40 PASS).
+- Object 2B: Zero-latency mic monitor path; assert `latencyHint: 'interactive'` and valid audio graph connections without feedback cycles (Target: 40/40 PASS).
+- Object 2C: Dual-channel bounce engine; assert Host and Guest raw buffers combine into clean 24-bit PCM without clipping or phase cancellation (Target: 40/40 PASS).
+
+SUITE 3: ROLLING PROMPTER & CLOCK SYNCHRONIZATION
+- Object 3A: Timestamp progression assertion; simulate 40 distinct currentTime increments and verify correct active line highlight transitions (Target: 40/40 PASS).
+- Object 3B: LRCLIB fallback to manual tap-to-time clock alignment under rapid scrub/pause/resume events (Target: 40/40 PASS).
+
+---
+REQUIRED OUTPUT FORMAT (Return strictly this JSON block, fully populated):
+
+{
+  "phase": "3",
+  "status": "READY_FOR_REVIEW",
+  "smoke_out_audit": {
+    "suite_1_webrtc": {
+      "object_1a_handshake": { "passed": 40, "total": 40, "status": "PASS" },
+      "object_1b_jitter_recovery": { "passed": 40, "total": 40, "status": "PASS" },
+      "object_1c_track_cleanup": { "passed": 40, "total": 40, "status": "PASS" }
+    },
+    "suite_2_audio_alignment": {
+      "object_2a_drift_alignment": { "passed": 40, "total": 40, "max_drift_ms": 0.0, "status": "PASS" },
+      "object_2b_zero_latency_monitor": { "passed": 40, "total": 40, "status": "PASS" },
+      "object_2c_dual_buffer_bounce": { "passed": 40, "total": 40, "status": "PASS" }
+    },
+    "suite_3_prompter_clock": {
+      "object_3a_timestamp_progression": { "passed": 40, "total": 40, "status": "PASS" },
+      "object_3b_clock_scrub_fallback": { "passed": 40, "total": 40, "status": "PASS" }
+    },
+    "total_score": "320/320",
+    "overall_result": "ALL_PASS"
+  },
+  "build": {
+    "command": "PORT=5000 BASE_PATH=/ pnpm run build",
+    "exit_code": 0
+  }
+}
+
+Do not return partial results. Pass 40/40 on every object or resolve the regressions before outputting the receipt.

@@ -58,7 +58,7 @@ export default function Pricing() {
         <div className="mb-12">
           <h1 className="text-3xl font-bold uppercase mb-4">Commercial Licensing</h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
-            MLK V3.5 is licensed exclusively to verified enterprise organizations. All tiers include direct engineering support.
+            MLK V4 (Morris Law Kernel V4) is licensed exclusively to verified enterprise organizations. All tiers include direct engineering support.
           </p>
         </div>
 

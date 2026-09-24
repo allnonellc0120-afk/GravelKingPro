@@ -562,6 +562,20 @@ export class ObjectStorageService {
     await saveObjectWithFallback(bucketName, objectName, buffer, { contentType });
   }
 
+  async savePrivateObject(key: string, buffer: Buffer, contentType: string): Promise<void> {
+    await this.savePrivateBuffer(key, buffer, contentType);
+  }
+
+  async deleteObject(key: string, visibility: "private" | "public"): Promise<void> {
+    const basePath = visibility === "private"
+      ? this.getPrivateObjectDir()
+      : this.getPublicObjectSearchPaths()[0];
+    const cleanKey = key.replace(/^\/+/, "");
+    const { bucketName, objectName } = parseObjectPath(`${basePath}/${cleanKey}`);
+    const file = await getObjectFileWithFallback(bucketName, objectName);
+    if (file) await file.delete();
+  }
+
   /**
    * Store a generated result (e.g. a mastered WAV) as a PRIVATE object and return
    * a short-lived signed GET URL the browser can download straight from GCS.

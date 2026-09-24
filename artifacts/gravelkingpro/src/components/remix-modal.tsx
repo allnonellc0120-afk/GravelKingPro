@@ -1,11 +1,11 @@
 /**
- * MLK v3.5 Remix Engine modal (Mastering Tool).
+ * MLK V4 Remix Engine modal (Mastering Tool).
  *
- * The loaded track's original prompt + MLK profile stay server-side as the
- * hidden base anchor — the user only supplies an optional new twist. Vocals
- * can be toggled ON (model-written lyrics) or OFF (strict instrumental).
- * The remix runs the REAL MLK v3.5 master pipeline and gets a child IP cert
- * linked to the parent track, then auto-loads back into the Mastering Tool.
+ * The loaded track's metadata and any recorded original prompt are resolved
+ * server-side — the user supplies an optional new twist. Vocals can be toggled
+ * ON (model-written lyrics) or OFF (strict instrumental).
+ * Certification is an explicit request and is issued only when the original
+ * and the new render both pass server-side eligibility checks.
  */
 import { useState } from "react";
 import {
@@ -37,6 +37,7 @@ export function RemixModal({
   const { toast } = useToast();
   const [twist, setTwist] = useState("");
   const [vocalsOn, setVocalsOn] = useState(true);
+  const [certify, setCertify] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,8 +50,8 @@ export function RemixModal({
     try {
       const state = await submitGenerationJob({
         kind: "remix",
-        dedupeKey: `${parentTrackId}:${twist.trim()}:${vocalsOn ? "v" : "i"}`,
-        body: { parentTrackId, twist: twist.trim(), vocalsOn },
+        dedupeKey: `${parentTrackId}:${twist.trim()}:${vocalsOn ? "v" : "i"}:${certify ? "cert" : "no-cert"}`,
+        body: { parentTrackId, twist: twist.trim(), vocalsOn, certify },
         onProgress: setProgress,
       });
       if (!state.trackId) throw new Error("Remix failed.");
@@ -75,12 +76,12 @@ export function RemixModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shuffle className="w-4 h-4 text-emerald-400" />
-            Remix with MLK v3.5
+            Remix with MLK V4
           </DialogTitle>
           <DialogDescription>
             Spins a new variation of <span className="font-semibold text-foreground">“{parentTitle}”</span> that
-            keeps its identity, remasters it through the MLK v3.5 kernel, and issues a child IP
-            cert linked to the original.
+            uses the original creative direction when available. Remixes are saved to your vault;
+            certification is optional and is never guaranteed.
           </DialogDescription>
         </DialogHeader>
 
@@ -99,9 +100,19 @@ export function RemixModal({
             <Switch checked={vocalsOn} onCheckedChange={setVocalsOn} aria-label="Lyrics on or off" />
           </div>
 
+          <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2.5">
+            <div className="pr-3">
+              <p className="text-sm font-semibold">Request IP certification</p>
+              <p className="text-[11px] text-muted-foreground">
+                Optional. A certificate is created only if the original certificate and new-render checks qualify.
+              </p>
+            </div>
+            <Switch checked={certify} onCheckedChange={setCertify} aria-label="Request IP certification" />
+          </div>
+
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
-              Your twist <span className="opacity-70">(optional — the original’s style stays as the base)</span>
+              Your twist <span className="opacity-70">(optional — uses the original prompt when recorded)</span>
             </p>
             <Textarea
               value={twist}
@@ -122,8 +133,8 @@ export function RemixModal({
             className="w-full font-bold bg-emerald-500 hover:bg-emerald-600 text-black"
           >
             {busy
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Remixing + mastering (2–4 min)…</>
-              : <><Shuffle className="w-4 h-4 mr-2" />Remix Track with MLK v3.5</>}
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating remix…</>
+              : <><Shuffle className="w-4 h-4 mr-2" />Remix Track with MLK V4</>}
           </Button>
           {busy && (
             <div className="space-y-1.5">

@@ -1,0 +1,85 @@
+{
+  "task": "GRAVELKING_PRO_MASTER_REMEDIATION_AND_FEATURE_DEPLOYMENT",
+  "priority": "CRITICAL_OVERRIDE",
+  "execution_rules": {
+    "zero_stubs": true,
+    "physical_verification_required": true,
+    "fail_closed": true,
+    "pre_deployment_sign_off": true
+  },
+  "work_order": [
+    {
+      "step": 1,
+      "item": "STORK_WIRE_NEWS_PROXY_INTEGRATION",
+      "requirements": [
+        "Implement server-side reverse proxy for `/news` and `/news/*` targeting `https://www.stork.ai/wire/wa3l9nvf14gbmqa40` returning HTTP 200 (NO 301/302 redirects).",
+        "Append `Sitemap: https://gravelkingpro.com/news/sitemap.xml` to `robots.txt` if sitemaps are referenced.",
+        "Add a visible 'News' link pointing to `/news` in the primary navigation or global footer matching current design tokens.",
+        "Verify `https://gravelkingpro.com/news` returns HTTP 200 containing the string 'stork-wire:'. If blocked by WAF/firewall with 403/429, log the firewall bypass directive for the dashboard immediately."
+      ]
+    },
+    {
+      "step": 2,
+      "item": "ZERO_LATENCY_LIVE_DUET_MONITOR_GKA_DSP_BINDING",
+      "requirements": [
+        "Re-architect the live mic monitoring chain away from main-thread script processors and recording buffers.",
+        "Instantiate an `AudioWorkletNode` executing the GravelKing Advantage (GKA) multi-band DSP and sub-harmonic saturation kernel.",
+        "Enforce low-latency hardware constraints: buffer size 128 (max 256 samples), `latencyHint: 'interactive'`, disable browser-side audio preprocessing (`echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`) on live input.",
+        "Audio graph routing: `MediaStreamSource` -> `GKA AudioWorkletNode` -> `AudioContext.destination`.",
+        "Log calculated round-trip buffer latency (< 10ms target)."
+      ]
+    },
+    {
+      "step": 3,
+      "item": "ARTIST_PROFILE_SCHEMA_ALIGNMENT_FIX",
+      "requirements": [
+        "Audit frontend profile edit form and backend `PATCH /api/users/profile` schema.",
+        "Eliminate schema violation causing error: `'first_name is not a valid parameter for this request.'`.",
+        "Align submission payload to valid database schema (`artistName`, `hometown`, `bio`).",
+        "Verify persistence: successfully update artist name to 'Gravelking' and return HTTP 200."
+      ]
+    },
+    {
+      "step": 4,
+      "item": "REMIX_MLK_V4_CERTIFICATE_LOOKUP_FIX",
+      "requirements": [
+        "Resolve modal error: `'Original track not found. The original track's certificate record is missing.'`.",
+        "Ensure the Studio/JAX rendering pipeline commits the master record, asset storage URL, and certificate reference to the database on render completion.",
+        "Update the 'Remix with MLK V4' modal to resolve the valid track ID and parent certificate."
+      ]
+    },
+    {
+      "step": 5,
+      "item": "DECOUPLE_CONTEST_FROM_MAIN_STAGE_SAVE_FLOW",
+      "requirements": [
+        "Restore primary Main Stage save action to write exclusively to the user's private Vault.",
+        "Convert 'Submit to Featured Artist Contest' into a distinct, optional action or checkbox.",
+        "Keep the dedicated contest flyer landing page as the standalone public entry point.",
+        "Ensure `/label` storefront renders clean roster state without orphan contest links."
+      ]
+    },
+    {
+      "step": 6,
+      "item": "ADMIN_LABEL_CATALOG_MANAGER",
+      "requirements": [
+        "Build manual release upload form on `/admin/label`: Track Title, freeform Artist Name, audio file upload, cover artwork upload.",
+        "Hardcode track price to flat 9.99 (bypass Stripe checkout dependency).",
+        "Enforce admin authorization locked strictly to `allin10120@gmail.com`.",
+        "Verify uploaded tracks commit to the database and immediately display on the `/label` public page."
+      ]
+    },
+    {
+      "step": 7,
+      "item": "STRICT_320_PIPELINE_VERIFICATION",
+      "requirements": [
+        "Run real subprocess audio mastering export pipeline test.",
+        "Output terminal `ffprobe` JSON proving: `codec: mp3`, `bit_rate: 320000`, `sample_rate: 44100`, `channels: 2`.",
+        "Dump OS disk `stat` and `sha256sum`."
+      ]
+    }
+  ],
+  "required_output": {
+    "action": "EXECUTE_IMMEDIATELY",
+    "deliverable": "Provide code diffs, terminal execution logs, and curl verification for every step prior to deployment confirmation."
+  }
+}

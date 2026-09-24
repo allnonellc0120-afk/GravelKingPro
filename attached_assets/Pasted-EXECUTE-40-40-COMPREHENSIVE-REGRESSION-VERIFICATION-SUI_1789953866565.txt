@@ -1,0 +1,57 @@
+EXECUTE 40/40 COMPREHENSIVE REGRESSION & VERIFICATION SUITE
+
+Run a strict, automated 40-point test matrix across all implemented fixes. Every item must output PASS or FAIL with zero mock bypasses.
+
+SECTION 1: DUAL-AUDIO DECK & STEM PREP (/studio/track-prep)
+01. [ ] Slot 1 file loader accepts .mp3, .wav, and .m4a without container errors.
+02. [ ] Slot 2 (Guide Vocal) file loader accepts .mp3, .wav, and .m4a without container errors.
+03. [ ] Slot 2 remains strictly optional; transport plays cleanly with only Slot 1 loaded.
+04. [ ] Initial default volume for Slot 1 mounts at 35% (-9 dB) to prevent ear damage.
+05. [ ] Initial default volume for Slot 2 mounts at 40% (-8 dB) to prevent ear damage.
+06. [ ] Master DynamicsCompressorNode (soft limiter) engages before ctx.destination.
+07. [ ] Slot 1 GainNode slider adjusts real-time volume smoothly between 0% and 100%.
+08. [ ] Slot 2 GainNode slider adjusts real-time volume smoothly between 0% and 100%.
+09. [ ] Slot 1 Mute instantly silences backing track without pausing the playback clock.
+10. [ ] Slot 2 Mute instantly silences guide vocal without pausing the playback clock.
+11. [ ] Slot 1 Solo isolates backing track and mutes Slot 2 cleanly.
+12. [ ] Slot 2 Solo isolates guide vocal and mutes Slot 1 cleanly.
+
+SECTION 2: STEM TIMING & NUDGE ENGINE
+13. [ ] Nudge range spans -15.000s to +15.000s without clamping errors.
+14. [ ] Coarse buttons (-5s, +5s) advance and retard Slot 2 playback by exactly 5000ms.
+15. [ ] Medium buttons (-1s, +1s) advance and retard Slot 2 playback by exactly 1000ms.
+16. [ ] Fine buttons (-50ms, +50ms) trim Slot 2 playback timing with millisecond precision.
+17. [ ] Center [ 0.00s Reset ] snaps Slot 2 offset back to 0.000s immediately.
+18. [ ] Adjusting nudge buttons while playback is active reschedules Slot 2 on the fly without glitching or desyncing Slot 1.
+19. [ ] Live numeric offset display updates in real time with high-contrast formatting (e.g., OFFSET: +2.150s).
+
+SECTION 3: LYRICS SYNCHRONIZATION ENGINE
+20. [ ] Manual lyric input correctly parses line breaks into individual timestamp blocks.
+21. [ ] LRCLIB search query successfully fetches and maps external LRC strings.
+22. [ ] Tap-to-time engine records AudioContext.currentTime timestamps accurately on user trigger.
+23. [ ] Prompter preview scrolls and highlights active lines in sync with the audio playback clock.
+24. [ ] Reset button clears recorded timestamps back to null state without dropping the lyric text.
+
+SECTION 4: VAULT PERSISTENCE & INDEXEDDB STABILITY
+25. [ ] "Save to Vault" serializes audio as raw Blobs/ArrayBuffers (never raw decoded AudioBuffer objects).
+26. [ ] Large audio payload (>50MB) saves to IndexedDB on iOS Safari/WebKit without triggering "Connection to Indexed Database server lost".
+27. [ ] IndexedDB open handler includes auto-reconnect and transaction error-recovery fallbacks.
+28. [ ] Saved Vault payload retains Slot 1 Blob, optional Slot 2 Blob, LRC array, and stem offset metadata intact.
+29. [ ] Stored package appears immediately in the Vault library list with correct title and duration metadata.
+
+SECTION 5: SINGLE-ARTIST MAIN STAGE (/main-stage)
+30. [ ] Global bottom navigation dock (STUDIO, MAIN STAGE, JAX, VAULT, ARTIST) is 100% unmounted on /main-stage.
+31. [ ] Stage transport controls (Play/Stop, Timeline Scrubber, Live Mic) occupy full bottom safe area without obstruction.
+32. [ ] Prep/editor panels are completely absent from the live stage floor.
+33. [ ] "Select Song from Vault" modal lists all saved Vault projects correctly.
+34. [ ] Loading a song unpacks the audio Blob into the stage AudioContext and arms the transport.
+35. [ ] Rolling prompter mounts all lyric lines and stays locked to AudioContext.currentTime without drifting.
+36. [ ] Live mic monitoring operates with zero noticeable round-trip latency on interactive audio mode.
+
+SECTION 6: MORRIS LAW KERNEL (MLK V4) & MASTERING
+37. [ ] Mastering ingestion (stage=read_input) successfully demuxes .m4a and .aac files via ffmpeg/fluent-ffmpeg.
+38. [ ] Ingested .m4a files unpack cleanly into intermediate 32-bit float PCM WAV before hitting stage=gka_prepare.
+39. [ ] GKA mastering chain runs full multi-band compression and target LUFS pass without throwing container exceptions.
+40. [ ] Full build compiles cleanly via `PORT=5000 BASE_PATH=/ pnpm run build` with exit code 0.
+
+Run the test suite and output the exact verification results line-by-line (e.g., "01. PASS", "02. PASS") followed by the build exit code.

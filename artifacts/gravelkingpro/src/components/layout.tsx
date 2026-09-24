@@ -4,6 +4,7 @@ import { Zap, Menu, X, User, LogIn, Crown, ArrowRight, ChevronDown, BookOpen, Ga
 import { useState } from "react";
 import { useAppState } from "@/lib/context";
 import { useUser } from "@clerk/react";
+import { JaxOwnerWidget } from "@/components/jax-owner-widget";
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
   weekly:       { label: "Pro",          className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -34,20 +35,23 @@ export function Layout({
   // plan-specific redirects set by the pricing page keep working unchanged).
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(`${base}/pricing?plan=monthly`)}`;
+  const email = user?.primaryEmailAddress?.emailAddress;
+  const isOwner = email?.trim().toLowerCase() === "allnonellc0120@gmail.com";
 
   const links = [
     { href: "/library", label: "Library" },
     { href: "/mastering", label: "Mastering" },
     { href: "/vocal-booth", label: "Vocal Booth" },
+    { href: "/duet", label: "Duet Room" },
     { href: "/songwriting", label: "Lyrics Generator", icon: Sparkles },
     { href: "/convert", label: "Converter" },
     { href: "/label", label: "Label" },
     { href: "/pricing", label: "Pricing" },
     ...(isPro ? [{ href: "/kernel", label: "Kernel" }] : []),
-    ...(isDeveloper ? [{ href: "/admin", label: "Admin" }] : []),
+    ...(isOwner ? [{ href: "/admin/control", label: "Admin Control" }] :
+      isDeveloper ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
-  const email = user?.primaryEmailAddress?.emailAddress;
   const displayName = user
     ? ([user.firstName, user.lastName].filter(Boolean).join(" ") || email || "Account")
     : null;
@@ -56,8 +60,8 @@ export function Layout({
     : null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
-      {!hideChrome && <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+    <div className="app-shell min-h-screen bg-background text-foreground flex flex-col font-sans">
+      {!hideChrome && <header className="studio-chrome border-b border-border/40 sticky top-0 z-10">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <Zap className="w-6 h-6 text-amber-500" />
@@ -79,6 +83,15 @@ export function Layout({
                 {link.label}
               </Link>
             ))}
+            <a
+              href="/news"
+              className={`text-sm font-medium transition-colors hover:text-amber-500 ${
+                location === "/news" || location.startsWith("/news/") ? "text-amber-500" : "text-muted-foreground"
+              }`}
+              data-testid="link-news"
+            >
+              News
+            </a>
             <div className="relative">
               <button
                 type="button"
@@ -183,6 +196,16 @@ export function Layout({
                   {link.label}
                 </Link>
               ))}
+              <a
+                href="/news"
+                onClick={() => setMobileOpen(false)}
+                className={`text-sm font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary/60 ${
+                  location === "/news" || location.startsWith("/news/") ? "text-amber-500 bg-secondary/40" : "text-muted-foreground"
+                }`}
+                data-testid="link-news-mobile"
+              >
+                News
+              </a>
               <Link
                 href="/help"
                 onClick={() => setMobileOpen(false)}
@@ -243,6 +266,8 @@ export function Layout({
         {children}
       </main>
 
+      {isOwner && <JaxOwnerWidget />}
+
       {!hideChrome && <footer className="border-t border-border/20 bg-card/30 py-4">
         <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
@@ -254,6 +279,7 @@ export function Layout({
           </span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 justify-center sm:justify-end">
             <Link href="/label" className="hover:text-amber-500 transition-colors">Label</Link>
+            <a href="/news" className="hover:text-amber-500 transition-colors" data-testid="footer-link-news">News</a>
             <Link href="/library" className="hover:text-amber-500 transition-colors">Library</Link>
             <Link href="/protected-lyrics" className="hover:text-amber-500 transition-colors">My Lyrics</Link>
             <Link href="/contact" className="hover:text-amber-500 transition-colors">Contact</Link>

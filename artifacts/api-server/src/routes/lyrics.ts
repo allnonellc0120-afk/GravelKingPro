@@ -599,7 +599,7 @@ lyricsRouter.post("/lyrics/convert-style", lyricsAiRateLimit, async (req: Reques
     return;
   }
 
-  const prompt = `Convert this music style description into concise style tags for the in-house MLK v3.5 music generator.
+  const prompt = `Convert this music style description into concise style tags for the in-house MLK V4 music generator.
 
 Description: "${styleDescription.trim()}"
 

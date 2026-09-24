@@ -116,7 +116,7 @@ def header_footer(canv: canvas.Canvas, doc):
     canv.line(18 * mm, 14 * mm, width - 18 * mm, 14 * mm)
     canv.setFont("Helvetica", 7)
     canv.setFillColor(SLATE)
-    canv.drawString(18 * mm, 8.5 * mm, "GravelKing Pro • MLK v3.5 • Joel meeting brief")
+    canv.drawString(18 * mm, 8.5 * mm, "GravelKing Pro • MLK V4 (Morris Law Kernel V4) • Joel meeting brief")
     canv.drawRightString(width - 18 * mm, 8.5 * mm, f"{doc.page}")
     canv.restoreState()
 
@@ -139,7 +139,7 @@ def hero(title: str, subtitle: str):
 def metric_cards():
     cards = [
         ("1,000/1,000", "health checks returned HTTP 200", PALE_GREEN),
-        ("500/500", "MLK v3 requests returned HTTP 200", PALE_GREEN),
+        ("500/500", "MLK V4 (Morris Law Kernel V4) requests returned HTTP 200", PALE_GREEN),
         ("74/74", "automated API checks passed", PALE_GREEN),
         ("3 lanes", "current mastering concurrency cap", PALE_AMBER),
     ]
@@ -175,7 +175,7 @@ def build_readiness_pdf():
     story = [
         hero(
             "API Readiness & Load-Test Report",
-            f"GravelKing Pro / Morris Law Kernel v3.5 • Prepared {TODAY} for the Joel integration meeting",
+            f"GravelKing Pro / Morris Law Kernel V4 • Prepared {TODAY} for the Joel integration meeting",
         ),
         Spacer(1, 9 * mm),
         metric_cards(),
@@ -216,7 +216,7 @@ def build_readiness_pdf():
     test_rows = [
         [p("Test", STYLES["table_bold"]), p("Observed result", STYLES["table_bold"]), p("Meaning", STYLES["table_bold"])],
         [p("Health endpoint", STYLES["table"]), p("<b>1,000 / 1,000 HTTP 200</b>", STYLES["table"]), p("No failed health requests in the controlled run.", STYLES["table"])],
-        [p("MLK v3 processing", STYLES["table"]), p("<b>500 / 500 HTTP 200</b>", STYLES["table"]), p("Kernel processing route stayed available under the test load.", STYLES["table"])],
+        [p("MLK V4 (Morris Law Kernel V4) processing", STYLES["table"]), p("<b>500 / 500 HTTP 200</b>", STYLES["table"]), p("Kernel processing route stayed available under the test load.", STYLES["table"])],
         [p("Raw processing baseline", STYLES["table"]), p("<b>1,000 / 1,000 HTTP 200</b>", STYLES["table"]), p("Baseline API request handling remained stable.", STYLES["table"])],
         [p("Invalid payloads", STYLES["table"]), p("<b>200 / 200 HTTP 400</b>", STYLES["table"]), p("Bad requests were rejected cleanly, not as server crashes.", STYLES["table"])],
         [p("Missing routes", STYLES["table"]), p("<b>200 / 200 HTTP 404</b>", STYLES["table"]), p("Unknown paths failed predictably.", STYLES["table"])],
@@ -419,10 +419,10 @@ def pptx_slide_xml() -> str:
     )
     shapes.append(xml_text("THE JOEL MEETING", 650000, 420000, 5000000, 300000, 1700, "67E8F9", True))
     shapes.append(xml_text("The core is tested.\nThe partner handoff is the decision.", 650000, 850000, 9000000, 1600000, 3700, "FFFFFF", True))
-    shapes.append(xml_text("GravelKing Pro  •  Morris Law Kernel v3.5  •  August 4, 2026", 680000, 2650000, 8000000, 300000, 1450, "CBD5E1"))
+    shapes.append(xml_text("GravelKing Pro  •  Morris Law Kernel V4  •  August 4, 2026", 680000, 2650000, 8000000, 300000, 1450, "CBD5E1"))
     cards = [
         (650000, "1,000 / 1,000", "health checks • HTTP 200", "16A34A"),
-        (3150000, "500 / 500", "MLK v3 requests • HTTP 200", "16A34A"),
+        (3150000, "500 / 500", "MLK V4 (Morris Law Kernel V4) requests • HTTP 200", "16A34A"),
         (5650000, "74 / 74", "automated API checks passed", "16A34A"),
     ]
     for x, value, label, accent in cards:
@@ -528,11 +528,11 @@ def build_opening_pdf():
     c.drawString(22 * mm, H - 59 * mm, "The partner handoff is the decision.")
     c.setFillColor(colors.HexColor("#CBD5E1"))
     c.setFont("Helvetica", 14)
-    c.drawString(22 * mm, H - 76 * mm, "GravelKing Pro  •  Morris Law Kernel v3.5  •  August 4, 2026")
+    c.drawString(22 * mm, H - 76 * mm, "GravelKing Pro  •  Morris Law Kernel V4  •  August 4, 2026")
     x0, y0, cw, ch, gap = 22 * mm, H - 142 * mm, 77 * mm, 42 * mm, 9 * mm
     for i, (value, label) in enumerate([
         ("1,000 / 1,000", "health checks • HTTP 200"),
-        ("500 / 500", "MLK v3 requests • HTTP 200"),
+        ("500 / 500", "MLK V4 (Morris Law Kernel V4) requests • HTTP 200"),
         ("74 / 74", "automated API checks passed"),
     ]):
         x = x0 + i * (cw + gap)

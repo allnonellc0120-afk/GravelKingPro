@@ -4,16 +4,47 @@ import { mlk_v3 } from "../kernel-v3";
 
 const kernelRouter = Router();
 
+/**
+ * Proxy the public status check to the authentic Python MLK service.
+ *
+ * This route deliberately fails closed when the standalone service is not
+ * reachable. It must never synthesize a "LIVE_AUTHENTICATED" response.
+ */
+kernelRouter.get("/jax/kernel-status", async (req, res) => {
+  const upstreamUrl =
+    process.env.MLK_KERNEL_STATUS_URL ?? "http://127.0.0.1:5000/api/jax/kernel-status";
+
+  try {
+    const upstream = await fetch(upstreamUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5_000),
+    });
+    const body = await upstream.text();
+    const contentType = upstream.headers.get("content-type");
+    if (contentType) res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-GK-Kernel-Proxy", "mlk-python");
+    res.status(upstream.status).send(body);
+  } catch (error) {
+    req.log.warn({ err: error, upstreamUrl }, "Morris Law Kernel status proxy unavailable");
+    res.status(503).json({
+      error: "Morris Law Kernel status service is unavailable.",
+      code: "kernel_status_unavailable",
+    });
+  }
+});
+
 // Sample rate assumed for the synthetic demo clip when reporting a real-time ratio.
 const SAMPLE_RATE = 44100;
 // Bound the public before/after demo so an arbitrary caller can't push a huge array.
 const MAX_SAMPLES = 48000; // ~1.1s @ 44.1k
 
 /**
- * Deterministic, audio-like sample clip used for the public MLK v3 before/after
+ * Deterministic, audio-like sample clip used for the public MLK V4 (Morris Law Kernel V4) before/after
  * demo when the visitor hasn't supplied their own input. Two percussive grains
  * (sharp attack + exponential decay) over a harmonic tone give it a high crest
- * factor, so MLK v3's multi-band carving + adaptive normalization produce a
+ * factor, so MLK V4 (Morris Law Kernel V4)'s multi-band carving + adaptive normalization produce a
  * visible, reproducible difference against the raw baseline.
  */
 function generateSampleClip(n = 8192): Float32Array {
@@ -56,7 +87,7 @@ kernelRouter.post("/kernel/process", (req, res) => {
   try {
     const body = req.body ?? {};
 
-    // ── MLK v3 ON/OFF before/after comparison ────────────────────────────
+    // ── MLK V4 (Morris Law Kernel V4) ON/OFF before/after comparison ────────────────────────────
     if (typeof body.mlk === "boolean") {
       const { mlk, input_data, multiplier } = body;
 

@@ -1,0 +1,50 @@
+{
+  "target": "gravelking-pro-agent",
+  "action": "EXPAND_ARTIST_PROFILES_AND_KARAOKE_LIBRARY_SUITE",
+  "checklist": [
+    {
+      "task_id": "PROF-01",
+      "title": "Artist Profile Schema & API Expansion",
+      "instruction": "Expand the user profile database schema and API routes (/api/user/profile): add fields for artistName, hometown, bio, and avatarUrl. Ensure endpoints allow GET/PUT operations authenticated via the active user session."
+    },
+    {
+      "task_id": "PROF-02",
+      "title": "Profile Photo Upload & Storage Pipeline",
+      "instruction": "Add an image upload pipeline (POST /api/user/avatar) accepting standard image formats (JPEG, PNG, WEBP). Save the image to persistent object storage / uploads directory, generate a public URL, update avatarUrl on the user's record, and return the updated profile."
+    },
+    {
+      "task_id": "PROF-03",
+      "title": "Artist Profile Management UI",
+      "instruction": "Create or update the Profile/Account settings screen: provide an interactive avatar upload dropzone/picker with live preview, input fields for Artist Name, Hometown, and Bio (with character count), and a 'Save Profile' button that syncs changes and displays artist badges across the app and Duet Room."
+    },
+    {
+      "task_id": "KLIB-01",
+      "title": "Persistent Public Karaoke Track Repository",
+      "instruction": "Add a dedicated database table and API routes (/api/karaoke/tracks) for public backing tracks. When any user uploads an instrumental, persist assetUrl, title, bpm, duration, and uploader artistName. Ensure the library is globally accessible across all sessions so uploaded tracks permanently remain in the pile."
+    },
+    {
+      "task_id": "KLIB-02",
+      "title": "Robust Audio-to-Lyric Transcription Service",
+      "instruction": "Fix the transcription pipeline. Ensure audio files sent for lyric transcription return structured timestamped lines [{ id: string, text: string, startTimeMs: number, endTimeMs: number }]. Provide a robust fallback parser that accepts pasted plain lyrics and divides them into time-alignable bars automatically if raw audio transcription fails."
+    },
+    {
+      "task_id": "KLIB-03",
+      "title": "Interactive Lyric Re-Timing & Offset Editor",
+      "instruction": "Build a live re-timing suite in the karaoke/duet booth: (1) 'Tap to Mark' button that records current playback timestamp to the active line, (2) +/- 100ms manual nudge buttons per line, (3) global +/- offset slider to shift all lines together, and (4) 'Reset / Re-Time All' button allowing singers to scrub to 0:00 and record timestamps fresh from scratch."
+    },
+    {
+      "task_id": "KLIB-04",
+      "title": "Duet Booth Library & Profile Integration",
+      "instruction": "Integrate the public track library, timed lyrics, and artist profile badges directly into the Duet Room (/duet). When Host and Partner connect, display each singer's avatar, artist name, and hometown, and broadcast selected community tracks with synchronized timestamps over the signaling channel."
+    }
+  ],
+  "verification_required": {
+    "profile_routes": "GET/PUT /api/user/profile and avatar upload verified",
+    "karaoke_routes": "GET/POST /api/karaoke/tracks and transcription verified",
+    "re_timing_ui": "Tap-to-mark, nudge, and reset buttons interact without errors",
+    "frontend_typecheck": "passed",
+    "api_typecheck": "passed",
+    "production_build": "passed"
+  },
+  "required_output_format": "RAW_JSON_RECEIPT_ONLY"
+}

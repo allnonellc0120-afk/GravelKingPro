@@ -21,3 +21,6 @@ export * from "./credits";
 export * from "./master_jobs";
 export * from "./generation_jobs";
 export * from "./artist_profiles";
+export * from "./karaoke_tracks";
+export * from "./duet";
+export * from "./featured_contest";

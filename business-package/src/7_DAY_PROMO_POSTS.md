@@ -44,7 +44,7 @@ If you could have one tool that gave you both better masters AND ironclad proof 
 Genuinely curious what people think."
 
 ## Day 7 (Sunday) — Call to Action / Soft Launch (All platforms)
-"We’re getting close to sharing the first public version of Morris Law Kernel v3.5 + the full IP protection system.
+"We’re getting close to sharing the first public version of Morris Law Kernel V4 + the full IP protection system.
 
 High-performance adaptive mastering. Robust watermarking. Cryptographic provenance that can actually be used as evidence.
 

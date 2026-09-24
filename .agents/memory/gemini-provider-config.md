@@ -45,6 +45,18 @@ to the script's own path, not the cwd. The CodeExecution sandbox was erroring
 ("durable ptc") during this work; a plain Node script via shell was the reliable
 path.
 
+For a Python-side local OpenAI-compatible proxy, call the existing Vertex helper
+through `pnpm --dir artifacts/api-server exec tsx --eval` rather than recreating
+service-account OAuth in Python. The public Gemini API-key path can return 404
+even when the configured Vertex path is healthy.
+
+**Why:** keeping one Vertex auth/model implementation prevents local verification
+from drifting from the production provider contract.
+
+**How to apply:** detect `GCP_SERVICE_ACCOUNT`, pass only the prompt over stdin
+to a short TypeScript bridge, and keep provider output separate from proxy
+telemetry bookkeeping.
+
 ## Vertex tool placement
 Vertex `generateContent` accepts `tools` at the top level, not inside
 `generationConfig`. Passing the same search tool in both places causes a 400

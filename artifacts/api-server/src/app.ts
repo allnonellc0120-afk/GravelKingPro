@@ -10,6 +10,7 @@ import { logger } from "./lib/logger";
 import { loadAuthUser } from "./middlewares/authMiddleware";
 import { maintenanceModeMiddleware } from "./middlewares/maintenanceMode";
 import { WebhookHandlers } from "./webhookHandlers";
+import { createNewsProxy } from "./routes/newsProxy";
 import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
@@ -52,6 +53,9 @@ app.use(
 
 // Clerk proxy MUST be mounted before body parsers — it streams raw bytes.
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+// Serve Stork Wire on the same origin. The API artifact is explicitly routed
+// for /news so production and development requests never fall through to SPA.
+app.use("/news", createNewsProxy());
 
 // Webhook route MUST be registered before express.json() so the raw Buffer body is preserved
 app.post(
@@ -104,12 +108,15 @@ app.use(
       ) {
         return callback(null, true);
       }
-      callback(new Error(`CORS: origin not allowed: ${requestOrigin}`));
+      callback(Object.assign(new Error("Origin not allowed"), { status: 403 }));
     },
   }),
 );
 app.use(cookieParser());
-app.use(express.json());
+// JAX enterprise sessions may intentionally retransmit a multi-file codebase
+// and accumulated diagnostics on every turn. Keep this aligned with the GKA
+// proxy's 2 MB request ceiling while preserving an explicit finite limit.
+app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Clerk session validation — resolves the publishable key from the request host
@@ -128,6 +135,12 @@ app.use(loadAuthUser);
 app.use(maintenanceModeMiddleware);
 
 app.use("/api", router);
+
+// Keep unknown API paths as real HTTP 404s. The frontend has its own static
+// route handling, but API clients must never receive an empty 200 response.
+app.use("/api", (_req: Request, res: Response) => {
+  res.status(404).json({ success: false, error: "API route not found" });
+});
 
 // Global JSON error handler — MUST be last. Catches any error passed to next(err)
 // (multer LIMIT_FILE_SIZE, CORS failures, unhandled route errors, etc.) and returns

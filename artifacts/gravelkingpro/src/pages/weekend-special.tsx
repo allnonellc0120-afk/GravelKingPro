@@ -321,7 +321,7 @@ export default function WeekendSpecial() {
               <span className="text-amber-500">for $9.99</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              Get three release-ready masters this weekend. MLK v3 mastering engine. 24–48 hour delivery after upload. One payment, no subscription.
+              Get three release-ready masters this weekend. MLK V4 (Morris Law Kernel V4) mastering engine. 24–48 hour delivery after upload. One payment, no subscription.
             </p>
           </div>
 
@@ -425,7 +425,7 @@ export default function WeekendSpecial() {
                 step: "3",
                 icon: <Clock className="w-5 h-5 text-emerald-400" />,
                 title: "Get masters in 24–48 hours",
-                body: "We'll process your tracks through the MLK v3 mastering engine and deliver lossless WAV files.",
+                body: "We'll process your tracks through the MLK V4 (Morris Law Kernel V4) mastering engine and deliver lossless WAV files.",
               },
             ].map((item) => (
               <div key={item.step} className="flex items-start gap-4">
@@ -461,7 +461,7 @@ export default function WeekendSpecial() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, text: "3 mastered tracks" },
-              { icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, text: "MLK v3 mastering engine" },
+              { icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, text: "MLK V4 (Morris Law Kernel V4) mastering engine" },
               { icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, text: "Lossless WAV output" },
               { icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, text: "One revision per track" },
               { icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, text: "24–48 hour delivery" },

@@ -6,6 +6,9 @@ export const artistProfilesTable = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     userId: varchar("user_id").notNull().unique().references(() => usersTable.id, { onDelete: "cascade" }),
+    artistName: varchar("artist_name", { length: 120 }).notNull().default(""),
+    hometown: varchar("hometown", { length: 120 }).notNull().default(""),
+    avatarUrl: text("avatar_url"),
     memoryEnabled: boolean("memory_enabled").notNull().default(true),
     bio: text("bio").notNull().default(""),
     genre: text("genre").notNull().default(""),

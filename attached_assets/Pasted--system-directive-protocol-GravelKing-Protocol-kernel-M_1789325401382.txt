@@ -1,0 +1,61 @@
+{
+  "system_directive": {
+    "protocol": "GravelKing Protocol",
+    "kernel": "Morris Law Kernel V2",
+    "author": "Kevin Morris",
+    "mode": "STRICT_TASK_EXECUTION_AND_VERIFICATION",
+    "mentor_guidance": "Run an enterprise multi-turn code debugging simulation through GKA. Show real token pruning, calculate exact dollar savings and GKA 33% gain-share into the active ledger, and generate a production video spec with large readable text and a minimum 4-second dwell per frame."
+  },
+  "task_execution": {
+    "operation_label": "ENTERPRISE_MULTI_TURN_CODE_AGENT",
+    "domain": "Autonomous Software Engineering & Terminal Debugging",
+    "benchmark_payload": {
+      "turns": 4,
+      "context": "Multi-file TypeScript AST refactor, full 600-line codebase re-transmitted on each turn with accumulated compile errors and bash execution logs."
+    },
+    "actions": [
+      {
+        "step": 1,
+        "action": "Trigger a 4-turn enterprise code debugging session through GKA proxy (port 8090) hitting POST /api/jax/generate (or chat proxy) using client_id: 'enterprise-code-pilot-01'."
+      },
+      {
+        "step": 2,
+        "action": "Ensure tokenTracker.ts intercepts and writes the exact BPE counts, tokens suppressed, dollar savings ($3.00/1M token benchmark rate), and 33% GKA cut to artifacts/api-server/data/token_savings_ledger.jsonl."
+      },
+      {
+        "step": 3,
+        "action": "Query GET /api/jax/telemetry/ledger?clientId=enterprise-code-pilot-01 and verify the cash register balance."
+      },
+      {
+        "step": 4,
+        "action": "Generate a 45-second video layout specification (timing, text overlays, and terminal frames) showing the raw code bloat entering, GKA carving it at sub-millisecond speeds, and the dollar ledger registering the 33% split. Every frame must have large readable text and remain static for at least 4.5 seconds for complete legibility."
+      }
+    ]
+  },
+  "response_requirement": {
+    "format": "JSON_ONLY",
+    "schema": {
+      "status": "COMPLETED | FAILED",
+      "workflow_tested": "Enterprise Multi-Turn Code Agent",
+      "financial_telemetry": {
+        "raw_tokens_in": "number",
+        "carved_tokens_processed": "number",
+        "tokens_suppressed": "number",
+        "suppression_percentage": "string",
+        "total_dollar_savings": "number",
+        "gka_33_gain_share_cash": "number"
+      },
+      "video_production_spec": {
+        "duration_seconds": 45,
+        "frames": [
+          {
+            "frame_number": "number",
+            "time_range": "string",
+            "display_text_large": "string",
+            "visual_asset_terminal_view": "string"
+          }
+        ]
+      }
+    }
+  }
+}

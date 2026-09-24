@@ -6,7 +6,7 @@
 
 Hi [First Name],
 
-I’m the founder of GravelKing Productions. We’ve built Morris Law Kernel v3.5 — a production-ready adaptive audio mastering engine combined with cryptographically verifiable human authorship and ownership (multi-layer provenance + robust watermarking + verification API).
+I’m the founder of GravelKing Productions. We’ve built Morris Law Kernel V4 — a production-ready adaptive audio mastering engine combined with cryptographically verifiable human authorship and ownership (multi-layer provenance + robust watermarking + verification API).
 
 It’s designed to give creators both superior sound quality and real legal defensibility in one system.
 
@@ -23,7 +23,7 @@ Founder, GravelKing Productions
 
 ## Template 2: Follow-up After They Showed Interest
 
-**Subject:** Follow-up — Morris Law Kernel v3.5 demo
+**Subject:** Follow-up — Morris Law Kernel V4 demo
 
 Hi [First Name],
 
@@ -46,7 +46,7 @@ Kevin
 
 ## Template 3: Investor / Strategic Partner (More Formal)
 
-**Subject:** Morris Law Kernel v3.5 — Adaptive Mastering + Court-Grade IP Protection
+**Subject:** Morris Law Kernel V4 — Adaptive Mastering + Court-Grade IP Protection
 
 Dear [Name],
 
@@ -74,13 +74,13 @@ allnonellc0120@gmail.com
 
 ## Template 4: Warm Introduction Request
 
-**Subject:** Quick intro request — Morris Law Kernel v3.5
+**Subject:** Quick intro request — Morris Law Kernel V4
 
 Hi [Name],
 
 I hope you’re doing well.
 
-I’m building Morris Law Kernel v3.5 — an adaptive mastering engine with built-in court-grade IP protection.
+I’m building Morris Law Kernel V4 — an adaptive mastering engine with built-in court-grade IP protection.
 
 I noticed you’re connected with [Mutual Connection or Company]. Would you be open to making a warm introduction? I’d love to share what we’re building and explore potential alignment.
 

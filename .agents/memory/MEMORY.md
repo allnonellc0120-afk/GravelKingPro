@@ -4,11 +4,11 @@
 - [DAW specialParams pattern](daw-special-params.md) — PluginNodeResult has specialParams for non-AudioParam live updates
 - [getUserMedia exact deviceId fallback](getusermedia-exact-fallback.md) — exact deviceId throws OverconstrainedError if device gone; retry without constraint to fall back to default
 - [GravelKing page inventory](page-inventory.md) — all pages, routes, and gate tiers built so far
-- [Beat Maker + MLK v3](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK v3 multi-band kernel
+- [Beat Maker + MLK V4 (Morris Law Kernel V4)](beatmaker-mlkv3.md) — beat synthesis via ffmpeg lavfi + MLK V4 (Morris Law Kernel V4) multi-band kernel
 - [Gemini transcription provider](vertex-ai-gemini-transcription.md) — Vertex-only (proxy fallback removed); must import VERTEX_MODEL, never hardcode a model
 - [Audio ingest is format-agnostic](audio-format-agnostic-ingest.md) — no multer fileFilter + sanitizeExt allows any ext + ffmpeg auto-detects; new client formats (mic .m4a/.webm) need zero server work
 - [Python MLK is sole mastering DSP](mlk-python-primary.md) — worker subprocess, no ffmpeg fallback by user directive; handover kernel had signal-nulling bugs (fixed both copies); verify handover code numerically before wiring
-- [MLK v3 on every audio process](mlk-v3-everywhere.md) — every route carves via MLK v3; production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
+- [MLK V4 (Morris Law Kernel V4) on every audio process](mlk-v3-everywhere.md) — every route carves via MLK V4 (Morris Law Kernel V4); production route carves MUST use ffmpeg-native applyMLKv3Fast (sync JS gravelking_opt builds GB of number[][] → OOMs the shared Node process → all separators hang in prod); remote standard path canonical (don't double-carve)
 - [Download package](download-package.md) — free download architecture: local ffmpeg for free, gravelkingpro.com for paid
 - [Object storage public prefix](object-storage-public-prefix.md) — public assets must live UNDER the PUBLIC_OBJECT_SEARCH_PATHS prefix, not bucket root, or the serve route 404s
 - [Public storage audit permissions](public-storage-audit-permissions.md) — managed bucket list/get may be denied; pair SDK errors with anonymous URL checks, never treat them as empty
@@ -55,8 +55,9 @@
 - [Admin Ops diagnostics pattern](admin-ops-diagnostics.md) — logToolError/recordActivity conventions, admin_settings-backed kill switch (bypasses via isAdminAuthenticated not requireAdmin), /tmp-scoped cache purge
 - [Custom domain + GoDaddy DNS](custom-domain-godaddy.md) — gravelkingpro.com attached to THIS repl's deploy; relink issues new replit-verify TXT; GoDaddy API secrets exist; PUT replaces ALL apex TXT (keep MS/SPF)
 - [Tailwind v4 legacy directives](tailwind-v4-legacy-directives.md) — v3 @tailwind lines under the v4 engine compile a PARTIAL utility set (inset-0/from-* missing) → invisible 0×0 UIs; use @import 'tailwindcss'; ?still/?scene poster QA for videos
-- [Two MLK v3.5 products](mlk-naming-collision.md) — audio Morris Law Kernel ≠ mlk-licensing matrix-multiplication site; never mix assets/copy between them
+- [Two MLK V4 (Morris Law Kernel V4) products](mlk-naming-collision.md) — audio Morris Law Kernel ≠ mlk-licensing matrix-multiplication site; never mix assets/copy between them
 - [PWA SW navigateFallback hijack](pwa-sw-navigate-fallback.md) — generateSW serves SPA shell for /api/* navigations → sign-in 404s for RETURNING users only; curl can't see it; denylist server + sibling-artifact prefixes
+- [Static deployment cache headers](static-deployment-cache-headers.md) — artifact static responses use root .replit deployment.responseHeaders, not Express app middleware
 - [Paid upload authorization](paid-upload-authorization.md) — verify payment before parsing bytes; use fixed order slots, actual-content checks, throttling, and a final lock
 - [Play TWA build](play-twa-build.md) — non-interactive Bubblewrap build + Play internal upload; keystore in android-twa/ is irreplaceable; assetlinks needs republish
 - [Mastering cert opt-in](mastering-cert-opt-in.md) — /api/kernel/master never gates on copyright; cert/watermark only with certify=true; masters always stream in-app bytes, never external links
@@ -79,6 +80,7 @@
 - [JAX speech session isolation](jax-speech-session-isolation.md) — invalidate mic sessions and explicitly cancel HTMLAudioElement TTS; speechSynthesis.cancel alone cannot stop JAX
 - [Stale lib/db dist declarations](db-dist-declarations.md) — api-server typecheck fails on "missing" schema fields until `tsc -b lib/db --force`; dist/ never rebuilds automatically
 - [Stripe idempotency races](stripe-idempotency-races.md) — stable keys need bounded retry for in-flight conflicts; customer relinking must remain CAS-protected
+- [Stripe backfill stale customers](stripe-backfill-stale-customers.md) — retain foreign-account mirror rows as deleted and keep unrelated backfill errors visible
 - [Package firewall blocked packages](package-firewall-block.md) — deploy installs 403 on some npm packages (all `tar` versions); fix by vendoring the tgz + pnpm file: override
 - [Cert document paywall](cert-paywall.md) — stamping free, doc owner-only+unlock-gated; $1.99 or 20/30d Studio allowance; Express 5: register `/:id.pdf` route BEFORE `/:id` or it's dead
 - [Production certificate verification](production-certificate-verification.md) — generated cert proof requires global ACRCloud no_match; local_no_match/unavailable intentionally produces no cert
@@ -99,3 +101,20 @@
 - [RVC model URL filename constraint](rvc-model-url-filename.md) — Replicate RVC crashes ENAMETOOLONG on GCS signed URLs; only the clean-path HMAC URL ending in /gravelking_v2.zip works
 - [GKA runtime boundary](gka-runtime-boundary.md) — Python audio services bind to gka_spec.json through GKAdvantageCore; Node studio fast path mirrors the same multiplier/slice and DAW targets
 - [JAX token telemetry](jax-token-telemetry.md) — native bounded ledger tracks prompt/completion savings; keep bookkeeping under 1ms and never persist prompt contents
+- [GitHub credential history remediation](github-credential-history-remediation.md) — revocation and alert closure are insufficient; verify every published branch/tag after rewriting secret-bearing history
+- [Vertex allowlist proxy](vertex-allowlist-proxy.md) — keep Vertex interception loopback-only and fixed-path; strip content-encoding after Node fetch auto-decompresses upstream bodies
+- [Email capture identity handoff](email-capture-identity-handoff.md) — email capture must resolve an existing users.email owner before assigning email or moving a unique session token
+- [RVC base-generation fallback](rvc-base-generation-fallback.md) — voice cloning is optional; transient Replicate errors and failed RVC webhooks continue with the original generated vocal
+- [Duet partner audio in Web Audio](duet-preview-audio.md) — remote WebRTC stream needs a muted <audio> sink or Chromium leaves the analyser silent (headless and real)
+- [Artifact runtime system dependencies](artifact-runtime-system-deps.md) — managed API artifacts need OS binaries in root Nix config; a sibling Dockerfile is not enough
+- [Cache purge scope](cache-purge-scope.md) — recursive dist cleanup must exclude node_modules or it deletes installed package distributions
+- [Stage Vault audio persistence](stage-vault-audio-persistence.md) — persist original compressed Blobs plus timing/alignment JSON; retry lost IndexedDB connections
+- [Stage dock portrait QA](stage-dock-portrait-qa.md) — native range inputs and compact stage controls need explicit rendered 44px hit areas, not only visual track sizing
+- [Real-app promo capture pipeline](real-app-promo-capture.md) — record the live app with fake-mic WAVs + flash-marker alignment; never mock scenes or tone beds
+- [Mobile promo reframe](mobile-promo-reframe.md) — use a full-view app shell; preserve stage/master aspect ratios so singers, controls, and captions stay complete
+- [Promo clean-room renders](promo-clean-room-renders.md) — “brand new” means no prior video/audio/timing; rebuild narrative, motion, copy, and sound from standalone assets
+- [Canonical benchmark fixtures](canonical-benchmark-fixtures.md) — benchmark inputs must already be 48 kHz/24-bit before invoking the Python worker
+- [Admin control and DNS operations](admin-control-and-dns.md) — persist validated runtime controls; fail closed on DNS credential errors and preserve sibling records
+- [Task-envelope verification](task-envelope-verification.md) — live audio contract checks require real Replicate output, fresh admin settings, DB-backed auth, and OS subprocess telemetry
+- [drizzle-kit push non-interactive](drizzle-push-noninteractive.md) — push/push-force prompt-fail in shell; apply additive DDL via executeSql instead
+- [Admin route prefixes](admin-route-prefixes.md) — routers mounted at /api must not repeat /api in their declared paths

@@ -1,0 +1,37 @@
+{
+  "task": "HOTFIX_BATCH_AND_CLEANUP",
+  "build_command": "PORT=5000 BASE_PATH=/ pnpm run build",
+  "expected_exit_code": 0,
+  "fixes": [
+    {
+      "id": "BUG_01_UI_OVERLAP",
+      "target_file": "main-stage",
+      "issue": "Yellow 'PREP TRACK & LYRICS' button in bottom dock overlaps the timeline scrubber and play controls.",
+      "resolution": "Move 'PREP TRACK & LYRICS' into the main stage center card/empty-stage overlay when no track is loaded. Ensure the bottom transport scrubber and playback controls have dedicated, unobstructed spacing."
+    },
+    {
+      "id": "BUG_02_VAULT_SAVE_REQUIREMENTS",
+      "target_file": "studio/track-prep",
+      "issue": "Save to Vault is gated behind requiring both stems (Track A and B) and manual spacebar lyric timing.",
+      "resolution": "Enable instant 'Save to Vault' as soon as ANY single audio track (Track A or B) is uploaded. Make guide vocals and lyric timing completely optional. If lyrics are omitted, flag and save as an 'Audio-Only' track."
+    },
+    {
+      "id": "BUG_03_LIBRARY_VAULT_UNIFICATION",
+      "target_file": "main-stage/vault-modal",
+      "issue": "'Select Song from Vault' modal only queries local cache/IndexedDB, reporting 'Vault is empty' despite tracks existing in user Library.",
+      "resolution": "Unify the modal with the central backend user library API (/api/library or /api/tracks). List all account tracks so any song can be pulled directly onto the Main Stage for live performance."
+    },
+    {
+      "id": "BUG_04_ZOMBIE_AUDIO_PLAYBACK",
+      "target_file": "track-prep and main-stage",
+      "issue": "Audio continues playing in background upon navigating away; requires app termination to stop.",
+      "resolution": "Add strict React useEffect unmount cleanup handlers to stop active AudioBufferSourceNodes, disconnect GainNodes, and suspend or close the AudioContext on route change."
+    },
+    {
+      "id": "BUG_05_REMOVE_PERSISTENT_LAUNCH_TAG",
+      "target_file": "App.tsx / root layout wrapper",
+      "issue": "Embedded launch tag/splash overlay triggers across every route and blocks entry into the app.",
+      "resolution": "Completely remove the launch tag/splash overlay component and route-change interceptors from the application shell so views load directly without interstitial blocks."
+    }
+  ]
+}

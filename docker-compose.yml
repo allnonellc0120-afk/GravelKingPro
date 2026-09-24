@@ -57,7 +57,7 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # ── MLK V3.5 Engine Processing Service ──────────────────────────────────────
+  # ── MLK V4 (Morris Law Kernel V4) Engine Processing Service ──────────────────────────────────────
   # This is a placeholder container for the CPU-bound, memory-locked C++
   # processing worker. In the current architecture the engine is invoked via
   # ffmpeg from the API container; a dedicated worker is the enterprise upgrade.

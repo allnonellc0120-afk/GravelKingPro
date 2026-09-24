@@ -10,7 +10,7 @@ import { useAppState } from "@/lib/context";
 import { useToast } from "@/hooks/use-toast";
 import {
   Disc3, Music, User, Loader2, ChevronRight, ShieldCheck,
-  Mic2, Star, Globe, FileCode2, ArrowRight, Headphones,
+  Mic2, Star, Globe, FileCode2, ArrowRight, Headphones, PlayCircle, Trophy,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -25,6 +25,29 @@ function useTracks() {
       .finally(() => setLoading(false));
   }, []);
   return { tracks, loading };
+}
+
+interface FeaturedEntry {
+  id: string;
+  title: string;
+  artistName: string;
+  slotNumber: number;
+  audioUrl: string;
+}
+
+function useFeaturedContest() {
+  const [entries, setEntries] = useState<FeaturedEntry[]>([]);
+  const [storefrontBlank, setStorefrontBlank] = useState(false);
+  useEffect(() => {
+    fetch("/api/featured-contest")
+      .then(r => r.json())
+      .then((data: { entries?: FeaturedEntry[]; storefrontBlank?: boolean }) => {
+        setEntries(data.entries ?? []);
+        setStorefrontBlank(data.storefrontBlank === true);
+      })
+      .catch(() => setEntries([]));
+  }, []);
+  return { entries, storefrontBlank };
 }
 
 const LABEL_VALUES = [
@@ -46,7 +69,7 @@ const LABEL_VALUES = [
   {
     icon: <Star className="w-5 h-5 text-sky-400" />,
     title: "Professional Audio Processing",
-    body: "Every submission goes through MLK v3 neural optimization, professional mastering, and stem analysis before release — the same tools available to Pro subscribers.",
+    body: "Every submission goes through MLK V4 (Morris Law Kernel V4) neural optimization, professional mastering, and stem analysis before release — the same tools available to Pro subscribers.",
   },
 ];
 
@@ -54,6 +77,20 @@ export default function LabelPage() {
   const { tracks, loading } = useTracks();
   const { buy, buying, checkoutElement } = useTrackPurchase();
   const { isPro } = useAppState();
+  const { entries: featuredEntries, storefrontBlank } = useFeaturedContest();
+  if (storefrontBlank && featuredEntries.length === 0) {
+    return (
+      <Layout>
+        <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center px-6 text-center">
+          <div className="space-y-3">
+            <Disc3 className="mx-auto h-10 w-10 text-amber-500/70" />
+            <h1 className="text-3xl font-black">GravelKing Productions</h1>
+            <p className="text-sm text-muted-foreground">The storefront is between featured artist releases. Check back soon.</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   const byArtist = tracks.reduce((acc, t) => {
     acc[t.artistName] = acc[t.artistName] || [];
@@ -108,44 +145,41 @@ export default function LabelPage() {
           </div>
         </div>
 
-        {/* ── Featured Artist ── */}
-        <div className="space-y-4">
+        {/* Show only the active public roster here; contest entry remains on its
+            dedicated landing page rather than linking visitors into a partial flow. */}
+        {featuredEntries.length > 0 && <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Star className="w-5 h-5 text-amber-400" />
-            <h2 className="text-2xl font-black">Featured Artist</h2>
-            <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">Spotlight</Badge>
+            <h2 className="text-2xl font-black">Featured Artists</h2>
+            <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">10 Spots</Badge>
           </div>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/8 via-amber-400/4 to-transparent p-7 flex flex-col sm:flex-row items-center gap-7">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/30 to-amber-900/40 border-4 border-amber-500/40 flex items-center justify-center shrink-0">
-              <Mic2 className="w-10 h-10 text-amber-400" />
-            </div>
-            <div className="flex-1 text-center sm:text-left space-y-2">
-              <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                <h3 className="text-xl font-black">GravelKing Productions</h3>
-                <Badge className="bg-amber-500 text-black text-[10px] font-bold">Founder</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                The founder of GravelKing Pro — independently releasing IP-certified music through the same platform built to protect every artist's rights. Every track is processed with MLK v3, cryptographically certified, and distributed through the label.
+          <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/8 via-amber-400/4 to-transparent p-7">
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold">Selected Main Stage performances</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                These artists were selected by GravelKing Productions for public Featured Artist recognition.
               </p>
-              <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap pt-1">
-                <Link href="/label">
-                  <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-black font-bold h-8 px-4 text-xs">
-                    <Disc3 className="w-3.5 h-3.5 mr-1.5" /> View Catalog
-                  </Button>
-                </Link>
-                <Link href="/submit">
-                  <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 h-8 px-4 text-xs">
-                    Submit to Label
-                  </Button>
-                </Link>
-              </div>
             </div>
-          </motion.div>
-          <p className="text-xs text-muted-foreground text-center">
-            Want to be featured? <Link href="/submit" className="text-amber-400 underline underline-offset-2">Submit your IP-certified track</Link> to the label catalog.
-          </p>
-        </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {featuredEntries.map((entry) => (
+              <motion.article key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-amber-500/20 bg-card/40 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-400"><Trophy className="h-5 w-5" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Featured Artist #{entry.slotNumber}</p>
+                    <h3 className="truncate font-bold">{entry.artistName}</h3>
+                    <p className="truncate text-xs text-muted-foreground">{entry.title}</p>
+                  </div>
+                </div>
+                <audio className="mt-3 w-full" controls preload="none" src={entry.audioUrl}>
+                  <track kind="captions" />
+                </audio>
+                <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground"><PlayCircle className="h-3 w-3" /> Selected Main Stage performance</div>
+              </motion.article>
+            ))}
+          </div>
+        </div>}
 
         {/* ── What We Stand For ── */}
         <div className="space-y-6">
@@ -279,16 +313,16 @@ export default function LabelPage() {
 
         {/* ── Bottom CTA ── */}
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-8 text-center space-y-4 mb-4">
-          <h2 className="text-xl font-bold">Ready to release?</h2>
+          <h2 className="text-xl font-bold">Ready to be heard?</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            GravelKing Pro subscribers can submit tracks directly to the label catalog.
-            Your music gets professionally processed, IP-certified, and listed for sale.
+            Audition for a Featured Artist spot through the certified Main Stage path, or submit a release to the $9.99 label catalog.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             {isPro
               ? <Link href="/submit"><Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold"><Music className="w-4 h-4 mr-2" /> Submit Your Track</Button></Link>
               : <Link href="/pricing"><Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold">See Pro plans — from $9.99/mo</Button></Link>
             }
+            <Link href="/main-stage"><Button variant="outline" className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"><Mic2 className="mr-2 h-4 w-4" /> Featured Artist Audition</Button></Link>
             <Link href="/contact">
               <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">Contact the Label</Button>
             </Link>

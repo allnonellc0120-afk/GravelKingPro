@@ -1,6 +1,5 @@
 import { useCallback, useId, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
-import { EmailGate, useEmailGate } from "@/components/email-gate";
 import { ToolHelp } from "@/components/tool-help";
 import { useAppState } from "@/lib/context";
 import { Button } from "@/components/ui/button";
@@ -110,12 +109,6 @@ export default function MixStudio() {
     }
   }, [addFiles]);
 
-  const emailGate = useEmailGate();
-  if (emailGate.gated) return (
-    <Layout>
-      <EmailGate tool="studio" onUnlocked={emailGate.unlock} />
-    </Layout>
-  );
 
   if (!canUseStudio) return (
     <Layout>

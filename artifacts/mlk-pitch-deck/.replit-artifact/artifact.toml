@@ -1,6 +1,6 @@
 kind = "slides"
 previewPath = "/mlk-pitch-deck/"
-title = "Morris Law Kernel v3.5 — Pitch Deck"
+title = "Morris Law Kernel V4 — Pitch Deck"
 version = "1.0.0"
 id = "artifacts/mlk-pitch-deck"
 router = "path"

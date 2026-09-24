@@ -329,7 +329,7 @@ function OpsDashboard() {
               >
                 <div className="text-xs font-bold uppercase tracking-widest text-amber-500">Investor Pitch</div>
                 <div className="text-sm font-semibold text-foreground">Executive Pitch Paper</div>
-                <div className="text-xs text-muted-foreground leading-relaxed">MLK V3.5 moat, Clean Room Protocol, product overview, ask. Printable PDF-ready.</div>
+                <div className="text-xs text-muted-foreground leading-relaxed">MLK V4 moat, Clean Room Protocol, product overview, ask. Printable PDF-ready.</div>
                 <div className="text-xs text-amber-500/60 mt-1 font-mono">pitch-paper.html ↗</div>
               </a>
               <a

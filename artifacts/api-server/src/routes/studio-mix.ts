@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { fileURLToPath } from "url";
 import { streamBuffer } from "../lib/streamResponse";
 import multer from "multer";
 import { execFile } from "child_process";
@@ -9,7 +10,6 @@ import { rateLimit } from "../lib/rateLimiter";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
 import { probeFileDuration, sanitizeExt, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
 import { hasStudio } from "../lib/entitlement";
-import { buildMLKv3FastFilter } from "../kernel-v3";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
 
 const execFileAsync = promisify(execFile);
@@ -91,8 +91,10 @@ studioRouter.post(
     const tmpFiles: string[] = files.map((f) => f.path);
 
     const id = randomUUID();
+    const mixPath = `/tmp/gk_mix_pre_${id}.wav`;
     const outputPath = `/tmp/gk_mix_out_${id}.wav`;
     tmpFiles.push(outputPath);
+    tmpFiles.push(mixPath);
     const renderStartedAt = performance.now();
 
     try {
@@ -127,7 +129,7 @@ studioRouter.post(
       const clampedPitch = Math.min(Math.max(pitchRatio, 0.1), 4.0);
       const clampedSpeed = Math.min(Math.max(speed, 0.25), 4.0);
 
-      // Bound total output duration so the buffered MLK v3 carve cannot OOM the
+      // Bound total output duration so the buffered MLK V4 (Morris Law Kernel V4) carve cannot OOM the
       // API. Sequential mixes sum track lengths; layered mixes take the longest.
       // Speeds below 1.0 lengthen the output (output duration ≈ input / speed).
       const combinedInput =
@@ -154,9 +156,9 @@ studioRouter.post(
 
       const filterParts: string[] = [];
 
-      // Normalize each input to 44100 stereo
+      // Normalize each input to the canonical 48 kHz stereo worker format.
       for (let i = 0; i < n; i++) {
-        filterParts.push(`[${i}:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[norm${i}]`);
+        filterParts.push(`[${i}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[norm${i}]`);
       }
 
       // Arrange tracks
@@ -195,31 +197,52 @@ studioRouter.post(
       else if (noiseReduce === "heavy") effects.push("afftdn=nf=-35,anlmdn");
 
       const effectStr = effects.length > 0 ? effects.join(",") : "anull";
+       // FFmpeg owns only arrangement and optional pre-processing. The
+       // canonical Python MLK V4 worker owns all DSP, loudness, and output
+       // quantization so Studio Mix and Mastering share one engine boundary.
        filterParts.push(`${prevStream}${effectStr}[aout]`);
-       filterParts.push(buildMLKv3FastFilter(
-         0.75,
-         { lufs: GKA_DAW_TARGET_LUFS, ceilingDb: GKA_DAW_CEILING_DB },
-         "[aout]",
-       ));
 
       ffmpegArgs.push(
         "-filter_complex", filterParts.join(";"),
-         "-map", "[gkaout]",
-        "-acodec", "pcm_s16le",
-        "-ar", "44100",
-        outputPath
+          "-map", "[aout]",
+         "-acodec", "pcm_f32le",
+         "-ar", "48000",
+         "-ac", "2",
+         mixPath
       );
 
       await execFileAsync("ffmpeg", ffmpegArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 120_000 });
 
-      // Carve the combined mix through the MLK v3 kernel before returning it.
-      // Runs entirely in ffmpeg (streaming on disk) so it completes in ~realtime
-      // and never allocates the multi-GB JS arrays the in-process kernel needed.
-      // The MLK/GKA carve is part of the same ffmpeg graph as the mix. The
-      // output is already at the fixed DAW targets and needs no second pass.
+       const workerPath = fileURLToPath(new URL("../python/mlk_master.py", import.meta.url));
+       const workerStartedAt = performance.now();
+       const { stdout: workerStdout } = await execFileAsync("python3", [
+         workerPath,
+         "--input", mixPath,
+         "--output", outputPath,
+         "--preset", "natural_body",
+         "--intensity", "65",
+         "--sidechain-filter", "highpass",
+         "--sidechain-freq", "140",
+         "--stereo-link", "true",
+         "--adaptive-mode", "bass_aware",
+         "--auto-threshold", "true",
+         "--auto-offset", "-15.5",
+         "--target-lufs", String(GKA_DAW_TARGET_LUFS),
+         "--ceiling-db", String(GKA_DAW_CEILING_DB),
+       ], {
+         maxBuffer: 10 * 1024 * 1024,
+         timeout: 45_000,
+         killSignal: "SIGKILL",
+       });
+       const workerStats = JSON.parse(workerStdout.trim().split("\n").pop() ?? "{}") as {
+         outputLufs?: number;
+         bitDepth?: number;
+         sampleRate?: number;
+       };
       const finalWav = await readFile(outputPath);
-      const parity = "MLK_V3_VALIDATED";
+       const parity = "MLK_V4_PYTHON";
       const renderMs = Math.round(performance.now() - renderStartedAt);
+       const workerMs = Math.round(performance.now() - workerStartedAt);
 
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="gravelking_mix.wav"`);
@@ -227,8 +250,15 @@ studioRouter.post(
       res.setHeader("X-GK-Routing", "local");
       res.setHeader("X-GK-Track-Count", String(n));
       res.setHeader("X-GK-Arrangement", arrangement);
-      res.setHeader("X-GK-Kernel", "MLK_v3");
+       res.setHeader("X-GK-Kernel", "MLK V4 (Morris Law Kernel V4)");
       res.setHeader("X-GK-Parity", parity);
+       res.setHeader("X-GK-Kernel-Engine", "local-python");
+       res.setHeader("X-GK-Audio-Sample-Rate", String(workerStats.sampleRate ?? 48000));
+       res.setHeader("X-GK-Audio-Bit-Depth", String(workerStats.bitDepth ?? 24));
+       if (workerStats.outputLufs !== undefined) {
+         res.setHeader("X-GK-Output-LUFS", String(workerStats.outputLufs));
+       }
+       res.setHeader("X-GK-Worker-Ms", String(workerMs));
       res.setHeader("X-GK-DAW-Target-LUFS", String(GKA_DAW_TARGET_LUFS));
       res.setHeader("X-GK-DAW-Ceiling-dB", String(GKA_DAW_CEILING_DB));
       res.setHeader("X-GK-DAW-Render-Ms", String(renderMs));

@@ -1,6 +1,6 @@
 import { clerkClient, getAuth } from "@clerk/express";
 import { type Request, type Response, type NextFunction } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, adminSettingsTable } from "@workspace/db";
 import type { User } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { getSession, getSessionId, DEMO_USER_ID, DEMO_EMAIL } from "../lib/auth";
@@ -208,6 +208,29 @@ export async function loadAuthUser(
     }
   } catch {
     // Non-fatal: if auth resolution fails, continue unauthenticated
+  }
+  // Persistent account locks apply on every request, including already-issued
+  // Clerk sessions and legacy gk_session credit routes. Fail closed if the lock
+  // store is unavailable; otherwise a database outage could bypass a ban.
+  try {
+    const identities: User[] = req.dbUser ? [req.dbUser] : [];
+    const legacySession = (req.cookies as Record<string, string> | undefined)?.gk_session;
+    if (legacySession) {
+      const [legacyUser] = await db.select().from(usersTable)
+        .where(sql`${usersTable.sessionId} = ${legacySession} OR ${usersTable.id} = ${legacySession}`).limit(1);
+      if (legacyUser && !identities.some(user => user.id === legacyUser.id)) identities.push(legacyUser);
+    }
+    for (const identity of identities) {
+      const [state] = await db.select({ value: adminSettingsTable.value }).from(adminSettingsTable)
+        .where(eq(adminSettingsTable.key, `account.status.${identity.id}`)).limit(1);
+      if (state && state.value !== "active") {
+        res.status(403).json({ error: `Account ${state.value}. Access denied.` });
+        return;
+      }
+    }
+  } catch {
+    res.status(503).json({ error: "Account permission check unavailable." });
+    return;
   }
   next();
 }

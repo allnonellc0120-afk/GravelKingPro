@@ -178,8 +178,8 @@ async function createDetailedPitchDeck() {
   pages.push({
     build: async () => {
       newPage();
-      heading("The Solution: MLK V3.5 Authorship Engine");
-      body("The Morris Law Kernel V3.5 is a multi-stage audio processing and authorship measurement engine. It runs inside every creative workflow and compares the artist's final output against the original AI-generated or imported baseline.");
+      heading("The Solution: MLK V4 (Morris Law Kernel V4) Authorship Engine");
+      body("The Morris Law Kernel V4 is a multi-stage audio processing and authorship measurement engine. It runs inside every creative workflow and compares the artist's final output against the original AI-generated or imported baseline.");
       y -= 12;
       subheading("How it works in plain language:");
       bullet([
@@ -267,7 +267,7 @@ async function createDetailedPitchDeck() {
       await addImage("mastering.jpg", 280);
       body("Upload a finished mix, pick a genre preset, and apply a full mastering chain — EQ, compression, loudness, optional denoise. The output is a broadcast-ready WAV that also carries the Clean Room forensic mark.");
       bullet([
-        "MLK V3.5 normalization to 0.92 peak ceiling",
+        "MLK V4 (Morris Law Kernel V4) normalization to 0.92 peak ceiling",
         "Genre-specific presets",
         "Before/after preview",
         "WAV download with embedded certificate linkage",
@@ -306,7 +306,7 @@ async function createDetailedPitchDeck() {
         "Synchronized timeline and waveform scrubbing",
         "Per-track plugins and automation",
         "Project save and resume",
-        "MLK V3.5 on every export",
+        "MLK V4 (Morris Law Kernel V4) on every export",
       ]);
       pageNumber(++pageIdx, 0);
     },
@@ -319,11 +319,11 @@ async function createDetailedPitchDeck() {
       heading("Tool: Beat Maker");
       subheading("AI-generated beats that feed the authorship pipeline");
       await addImage("beatmaker.jpg", 280);
-      body("Describe the style, tempo, and feel of the beat. The platform generates a custom beat using ffmpeg lavfi synthesis and the MLK V3.5 kernel, then loads it directly into the mixing studio for further customization. Every customization counts toward authorship.");
+      body("Describe the style, tempo, and feel of the beat. The platform generates a custom beat using ffmpeg lavfi synthesis and the MLK V4 (Morris Law Kernel V4) kernel, then loads it directly into the mixing studio for further customization. Every customization counts toward authorship.");
       bullet([
         "30-second free generation",
         "Up to 120-second generation for Pro users",
-        "MLK V3.5 multi-band carving applied",
+        "MLK V4 (Morris Law Kernel V4) multi-band carving applied",
         "One-click load into the DAW",
       ]);
       pageNumber(++pageIdx, 0);
@@ -371,9 +371,9 @@ async function createDetailedPitchDeck() {
     build: async () => {
       newPage();
       heading("Tool: Kernel Dashboard");
-      subheading("Real-time MLK V3.5 telemetry");
+      subheading("Real-time MLK V4 (Morris Law Kernel V4) telemetry");
       await addImage("kernel.jpg", 280);
-      body("The Kernel Dashboard provides real-time MLK V3.5 processing telemetry, live before/after comparison, and authorship scoring. It is the command center for understanding how the engine is shaping the audio and measuring the human creative contribution.");
+      body("The Kernel Dashboard provides real-time MLK V4 (Morris Law Kernel V4) processing telemetry, live before/after comparison, and authorship scoring. It is the command center for understanding how the engine is shaping the audio and measuring the human creative contribution.");
       bullet([
         "Live processing metrics",
         "Before/after waveform comparison",
@@ -394,7 +394,7 @@ async function createDetailedPitchDeck() {
       const plans = [
         ["Starter", "Free", "Core tools, 1 free master, file converter"],
         ["Pro", "$9.99/mo", "Unlimited removal/splitting + preset masters"],
-        ["King", "$24.99/mo", "Full studio + MLK V3.5 optimizer + 7-day trial"],
+        ["King", "$24.99/mo", "Full studio + MLK V4 (Morris Law Kernel V4) optimizer + 7-day trial"],
         ["Node Auditor", "$499/mo", "Unlimited optimization runs, API access, label hub"],
       ];
       for (const [name, price, desc] of plans) {
@@ -506,7 +506,7 @@ async function createDetailedPitchDeck() {
       bullet([
         "First-mover in AI-assisted music chain-of-title verification.",
         "Live product with real users, payments, and audio processing.",
-        "Proprietary MLK V3.5 engine with server-side verification authority.",
+        "Proprietary MLK V4 (Morris Law Kernel V4) engine with server-side verification authority.",
         "Built-in IP certificates create a network effect: more tracks = more value.",
         "Enterprise API ready for distributor and label integrations.",
       ]);

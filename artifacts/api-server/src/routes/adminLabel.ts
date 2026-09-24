@@ -7,8 +7,8 @@ import { getObjectFileWithFallback } from "../lib/objectStorage";
 const router = Router();
 
 async function guard(req: Request, res: Response): Promise<boolean> {
-  const { requireAdmin } = await import("../lib/adminAuth");
-  return requireAdmin(req, res);
+  const { requireLabelCatalogOwner } = await import("../lib/adminAuth");
+  return requireLabelCatalogOwner(req, res);
 }
 
 /** Build a unified list of all label tracks with submitter subscription info. */
@@ -23,6 +23,7 @@ async function fetchAllLabelTracks() {
       adminOverride: tracksTable.adminOverride,
       overrideExpiresAt: tracksTable.overrideExpiresAt,
       takenDown: tracksTable.takenDown,
+      isFeatured: tracksTable.isFeatured,
       submittedByUserId: tracksTable.submittedByUserId,
       createdAt: tracksTable.createdAt,
       updatedAt: tracksTable.updatedAt,
@@ -89,7 +90,7 @@ async function fetchAllLabelTracks() {
 }
 
 // GET /api/admin/label/tracks
-router.get("/api/admin/label/tracks", async (req: Request, res: Response) => {
+router.get("/admin/label/tracks", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const tracks = await fetchAllLabelTracks();
@@ -101,7 +102,7 @@ router.get("/api/admin/label/tracks", async (req: Request, res: Response) => {
 });
 
 // PATCH /api/admin/label/tracks/:id/approve
-router.patch("/api/admin/label/tracks/:id/approve", async (req: Request, res: Response) => {
+router.patch("/admin/label/tracks/:id/approve", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const id = String(req.params["id"]);
@@ -116,7 +117,7 @@ router.patch("/api/admin/label/tracks/:id/approve", async (req: Request, res: Re
 });
 
 // PATCH /api/admin/label/tracks/:id/reject
-router.patch("/api/admin/label/tracks/:id/reject", async (req: Request, res: Response) => {
+router.patch("/admin/label/tracks/:id/reject", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const id = String(req.params["id"]);
@@ -131,7 +132,7 @@ router.patch("/api/admin/label/tracks/:id/reject", async (req: Request, res: Res
 });
 
 // PATCH /api/admin/label/tracks/:id/takedown
-router.patch("/api/admin/label/tracks/:id/takedown", async (req: Request, res: Response) => {
+router.patch("/admin/label/tracks/:id/takedown", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const id = String(req.params["id"]);
@@ -146,7 +147,7 @@ router.patch("/api/admin/label/tracks/:id/takedown", async (req: Request, res: R
 });
 
 // PATCH /api/admin/label/tracks/:id/restore
-router.patch("/api/admin/label/tracks/:id/restore", async (req: Request, res: Response) => {
+router.patch("/admin/label/tracks/:id/restore", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const id = String(req.params["id"]);
@@ -163,7 +164,7 @@ router.patch("/api/admin/label/tracks/:id/restore", async (req: Request, res: Re
 // PATCH /api/admin/label/tracks/:id/delist — one-click "Remove from Label".
 // Sets status to "private": the track vanishes from the public label page
 // instantly but STAYS in its owner's personal library (playable/downloadable).
-router.patch("/api/admin/label/tracks/:id/delist", async (req: Request, res: Response) => {
+router.patch("/admin/label/tracks/:id/delist", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const id = String(req.params["id"]);
@@ -180,7 +181,7 @@ router.patch("/api/admin/label/tracks/:id/delist", async (req: Request, res: Res
 // DELETE /api/admin/label/tracks/:id — permanent delete: removes the DB row
 // (purchased_tracks rows cascade, so it leaves every library too) and
 // best-effort deletes the audio/cover objects from storage.
-router.delete("/api/admin/label/tracks/:id", async (req: Request, res: Response) => {
+router.delete("/admin/label/tracks/:id", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const id = String(req.params["id"]);
@@ -209,7 +210,7 @@ router.delete("/api/admin/label/tracks/:id", async (req: Request, res: Response)
 });
 
 // PATCH /api/admin/label/tracks/:id/override  { months: number }
-router.patch("/api/admin/label/tracks/:id/override", async (req: Request, res: Response) => {
+router.patch("/admin/label/tracks/:id/override", async (req: Request, res: Response) => {
   if (!await guard(req, res)) return;
   try {
     const id = String(req.params["id"]);

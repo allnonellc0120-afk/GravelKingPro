@@ -82,7 +82,7 @@ export const GetMlkLicenseStatusResponse = zod.object({
 
 /**
  * Executes the Morris Law Kernel and returns measured metrics. Full metrics require an active license; demo mode returns limited output.
- * @summary Run the MLK V3.5 benchmark
+ * @summary Run the MLK V4 (Morris Law Kernel V4) benchmark
  */
 export const RunMlkBenchmarkBody = zod.object({
   "matrixSize": zod.number().optional(),

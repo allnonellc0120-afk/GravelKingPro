@@ -2,7 +2,7 @@
  * GravelKing Neural Separator (GNS) v1
  * GravelKing Protocol — All N One LLC
  *
- * Pipeline: GNS Neural Separation (Demucs htdemucs) → MLK v3 Kernel Post-Processing
+ * Pipeline: GNS Neural Separation (Demucs htdemucs) → MLK V4 (Morris Law Kernel V4) Kernel Post-Processing
  * Neural stem separation under the GravelKing Protocol stack.
  */
 
@@ -80,7 +80,7 @@ async function mixStemsToInstrumental(stemPaths: string[]): Promise<Buffer> {
  * GNS Stem Split — 5-stem separation.
  * htdemucs yields vocals / drums / bass / other; we additionally synthesize a
  * full "instrumental" stem (everything except vocals) for a total of 5 stems.
- * Each stem is processed through MLK v3 post-separation.
+ * Each stem is processed through MLK V4 (Morris Law Kernel V4) post-separation.
  */
 export async function gnsStemSplit(
   inputBuf:   Buffer,
@@ -108,7 +108,7 @@ export async function gnsStemSplit(
     const stemDir   = join(outputDir, GNS_MODEL, trackName);
     const stemFiles = (await readdir(stemDir)).filter(f => f.endsWith(".wav"));
 
-    // ── Stage 2: MLK v3 Kernel Post-Processing on each stem ─────────────────
+    // ── Stage 2: MLK V4 (Morris Law Kernel V4) Kernel Post-Processing on each stem ─────────────────
     const zipInput: Record<string, Uint8Array> = {};
     let kernelParity = "MLK_V3_VALIDATED";
     const stemNames: string[] = [];
@@ -149,9 +149,9 @@ export async function gnsStemSplit(
   }
 }
 
-// ── MLK v3 DSP engine (fast, in-process — no neural net) ─────────────────────
-// Morris Law Kernel v3 separation. Runs entirely in-process with ffmpeg band
-// math + the MLK v3 kernel, so it completes in seconds and never stalls the way
+// ── MLK V4 (Morris Law Kernel V4) DSP engine (fast, in-process — no neural net) ─────────────────────
+// Morris Law Kernel V4 separation. Runs entirely in-process with ffmpeg band
+// math + the MLK V4 (Morris Law Kernel V4) kernel, so it completes in seconds and never stalls the way
 // the heavy GNS/Demucs neural path does. Used as the local route; the remote
 // kernel (REMOTE_KERNEL_URL) provides the cloud route for the same modes.
 
@@ -187,9 +187,9 @@ async function ffmpegFilterToWav(
 }
 
 /**
- * MLK v3 Voice Removal — center-channel cancellation + MLK v3 kernel.
+ * MLK V4 (Morris Law Kernel V4) Voice Removal — center-channel cancellation + MLK V4 (Morris Law Kernel V4) kernel.
  * Stereo: cancels center-panned vocals (out = L−R). Mono: attenuates the vocal
- * presence band. Output is post-processed through the Morris Law Kernel v3.
+ * presence band. Output is post-processed through the Morris Law Kernel V4.
  */
 export async function mlkVocalRemoval(
   filePath:   string,
@@ -293,12 +293,12 @@ export async function uvrVocalRemoval(
 }
 
 /**
- * MLK v3 Stem Split — frequency-band + spatial separation with MLK v3 kernel
+ * MLK V4 (Morris Law Kernel V4) Stem Split — frequency-band + spatial separation with MLK V4 (Morris Law Kernel V4) kernel
  * baked directly into each stem's extraction filter. Produces the 5 stems the
  * studio UI expects (vocals, drums, bass, other, instrumental).
  *
  * Each stem is rendered by its OWN independent ffmpeg process (band extraction
- * + MLK v3 carving inline, in a single ffmpeg call per stem). The processes run
+ * + MLK V4 (Morris Law Kernel V4) carving inline, in a single ffmpeg call per stem). The processes run
  * in parallel, so the job stays fast, but because each stem is isolated:
  *   - a failure is attributed to exactly ONE stem (we report which one), and
  *   - one stem failing no longer aborts the others.
@@ -325,7 +325,7 @@ export async function mlkStemSplit(
   const midMult  = multiplier.toFixed(4);
   const highMult = Math.max(0.1, multiplier * 0.80).toFixed(4);
 
-  // MLK v3 carving chain applied to an already-extracted stream: split into 3
+  // MLK V4 (Morris Law Kernel V4) carving chain applied to an already-extracted stream: split into 3
   // frequency bands → per-band gain → recombine + normalize. Self-contained so
   // it can live inside any single-stem ffmpeg process (labels are scoped to
   // that one process, so reuse across stems is safe).
@@ -356,7 +356,7 @@ export async function mlkStemSplit(
   const activeStemDefs = coreStemDefs;
 
   // Render a single stem in its own ffmpeg process: [source] → extraction →
-  // MLK v3 → disk. Errors are tagged with the stem name so the caller knows
+  // MLK V4 (Morris Law Kernel V4) → disk. Errors are tagged with the stem name so the caller knows
   // exactly which stem failed.
   async function renderStem(stem: typeof coreStemDefs[number]): Promise<void> {
     const filterComplex = `[0:a]${stem.extract}[x];[x]${mlkChain}`;
@@ -444,7 +444,7 @@ export interface GNSVocalResult {
 
 /**
  * GNS Voice Removal — two-stems mode (vocals / no_vocals).
- * Returns the ML-isolated instrumental after MLK v3 post-processing.
+ * Returns the ML-isolated instrumental after MLK V4 (Morris Law Kernel V4) post-processing.
  * Works on both mono and stereo input.
  */
 export async function gnsVocalRemoval(
@@ -474,7 +474,7 @@ export async function gnsVocalRemoval(
     const stemDir    = join(outputDir, GNS_MODEL, trackName);
     const noVocalBuf = await readFile(join(stemDir, "no_vocals.wav"));
 
-    // ── Stage 2: MLK v3 Post-Processing ─────────────────────────────────────
+    // ── Stage 2: MLK V4 (Morris Law Kernel V4) Post-Processing ─────────────────────────────────────
     const s16Buf              = await normalizeToS16le(noVocalBuf);
     const { buf, parity }     = await applyMLKv3Fast(s16Buf, multiplier);
 

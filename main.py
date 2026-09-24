@@ -5,7 +5,6 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import threading
 from uuid import uuid4
@@ -469,90 +468,6 @@ def gemini_dispatch(prompt: str, media: dict[str, object]) -> str:
     return text
 
 
-def elevenlabs_dispatch(text: str) -> dict[str, object]:
-    with GKA_CORE.task(
-        "elevenlabs_tts_dispatch",
-        metadata={"text_length": min(len(text), 10_000), "provider": "elevenlabs"},
-    ):
-        if not os.environ.get("ELEVENLABS_API_KEY"):
-            return elevenlabs_connector_dispatch(text)
-        bridge = """
-import { ReplitConnectors } from "@replit/connectors-sdk";
-const input = JSON.parse(await new Promise((resolve) => {
-  let data = ""; process.stdin.on("data", (chunk) => data += chunk);
-  process.stdin.on("end", () => resolve(data));
-}));
-const connectors = new ReplitConnectors();
-const response = await connectors.proxy("elevenlabs", "/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb", {
-  method: "POST",
-  headers: {"Content-Type": "application/json", "Accept": "audio/mpeg"},
-  body: JSON.stringify({text: input.text, model_id: "eleven_multilingual_v2", output_format: "mp3_44100_128"})
-});
-const bytes = (await response.arrayBuffer()).byteLength;
-console.log(JSON.stringify({ok: response.ok, status: response.status, bytes}));
-"""
-        try:
-            node_command = [shutil.which("node") or "pnpm", *([] if shutil.which("node") else ["exec", "node"])]
-            result = subprocess.run(
-                [*node_command, "--input-type=module", "-e", bridge],
-                input=json.dumps({"text": text[:10_000]}),
-                capture_output=True,
-                text=True,
-                timeout=90,
-                check=False,
-            )
-            if result.returncode != 0:
-                raise RuntimeError(result.stderr.strip()[-400:])
-            response = json.loads(result.stdout.strip().splitlines()[-1])
-        except Exception as error:
-            raise RuntimeError(f"ElevenLabs dispatch failed: {error}") from error
-        if not response.get("ok"):
-            raise RuntimeError(f"ElevenLabs dispatch returned HTTP {response.get('status')}.")
-        return response
-
-
-def elevenlabs_connector_dispatch(text: str) -> dict[str, object]:
-    """Use the existing authorized Replit connection when no raw key is exposed."""
-    with GKA_CORE.task(
-        "elevenlabs_connector_tts_dispatch",
-        metadata={"text_length": min(len(text), 10_000), "provider": "elevenlabs_connector"},
-    ):
-        bridge = """
-import { ReplitConnectors } from "@replit/connectors-sdk";
-const input = JSON.parse(await new Promise((resolve) => {
-  let data = ""; process.stdin.on("data", (chunk) => data += chunk);
-  process.stdin.on("end", () => resolve(data));
-}));
-const connectors = new ReplitConnectors();
-const response = await connectors.proxy("elevenlabs", "/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb", {
-  method: "POST",
-  headers: {"Content-Type": "application/json", "Accept": "audio/mpeg"},
-  body: JSON.stringify({text: input.text, model_id: "eleven_multilingual_v2", output_format: "mp3_44100_128"})
-});
-const bytes = (await response.arrayBuffer()).byteLength;
-console.log(JSON.stringify({ok: response.ok, status: response.status, bytes}));
-"""
-        try:
-            node = shutil.which("node")
-            command = [node] if node else ["pnpm", "exec", "node"]
-            result = subprocess.run(
-                [*command, "--input-type=module", "-e", bridge],
-                input=json.dumps({"text": text[:10_000]}),
-                capture_output=True,
-                text=True,
-                timeout=90,
-                check=False,
-            )
-            if result.returncode != 0:
-                raise RuntimeError(result.stderr.strip()[-400:])
-            response = json.loads(result.stdout.strip().splitlines()[-1])
-        except Exception as error:
-            raise RuntimeError(f"ElevenLabs managed dispatch failed: {error}") from error
-        if not response.get("ok"):
-            raise RuntimeError(f"ElevenLabs managed dispatch returned HTTP {response.get('status')}.")
-        return response
-
-
 def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
     if not isinstance(request, dict):
         raise ValueError("JSON object required")
@@ -578,7 +493,7 @@ def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
         "parity_bit_alignment_validation",
         "gemini_multimodal_inference_dispatch",
         "inline_tag_serialization",
-        "elevenlabs_api_dispatch_binding",
+        "mlk_native_payload_return",
         "authenticated_payload_return",
     ]
     pipeline_task = GKA_CORE.begin_task(
@@ -598,7 +513,6 @@ def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
     generated = gemini_dispatch(instruction, media)
     tags = ["[Low Spoken Growl]", "[Half-Time Drag Stomp]", "[Distorted Screech Hook]"]
     tagged = f"{tags[0]} {generated} {tags[1]} {tags[2]}"
-    voice = elevenlabs_dispatch(tagged)
     music_specification = {
         "genre": genre,
         "mood": mood,
@@ -632,7 +546,12 @@ def run_proxima_pipeline(request: object, port: int) -> dict[str, object]:
         "execution_overhead_reduction": "75%",
         "complexity": "O(n)",
         "gemini": "dispatched",
-        "elevenlabs": voice,
+        "audio_generation": {
+            "status": "delegated_to_mlk_primary",
+            "engine": "Morris Law Kernel V2",
+            "voice_profile": "gravelking_outlaw_baritone",
+            "voice_asset": "gravelking_outlaw_baritone.zip",
+        },
         "gka": GKA_CORE.verify_parity(),
         "gka_lineage": GKA_CORE.lineage_snapshot()[-1:],
     }

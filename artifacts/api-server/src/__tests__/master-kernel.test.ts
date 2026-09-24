@@ -238,7 +238,7 @@ async function main(): Promise<void> {
       });
       check(`${c.label}: HTTP 200`, res.status === 200, `got ${res.status} ${await (res.status === 200 ? Promise.resolve("") : res.text().then(t => t.slice(0, 200)))}`);
       if (res.status !== 200) continue;
-      check(`${c.label}: X-GK-Kernel = MLK_v3.5`, res.headers.get("x-gk-kernel") === "MLK_v3.5", String(res.headers.get("x-gk-kernel")));
+      check(`${c.label}: X-GK-Kernel = MLK V4`, res.headers.get("x-gk-kernel") === "MLK V4 (Morris Law Kernel V4)", String(res.headers.get("x-gk-kernel")));
       check(`${c.label}: X-GK-Sidechain echoes`, res.headers.get("x-gk-sidechain") === c.sidechainFilter, String(res.headers.get("x-gk-sidechain")));
       check(`${c.label}: X-GK-AdaptiveMode echoes`, res.headers.get("x-gk-adaptivemode") === c.adaptiveMode, String(res.headers.get("x-gk-adaptivemode")));
       check(`${c.label}: X-GK-AutoThreshold echoes`, res.headers.get("x-gk-autothreshold") === String(c.autoThreshold), String(res.headers.get("x-gk-autothreshold")));

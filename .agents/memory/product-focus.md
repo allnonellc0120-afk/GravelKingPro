@@ -2,7 +2,7 @@
 name: GravelKingPro product focus
 description: The four-pillar product scope and the deprecation of all cloud-AI separation features
 ---
-GravelKingPro is refocused to four pillars only: IP authorship certification, MLK v3 Mastering (local ffmpeg), the Vocal Booth (karaoke recording), and the karaoke-style DAW.
+GravelKingPro is refocused to four pillars only: IP authorship certification, MLK V4 (Morris Law Kernel V4) Mastering (local ffmpeg), the Vocal Booth (karaoke recording), and the karaoke-style DAW.
 
 **Decision (refined 2026-07-31):** splitter features (voice removal / stem split) STAY live in the app for existing users — but are removed from all plan feature lists and marketing copy. Owner's framing: the product story is IP rights in songwriting, the mastering tool, and the Vocal Booth/DAW; the Label is a feature, not a tool. Whitepapers/pitch decks were verified already clean of splitter mentions; the only remaining marketing mention was the download-page plan list (removed).
 

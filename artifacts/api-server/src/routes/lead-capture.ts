@@ -86,7 +86,7 @@ router.post("/v1/lead-capture", async (req: Request, res: Response): Promise<voi
               <span style="font-weight: 700; font-size: 16px; letter-spacing: 0.05em; text-transform: uppercase;">GravelKing Productions</span>
             </div>
             <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 8px;">Your Enterprise Brief & Demo Key</h1>
-            <p style="color: #a1a1aa; margin-bottom: 24px;">Hi ${name!.trim()}, thanks for your interest in GravelKing Pro MLK V3.5.</p>
+            <p style="color: #a1a1aa; margin-bottom: 24px;">Hi ${name!.trim()}, thanks for your interest in GravelKing Pro MLK V4.</p>
 
             <div style="background: #18181b; border: 1px solid #3f3f46; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
               <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #a1a1aa; margin-bottom: 8px;">Your Demo API Key</p>
@@ -94,7 +94,7 @@ router.post("/v1/lead-capture", async (req: Request, res: Response): Promise<voi
               <p style="font-size: 11px; color: #71717a; margin-top: 8px;">Valid for 7 days · ${demoApiKeyExpiresAt.toUTCString()}</p>
             </div>
 
-            <p style="color: #a1a1aa; margin-bottom: 16px;">Attached is our full technical brief covering the MLK V3.5 dual-anchor LSB steganography architecture, chain-of-custody certification, and enterprise integration guide.</p>
+            <p style="color: #a1a1aa; margin-bottom: 16px;">Attached is our full technical brief covering the MLK V4 dual-anchor LSB steganography architecture, chain-of-custody certification, and enterprise integration guide.</p>
 
             <a href="${whitepaperUrl}"
                style="display: inline-block; background: #f59e0b; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-bottom: 24px;">

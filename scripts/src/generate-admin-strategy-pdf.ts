@@ -71,7 +71,7 @@ async function createAdminStrategyPDF() {
 
   newPage();
   heading("Executive Thesis", dark);
-  bodyCopy("The MLK V3.5 engine is not a feature. It is credentialing infrastructure — the same category as a credit bureau, title insurer, or certification body.");
+  bodyCopy("The MLK V4 (Morris Law Kernel V4) engine is not a feature. It is credentialing infrastructure — the same category as a credit bureau, title insurer, or certification body.");
   bodyCopy("Every mastered track leaves our servers with a cryptographic Clean Room certificate split between the audio file (LSB nominator) and our server (denominator + HMAC). Neither half validates alone.");
   bodyCopy("This creates a verification monopoly. Only GravelKing Pro can authenticate a GKP master. That is the enterprise business model, not the SaaS subscription.");
 

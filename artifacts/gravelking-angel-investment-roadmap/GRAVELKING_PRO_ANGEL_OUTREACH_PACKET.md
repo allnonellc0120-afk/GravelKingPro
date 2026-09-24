@@ -11,7 +11,7 @@ Subject: GravelKing Pro — creator-audio provenance and a focused $250K–$500K
 
 Hi [Name],
 
-I’m building GravelKing Pro through GravelKing Productions: a live creator-audio workspace combining JAX songwriting sessions, immutable AI lyric snapshots, direct human lyric editing, authorship tracking, creator audio tools, unmastered generation, and paid MLK v3.5 mastering.
+I’m building GravelKing Pro through GravelKing Productions: a live creator-audio workspace combining JAX songwriting sessions, immutable AI lyric snapshots, direct human lyric editing, authorship tracking, creator audio tools, unmastered generation, and paid MLK V4 (Morris Law Kernel V4) mastering.
 
 The product is live at https://gravelkingpro.com. The current production snapshot is 123 users, 41 tracks, and 27 certificate records. I am raising $250,000–$500,000 in cash capital to prove paid retention, run one label/studio/school/publisher pilot, reconcile the IP and billing data room, and build a repeatable acquisition channel.
 

@@ -68,7 +68,7 @@ async function toWav(inputPath: string): Promise<{ wavPath: string; cleanup: () 
 /**
  * POST audio to the Cloud Run /separate endpoint (mode=voice_remove).
  * Returns: { vocals, no_vocals } — we return the no_vocals (instrumental) Buffer
- * post-processed through MLK v3.
+ * post-processed through MLK V4 (Morris Law Kernel V4).
  */
 export async function demucsVoiceRemove(
   filePath:   string,
@@ -121,7 +121,7 @@ export async function demucsVoiceRemove(
 /**
  * POST audio to the Cloud Run /separate endpoint (mode=stem_split).
  * Returns all stems (drums, bass, other, vocals, instrumental) as a ZIP
- * post-processed through MLK v3.
+ * post-processed through MLK V4 (Morris Law Kernel V4).
  */
 export async function demucsStemSplit(
   filePath:         string,

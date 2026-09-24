@@ -86,7 +86,7 @@ async function createPitchDeck() {
     page.drawLine({ start: { x: margin + colW + 28, y: colY + 116 }, end: { x: margin + colW + 104, y: colY + 116 }, color: green, thickness: 2 });
 
     page.drawText("Raw Audio", { x: margin + 12, y: colY + 92, size: 14, font: fontBold, color: textLight });
-    page.drawText("MLK v3", { x: margin + colW + 36, y: colY + 92, size: 14, font: fontBold, color: accent });
+    page.drawText("MLK V4 (Morris Law Kernel V4)", { x: margin + colW + 36, y: colY + 92, size: 14, font: fontBold, color: accent });
 
     page.drawText(left, { x: margin + 12, y: colY + 56, size: 22, font: fontBold, color: leftColor });
     page.drawText(right, { x: margin + colW + 36, y: colY + 56, size: 22, font: fontBold, color: rightColor });
@@ -111,14 +111,14 @@ async function createPitchDeck() {
 
   // ===== SLIDE 3: THE SOLUTION =====
   page = addSlide();
-  drawSlideHeader(page, "The Solution: MLK v3");
-  drawSlideBody(page, "MLK v3, the Morris Law Kernel V3, is a multi-band amplitude carving engine with three parallel processing stages and adaptive normalization.");
+  drawSlideHeader(page, "The Solution: MLK V4 (Morris Law Kernel V4)");
+  drawSlideBody(page, "MLK V4 (Morris Law Kernel V4), the Morris Law Kernel V4, is a multi-band amplitude carving engine with three parallel processing stages and adaptive normalization.");
   drawSlideBody(page, "Three frequency bands receive independent carving: bass is boosted, mid is preserved, high is controlled. After phase-coherent recombination, the signal is normalized to a 0.92 peak ceiling.");
   drawSlideBody(page, "No clipping. No artifacts. No guesswork. Just a verified, broadcast-ready output every single time.");
 
   // ===== SLIDE 4: THE NUMBERS =====
   page = addSlide();
-  drawSlideHeader(page, "Raw vs. MLK v3: The Numbers");
+  drawSlideHeader(page, "Raw vs. MLK V4 (Morris Law Kernel V4): The Numbers");
   drawTwoCol(page, "0.95 Peak", "0.92 Peak", red, green);
   drawTwoCol(page, "Unverified", "VALIDATED", red, green);
   drawTwoCol(page, "~0x Real-time", "6.7x Real-time", red, green);
@@ -127,10 +127,10 @@ async function createPitchDeck() {
   // ===== SLIDE 5: THE PRODUCT =====
   page = addSlide();
   drawSlideHeader(page, "GravelKing Pro: The Product");
-  drawSlideBody(page, "Kernel Dashboard - Real-time MLK v3 processing with live telemetry and before/after comparison.");
-  drawSlideBody(page, "Audio Studio - Upload and process your own tracks with MLK v3 applied. Full WAV downloads.");
-  drawSlideBody(page, "Mix Studio - Full multi-track DAW with synchronized zoom, waveform scrubbing, and MLK v3 on every export.");
-  drawSlideBody(page, "One-Click Master - Automatic mastering with MLK v3 normalization. Instant broadcast-ready output.");
+  drawSlideBody(page, "Kernel Dashboard - Real-time MLK V4 (Morris Law Kernel V4) processing with live telemetry and before/after comparison.");
+  drawSlideBody(page, "Audio Studio - Upload and process your own tracks with MLK V4 (Morris Law Kernel V4) applied. Full WAV downloads.");
+  drawSlideBody(page, "Mix Studio - Full multi-track DAW with synchronized zoom, waveform scrubbing, and MLK V4 (Morris Law Kernel V4) on every export.");
+  drawSlideBody(page, "One-Click Master - Automatic mastering with MLK V4 (Morris Law Kernel V4) normalization. Instant broadcast-ready output.");
   drawSlideBody(page, "Stem Separation - AI-powered voice removal and stem splitting. Free-tier preview, unlimited for Studio.");
 
   // ===== SLIDE 6: THE BRAND =====
@@ -139,7 +139,7 @@ async function createPitchDeck() {
   drawSlideBody(page, "Kevin Morris, Chief Architect. Over 1,500 tracks produced. Born in Louisiana, raised in a musical family, two retired-professional older brothers.");
   drawSlideBody(page, "The name GravelKing came from fellow artists who noticed the raw grit in Kevin's voice. It stuck. It became the brand.");
   drawSlideBody(page, "Today, Kevin performs live on StarMaker as KevJamm84 at The Juke Joint party room, Friday and Saturday nights at 8 PM CST.");
-  drawSlideBody(page, "The grit that earned the name is the same grit that built MLK v3.");
+  drawSlideBody(page, "The grit that earned the name is the same grit that built MLK V4 (Morris Law Kernel V4).");
 
   // ===== SLIDE 7: THE ASK =====
   page = addSlide();

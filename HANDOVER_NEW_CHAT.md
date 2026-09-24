@@ -13,7 +13,7 @@ Main product areas:
 - JAX songwriting assistant with persistent sessions, voice playback, autosave/restore, ownership checks, and deletion
 - Lyrics editing, authorship tracking, forensic edit evidence, and copyright certificates
 - Vocal Booth and karaoke tools
-- MLK v3.5 mastering
+- MLK V4 (Morris Law Kernel V4) mastering
 - Unmastered AI generation/remix, with mastering as a separate paid action
 - Audio downloads, credits, subscriptions, Stripe, Google Play Billing, referrals, and admin tools
 - Android TWA / Play compliance support
@@ -21,7 +21,7 @@ Main product areas:
 ## Important product decisions
 
 - Production domain is `gravelkingpro.com`; the old `.it.com` domain is retired.
-- MLK v3 is the sole mastering DSP.
+- MLK V4 (Morris Law Kernel V4) is the sole mastering DSP.
 - Generation and remix routes must remain unmastered.
 - JAX uses `HTMLAudioElement`, not browser speech synthesis.
 - Typing must not interrupt JAX playback.

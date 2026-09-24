@@ -40,6 +40,7 @@ import { logToolError } from "../lib/errorTracker";
 import { recordActivity } from "../lib/activityTracker";
 import { validateAssetIngestion } from "../middlewares/validateAssetIngestion";
 import type { NextFunction } from "express";
+import { parsePastedLyrics, transcriptToTimedLines } from "../lib/lyricTiming";
 
 const execFileAsync = promisify(execFile);
 
@@ -64,7 +65,9 @@ const upload = multer({
       cb(null, `gk_audio_${randomUUID()}.${sanitizeExt(file.originalname)}`);
     },
   }),
-  limits: { fileSize: 100 * 1024 * 1024 },
+  // Camera-roll uploads may be video containers; keep the same 250 MB
+  // contract as the paid upload flow before ffmpeg strips the video stream.
+  limits: { fileSize: 250 * 1024 * 1024 },
 });
 const audioRouter = Router();
 
@@ -75,14 +78,14 @@ type ProcessMode = "standard" | "voice_remove" | "stem_split";
 
 // ── Audio helpers ─────────────────────────────────────────────────────────────
 async function getAudioInfo(filePath: string): Promise<{ sampleRate: number; channels: number }> {
-  let sampleRate = 44100;
+  let sampleRate = 48000;
   let channels = 2;
   try {
     const { stdout } = await execFileAsync("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_streams", filePath], { timeout: 10_000 });
     const info = JSON.parse(stdout);
     const stream = info.streams?.find((s: any) => s.codec_type === "audio");
     if (stream) {
-      sampleRate = parseInt(stream.sample_rate) || 44100;
+      sampleRate = parseInt(stream.sample_rate) || 48000;
       channels = parseInt(stream.channels) || 2;
     }
   } catch { /* use defaults */ }
@@ -90,7 +93,7 @@ async function getAudioInfo(filePath: string): Promise<{ sampleRate: number; cha
 }
 
 /**
- * MLK v3 via ffmpeg filter chain — multi-band carving with no in-process RAM allocation.
+ * MLK V4 (Morris Law Kernel V4) via ffmpeg filter chain — multi-band carving with no in-process RAM allocation.
  * Streams entirely on disk; handles any file size without OOM.
  */
 async function processWithMLKv3Ffmpeg(
@@ -125,7 +128,7 @@ async function processWithMLKv3Ffmpeg(
       "-y", "-i", filePath,
       "-filter_complex", filter,
       "-ac", "2",
-      "-acodec", "pcm_s16le",
+      "-acodec", "pcm_s24le",
       outPath,
     ], { timeout: 180_000 });
 
@@ -193,7 +196,7 @@ async function processWithFilter(
       "-y", "-i", filePath,
       "-af", filter,
       "-ac", String(outputChannels),
-      "-acodec", "pcm_s16le",
+      "-acodec", "pcm_s24le",
       outPath,
     ], { timeout: 120_000 });
     return await readFile(outPath);
@@ -318,9 +321,17 @@ audioRouter.post(
       try {
         await execFileAsync("ffmpeg", [
           "-y", "-i", filePath, "-vn",
-          "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2",
+          "-acodec", "pcm_s24le", "-ar", "48000", "-ac", "2",
           wavPath,
         ], { timeout: 120_000 });
+        req.log.info(
+          {
+            originalName: req.file.originalname,
+            sourceExtension: ext.toLowerCase(),
+            extractedExtension: "wav",
+          },
+          "[audio-ingest] video container demuxed to audio",
+        );
         await unlink(filePath).catch(() => {});
         filePath = wavPath;
       } catch {
@@ -572,7 +583,7 @@ audioRouter.post(
           await writeFile(mp3InPath, wavBuffer);
           try {
             await execFileAsync("ffmpeg", [
-              "-y", "-i", mp3InPath, "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100", mp3OutPath,
+          "-y", "-i", mp3InPath, "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "48000", mp3OutPath,
             ], { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 });
             const mp3Buf = await readFile(mp3OutPath);
             res.setHeader("Content-Type", "audio/mpeg");
@@ -615,7 +626,7 @@ audioRouter.post(
       }
     }
 
-    // ── Stem splitting — Morris Law Kernel v3 (fast local) ───────────────────
+    // ── Stem splitting — Morris Law Kernel V4 (fast local) ───────────────────
     if (mode === "stem_split") {
       recordActivity((req.cookies as Record<string, string>)?.["gk_session"], "Singing Booth");
       // Pre-compress: files > 15 MB are re-encoded to 22050 Hz stereo so Cloud
@@ -626,7 +637,7 @@ audioRouter.post(
           const compPath = `/tmp/gk_comp_${randomUUID()}.wav`;
           await execFileAsync("ffmpeg", [
             "-y", "-i", filePath, "-vn",
-            "-acodec", "pcm_s16le", "-ar", "22050", "-ac", "2",
+            "-acodec", "pcm_s24le", "-ar", "48000", "-ac", "2",
             compPath,
           ], { timeout: 60_000 });
           await unlink(filePath).catch(() => {});
@@ -766,7 +777,7 @@ audioRouter.post(
       return;
     }
 
-    // ── Standard mode: MLK v3 via ffmpeg (local only, no external routing) ────
+    // ── Standard mode: MLK V4 (Morris Law Kernel V4) via ffmpeg (local only, no external routing) ────
     try {
       const { wavBuffer, parity, efficiency, decayRate, sampleCount } =
         await processWithMLKv3Ffmpeg(filePath, ext, multiplier);
@@ -815,7 +826,7 @@ audioRouter.post(
 );
 
 // ── Vocal transcription ────────────────────────────────────────────────────────
-// POST /api/audio/transcribe — accepts audio, returns { segments, fullText }.
+// POST /api/audio/transcribe — accepts audio, returns { segments, lines, fullText }.
 // Provider: Gemini Vertex AI (GCP_SERVICE_ACCOUNT). No Replicate fallback —
 // when Gemini is unavailable the client falls back to manual tap-to-time.
 // For known songs, prefer lrclib synced lyrics on the client before calling
@@ -825,6 +836,16 @@ audioRouter.post(
   audioRateLimit,
   upload.single("audio"),
   async (req: Request, res: Response) => {
+    const pastedLyrics = typeof req.body?.lyrics === "string" ? req.body.lyrics : "";
+    if (!req.file && pastedLyrics.trim()) {
+      res.json({
+        segments: [],
+        lines: parsePastedLyrics(pastedLyrics, Number(req.body?.durationMs) || 0),
+        fullText: pastedLyrics.trim(),
+        fallback: "pasted-lyrics",
+      });
+      return;
+    }
     if (!req.file) {
       res.status(400).json({ error: "No audio file uploaded." });
       return;
@@ -832,11 +853,36 @@ audioRouter.post(
     const filePath = req.file.path;
     try {
       const result = await transcribeWithGemini(filePath);
-      res.json(result);
+      const lines = transcriptToTimedLines(result.segments);
+      if (lines.length > 0) {
+        res.json({ ...result, lines });
+        return;
+      }
+      if (pastedLyrics.trim()) {
+        const durationMs = Math.round((await probeFileDuration(filePath)) * 1000);
+        res.json({
+          ...result,
+          lines: parsePastedLyrics(pastedLyrics, durationMs),
+          fullText: pastedLyrics.trim(),
+          fallback: "pasted-lyrics",
+        });
+        return;
+      }
+      res.json({ ...result, lines });
     } catch (err: any) {
       const raw = String(err?.message ?? "");
       const busy = /quota|limit|429|throttl/i.test(raw);
       req.log.warn({ err: raw }, "Transcription unavailable; client falls back to tap-to-time");
+      if (pastedLyrics.trim()) {
+        const durationMs = Math.round((await probeFileDuration(filePath)) * 1000);
+        res.json({
+          segments: [],
+          lines: parsePastedLyrics(pastedLyrics, durationMs),
+          fullText: pastedLyrics.trim(),
+          fallback: "pasted-lyrics",
+        });
+        return;
+      }
       res.status(502).json({
         error: busy
           ? "Auto-transcribe is busy right now. Use Tap-to-Time below to sync your lyrics."

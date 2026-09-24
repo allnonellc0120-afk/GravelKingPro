@@ -1,8 +1,8 @@
-# WHITE PAPER: Morris Law Kernel v3.5 + Court-Grade IP Protection System
+# WHITE PAPER: Morris Law Kernel V4 + Court-Grade IP Protection System
 
 ## Executive Summary
 
-Morris Law Kernel v3.5 is the first production-ready system that combines high-performance adaptive audio mastering with cryptographically verifiable human authorship and ownership provenance.
+Morris Law Kernel V4 is the first production-ready system that combines high-performance adaptive audio mastering with cryptographically verifiable human authorship and ownership provenance.
 
 It is designed to be the technical moat for GravelKing Pro — the first platform to offer both superior sound quality and legally defensible IP protection in one integrated system.
 
@@ -14,7 +14,7 @@ Current audio tools suffer from two major gaps:
 
 ## The Solution
 
-Morris Law Kernel v3.5 delivers:
+Morris Law Kernel V4 delivers:
 - **Numba-accelerated adaptive mastering** with stereo-linked sidechain, bass-aware adaptation, and auto-threshold.
 - **Robust hybrid watermarking** (spread-spectrum + echo hiding) that survives re-encoding.
 - **Multi-layer cryptographic provenance** binding the file to a specific user + brand + timestamp via digital signature + perceptual hash.
@@ -43,7 +43,7 @@ Independent creators, labels, sync libraries, and platforms need both better sou
 
 ## Conclusion
 
-Morris Law Kernel v3.5 is not just a tool — it is infrastructure for the next generation of creator-owned audio platforms.
+Morris Law Kernel V4 is not just a tool — it is infrastructure for the next generation of creator-owned audio platforms.
 
 ---
 

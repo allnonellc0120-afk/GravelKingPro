@@ -50,7 +50,7 @@ Create a .env file in artifacts/api-server/ with:
 ## Architecture
   Free tier  →  Local ffmpeg processing  (your machine)
   Paid tier  →  gravelkingpro.com API  (GravelKing servers)
-  Kernel     →  MLK v3 multi-band amplitude carving (local or remote)
+  Kernel     →  MLK V4 (Morris Law Kernel V4) multi-band amplitude carving (local or remote)
 
 ## Support
 Email:   kevm@gravelkingpro.com
@@ -58,7 +58,7 @@ Website: https://gravelkingpro.com
 
 ────────────────────────────────────────────
 GravelKing Productions | All N One LLC
-Powered by GravelKing Protocol + MLK v3 Kernel
+Powered by GravelKing Protocol + MLK V4 (Morris Law Kernel V4) Kernel
 `;
 
 downloadRouter.get("/download/package", (_req: Request, res: Response) => {

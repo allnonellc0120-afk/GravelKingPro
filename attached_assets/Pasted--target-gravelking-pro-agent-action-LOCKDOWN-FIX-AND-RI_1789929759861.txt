@@ -1,0 +1,81 @@
+{
+  "target": "gravelking-pro-agent",
+  "action": "LOCKDOWN_FIX_AND_RIGOROUS_TESTING_SUITE",
+  "auth": {
+    "admin_identity": "Allnonellc0120@gmail.com",
+    "protocol": "MORRIS_LAW_KERNEL_V4"
+  },
+  "directive": {
+    "summary": "Permanently eliminate media decode failures on mobile/video uploads, replace audio technical jargon with plain creator English, rebrand and bind engine to MLK V4, fix Google Search Console soft-404/canonical indexing errors, and enforce hard automated integration test verification before declaring completion.",
+    "execution_requirements": [
+      {
+        "module": "mastering_ingest_decoder",
+        "action": "SERVER_SIDE_FFMPEG_AUDIO_EXTRACTION",
+        "specs": [
+          "Remove any client-side AudioContext.decodeAudioData pre-checks that reject video or uncommon audio formats.",
+          "Accept binary buffers for .mp4, .mov, .m4a, .aac, .mp3, .wav, .flac, .ogg directly in the upload route.",
+          "Execute an immediate server-side FFmpeg transcode before MLK processing: ffmpeg -y -i <input_path> -vn -acodec pcm_s16le -ar 44100 <clean_source.wav>",
+          "Handle camera roll video uploads (such as MP4 with AAC tracks) seamlessly without throwing 'Could not decode audio from this file'."
+        ]
+      },
+      {
+        "module": "mastering_ui_copy",
+        "action": "PLAIN_ENGLISH_CREATOR_TERMINOLOGY",
+        "specs": [
+          "Sidechain Compressor -> Bass Clarity & Punch (Prevents Mud)",
+          "Detector cutoff frequency -> Bass Focus Range",
+          "Adaptive Mode (Bass Aware) -> Smart Low-End Smoothing",
+          "Auto Threshold (RMS) -> Automatic Punch Balancing",
+          "Stereo link -> Balanced Left/Right Mastering",
+          "Kernel Intensity -> Mastering Drive / Loudness Power",
+          "Rewrite tooltips so an everyday creator understands the exact sonic result without studio jargon."
+        ]
+      },
+      {
+        "module": "engine_identity",
+        "action": "MLK_V4_CORE_BINDING",
+        "specs": [
+          "Update all UI headers, status text, and backend references from MLK v3 to MLK V4 (Morris Law Kernel V4).",
+          "Ensure multiband limiting, harmonic saturation, and LUFS targets execute under the V4 preset profiles."
+        ]
+      },
+      {
+        "module": "seo_search_console",
+        "action": "INDEXING_AND_CANONICAL_RESOLUTIONS",
+        "specs": [
+          "Resolve Soft 404: Ensure the server returns genuine HTTP 404 status codes for invalid routes rather than 200 OK empty SPA bodies.",
+          "Enforce canonical tags: Set <link rel='canonical' href='https://gravelkingpro.it.com/' /> on root and mirror across canonical pages.",
+          "Audit robots.txt to ensure bots are not blocked from indexing public tools and landing pages.",
+          "Validate sitemap.xml against active public routes."
+        ]
+      }
+    ],
+    "mandatory_test_gates": {
+      "gate_1_mp4_video_ingest": {
+        "command": "node scripts/test-mastering-ingest.mjs --fixture=test_fixtures/sample.mp4",
+        "expected_result": "FFmpeg extracts audio stream, writes clean 44.1kHz WAV, returns HTTP 200, zero client-side decode errors."
+      },
+      "gate_2_iphone_m4a_ingest": {
+        "command": "node scripts/test-mastering-ingest.mjs --fixture=test_fixtures/sample.m4a",
+        "expected_result": "Sanitizes AAC stream to PCM WAV, processes via MLK V4, returns mastered output."
+      },
+      "gate_3_mlk_v4_dsp_run": {
+        "command": "node scripts/test-mlk-v4-master.mjs",
+        "expected_result": "Executes full multiband pass, hits preset target LUFS (-14 for YouTube, -11 for SoundCloud), verifies non-clipped output."
+      },
+      "gate_4_soft_404_status_check": {
+        "command": "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/non-existent-test-route",
+        "expected_result": "404"
+      },
+      "gate_5_sitemap_and_robots_verification": {
+        "command": "curl -s http://localhost:8080/robots.txt && curl -s http://localhost:8080/sitemap.xml",
+        "expected_result": "HTTP 200 with valid sitemap XML and unblocked public paths in robots.txt."
+      }
+    }
+  },
+  "receipt_format": {
+    "require_terminal_logs": true,
+    "require_code_diff": true,
+    "require_pass_fail_table": true
+  }
+}

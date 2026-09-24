@@ -180,3 +180,69 @@
   left: 8%;
   right: 8%;
 }
+
+.gka-mono {
+  font-family: var(--font-mono);
+}
+
+.gka-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 1.02cqw;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: rgba(98, 246, 255, .72);
+}
+
+.gka-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 2.55cqw;
+  line-height: .95;
+  letter-spacing: -.07em;
+  font-weight: 800;
+  color: rgba(243, 252, 252, .96);
+}
+
+.gka-grid {
+  background-image:
+    linear-gradient(rgba(98, 246, 255, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(98, 246, 255, .035) 1px, transparent 1px);
+  background-size: 4cqw 4cqw;
+  mask-image: linear-gradient(to bottom, transparent, black 15%, black 82%, transparent);
+}
+
+.gka-scanline {
+  animation: gka-scanline 4s linear infinite;
+}
+
+.gka-cursor {
+  display: inline-block;
+  width: .6em;
+  height: 1em;
+  margin-left: .25em;
+  vertical-align: -.15em;
+  background: #8dffb3;
+  box-shadow: 0 0 .8cqw rgba(141, 255, 179, .9);
+  animation: gka-blink 1s steps(2, jump-none) infinite;
+}
+
+.gka-pulse {
+  animation: gka-pulse 1.3s ease-in-out infinite;
+}
+
+.gka-blink {
+  animation: gka-blink 1s steps(2, jump-none) infinite;
+}
+
+@keyframes gka-scanline {
+  0% { transform: translateX(-60%); opacity: 0; }
+  18%, 72% { opacity: .8; }
+  100% { transform: translateX(160%); opacity: 0; }
+}
+
+@keyframes gka-blink {
+  50% { opacity: 0; }
+}
+
+@keyframes gka-pulse {
+  50% { opacity: .45; transform: scale(.72); }
+}

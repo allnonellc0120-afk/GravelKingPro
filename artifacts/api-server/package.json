@@ -7,8 +7,11 @@
     "dev": "export NODE_ENV=development PORT=${PORT:-8080} && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --max-old-space-size=2048 --enable-source-maps ./dist/index.mjs",
+    "proxy:vertex": "node ./tools/vertex-allowlist-proxy.mjs",
     "test:rvc": "node --experimental-strip-types ./scripts/test-rvc.ts",
-    "test": "flock /tmp/gk-apiserver-test.lock -c 'node ./build.test.mjs && node --enable-source-maps ./dist-test/jax-voice-metadata.test.mjs && node --enable-source-maps ./dist-test/whitepaper.test.mjs && node --enable-source-maps ./dist-test/studio-audio.test.mjs && node --enable-source-maps ./dist-test/investor-alerts.test.mjs && node --enable-source-maps ./dist-test/master-kernel.test.mjs && node --enable-source-maps ./dist-test/price-parity.test.mjs && node --enable-source-maps ./dist-test/download-gate.test.mjs && node --enable-source-maps ./dist-test/webhook-track-purchase.test.mjs && node --enable-source-maps ./dist-test/track-buyer-identity.test.mjs && node --enable-source-maps ./dist-test/referral-commission.test.mjs && node --enable-source-maps ./dist-test/benchmark.test.mjs && node --enable-source-maps ./dist-test/clerk-jit-provision.test.mjs && node --enable-source-maps ./dist-test/generation-pipeline.test.mjs && node --enable-source-maps ./dist-test/export-quota.test.mjs && node --enable-source-maps ./dist-test/lyric-owner-auth.test.mjs && node --enable-source-maps ./dist-test/commercial-fingerprint.test.mjs && node --enable-source-maps ./dist-test/cert-unlock-webhook.test.mjs && node --enable-source-maps ./dist-test/cert-paywall.test.mjs && node --enable-source-maps ./dist-test/credits.test.mjs'",
+    "test:label-admin-policy": "pnpm exec tsx ./src/__tests__/label-admin-policy.test.ts",
+    "verify:task-envelope": "pnpm exec tsx ./scripts/verify-task-envelope.ts",
+    "test": "flock /tmp/gk-apiserver-test.lock -c 'node ./build.test.mjs && node --enable-source-maps ./dist-test/jax-voice-metadata.test.mjs && node --enable-source-maps ./dist-test/whitepaper.test.mjs && node --enable-source-maps ./dist-test/studio-audio.test.mjs && node --enable-source-maps ./dist-test/investor-alerts.test.mjs && node --enable-source-maps ./dist-test/master-kernel.test.mjs && node --enable-source-maps ./dist-test/price-parity.test.mjs && node --enable-source-maps ./dist-test/download-gate.test.mjs && node --enable-source-maps ./dist-test/webhook-track-purchase.test.mjs && node --enable-source-maps ./dist-test/track-buyer-identity.test.mjs && node --enable-source-maps ./dist-test/referral-commission.test.mjs && node --enable-source-maps ./dist-test/benchmark.test.mjs && node --enable-source-maps ./dist-test/clerk-jit-provision.test.mjs && node --enable-source-maps ./dist-test/generation-pipeline.test.mjs && node --enable-source-maps ./dist-test/export-quota.test.mjs && node --enable-source-maps ./dist-test/lyric-owner-auth.test.mjs && node --enable-source-maps ./dist-test/commercial-fingerprint.test.mjs && node --enable-source-maps ./dist-test/cert-unlock-webhook.test.mjs && node --enable-source-maps ./dist-test/cert-paywall.test.mjs && node --enable-source-maps ./dist-test/credits.test.mjs && node --enable-source-maps ./dist-test/token-telemetry.test.mjs && node --enable-source-maps ./dist-test/jax-telemetry-ledger.test.mjs && node --enable-source-maps ./dist-test/telemetry-reports.test.mjs && node --enable-source-maps ./dist-test/duet-timeout.test.mjs && node --enable-source-maps ./dist-test/news-proxy.test.mjs'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -27,8 +30,11 @@
     "fflate": "^0.8.3",
     "google-auth-library": "^10.7.0",
     "http-proxy-middleware": "^4.2.0",
+    "js-tiktoken": "^1.0.21",
     "jspdf": "^4.2.1",
     "multer": "^2.2.0",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.6",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
     "resend": "^6.12.4"
@@ -38,6 +44,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",
+    "@types/nodemailer": "^7.0.2",
     "@types/node": "catalog:",
     "esbuild": "0.25.8",
     "esbuild-plugin-pino": "^2.3.3",

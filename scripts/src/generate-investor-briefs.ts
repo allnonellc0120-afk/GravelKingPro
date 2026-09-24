@@ -162,12 +162,12 @@ async function buildValuationBrief(outDir: string) {
 
   newPage(ctx);
   heading(ctx, "1. What Is Being Valued");
-  body(ctx, "GravelKing Pro is a live, revenue-wired music platform: AI-attributed IP certification (split-key certificates), proprietary Morris Law Kernel v3.5 multi-band mastering DSP, browser Vocal Booth and karaoke DAW, generative music pipeline, Stripe + Google Play billing, Android TWA on the Play Store, and a production deployment at gravelkingpro.com. Built and shipped bootstrapped by a solo founder.");
+  body(ctx, "GravelKing Pro is a live, revenue-wired music platform: AI-attributed IP certification (split-key certificates), proprietary Morris Law Kernel V4 multi-band mastering DSP, browser Vocal Booth and karaoke DAW, generative music pipeline, Stripe + Google Play billing, Android TWA on the Play Store, and a production deployment at gravelkingpro.com. Built and shipped bootstrapped by a solo founder.");
   divider(ctx);
 
   heading(ctx, "2. Asset-Based Valuation (Replacement Cost)");
   const rows: [string, string, string][] = [
-    ["Morris Law Kernel v3.5 (proprietary DSP)", "$800K - $1.2M", "Years of multi-band mastering R&D; no open-source equivalent; runs every track on the platform."],
+    ["Morris Law Kernel V4 (proprietary DSP)", "$800K - $1.2M", "Years of multi-band mastering R&D; no open-source equivalent; runs every track on the platform."],
     ["Split-key cert + provenance architecture", "$200K - $500K", "Nominator in audio LSBs, denominator + HMAC server-side; AI attribution + catalog screening on every cert."],
     ["Generative pipeline + AI integrations", "$150K - $400K", "Lyria 3 generation, Gemini pre-pass safety, authorship scoring, karaoke sync."],
     ["Registry data + customer base", "$50K - $200K", "Growing certified-track registry; compounds as a data asset no acquirer can rebuild retroactively."],
@@ -286,7 +286,7 @@ async function buildOutreachPlaybook(outDir: string) {
       why: "Corporate VC arm of a music hardware/software giant; strategic acquirer profile.",
       route: "Official innovation program / partnership form on Yamaha's corporate site. Long cycle - start now.",
       angle: "Strategic, not financial: MLK mastering could live inside their creator tools, and certification differentiates their AI features. This is a licensing or buyout track.",
-      message: "Hello - I've built a proprietary multi-band mastering kernel (MLK v3.5) plus an AI-attribution certification system, live in production. For Yamaha's creator ecosystem this could be a white-label mastering + provenance layer. Open to licensing or deeper conversations. Public overview: [link].",
+      message: "Hello - I've built a proprietary multi-band mastering kernel (MLK V4 (Morris Law Kernel V4)) plus an AI-attribution certification system, live in production. For Yamaha's creator ecosystem this could be a white-label mastering + provenance layer. Open to licensing or deeper conversations. Public overview: [link].",
     },
     {
       name: "6. Backbeat Capital",

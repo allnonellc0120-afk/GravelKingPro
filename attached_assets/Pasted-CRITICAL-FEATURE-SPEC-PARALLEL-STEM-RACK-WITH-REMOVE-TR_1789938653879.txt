@@ -1,0 +1,33 @@
+CRITICAL FEATURE SPEC: PARALLEL STEM RACK WITH REMOVE / TRASH & MULTI-STEM EXPORT BOUNCE
+
+1. PARALLEL STEM DUPLICATION & REMOVAL (MAX 3 STEMS):
+   - Add a "Duplicate Stem" button right under the fine-tune section (limit: up to 3 stems total).
+   - Add a Trash Can / Delete Stem button on each duplicated stem card:
+     * Clicking the trash icon instantly tears down that stem's Web Audio node chain (disconnects Gain, Filter, and Panner nodes) and removes it from state.
+     * Stem 1 (Primary Master) remains locked/protected from accidental full deletion.
+   - All stems share the original decoded AudioBuffer in memory (instant, zero duplicate API calls).
+   - Independent controls per stem:
+     * Stereo Pan (-100% Left to +100% Right via StereoPannerNode)
+     * 3-Band EQ: Low Shelf (100Hz), Mid Bell (2.5kHz), High Shelf (8kHz)
+     * Level / Volume Trim + Solo / Mute toggles.
+
+2. OFFLINE BOUNCE FOR SAVE / EXPORT:
+   - When the user clicks "Save WAV" or "Export Master":
+   - If duplicates exist, do NOT export just the raw single buffer.
+   - Initialize an `OfflineAudioContext` (2 channels, 44100Hz, full buffer length).
+   - Replicate the exact active stem graph offline:
+     * For each active stem remaining (up to 3): instantiate BufferSource -> Low/Mid/High BiquadFilterNodes -> StereoPannerNode -> GainNode -> offlineContext.destination.
+   - Run `offlineContext.startRendering()`.
+   - Encode the resulting AudioBuffer into a pristine 24-bit PCM WAV blob and trigger download / save to library.
+
+3. HORIZONTAL TOUCH SLIDERS:
+   - Convert all vertical fine-tune controls to horizontal sliders.
+   - Apply CSS `touch-action: pan-y;` across all slider elements so adjusting sliders on touch screens never scrolls the page.
+
+4. MP4/VIDEO MASTERING FIX:
+   - In `artifacts/api-server/src/lib/audioGuards.ts` and `mlk_master.py`:
+   - Inspect input MIME / extension. If `.mp4`, `.mov`, or video container, demux the audio track cleanly via FFmpeg before processing:
+     `ffmpeg -y -i input.mp4 -vn -c:a pcm_s24le -ar 44100 temp_audio.wav`
+   - Feed the uncompressed audio directly into the MLK V4 chain to prevent processing hangs.
+
+Compile the updates, verify with `pnpm run build`, and confirm OfflineAudioContext mixdown and trash can stem removal operate cleanly.

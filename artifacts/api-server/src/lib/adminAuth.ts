@@ -14,7 +14,7 @@ import type { Request, Response } from "express";
 export const ADMIN_COOKIE = "gk_admin";
 const COOKIE_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
 const HMAC_DATA = "gk_admin_session_v1";
-export const ADMIN_AUTOMATION_EMAIL = "Allnonellc0120@gmail.com";
+export const ADMIN_AUTOMATION_EMAIL = "allnonellc0120@gmail.com";
 
 function computeToken(adminKey: string): string {
   return createHmac("sha256", adminKey).update(HMAC_DATA).digest("hex");
@@ -93,7 +93,21 @@ export function isAdminAuthenticated(req: Request): boolean {
 
 /** Returns true if the request is from a Clerk-authenticated user with isDeveloper=true. */
 export async function isDeveloperAuthenticated(req: Request): Promise<boolean> {
-  return req.dbUser?.isDeveloper === true;
+  return req.dbUser?.isDeveloper === true && isLabelCatalogOwner(req);
+}
+
+/** Label/catalog administration is deliberately narrower than general admin. */
+export function isLabelCatalogOwner(req: Request): boolean {
+  return req.dbUser?.email?.trim().toLowerCase() === ADMIN_AUTOMATION_EMAIL;
+}
+
+/** Require the owner account; API keys and developer flags never bypass this. */
+export function requireLabelCatalogOwner(req: Request, res: Response): boolean {
+  if (!isLabelCatalogOwner(req)) {
+    res.status(403).json({ error: "Label catalog access is restricted to the owner account." });
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -111,4 +125,17 @@ export async function requireAdmin(req: Request, res: Response): Promise<boolean
   if (await isDeveloperAuthenticated(req)) return true;
   res.status(403).json({ error: "Not authenticated." });
   return false;
+}
+
+/**
+ * Contract-only guard for /admin/control.
+ *
+ * Unlike the broader admin guard, this surface requires the explicitly
+ * whitelisted automation identity in x-admin-user. If a bearer session is
+ * also presented, the auth middleware must have resolved that session to the
+ * same database user; a valid admin key cannot bypass a mismatched session.
+ * Unauthorized probes intentionally receive an empty 403 response.
+ */
+export async function requireContractAdmin(req: Request, res: Response): Promise<boolean> {
+  return requireLabelCatalogOwner(req, res);
 }

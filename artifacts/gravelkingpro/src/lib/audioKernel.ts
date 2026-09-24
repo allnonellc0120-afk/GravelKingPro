@@ -39,7 +39,7 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const numSamples = buffer.length;
-  const bytesPerSample = 2;
+  const bytesPerSample = 3;
   const blockAlign = numChannels * bytesPerSample;
   const byteRate = sampleRate * blockAlign;
   const dataSize = numSamples * blockAlign;
@@ -61,7 +61,7 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true);
+  view.setUint16(34, 24, true);
   writeString(36, "data");
   view.setUint32(40, dataSize, true);
 
@@ -69,8 +69,11 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   for (let i = 0; i < numSamples; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
       const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-      offset += 2;
+      const value = Math.round(sample < 0 ? sample * 0x800000 : sample * 0x7fffff);
+      view.setUint8(offset, value & 0xff);
+      view.setUint8(offset + 1, (value >> 8) & 0xff);
+      view.setUint8(offset + 2, (value >> 16) & 0xff);
+      offset += 3;
     }
   }
 

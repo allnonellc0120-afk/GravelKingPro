@@ -1,5 +1,5 @@
 """
-Morris Law Kernel V3.5 - Production Audio Mastering Engine
+Morris Law Kernel V4 - Production Audio Mastering Engine
 Numba-Accelerated | Stereo Linked | Adaptive + Auto-Threshold | Ultra Lightweight
 
 Developed for GravelKing Pro / All One LLC
@@ -9,6 +9,7 @@ IP Protected - All Rights Reserved
 import numpy as np
 import scipy.signal as signal
 from typing import Literal, Optional
+from audio_standards import integrated_lufs
 
 # Optional Numba acceleration
 try:
@@ -45,7 +46,7 @@ class MorrisLawKernel:
         "gravelking_max": {"low_freq": 80.0, "low_gain_max": 4.5, "high_freq": 9000.0, "high_gain_max": 4.5, "drive_max": 0.40, "comp_ratio_max": 3.5},
     }
 
-    def __init__(self, sample_rate: int = 44100):
+    def __init__(self, sample_rate: int = 48000):
         self.sample_rate = sample_rate
         self.nyq = sample_rate / 2.0
         self._use_numba = NUMBA_AVAILABLE
@@ -214,11 +215,10 @@ class MorrisLawKernel:
         peak = 10 ** (ceiling_db / 20.0)
         audio = np.clip(audio, -peak, peak)
 
-        # LUFS staging
-        rms = np.sqrt(np.mean(audio * audio))
-        if rms > 1e-8:
-            gain = (10 ** (target_lufs / 20.0)) / rms
-            audio = audio * gain
+        # True ITU-R BS.1770-4 K-weighted integrated loudness staging.
+        current_lufs = integrated_lufs(audio, self.sample_rate)
+        if np.isfinite(current_lufs):
+            audio = audio * (10 ** ((target_lufs - current_lufs) / 20.0))
 
         # Output processing
         if output_gain_db != 0.0:
@@ -241,4 +241,4 @@ class MorrisLawKernel:
 if __name__ == "__main__":
     kernel = MorrisLawKernel(sample_rate=44100)
     status = "Numba accelerated" if NUMBA_AVAILABLE else "Numba not installed (pure Python fallback)"
-    print(f"Morris Law Kernel V3.5 ready — {status}")
+    print(f"Morris Law Kernel V4 ready — {status}")

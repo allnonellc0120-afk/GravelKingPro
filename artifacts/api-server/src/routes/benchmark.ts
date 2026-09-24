@@ -2,7 +2,7 @@
  * Admin-only, on-demand performance benchmarks for the partner dashboard.
  *
  * Two protected surfaces:
- *   POST /api/admin/benchmark/kernel — times the REAL Morris Law Kernel v3.5
+ *   POST /api/admin/benchmark/kernel — times the REAL MLK V4 kernel
  *     execution path (remote Cloud Run first, local Python worker fallback —
  *     the exact selection logic /api/kernel/master uses) against a bounded,
  *     generated WAV fixture. Reports per-run timing, min/median/max, audio
@@ -42,7 +42,7 @@ const benchConcurrency = concurrencyLimit(1, "A benchmark is already running. Wa
 const MAX_RUNS = 5;
 const MAX_FIXTURE_SECONDS = 10;
 
-/** Generate a bounded true-stereo WAV fixture (distinct L/R sines + light noise). */
+/** Generate a bounded canonical true-stereo WAV fixture (48 kHz, 24-bit). */
 async function makeFixture(seconds: number): Promise<string> {
   const out = `/tmp/gk_bench_fix_${randomUUID()}.wav`;
   await execFileAsync("ffmpeg", [
@@ -50,7 +50,7 @@ async function makeFixture(seconds: number): Promise<string> {
     "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`,
     "-f", "lavfi", "-i", `sine=frequency=523:duration=${seconds}`,
     "-filter_complex", "[0:a][1:a]join=inputs=2:channel_layout=stereo,volume=0.8[a]",
-    "-map", "[a]", "-acodec", "pcm_s16le", "-ar", "44100", out,
+    "-map", "[a]", "-acodec", "pcm_s24le", "-ar", "48000", out,
   ], { timeout: 30_000 });
   return out;
 }
@@ -63,7 +63,7 @@ function summarize(values: number[]): { min: number; median: number; max: number
 }
 
 /**
- * Run the SAME Morris Law Kernel v3.5 selection the mastering route uses:
+ * Run the SAME MLK V4 selection the mastering route uses:
  * remote Cloud Run service when MLK_KERNEL_URL is set and reachable, otherwise
  * the local Python worker subprocess. Returns which engine actually processed.
  */
@@ -187,7 +187,7 @@ router.post(
         success: true,
         measuredAt: new Date().toISOString(),
         fixture: { durationS, bytes: fixtureBytes, kind: "generated true-stereo sine WAV" },
-        kernel: "Morris Law Kernel v3.5",
+        kernel: "MLK V4 (Morris Law Kernel V4)",
         engine: results[results.length - 1].engine,
         completedLocally: results.every((r) => r.engine === "local"),
         runs: results,

@@ -1,0 +1,33 @@
+{
+  "target": "gravelking-pro-agent",
+  "action": "CONSTRUCT_ACTUAL_VISUAL_CONCERT_STAGE_GRAPHICS",
+  "rejection_reason": "CSS color tweaks are unacceptable. The app still displays flat rectangular web cards. You must build tangible, visual concert stage graphics.",
+  "directives": [
+    {
+      "step": 1,
+      "title": "Concert Stage Visual Canvas/SVG Scaffolding",
+      "instruction": "Inside artifacts/gravelkingpro/src/components/live-performance-stage.tsx, construct an actual visual arena environment: (a) An SVG/Canvas lighting truss across the ceiling emitting 3 dynamic, angled volumetric spotlight cones down to the floor, (b) A 3D perspective floor plane (using CSS transform: perspective(600px) rotateX(45deg) or SVG grid) depicting illuminated stage deck tiles with reflective gloss, and (c) Stage-edge perimeter LED strip lighting."
+    },
+    {
+      "step": 2,
+      "title": "Stadium Jumbotron Teleprompter Hardware",
+      "instruction": "Replace the standard text div with a Jumbotron-styled display: give it a curved dark-glass monitor bezel, subtle scanline/mesh texture, and dynamic kinetic glowing text that scales and pulses as lines become active."
+    },
+    {
+      "step": 3,
+      "title": "Performer Stage Risers",
+      "instruction": "Anchor the Host and Partner avatars onto physical visual stage risers (3D beveled metallic pedestals) set upon the floor grid, featuring audio-reactive ring beams shooting upward when they sing."
+    },
+    {
+      "step": 4,
+      "title": "Replace Duet & Booth Active Views",
+      "instruction": "Mount this visual stage component directly into duet.tsx (triggering on performance start) and vocal-booth.tsx (replacing the empty Studio Mode screen). Remove the flat administrative card layout during active performance."
+    }
+  ],
+  "verification_required": {
+    "frontend_typecheck": "passed",
+    "production_build": "passed",
+    "visual_stage_elements_present": ["spotlight_cones", "stage_floor_grid", "jumbotron_frame", "performer_risers"]
+  },
+  "required_output_format": "RAW_JSON_RECEIPT_ONLY"
+}

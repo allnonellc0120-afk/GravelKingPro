@@ -7,10 +7,12 @@ import { submitSitemapToGSC } from "./lib/googleSearchConsole";
 import { scheduleOverdueAlerts } from "./lib/investorAlerts";
 import { scheduleInvestorOutreachDispatcher } from "./lib/investorOutreach";
 import { scheduleIndexNowSubmission } from "./lib/indexNow";
+import { scheduleTelemetryReports } from "./lib/telemetryReports";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { DEMO_EMAIL, DEMO_PASSWORD_HASH, DEMO_USER_ID } from "./lib/auth";
+import { runStripeBackfill } from "./lib/stripeBackfill";
 
 const rawPort = process.env["PORT"];
 
@@ -99,29 +101,10 @@ async function initStripe() {
 
     logger.info("Starting Stripe data backfill (runs in background)...");
     const stripeSync = await getStripeSync();
-    stripeSync
-      // Passing no argument makes syncBackfill a silent no-op in this library
-      // version (the object selector falls through the switch). "all" performs
-      // the real product/price/customer/subscription backfill.
-      .syncBackfill({ object: "all" })
-      .then(() => logger.info("Stripe data backfill complete"))
-      .catch((err: unknown) => {
-        // Known benign case: the local mirror still carries customer IDs
-        // minted on a previously connected Stripe account (dev sandbox before
-        // the live account was attached). Listing payment methods for those
-        // throws resource_missing. Checkout self-heals such customers via
-        // ensureCustomerOnCurrentAccount, so log this quietly instead of as
-        // an ERROR that buries real backfill failures.
-        const e = err as { code?: string; param?: string };
-        if (e?.code === "resource_missing" && e?.param === "customer") {
-          logger.warn(
-            { err },
-            "Stripe backfill skipped stale mirrored customer(s) from a previously connected account — checkout self-heals these"
-          );
-          return;
-        }
-        logger.error({ err }, "Stripe backfill error");
-      });
+    // Passing no argument makes syncBackfill a silent no-op in this library
+    // version (the object selector falls through the switch). "all" performs
+    // the real product/price/customer/subscription backfill.
+    void runStripeBackfill(stripeSync);
   } catch (err: unknown) {
     logger.error({ err }, "Failed to set up Stripe webhook/backfill");
   }
@@ -129,6 +112,32 @@ async function initStripe() {
 
 async function migrateAppSchema() {
   try {
+    // Public artist identity and community karaoke assets are represented in
+    // Drizzle schema as well as here so publish-time schema diffs retain them.
+    await db.execute(sql`
+      ALTER TABLE artist_profiles
+        ADD COLUMN IF NOT EXISTS artist_name varchar(120) NOT NULL DEFAULT '',
+        ADD COLUMN IF NOT EXISTS hometown varchar(120) NOT NULL DEFAULT '',
+        ADD COLUMN IF NOT EXISTS avatar_url text
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS karaoke_tracks (
+        id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        uploader_user_id     varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        asset_url            text NOT NULL,
+        storage_key          text NOT NULL UNIQUE,
+        title                varchar(200) NOT NULL,
+        bpm                  integer,
+        duration             integer NOT NULL DEFAULT 0,
+        uploader_artist_name varchar(120) NOT NULL DEFAULT '',
+        created_at           timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS karaoke_tracks_created_at_idx
+        ON karaoke_tracks(created_at DESC)
+    `);
+
     await db.execute(sql`
       ALTER TABLE users
         ADD COLUMN IF NOT EXISTS password_hash text
@@ -177,6 +186,33 @@ async function migrateAppSchema() {
           5000 - credits_balance,
           'admin_balance_set',
           'owner-admin-initial-balance-5000'
+        FROM owner
+        WHERE credits_balance <> 5000
+        ON CONFLICT (reference) DO NOTHING
+        RETURNING user_id, delta
+      )
+      UPDATE users
+      SET credits_balance = users.credits_balance + adjustment.delta
+      FROM adjustment
+      WHERE users.id = adjustment.user_id
+    `);
+    // The lifetime grant for hopelaborde66@gmail.com includes a fixed 5,000
+    // credit wallet. This is an exact, idempotent correction rather than an
+    // auto-refill: it only creates one ledger adjustment if the balance differs.
+    await db.execute(sql`
+      WITH owner AS (
+        SELECT id, credits_balance
+        FROM users
+        WHERE lower(email) = 'hopelaborde66@gmail.com'
+        LIMIT 1
+      ),
+      adjustment AS (
+        INSERT INTO credit_transactions (user_id, delta, kind, reference)
+        SELECT
+          id,
+          5000 - credits_balance,
+          'admin_balance_set',
+          'owner-admin-initial-balance-5000-hopelaborde66'
         FROM owner
         WHERE credits_balance <> 5000
         ON CONFLICT (reference) DO NOTHING
@@ -295,6 +331,10 @@ async function migrateAppSchema() {
       ALTER TABLE users
         ADD COLUMN IF NOT EXISTS cert_unlocks             integer NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS cert_unlock_period_start timestamptz
+    `);
+    await db.execute(sql`
+      ALTER TABLE featured_artist_entries
+        ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true
     `);
     // `pro` historically meant the higher Studio entitlement. Migrate those
     // rows before `pro` is reused for the new $9.99 plan, preventing an
@@ -496,6 +536,7 @@ await submitSitemapOnStartup();
 scheduleOverdueAlerts();
 scheduleInvestorOutreachDispatcher();
 scheduleIndexNowSubmission();
+scheduleTelemetryReports();
 
 app.listen(port, (err) => {
   if (err) {

@@ -1,4 +1,4 @@
-# PITCH DECK VISUAL DESIGN GUIDE — Morris Law Kernel v3.5
+# PITCH DECK VISUAL DESIGN GUIDE — Morris Law Kernel V4
 
 ## Overall Style Recommendations
 - Dark theme with green/cyan accents (GravelKing brand)
@@ -27,7 +27,7 @@
 
 **Slide 4: How It Works**
 - Clean flow diagram:
-  Audio → MLK v3 Kernel → Robust Embed → Cryptographic Record → Blockchain Anchor
+  Audio → MLK V4 (Morris Law Kernel V4) Kernel → Robust Embed → Cryptographic Record → Blockchain Anchor
 - Use arrows and numbered steps
 - Show a sample verification report screenshot
 

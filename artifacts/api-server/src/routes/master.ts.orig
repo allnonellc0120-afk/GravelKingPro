@@ -469,7 +469,7 @@ masterRouter.post(
       // Pre-kernel bytes for cert content-hash binding (read before cleanup).
       const preKernelBytes = await readFile(kernelInputPath);
 
-      // ── Morris Law Kernel v3.5 (Python + Numba) — the ONLY DSP path ─────
+      // ── Morris Law Kernel V4 (Python + Numba) — the ONLY DSP path ─────
       // All DSP — EQ, saturation, adaptive sidechain compression, limiting,
       // loudness staging — runs exclusively in the local Python MLK worker.
       // There is no cloud / remote fallback by design. If the kernel fails,

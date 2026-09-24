@@ -123,7 +123,7 @@ export function LeadCaptureModal({ open, onClose, verificationActivity }: LeadCa
                       Request Enterprise Demo
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Get the GravelKing Pro MLK V3.5 Technical Brief PDF + a 7-day demo API key sent to your inbox.
+                      Get the GravelKing Pro MLK V4 Technical Brief PDF + a 7-day demo API key sent to your inbox.
                     </p>
                   </div>
 

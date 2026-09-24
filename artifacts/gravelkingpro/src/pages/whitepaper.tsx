@@ -45,7 +45,7 @@ function ArchDiagram() {
   const nodes = [
     { label: "Creator / Platform", sub: "WAV · FLAC · AIFF · MP3", icon: <Globe className="w-5 h-5 text-cyan-400" />, color: "border-cyan-500/30 bg-cyan-950/20" },
     { label: "3-Tier Ingestion", sub: "Metadata · Spectral · Warrant", icon: <Shield className="w-5 h-5 text-amber-400" />, color: "border-amber-500/30 bg-amber-950/20" },
-    { label: "MLK V3.5 Engine", sub: "LSB embed · Mastering chain", icon: <Zap className="w-5 h-5 text-violet-400" />, color: "border-violet-500/30 bg-violet-950/20" },
+    { label: "MLK V4 Engine", sub: "LSB embed · Mastering chain", icon: <Zap className="w-5 h-5 text-violet-400" />, color: "border-violet-500/30 bg-violet-950/20" },
     { label: "Cert Dual-Store", sub: "PostgreSQL · Firestore", icon: <Database className="w-5 h-5 text-emerald-400" />, color: "border-emerald-500/30 bg-emerald-950/20" },
   ];
 
@@ -118,9 +118,9 @@ const SECTIONS = [
           reassigned, or fraudulently claimed by any actor with basic tooling.
         </p>
         <p>
-          <span className="text-cyan-400 font-semibold">GravelKing Pro MLK V3.5</span> solves this at the signal
+          <span className="text-cyan-400 font-semibold">GravelKing Pro MLK V4</span> solves this at the signal
           level — not the metadata level. Rather than relying on external ledgers, blockchain timestamps, or
-          third-party registries that can be circumvented, MLK V3.5 embeds cryptographic proof of ownership directly
+          third-party registries that can be circumvented, MLK V4 embeds cryptographic proof of ownership directly
           into the audio bitstream using dual-anchor LSB steganography. This proof travels with the track
           permanently, survives platform distribution, and is verified server-authoritatively.
         </p>
@@ -203,7 +203,7 @@ const SECTIONS = [
     content: (
       <div className="space-y-5 text-sm text-muted-foreground leading-relaxed">
         <p>
-          MLK V3.5 uses a nominator/denominator split: the two halves of the cryptographic proof are stored
+          MLK V4 uses a nominator/denominator split: the two halves of the cryptographic proof are stored
           separately, making verification server-authoritative. A discovered Anchor A proves nothing without the
           server-held Anchor B — legally equivalent to a two-factor notarisation.
         </p>
@@ -244,7 +244,7 @@ const SECTIONS = [
           </div>
           <div className="divide-y divide-border/10">
             {[
-              { method: "POST", path: "/api/v1/ingest", desc: "Submit audio for MLK V3.5 watermarking + mastering. Returns processed stream + X-GK-CertId header." },
+              { method: "POST", path: "/api/v1/ingest", desc: "Submit audio for MLK V4 watermarking + mastering. Returns processed stream + X-GK-CertId header." },
               { method: "POST", path: "/api/v1/verify", desc: "Public clean-room verification. No auth. Returns VerifyResult JSON. < 2ms for pre-certified." },
               { method: "GET", path: "/api/court-cert/:certId", desc: "Retrieve structured forensic certificate JSON for a certId." },
               { method: "GET", path: "/api/court-cert/:certId.pdf", desc: "Download court-ready PDF certificate." },
@@ -302,7 +302,7 @@ const SECTIONS = [
     content: (
       <div className="space-y-5 text-sm text-muted-foreground leading-relaxed">
         <p>
-          The MLK V3.5 kernel is a native C-bound DSP pipeline exposed through a Node.js FFI layer. The
+          The MLK V4 kernel is a native C-bound DSP pipeline exposed through a Node.js FFI layer. The
           architecture is designed for zero-trust enterprise cloud deployment and on-premise air-gapped
           installations at major labels and studios.
         </p>
@@ -347,7 +347,7 @@ export default function WhitepaperPage() {
               <FileText className="w-3.5 h-3.5" /> Technical Brief — Enterprise Edition
             </Badge>
             <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-xs gap-1.5 px-3 py-1">
-              MLK V3.5 · 2026
+              MLK V4 · 2026
             </Badge>
           </div>
 
@@ -398,7 +398,7 @@ export default function WhitepaperPage() {
                   <th className="text-left px-4 py-3 font-semibold text-muted-foreground w-[46%]">Protection Feature</th>
                   <th className="text-center px-3 py-3 font-semibold text-muted-foreground">Metadata / ID3</th>
                   <th className="text-center px-3 py-3 font-semibold text-muted-foreground">Blockchain Timestamp</th>
-                  <th className="text-center px-3 py-3 font-bold text-amber-400">MLK V3.5</th>
+                  <th className="text-center px-3 py-3 font-bold text-amber-400">MLK V4</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/10">

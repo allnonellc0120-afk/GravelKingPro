@@ -5,7 +5,7 @@ description: Product rule — AI generation/remix never auto-masters; mastering 
 
 **Rule:** `generateAndMasterTrack` (and therefore remix) does NOT run the MLK kernel. The normalized, cert-embedded generated mix is vaulted as-is (`kernelEngine: "unmastered"`) and the user lands in the Mastering Tool with it preloaded and playable, exactly like an uploaded song. Mastering is a separate, user-initiated paid step there.
 
-**Why:** Owner directive (2026-08-11): mastering is a separate charge; bundling it broke the flow and doubled cost per generation. This supersedes "MLK v3 on every audio process" for the *generation* pipeline only — upload/mastering routes still carve through MLK v3.
+**Why:** Owner directive (2026-08-11): mastering is a separate charge; bundling it broke the flow and doubled cost per generation. This supersedes "MLK V4 (Morris Law Kernel V4) on every audio process" for the *generation* pipeline only — upload/mastering routes still carve through MLK V4 (Morris Law Kernel V4).
 
 **How to apply:** Never reintroduce `runMlkKernel` into the generation path. The IP cert still binds to the pre-kernel generated mix (unchanged). Copy in songwriting UI must say "unmastered → you choose when to master."
 

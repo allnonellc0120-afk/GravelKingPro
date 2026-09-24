@@ -1,4 +1,4 @@
-# ONE-PAGE EXECUTIVE SUMMARY — Morris Law Kernel v3.5 + IP Protection System
+# ONE-PAGE EXECUTIVE SUMMARY — Morris Law Kernel V4 + IP Protection System
 
 **The Opportunity**
 
@@ -6,7 +6,7 @@ Independent creators and music platforms need two things: superior sound quality
 
 **The Solution**
 
-Morris Law Kernel v3.5 is the first integrated system that delivers:
+Morris Law Kernel V4 is the first integrated system that delivers:
 
 - **High-performance adaptive mastering** — Numba-accelerated with stereo-linked sidechain, bass-aware adaptation, and auto-threshold. Delivers pro-level results efficiently.
 - **Court-grade IP protection** — Robust hybrid watermarking (survives re-encoding) + multi-layer cryptographic provenance (content hash + perceptual hash + digital signature + brand locking).

@@ -94,16 +94,16 @@ logical_id = "0a85218b-3bcf-480d-8b13-02abbd1655fa"
 id = "dLolvStuoJdfJufxjGvra"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_WhitePaper.pdf"
 type = "pdf"
-title = "Morris Law Kernel V3.5 — White Paper (PDF)"
-description = "Technical white paper on the Morris Law Kernel v3.5 mastering and IP certification system."
+title = "Morris Law Kernel V4 — White Paper (PDF)"
+description = "Technical white paper on the Morris Law Kernel V4 mastering and IP certification system."
 logical_id = "c9994435-05f0-4c1d-908c-836339ffb87f"
 
 [[outputs]]
 id = "Kap8xFsaJ_kX--TvbfwwH"
 uri = "file://artifacts/gravelkingpro/public/GravelKingPro_MLKv3_PitchDeck.pdf"
 type = "pdf"
-title = "Morris Law Kernel V3 — Technical Pitch Deck (PDF)"
-description = "Technical pitch deck focused on the Morris Law Kernel v3 audio mastering engine."
+title = "Morris Law Kernel V4 — Technical Pitch Deck (PDF)"
+description = "Technical pitch deck focused on the Morris Law Kernel V4 audio mastering engine."
 logical_id = "1850ddb3-3e67-4669-8ae6-8ea4a9a8ed5c"
 
 [[outputs]]
@@ -166,7 +166,7 @@ logical_id = "200e6d2c-1e08-4d82-942f-2278141b448e"
 id = "vtsO69zU_zj12MlYc4aa_"
 uri = "file://attached_assets/gravelking_ip_certified_demo.mp3"
 type = "audio"
-title = "GravelKing IP Certified Demo — MLK v3.5 (30 sec)"
+title = "GravelKing IP Certified Demo — MLK V4 (Morris Law Kernel V4) (30 sec)"
 logical_id = "ba48f563-ebb3-4ff9-ab42-430b30742d6a"
 
 [[outputs]]
@@ -228,7 +228,7 @@ logical_id = "6d8e95a9-9f88-4f69-a00b-8ac93061e660"
 [[outputs]]
 id = "z3XhWnvAyEAT5WSM9lRxD"
 uri = "file://artifacts/gravelkingpro/public/pitch-paper.html"
-type = "text"
+type = "html"
 title = "Investor Pitch Paper (Executive Pitch)"
 logical_id = "4a727454-1fb7-4d04-ae31-dc712f5a6e0c"
 content_type = "text/html"
@@ -236,7 +236,7 @@ content_type = "text/html"
 [[outputs]]
 id = "S2AMa_xYZkSuYlrG-6t8J"
 uri = "file://artifacts/gravelkingpro/public/admin-strategy.html"
-type = "text"
+type = "html"
 title = "Admin Strategy Brief"
 logical_id = "647f831d-3916-476d-a6a0-a02046a13050"
 content_type = "text/html"
@@ -359,21 +359,21 @@ logical_id = "1044bfef-fb63-4480-99fb-2a63c315e939"
 id = "qPL9ofyPcQld_rDtTzCXD"
 uri = "file://attached_assets/GravelKingPro-MLKv35-Technical-Brief.pdf"
 type = "pdf"
-title = "GravelKing Pro MLK V3.5 — Technical Brief (large print)"
+title = "GravelKing Pro MLK V4 (Morris Law Kernel V4) — Technical Brief (large print)"
 logical_id = "deafd2f7-3ddf-424b-8069-81ceb6805268"
 
 [[outputs]]
 id = "fzhiCeZCXjsU8ISJHy5S5"
 uri = "file://.local/outputs/Morris-Law-Kernel-v3-5---Pitch-Deck.pdf"
 type = "pdf"
-title = "Morris Law Kernel v3.5 — Pitch Deck.pdf"
+title = "Morris Law Kernel V4 — Pitch Deck.pdf"
 logical_id = "3d24a4ee-0dd7-437a-84f9-3223b9dc2d28"
 
 [[outputs]]
 id = "iiYSFhX1HITkxmD9bC3x9"
 uri = "file://.local/outputs/Morris-Law-Kernel-v3-5---Pitch-Deck.pptx"
 type = "slides"
-title = "Morris Law Kernel v3.5 — Pitch Deck.pptx"
+title = "Morris Law Kernel V4 — Pitch Deck.pptx"
 logical_id = "b8f5d27f-5fd8-4477-97b7-703d02a7d76f"
 
 [[outputs]]
@@ -401,7 +401,7 @@ logical_id = "bba754ff-b5cd-4576-a469-299eea793e4f"
 id = "lBcAxy-gJyFFcyYWNhriD"
 uri = "file://business-package/pdf/WHITE_PAPER_Morris_Law_Kernel_v3.5.pdf"
 type = "pdf"
-title = "White Paper — Morris Law Kernel v3.5 (PDF)"
+title = "White Paper — Morris Law Kernel V4 (PDF)"
 logical_id = "099f26c0-81f7-4ace-99c0-a8ef21a81b8f"
 
 [[outputs]]
@@ -563,7 +563,7 @@ logical_id = "491acefe-f759-465e-b456-1c3b454112ba"
 id = "k2GFB4LY23FgMnEcG-zYz"
 uri = "file://exports/GravelKingPro_MLK_v3.5_Speed_Benchmark.pdf"
 type = "pdf"
-title = "MLK V3.5 Speed Benchmark (PDF)"
+title = "MLK V4 (Morris Law Kernel V4) Speed Benchmark (PDF)"
 description = "One-pager with real measured speeds vs LANDR, eMastered, CloudBounce, BandLab, and human engineers — with methodology."
 logical_id = "d868c19e-2b02-4854-919e-a336385e4419"
 
@@ -579,7 +579,7 @@ logical_id = "69575d0b-a78e-4b66-a194-7973223b0b0a"
 id = "tCbbntOAppgbw-fwhedSs"
 uri = "file://exports/GravelKingPro_MLK_v3.5_Metrics_By_Class.pdf"
 type = "pdf"
-title = "MLK V3.5 — Metrics by Class (PDF)"
+title = "MLK V4 (Morris Law Kernel V4) — Metrics by Class (PDF)"
 description = "2-page breakdown: health check, watermark verify, 30-second master, and full-song master — every run listed with cold/warm state, warm statistics, and industry comparison."
 logical_id = "bdd690b7-1314-40f0-8050-417165531ac3"
 
@@ -587,7 +587,7 @@ logical_id = "bdd690b7-1314-40f0-8050-417165531ac3"
 id = "TzMGtmtDFA2oagM0-s94n"
 uri = "file://screenshots/mlk-v35-overview.jpg"
 type = "image"
-title = "Morris Law Kernel V3.5 — Overview"
+title = "Morris Law Kernel V4 — Overview"
 description = "Product overview screenshot for the F6S listing."
 logical_id = "11b5faf0-4c27-475a-aa4c-25a239deffaf"
 
@@ -595,7 +595,7 @@ logical_id = "11b5faf0-4c27-475a-aa4c-25a239deffaf"
 id = "r__XbA5S52rmDgMFuKvvx"
 uri = "file://screenshots/mlk-v35-benchmark.jpg"
 type = "image"
-title = "Morris Law Kernel V3.5 — Live Benchmark"
+title = "Morris Law Kernel V4 — Live Benchmark"
 description = "Live benchmark interface screenshot for the F6S listing."
 logical_id = "b09881df-575f-474b-9b93-b9f9756ab391"
 
@@ -603,7 +603,7 @@ logical_id = "b09881df-575f-474b-9b93-b9f9756ab391"
 id = "vPaBWMHuYY28AyRWaaIi6"
 uri = "file://screenshots/mlk-v35-licensing.jpg"
 type = "image"
-title = "Morris Law Kernel V3.5 — Commercial Licensing"
+title = "Morris Law Kernel V4 — Commercial Licensing"
 description = "Enterprise licensing page screenshot for the F6S listing."
 logical_id = "bd81704d-5666-4032-b3cd-967a2a3a2932"
 
@@ -679,8 +679,8 @@ content_type = "video/mp4"
 id = "IZW3zZE_Elo91UV6V0gnd"
 uri = "file://artifacts/api-server/local_masters/mlk_v35_08026afe-e332-4fcb-9e32-60260e536041.wav"
 type = "audio"
-title = "MLK v3.5 Test Master — Dark Cinematic R&B"
-description = "Lyria 3 Pro vocals from your test lyrics, mastered through the real MLK v3.5 kernel (baseline preset) with the Dual-Anchor cert nominator embedded. 2:36, 44.1 kHz stereo WAV."
+title = "MLK V4 (Morris Law Kernel V4) Test Master — Dark Cinematic R&B"
+description = "Lyria 3 Pro vocals from your test lyrics, mastered through the real MLK V4 (Morris Law Kernel V4) kernel (baseline preset) with the Dual-Anchor cert nominator embedded. 2:36, 44.1 kHz stereo WAV."
 logical_id = "f64f1641-df21-4b16-86a6-fef1783b4be4"
 
 [[outputs]]
@@ -728,7 +728,7 @@ id = "9L4b2LEcYndlME5VXalyT"
 uri = "file://screenshots/live-songwriting-generator.png"
 type = "image"
 title = "LIVE proof — song generator on gravelkingpro.com"
-description = "Real browser session on the published site: lyrics generated, then the Generate with MLK v3.5 card rendered below them (build v08/11/26 12:11 visible in footer)."
+description = "Real browser session on the published site: lyrics generated, then the Generate with MLK V4 (Morris Law Kernel V4) card rendered below them (build v08/11/26 12:11 visible in footer)."
 logical_id = "0d307ef9-6901-4809-9567-0570a6ba4bb6"
 
 [[outputs]]
@@ -927,8 +927,8 @@ logical_id = "f288e18c-5598-49e5-b47c-553509fbeece"
 id = "J7gga8t-CIVwXMUzfkJl9"
 uri = "file://.local/outputs/MLK-v3-5-Pitch-Deck.pdf"
 type = "pdf"
-title = "Morris Law Kernel v3.5 — Pitch Deck"
-description = "9-slide MLK v3.5 pitch deck (PDF)"
+title = "Morris Law Kernel V4 — Pitch Deck"
+description = "9-slide MLK V4 (Morris Law Kernel V4) pitch deck (PDF)"
 logical_id = "e8de4fb5-2790-4e71-aa2b-7b86a6b71179"
 
 [[outputs]]
@@ -942,7 +942,7 @@ logical_id = "2fe48d9c-18e7-46a2-ada7-f7b2f14348d8"
 [[outputs]]
 id = "lUJL4OcilmV1TF0dS7HLI"
 uri = "file://pitch-files/matt-adel-musical-ai-one-pager.html"
-type = "text"
+type = "html"
 title = "Musical AI One-Pager (Matt Adel)"
 description = "Simplified one-page partnership pitch"
 logical_id = "88637a00-d437-47ff-bf44-ea4cc17168cf"
@@ -951,7 +951,7 @@ content_type = "text/html"
 [[outputs]]
 id = "qoO5AlHh-y2cQzxhOJgC4"
 uri = "file://pitch-files/cert-lyrics.html"
-type = "text"
+type = "html"
 title = "Certificate 1 of 3 — Lyrics Authorship"
 description = "\"You Used to Think I Was Superman\" — human-written lyrics certificate with real content hash from the released MP3."
 logical_id = "bbe0cd7c-b71f-4fc2-a62d-3642ce719fde"
@@ -960,7 +960,7 @@ content_type = "text/html"
 [[outputs]]
 id = "81lpgXDfLLEPuyQxX15sx"
 uri = "file://pitch-files/cert-instrumental.html"
-type = "text"
+type = "html"
 title = "Certificate 2 of 3 — Instrumental Composition"
 description = "\"You Used to Think I Was Superman\" — instrumental certificate with disclosed AI model and style authorship score."
 logical_id = "c0e5311b-91ae-4864-a4e8-150f2439b93a"
@@ -969,7 +969,7 @@ content_type = "text/html"
 [[outputs]]
 id = "PyNONW0p_ff9Nhn5LcNFX"
 uri = "file://pitch-files/cert-vocal.html"
-type = "text"
+type = "html"
 title = "Certificate 3 of 3 — Vocal Performance"
 description = "\"You Used to Think I Was Superman\" — human vocal booth performance certificate."
 logical_id = "53234c79-5b48-4ea5-83ac-3e329fbd1a7b"
@@ -999,7 +999,7 @@ content_type = "application/pdf"
 [[outputs]]
 id = "EaRxbTRbdXvHPtbUlawIv"
 uri = "file://exports/gravelking-live-analytics-report.html"
-type = "text"
+type = "html"
 title = "GravelKing Pro — Live Analytics & Stripe Reconciliation"
 description = "Printable visual report covering production page visits, signups, checkout drop-off, app entitlements, Stripe subscriptions, charges, refunds, and payouts for Aug 5–Sep 4, 2026."
 logical_id = "b33d4649-e970-4cac-9cf7-271b31d333ac"
@@ -1770,8 +1770,8 @@ content_type = "audio/mpeg"
 id = "8_ke1YhRyME_ZXL_6Kfav"
 uri = "file://attached_assets/insane_mlkv3_original_vocals.wav"
 type = "audio"
-title = "Insane — MLK V3.5 Master (WAV)"
-description = "Original vocals and lyrics preserved; rendered through the Morris Law Kernel V3.5 natural-body master."
+title = "Insane — MLK V4 (Morris Law Kernel V4) Master (WAV)"
+description = "Original vocals and lyrics preserved; rendered through the Morris Law Kernel V4 natural-body master."
 logical_id = "e880a631-71cf-4150-9c11-2d5adfe13586"
 content_hash = "sha256:7bf4597018e11e23c4929b3ab05d222ea1b023ec4b6506a0205dc57247ebc44b"
 size = 55381676
@@ -1784,8 +1784,8 @@ content_type = "audio/wav"
 id = "G5LoaDUfViOXQ_1gFG2hH"
 uri = "file://attached_assets/insane_mlkv3_original_vocals.mp3"
 type = "audio"
-title = "Insane — MLK V3.5 Master (MP3)"
-description = "Original vocals and lyrics preserved; rendered through the Morris Law Kernel V3.5 natural-body master."
+title = "Insane — MLK V4 (Morris Law Kernel V4) Master (MP3)"
+description = "Original vocals and lyrics preserved; rendered through the Morris Law Kernel V4 natural-body master."
 logical_id = "31eaca0b-25cc-4bde-9815-9f8a60e87e7d"
 content_hash = "sha256:d957daacf1cff26fed95c4048136989916b7fb02ec8df761effe292979e1ab29"
 size = 8374901
@@ -1798,8 +1798,8 @@ content_type = "audio/mpeg"
 id = "Rg3lhzTtOcPY5HFLrzccQ"
 uri = "file://attached_assets/insane_gravelking_trained_voice_mlkv35.wav"
 type = "audio"
-title = "Insane — GravelKing Trained Voice + MLK V3.5 (WAV)"
-description = "Canonical GravelKing trained RVC voice conversion, verified vocal/instrumental remix, and Morris Law Kernel V3.5 master. 24-bit stereo WAV at 48 kHz."
+title = "Insane — GravelKing Trained Voice + MLK V4 (Morris Law Kernel V4) (WAV)"
+description = "Canonical GravelKing trained RVC voice conversion, verified vocal/instrumental remix, and Morris Law Kernel V4 master. 24-bit stereo WAV at 48 kHz."
 logical_id = "4bface62-b0f4-4821-bb2f-7f85be67d12c"
 content_hash = "sha256:3782ce6e33f3e4e1c9935bdeb5c8fabd3083ec822a45bdb542f53d5723b6c002"
 size = 60292328
@@ -1812,8 +1812,8 @@ content_type = "audio/wav"
 id = "m1btmyQb5IeShjYrTL9zr"
 uri = "file://attached_assets/insane_gravelking_trained_voice_mlkv35.mp3"
 type = "audio"
-title = "Insane — GravelKing Trained Voice + MLK V3.5 (MP3)"
-description = "Canonical GravelKing trained RVC voice conversion, verified vocal/instrumental remix, and Morris Law Kernel V3.5 master. 320 kbps stereo MP3 at 48 kHz."
+title = "Insane — GravelKing Trained Voice + MLK V4 (Morris Law Kernel V4) (MP3)"
+description = "Canonical GravelKing trained RVC voice conversion, verified vocal/instrumental remix, and Morris Law Kernel V4 master. 320 kbps stereo MP3 at 48 kHz."
 logical_id = "84a0c39b-31ba-4bed-87e7-9a66f84a419c"
 content_hash = "sha256:dc70a21571681b5203ac0e99fc7f5df857b40bc580e3995327efe1bd503ae23c"
 size = 8376045
@@ -1821,3 +1821,355 @@ mtime_ms = 1789202559588
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/84a0c39b-31ba-4bed-87e7-9a66f84a419c/0d3ce7af-a60c-46d5-b8fb-2a08c66b299d"
 storage_version_token = "1789202582553883"
 content_type = "audio/mpeg"
+
+[[outputs]]
+id = "kCuV1DiARIx65TFd5pkUF"
+uri = "file://artifacts/gravelking-promo/public/videos/gka_customer_zero_27s_16x9.mp4"
+type = "video"
+title = "GKA Customer Zero Audit — 27s MP4"
+description = "Terminal-style GravelKing Advantage promo with the four-turn benchmark: 2,108 baseline tokens, 420 processed, 80.08% suppression, 0.2577 ms overhead, and 100% output fidelity."
+logical_id = "02cdc78a-20e8-461f-8276-8ba9897bea30"
+content_hash = "sha256:ae24acc0a00b49cedb7c37f82c1b5a186ce2ad7364ee83737f5f0105a78a4c5e"
+size = 14341048
+mtime_ms = 1789321652910
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/02cdc78a-20e8-461f-8276-8ba9897bea30/c001c373-1da6-48ae-a762-455e97c8ec29"
+storage_version_token = "1789321712123968"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "L6BFXGe_mMboRDAXQsDxs"
+uri = "file://artifacts/gka_enterprise_code_demo.mp4"
+type = "video"
+title = "GKA Enterprise Code Agent — Continuous Terminal Session"
+description = "Uninterrupted 1920x1080 terminal screencast with live workload commands, streamed carve counters, exact ledger verification, the actual tail -n 5 JSONL output, regression proof, and clean exit. H.264 video at 60fps with AAC audio."
+logical_id = "50927d38-65b5-4e9b-b0a2-588414c2f107"
+content_hash = "sha256:fe7aaee84eebdda96128efe3849262dfdc4910e78584af466d35ebba07dc2f9a"
+size = 5216909
+mtime_ms = 1789328292465
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/50927d38-65b5-4e9b-b0a2-588414c2f107/fe915e6e-6341-4f86-ad5a-446da92e1713"
+storage_version_token = "1789328313805681"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "o6GGiLXnxl53cJ24lhdcw"
+uri = "file://artifacts/pre_push_audit_dump.json"
+type = "unspecified"
+title = "GravelKing Pre-Push Security Audit Dump"
+description = "Structured JSON containing 12 core production source files with byte counts and SHA-256 hashes. Secrets, environment values, ledger data, credentials, and node_modules are excluded."
+logical_id = "c6b91b9c-d5a5-4db1-9219-29e20e8fd1c6"
+content_hash = "sha256:ba76073272415ec450d0153018488ef75413e37bd6750af96c285ed28eb02bfc"
+size = 107525
+mtime_ms = 1789332822577
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/c6b91b9c-d5a5-4db1-9219-29e20e8fd1c6/160d99c2-ef74-4df6-8fa1-132c0992626d"
+storage_version_token = "1789332908359406"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "mICBPV8eCGb0lPvEEbnZp"
+uri = "file://GKA_HANDOVER.md"
+type = "text"
+title = "GKA New Chat Handover"
+description = "Context, workstream boundaries, architecture, secret names, workflows, outreach priorities, and rules for future GKA-focused Replit agents."
+logical_id = "b046c4d0-4465-42d9-9eb1-d520f17b3974"
+content_hash = "sha256:dbc2e99afcdc18d6d5efc8cda8cd7016e2696bb862515d9d2c0947fd6fc51281"
+size = 6416
+mtime_ms = 1789352702478
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b046c4d0-4465-42d9-9eb1-d520f17b3974/cbf49957-2cd3-4f0d-85ed-58474914613c"
+storage_version_token = "1789352799097413"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "R3hyFet0gGGzKmBgYbEBi"
+uri = "file://gravelkingpro-production-audit.json"
+type = "unspecified"
+title = "GravelKing Pro Audit — Completions Before Approval"
+description = "Updated JSON report documenting local completions, verification results, remaining infrastructure work, and the explicit user-approval gate before publishing."
+logical_id = "c5844eb2-9e27-46f6-9b97-b6073b8d8f5f"
+content_hash = "sha256:9508aae90fd138d07e498f056e4d3d2911ec3b4b8ec04358a160fa0668006979"
+size = 12555
+mtime_ms = 1789410733221
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/c5844eb2-9e27-46f6-9b97-b6073b8d8f5f/2c70f421-48e9-4925-b207-0f9a902ea7c8"
+storage_version_token = "1789410742395470"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "H-Zww9jP4TY6-DEvlxm9u"
+uri = "file://artifacts/api-server/data/wire-word-042c.wav"
+type = "audio"
+title = "Wire Word 0x042C — Generated Audio"
+description = "Verified JAX/MLK generated WAV. Owner-bound private track; 48 kHz stereo PCM, 117.57 seconds. Generation engine state: unmastered by product design."
+logical_id = "496a3235-1d51-4045-8128-6befb8c8ce40"
+content_hash = "sha256:bf24d115c6e6895a29f7273d8d5c7468cd6d64af30c590b680d86e13bb220663"
+size = 22573498
+mtime_ms = 1789852023195
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/496a3235-1d51-4045-8128-6befb8c8ce40/0540dbb1-bcca-42ac-a990-9f66b5282279"
+storage_version_token = "1789852028576557"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "8qWlDLGRN8rYiW7YRKUxt"
+uri = "file://artifacts/gravelking-promo/public/videos/gka_main_stage_duet_30s_16x9.mp4"
+type = "video"
+title = "GravelKing Pro Duet Stage Promo"
+description = "30-second 16:9 promo video featuring the two-singer Main Stage experience."
+logical_id = "a02b4c54-dd7c-446e-8167-5a3d6f1fcc55"
+content_hash = "sha256:f4bc30227046ec2dae4c878151d82656c33b37f009d8f242f5dfa3bd550a35d7"
+size = 15489654
+mtime_ms = 1789956288889
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/a02b4c54-dd7c-446e-8167-5a3d6f1fcc55/9632867e-87fc-4e88-8811-ccb315bf3477"
+storage_version_token = "1790031957378518"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "0CXku-OT62B4W8Q_VF3uz"
+uri = "file://artifacts/gravelkingpro/audit/gravelkingpro-fixes-raw-source-audit.pdf"
+type = "pdf"
+title = "GravelKing Pro Fixes — Raw Source Audit PDF"
+description = "Complete UTF-8 source snapshot for routing/rewrites, Main Stage responsive transport, duet ingress, video ingestion, library ordering, credit ledger, and Stripe webhook audit paths. Includes file hashes and full source with no truncation or placeholders."
+logical_id = "1e450ede-9de9-4db3-baa6-ae8d1dee128c"
+content_hash = "sha256:48a80091ad43fbcbfb36706f00f1dbf555fdd04578be856a05e0ffae26001ded"
+size = 1292468
+mtime_ms = 1790013572012
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/1e450ede-9de9-4db3-baa6-ae8d1dee128c/a3975592-cea9-4384-89d6-2c1ad5e0a80e"
+storage_version_token = "1790013577330777"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "CLK0y7BOYYSMm4MAnNotX"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_live_duet_stage_59s_16x9.mp4"
+type = "video"
+title = "GravelKing Pro — Live Duet Stage promo (59 s, 1920×1080)"
+description = "Real Main Stage duet capture (two peers over WebRTC, rolling lyrics from your track's transcription), real Mastering Tool run, your track switching to its real MLK V4 master at 0:30."
+logical_id = "43d570bf-b6ab-4897-8381-8222b2503a66"
+content_hash = "sha256:32e31b254d5d49cbd688aeacb519880c26a0a5ad31f9aecdf82c4a9255d41953"
+size = 10825106
+mtime_ms = 1790034156999
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/43d570bf-b6ab-4897-8381-8222b2503a66/ccc7845a-50cc-47c4-9527-e3f2d10705b9"
+storage_version_token = "1790034204939160"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "wd3nbhyidKR0uxon9KddU"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_live_duet_stage_59s_phone_9x16.mp4"
+type = "video"
+title = "GravelKing Pro — Full-view phone remake"
+description = "Rebuilt 59-second 1080×1920 phone video using the supplied whole-screen references. The complete stage, both singers, teleprompter, floor, controls, mastering panel, and safe captions remain visible."
+logical_id = "b2a5ce00-0bc8-44c2-bfe9-1726749a4f4e"
+content_hash = "sha256:a54213449fc1eafc59636b98742c86993ea8039711a5ccfbdbc946c7f163fe45"
+size = 5711919
+mtime_ms = 1790076656296
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/b2a5ce00-0bc8-44c2-bfe9-1726749a4f4e/502212c9-18d7-4440-a677-4485d75a6214"
+storage_version_token = "1790076750722285"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "FOBTeXnj8hX5XDNtx8GH1"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_live_duet_stage_59s_ipad_3x4.mp4"
+type = "video"
+title = "GravelKing Pro — Full-view iPad remake"
+description = "Rebuilt 59-second 1620×2160 iPad video using the supplied whole-screen references, with complete stage and mastering views and no cut-off words."
+logical_id = "76eec69f-9f0d-4dc7-9a2a-838bcaf70b95"
+content_hash = "sha256:32703020f1985be61e21174d95a3277abdb277c971bcd4c3ed4dd205cdb112aa"
+size = 8832196
+mtime_ms = 1790076716729
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/76eec69f-9f0d-4dc7-9a2a-838bcaf70b95/37e4a2aa-afea-4fda-af5c-eeab71d3287c"
+storage_version_token = "1790076751912488"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "4qlMTN6neKgyByCKYFwCZ"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_signal_to_song_30s_phone_9x16.mp4"
+type = "video"
+title = "NEW GravelKing Pro — Signal to Song (Phone)"
+description = "Brand-new 30-second 1080×1920 clean-room render. New six-scene concept, new motion, new copy, and newly synthesized audio. No previous promo video or audio was reused."
+logical_id = "9b2ca7e4-8255-4fd4-b2a5-45ead228b5b6"
+content_hash = "sha256:0a414b0984dc913e153796f5d502f76b832cd76b219294f802409cb083d44b19"
+size = 6409175
+mtime_ms = 1790077680336
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/9b2ca7e4-8255-4fd4-b2a5-45ead228b5b6/8692a5a7-9de3-4387-836c-ca8bc404ffb3"
+storage_version_token = "1790077753838819"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "wNpuh-9kj0K045bw6KKbh"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_signal_to_song_30s_ipad_3x4.mp4"
+type = "video"
+title = "NEW GravelKing Pro — Signal to Song (iPad)"
+description = "Brand-new 30-second 1620×2160 clean-room render with a new narrative, artwork sequence, motion treatment, copy, and original synthesized audio."
+logical_id = "9efc0915-f3fa-43c2-9436-ea4e8f24d149"
+content_hash = "sha256:1215aa9775d735039c5c7dffbc1326ed908fe46a9de0ce10f58c4995b8dd44d0"
+size = 9226185
+mtime_ms = 1790077719855
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/9efc0915-f3fa-43c2-9436-ea4e8f24d149/72bdbdd5-09a9-4dbf-bea8-d4b090e8d867"
+storage_version_token = "1790077754891314"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "btBTTVYrmx0lzivBHIkqY"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_signal_to_song_main_stage_60s_phone_9x16.mp4"
+type = "video"
+title = "GravelKing Pro 60s Main Stage Promo — Phone"
+description = "60-second vertical master: existing 30-second clean promo followed by the 30-second Main Stage hero card."
+logical_id = "e9f7a1ad-3a26-48b9-860b-a226733ce22f"
+content_hash = "sha256:57060a6cd415ec608f85e9548a8ef1b1393066c658b178060d5094325f0608bb"
+size = 10418158
+mtime_ms = 1790079040371
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/e9f7a1ad-3a26-48b9-860b-a226733ce22f/0a49b9fb-89f6-4fdc-ad70-1ffc277951d2"
+storage_version_token = "1790079090048781"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "kCWZcPKTaPtSrubVeOR96"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_signal_to_song_main_stage_60s_ipad_3x4.mp4"
+type = "video"
+title = "GravelKing Pro 60s Main Stage Promo — iPad"
+description = "60-second 3:4 master: existing 30-second clean promo followed by the 30-second Main Stage hero card."
+logical_id = "7af099fa-b8ba-4701-ab67-cbfee9197138"
+content_hash = "sha256:9eaf1ffae500597e06e92264a7156163eb4b17109a9979c46a3f49484e136be7"
+size = 15746490
+mtime_ms = 1790079061051
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/7af099fa-b8ba-4701-ab67-cbfee9197138/5e4e2c20-538f-420b-8726-ec5dabcd0cd2"
+storage_version_token = "1790079091732523"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "cBo8_d1ZwxENmCMTs5R73"
+uri = "file://artifacts/gravelking-promo/.render-generated-live-duets-60s/generated-live-duets-30s-phone.mp4"
+type = "video"
+title = "Updated Live Duets Hero — Phone"
+description = "30-second hero with the actual moving remote-singer performance in the middle card."
+logical_id = "a74007f2-ace2-4fe9-9f3f-67691bfcc4e5"
+content_hash = "sha256:73369f8d0c30e75de8c840dedb4143a7af976573319eb2b9b70f62991d931ce0"
+size = 7536506
+mtime_ms = 1790082221283
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/a74007f2-ace2-4fe9-9f3f-67691bfcc4e5/9727ce5d-bf07-43ea-a484-0ff8a3c0066e"
+storage_version_token = "1790082331987873"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "KxE56VAwLiK1l6ku5o3_u"
+uri = "file://artifacts/gravelking-promo/.render-generated-live-duets-60s/generated-live-duets-30s-ipad.mp4"
+type = "video"
+title = "Updated Live Duets Hero — iPad"
+description = "30-second 3:4 hero with the actual moving remote-singer performance in the middle card."
+logical_id = "1864e79a-591d-4a74-8116-772a6dc67b45"
+content_hash = "sha256:ced3f5e491987948fd8ed77cdae12854d28a060a9a065b6d5c75402de984a488"
+size = 10755977
+mtime_ms = 1790082241735
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/1864e79a-591d-4a74-8116-772a6dc67b45/c0190b9d-5a59-40c4-850d-874ddee54477"
+storage_version_token = "1790082333166603"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "5D03rbLR5w4kOTr1MjVXe"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_signal_to_song_generated_live_duets_60s_phone_9x16.mp4"
+type = "video"
+title = "Final 60s Live Duets Promo — Phone"
+description = "Updated 60-second vertical master with actual moving singers in the remote duet section."
+logical_id = "e4ffea07-be54-4db7-a207-7b70ab895aea"
+content_hash = "sha256:ac2712ebef3a05beccaaabd9f8f1d5bf577d1d2ef4a99107bf2385a24346c6b9"
+size = 13842206
+mtime_ms = 1790082256441
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/e4ffea07-be54-4db7-a207-7b70ab895aea/eda7f99d-6588-4536-bc8f-d2106735ae49"
+storage_version_token = "1790082334460145"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "iwjzTJmf5__bHpylxuWRb"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelkingpro_signal_to_song_generated_live_duets_60s_ipad_3x4.mp4"
+type = "video"
+title = "Final 60s Live Duets Promo — iPad"
+description = "Updated 60-second 3:4 master with actual moving singers in the remote duet section."
+logical_id = "0188f87f-ab32-4552-ae0c-b4d07342e4f1"
+content_hash = "sha256:04a1c5c805c2f1512b46db9aeebf6a43497fa22186eef58f53f8d790662551c6"
+size = 20050586
+mtime_ms = 1790082278985
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/0188f87f-ab32-4552-ae0c-b4d07342e4f1/67b661e7-6091-49d9-b625-298aeaeca31d"
+storage_version_token = "1790082335953014"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "DVVSKxDWCvJFDsEXI9nsp"
+uri = "file://artifacts/gravelking-promo/.render-generated-live-duets-60s/remote-singers-actual-motion-10s.mp4"
+type = "video"
+title = "Actual Moving Duet Performance — 10s"
+description = "Real moving performance card using two separate singer clips, composited side by side from different studio locations."
+logical_id = "ade5b2a3-80b2-4761-9092-1e4270ffe063"
+content_hash = "sha256:cd1a9203fb87aaad7f661077a0164a22fdda6e8d368d8358f04a7b592c9c885a"
+size = 16629220
+mtime_ms = 1790082206251
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/ade5b2a3-80b2-4761-9092-1e4270ffe063/aab3433f-7337-47af-b511-f9cde4a9e842"
+storage_version_token = "1790082330637250"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "TbRv5JNI0_aehdIW_z6Wf"
+uri = "file://artifacts/gravelking-promo/public/audio/featured-artist-contest-bed.mp3"
+type = "audio"
+title = "featured artist contest bed"
+description = "Generated music: Original cinematic independent hip hop and R&B promotional instrumental, confident modern pulse, warm sub bass, restrained drums, inspiring rise, no vocals, designed under narration,…"
+logical_id = "fc2bee2e-9009-4beb-a9e0-13b1605b82f1"
+
+[[outputs]]
+id = "eG8A4eQr6ZxalaaBOnF2Y"
+uri = "file://artifacts/gravelking-promo/public/audio/featured-artist-contest-voiceover.mp3"
+type = "audio"
+title = "featured artist contest voiceover"
+description = "Text-to-speech audio: Your original song deserves a real stage. Write it. Sing it. Produce it with GravelKing. Then step onto Main Stage, capture your complete performance, and submit it to the Grave…"
+logical_id = "480678f9-ae0d-46ac-98ea-1e72162bb930"
+
+[[outputs]]
+id = "XpL8BHBaPacEsQzNr1Ka3"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelking-featured-artist-contest-45s-16x9.mp4"
+type = "video"
+title = "Featured Artist Contest promo (45s, 16:9)"
+description = "Write, sing, and produce an original GK track → submit via Main Stage → one of 10 Featured Artist spots."
+logical_id = "5ab22057-a208-4b25-9361-5019b29ef46b"
+content_hash = "sha256:0ebfeee875191cc1785902c7a9a1f97007f78004bac881542a82eeaf7e240db9"
+size = 2978451
+mtime_ms = 1790201581351
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/5ab22057-a208-4b25-9361-5019b29ef46b/54e6823d-28c4-4062-84e8-503147461215"
+storage_version_token = "1790201643000707"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "y9Cfe-THMP9ZuPfTRmua4"
+uri = "file://artifacts/gravelking-promo/featured-artist-contest-implementation.json"
+type = "unspecified"
+title = "Featured Artist Contest implementation brief"
+description = "Admin tools, label-page tools, IP/ledger, and promo spec."
+logical_id = "2adc4896-9d62-48a1-8980-aa0b7dc7821c"
+content_hash = "sha256:248f16f10583093a6f8eb68058e268e79ac8ef9259946215d319707d53ab67b6"
+size = 4051
+mtime_ms = 1790201419707
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/2adc4896-9d62-48a1-8980-aa0b7dc7821c/c64fadc9-d2c6-4c88-aaff-db754881c381"
+storage_version_token = "1790201643684803"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "6f9TN0EtefWIWjIU6FNKC"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelking-featured-artist-contest-45s-phone-9x16.mp4"
+type = "video"
+title = "Featured Artist Contest — iPhone"
+description = "45-second 1080×1920 promo using the real phone, studio, and Main Stage footage."
+logical_id = "fa6665a9-c1bd-4d15-9856-66de540228a9"
+content_hash = "sha256:c659c8e5adfdf758aa64087826c22e66b26be476c5087b43c0b924488f5ae556"
+size = 6644782
+mtime_ms = 1790202762687
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/fa6665a9-c1bd-4d15-9856-66de540228a9/5ba2145e-6d05-4ea6-8ff5-e31621d58a4c"
+storage_version_token = "1790202852695158"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "FL2NoOV8sFJxn6jmBD4B1"
+uri = "file://artifacts/gravelking-promo/public/videos/gravelking-featured-artist-contest-45s-ipad-3x4.mp4"
+type = "video"
+title = "Featured Artist Contest — iPad"
+description = "45-second 1200×1600 promo using the real phone, studio, and Main Stage footage."
+logical_id = "bf888bf6-daae-4634-9439-79edd497320c"
+content_hash = "sha256:26074e64de0ee813aca35a6bb78b5fc7b3a907a7336eac8bcd55513a535da663"
+size = 5487696
+mtime_ms = 1790202796023
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:f6773184-dd6e-4bbe-ac39-473b65ee15f4/bf888bf6-daae-4634-9439-79edd497320c/8d698bc1-572f-47d1-8942-9294c17530ab"
+storage_version_token = "1790202854028178"
+content_type = "video/mp4"

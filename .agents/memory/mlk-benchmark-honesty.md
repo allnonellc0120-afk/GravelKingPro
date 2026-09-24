@@ -1,9 +1,9 @@
 ---
 name: MLK benchmark honesty + dev gating
-description: The MLK V3.5 licensing benchmark must report only real detected hardware, and the dev open-usage bypass must be fail-closed.
+description: The MLK V4 (Morris Law Kernel V4) licensing benchmark must report only real detected hardware, and the dev open-usage bypass must be fail-closed.
 ---
 
-# MLK V3.5 benchmark: report real hardware only, gate dev access fail-closed
+# MLK V4 (Morris Law Kernel V4) benchmark: report real hardware only, gate dev access fail-closed
 
 ## Real hardware only (no fabricated specs)
 The benchmark page (`artifacts/mlk-licensing/src/pages/benchmark.tsx`) once hardcoded a

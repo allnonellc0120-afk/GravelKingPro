@@ -1,0 +1,54 @@
+MANDATORY END-TO-END VERIFICATION: TEST SUITE EXECUTION, RUNTIME LOGS & AUDIT
+
+Do not defer the backend work. We need the full 40/40 test suite executed live across all six sections, along with raw runtime logs and a verified Stripe billing audit before publishing.
+
+REQUIRED DELIVERABLES:
+
+1. 40/40 TEST SUITE RUNNER OUTPUT (STDOUT):
+   Run the automated test runner and output terminal execution logs showing 40 out of 40 passed across:
+   - Section 1A: Mobile Transport Dock & Responsive Layout (no overlaps, valid touch targets)
+   - Section 1B: Duet Routing & WebRTC Ingress (/stage/duet/:roomId returning 200 OK)
+   - Section 1C: Navigation & Asset Cleanup (zero zombie audio on route exit, zero auto-downloads)
+   - Section 2A: Vault & Central Library Storage Unification (instant load from /api/library)
+   - Section 2B: Generation & Stems (vocalMode: "instrumental" accepted, single MLK button)
+   - Section 2C: Build Integrity & Bundle Validation (zero Launchstag references, clean exit code 0)
+
+2. CORE BACKEND & MASTERING ENGINE RUNTIME LOGS:
+   Provide raw terminal logs showing these deferred items actively executing and succeeding:
+   - 250MB Payload & Video Ingestion: Terminal output of a .mov/.mp4 file ingested, video stripped via ffmpeg, and audio buffer extracted without a 413 error.
+   - Stem Mixdown & Export: Successful export log of a duplicated stem producing non-zero byte WAV and MP3 files (no 0 KB files, no 500 errors).
+
+3. STRIPE 320 INTEGRITY CHECK & CREDIT DEDUCTION LOGS:
+   - Run a live test transaction using a Stripe test card.
+   - Show the webhook ingress log: `checkout.session.completed` returning 200 OK and crediting the user balance.
+   - Show the runtime deduction log proving operations are no longer bypassing the ledger:
+     `[LEDGER] User {id} balance: {before} -> deducted {cost} -> remaining {after}`
+
+4. FINAL JSON AUDIT:
+   Return the machine-readable summary block:
+
+{
+  "suite": "GRAVELKING_PRO_VERIFICATION",
+  "status": "PASS",
+  "total_tests": 40,
+  "passed": 40,
+  "failed": 0,
+  "sections": {
+    "section_1": {
+      "A_transport_dock": { "tests_run": 7, "passed": 7, "failed": 0 },
+      "B_duet_routing": { "tests_run": 7, "passed": 7, "failed": 0 },
+      "C_cleanup_downloads": { "tests_run": 6, "passed": 6, "failed": 0 }
+    },
+    "section_2": {
+      "A_vault_library": { "tests_run": 7, "passed": 7, "failed": 0 },
+      "B_generation_stems": { "tests_run": 7, "passed": 7, "failed": 0 },
+      "C_build_bundle": { "tests_run": 6, "passed": 6, "failed": 0 }
+    }
+  },
+  "stripe_audit": { "status": "VERIFIED", "deduction_active": true },
+  "media_pipeline": { "video_extraction": "PASS", "export_wav_mp3": "PASS" },
+  "command": "PORT=5000 BASE_PATH=/ pnpm run build",
+  "exit_code": 0
+}
+
+Execute this verification now and provide the raw output.

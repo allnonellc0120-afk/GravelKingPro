@@ -1,10 +1,10 @@
 /**
- * Integration test: paid Studio audio always returns valid MLK v3 audio.
+ * Integration test: paid Studio audio always returns valid MLK V4 (Morris Law Kernel V4) audio.
  *
  * Runs the real Express `app` in-process against a seeded monthly (Studio) session
  * and asserts the revenue-gated surface:
- *   - POST /api/kernel/process-audio (mode=standard) → 200, X-GK-Kernel: MLK_v3, decodable WAV
- *   - POST /api/kernel/studio-mix                     → 200, X-GK-Kernel: MLK_v3, decodable WAV
+ *   - POST /api/kernel/process-audio (mode=standard) → 200, decodable WAV
+ *   - POST /api/kernel/studio-mix                     → 200, X-GK-Kernel: MLK V4 (Morris Law Kernel V4), decodable WAV
  *   - studio-mix combined-duration guard             → HTTP 422
  *   - both endpoints with no session                 → 403 STUDIO_REQUIRED
  */
@@ -147,7 +147,7 @@ async function main(): Promise<void> {
     const stereoWav = await makeTrueStereoWav(2);
     const longMp3 = await makeLongMp3(300);
 
-    // ── 1. process-audio mode=standard (local MLK v3) ──────────────────────────
+    // ── 1. process-audio mode=standard (local MLK V4 (Morris Law Kernel V4)) ──────────────────────────
     console.log("\n[1] POST /api/kernel/process-audio mode=standard (authed Studio)");
     {
       const res = await fetch(`${base}/api/kernel/process-audio`, {
@@ -174,7 +174,7 @@ async function main(): Promise<void> {
         ]),
       });
       check("studio-mix: HTTP 200", res.status === 200, `got ${res.status}`);
-      check("studio-mix: X-GK-Kernel = MLK_v3", res.headers.get("x-gk-kernel") === "MLK_v3", String(res.headers.get("x-gk-kernel")));
+      check("studio-mix: X-GK-Kernel = MLK V4 Python", res.headers.get("x-gk-kernel") === "MLK V4 (Morris Law Kernel V4)", String(res.headers.get("x-gk-kernel")));
       const buf = Buffer.from(await res.arrayBuffer());
       await assertDecodableWav("studio-mix", buf);
     }
@@ -262,7 +262,7 @@ async function main(): Promise<void> {
 
   // ── Report ────────────────────────────────────────────────────────────────
   console.log(`\n──────────────────────────────────────────`);
-  console.log(`Studio audio MLK v3 check: ${passed} passed, ${failures.length} failed`);
+  console.log(`Studio audio MLK V4 (Morris Law Kernel V4) check: ${passed} passed, ${failures.length} failed`);
   if (failures.length) {
     console.error("\nFailures:");
     for (const f of failures) console.error(`  - ${f}`);

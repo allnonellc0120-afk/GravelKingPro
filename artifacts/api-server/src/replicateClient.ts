@@ -5,12 +5,21 @@
  */
 
 import Replicate from "replicate";
+import { getAdminRuntimeConfig } from "./lib/adminRuntimeConfig";
+import { buildSignedRvcModelStreamUrl, resolveRvcModelOrigin } from "./services/rvcModelAccess";
 
 const REPLICATE_BASE = "https://api.replicate.com/v1";
 export const DEFAULT_RVC_MODEL =
   "zsxkib/realistic-voice-cloning:0a9c7c558af4c0f20667c1bd1260ce32a2879944a0b9e44e1398660c077b1550";
 export const ACTIVE_RVC_VOICE_PRESET_ID = "gravelking_outlaw_baritone";
 export const ACTIVE_RVC_VOICE_LABEL = "GravelKing Outlaw Baritone";
+export const GRAVELKING_RVC_DEFAULTS = {
+  indexRate: 0.88,
+  /** Zero disables median-F0 smoothing so vocal breaks and rasp remain intact. */
+  filterRadius: 0,
+  protect: 0.15,
+  f0Method: "rmvpe",
+};
 
 function getToken(): string | undefined {
   return process.env["REPLICATE_API_TOKEN"];
@@ -116,13 +125,24 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
   }
 
   const audio = requireHttpUrl(input.audioUrl, "audioUrl");
-  const modelWeights = input.modelWeightsUrl
-    ? requireHttpUrl(input.modelWeightsUrl, "modelWeightsUrl")
-    : undefined;
-  const pitchShift = input.pitchShift ?? 0;
-  const indexRate = input.indexRate ?? 0.78;
-  const protect = input.protect ?? 0.10;
-  const filterRadius = input.filterRadius ?? 3;
+  const configured = getAdminRuntimeConfig().rvc;
+  // The legacy synchronous orchestrator still supplies its original hardcoded
+  // tuning and a Dropbox URL ending in VoiceAudio.wav (not a checkpoint).
+  // Treat those values as defaults so owner controls reach BOTH conversion
+  // pipelines without requiring a concurrent edit to that orchestrator.
+  const legacyModel = input.modelWeightsUrl && /dropbox[.]com\/.*VoiceAudio[.]wav/i.test(input.modelWeightsUrl);
+  const modelWeights = legacyModel
+    ? buildSignedRvcModelStreamUrl(resolveRvcModelOrigin())
+    : input.modelWeightsUrl
+      ? requireHttpUrl(input.modelWeightsUrl, "modelWeightsUrl")
+      : undefined;
+  const pitchShift = input.pitchShift === 0 || input.pitchShift === undefined ? configured.pitchShift : input.pitchShift;
+  const indexRate = input.indexRate === GRAVELKING_RVC_DEFAULTS.indexRate || input.indexRate === undefined
+    ? configured.indexRate : input.indexRate;
+  const protect = input.protect === GRAVELKING_RVC_DEFAULTS.protect || input.protect === undefined
+    ? configured.protect : input.protect;
+  const filterRadius = input.filterRadius === GRAVELKING_RVC_DEFAULTS.filterRadius || input.filterRadius === undefined
+    ? configured.filterRadius : input.filterRadius;
 
   if (!Number.isFinite(pitchShift) || pitchShift < -24 || pitchShift > 24) {
     throw new Error("Replicate RVC pitchShift must be between -24 and 24 semitones");
@@ -141,7 +161,7 @@ export async function convertToGravelKingVoice(input: VoiceConvertInput): Promis
     rvc_model: "CUSTOM",
     song_input: audio,
     custom_rvc_model_download_url: modelWeights ?? "",
-    pitch_detection_algorithm: "rmvpe",
+    pitch_detection_algorithm: configured.f0Method,
     pitch_change: pitchShift === 0
       ? "no-change"
       : pitchShift > 0
@@ -260,13 +280,14 @@ export async function uploadFile(
 }
 
 // Low-credit Replicate accounts get prediction creation throttled to a tiny
-// burst (6/min, burst 1) with a ~10s reset window. The throttle is transient:
-// a single isolated request succeeds. So on 429 we wait out the window
-// (respecting the server's retry_after) and retry instead of giving up — only
-// falling back to DSP if the throttle won't clear after several attempts.
+// burst (6/min, burst 1) with a ~10s reset window. Replicate can also return
+// transient 5xx/408 responses while the model runtime is starting. Retry those
+// failures as well; permanent 4xx validation/auth errors still fail fast so
+// callers can use the base-generation fallback.
 const MAX_429_RETRIES = 3;
 const MAX_RETRY_WAIT_MS = 15_000;
 const DEFAULT_RETRY_WAIT_MS = 6_000;
+const RETRYABLE_CREATE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
 // Cache the resolved latest version hash per model so we don't re-fetch the
 // model document on every request (the demucs model has no active deployment,
@@ -332,15 +353,17 @@ async function postPredictionWithRetry(
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
     const res = await makeRequest();
 
-    if (res.status === 429) {
+    if (RETRYABLE_CREATE_STATUSES.has(res.status)) {
       lastBody = await res.text().catch(() => "");
       if (attempt < MAX_429_RETRIES) {
-        const waitMs = parseRetryAfterMs(res, lastBody) + 1_000;
+        const waitMs = res.status === 429
+          ? parseRetryAfterMs(res, lastBody) + 1_000
+          : Math.min(1_000 * 2 ** attempt, MAX_RETRY_WAIT_MS);
         await new Promise<void>((r) => setTimeout(r, waitMs));
         continue;
       }
       throw new Error(
-        `Replicate createPrediction throttled (429) after ${attempt + 1} attempts: ${lastBody}`,
+        `Replicate createPrediction failed (${res.status}) after ${attempt + 1} attempts: ${lastBody}`,
       );
     }
 
@@ -415,5 +438,66 @@ export async function createPrediction(
       }),
     }),
   );
+}
+
+/**
+ * Poll a real Replicate prediction for the explicit verification harness.
+ *
+ * The normal product path uses webhooks/background jobs and intentionally does
+ * not wait in a request. This helper is separate so an operator-run hardware
+ * verification can prove the provider returned HTTP 200, a prediction id, and
+ * an actual output file without fabricating a completed result.
+ */
+export async function waitForPredictionOutput(
+  predictionId: string,
+  options: { timeoutMs?: number; pollMs?: number } = {},
+): Promise<{ predictionId: string; outputUrl: string; elapsedMs: number }> {
+  if (!/^[A-Za-z0-9_-]+$/.test(predictionId)) {
+    throw new Error("Replicate prediction id is invalid");
+  }
+
+  const timeoutMs = options.timeoutMs ?? 15 * 60_000;
+  const pollMs = options.pollMs ?? 2_000;
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const response = await replicateFetch(
+      `/predictions/${encodeURIComponent(predictionId)}`,
+    );
+    if (response.status !== 200) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Replicate prediction lookup failed (${response.status}): ${body.slice(0, 500)}`,
+      );
+    }
+
+    const prediction = (await response.json()) as {
+      id?: string;
+      status?: string;
+      output?: unknown;
+      error?: unknown;
+    };
+    if (prediction.id !== predictionId) {
+      throw new Error("Replicate prediction lookup returned a mismatched id");
+    }
+
+    if (prediction.status === "succeeded") {
+      return {
+        predictionId,
+        outputUrl: predictionOutputUrl(prediction.output),
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+    if (prediction.status === "failed" || prediction.status === "canceled") {
+      throw new Error(
+        `Replicate prediction ${prediction.status}: ${String(prediction.error ?? "no provider detail")}`,
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+
+  throw new Error(`Replicate prediction timed out after ${timeoutMs}ms`);
 }
 

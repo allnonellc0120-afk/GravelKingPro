@@ -12,6 +12,13 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+type ArtistProfile = {
+  artistName: string;
+  hometown: string;
+  bio: string;
+  avatarUrl: string | null;
+};
+
 const TIER_META = {
   null: {
     label: "Free",
@@ -25,7 +32,7 @@ const TIER_META = {
     color: "text-emerald-400",
     border: "border-emerald-500/30",
     icon: <Scissors className="w-4 h-4 text-emerald-400" />,
-    description: "Full MLK v3 mastering suite + Vocal Booth + WAV exports",
+    description: "Full MLK V4 (Morris Law Kernel V4) mastering suite + Vocal Booth + WAV exports",
   },
   monthly: {
     label: "King",
@@ -65,6 +72,9 @@ export default function Account() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileName, setProfileName] = useState("");
+  const [artistProfile, setArtistProfile] = useState<ArtistProfile | null>(null);
+  const [artistName, setArtistName] = useState("");
+  const [hometown, setHometown] = useState("");
   const [profileBio, setProfileBio] = useState("");
   const [profileEditing, setProfileEditing] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
@@ -73,21 +83,64 @@ export default function Account() {
     if (user) setProfileName([user.firstName, user.lastName].filter(Boolean).join(" "));
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    void fetch("/api/user/profile", { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<{ profile: ArtistProfile }> : null)
+      .then((data) => {
+        if (!active || !data?.profile) return;
+        setArtistProfile(data.profile);
+        setArtistName(data.profile.artistName);
+        setHometown(data.profile.hometown);
+        setProfileBio(data.profile.bio);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [user]);
+
   const saveProfile = async () => {
     if (!user) return;
     setProfileSaving(true);
     try {
       const [firstName, ...rest] = profileName.trim().split(/\s+/);
       await user.update({ firstName: firstName || "", lastName: rest.join(" ") || "" });
+      const response = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ artistName, hometown, bio: profileBio }),
+      });
+      if (!response.ok) throw new Error("Profile save failed");
+      const data = await response.json() as { profile: ArtistProfile };
+      setArtistProfile(data.profile);
       setProfileEditing(false);
-    } finally { setProfileSaving(false); }
+    } catch {
+      alert("Could not save your artist profile. Please try again.");
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const changeAvatar = async (file: File) => {
-    if (!user) return;
+    if (!user || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      alert("Choose a JPEG, PNG, or WEBP image.");
+      return;
+    }
     setAvatarSaving(true);
     try {
-      await user.setProfileImage({ file });
+      const form = new FormData();
+      form.append("avatar", file);
+      const response = await fetch("/api/user/avatar", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!response.ok) throw new Error("Avatar upload failed");
+      const data = await response.json() as { profile: ArtistProfile };
+      setArtistProfile(data.profile);
+    } catch {
+      alert("Could not upload that avatar. Please choose a valid image under 5 MB.");
     } finally {
       setAvatarSaving(false);
     }
@@ -146,12 +199,21 @@ export default function Account() {
   }
 
   const email = user.primaryEmailAddress?.emailAddress;
+  const isOwner = email?.trim().toLowerCase() === "allnonellc0120@gmail.com";
   const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || email || "User";
   const initials = [user.firstName?.[0], user.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "U";
+  const artistInitials = artistName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || initials;
+  const avatarUrl = artistProfile?.avatarUrl || user.imageUrl;
 
   return (
     <Layout>
       <div className="max-w-2xl mx-auto py-10 space-y-6">
+        {isOwner && (
+          <a href="/admin/control" className="block rounded-lg border border-amber-500/40 bg-amber-500/10 px-5 py-4 text-amber-300 hover:bg-amber-500/20">
+            <span className="font-semibold">Open Admin Control</span>
+            <span className="block text-xs mt-1 text-muted-foreground">Audio, operations, label and automation tools</span>
+          </a>
+        )}
 
         {/* Profile card */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
@@ -164,11 +226,11 @@ export default function Account() {
             </CardHeader>
             <CardContent className="flex items-center gap-4">
               <label className="relative group shrink-0 cursor-pointer" title="Change profile picture">
-                {user.imageUrl ? (
-                  <img src={user.imageUrl} alt={displayName} className="w-14 h-14 rounded-full object-cover border border-border/40" />
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={artistName || displayName} className="w-14 h-14 rounded-full object-cover border border-border/40" />
                 ) : (
                   <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-lg">
-                    {initials}
+                    {artistInitials}
                   </div>
                 )}
                 <span className="absolute inset-0 rounded-full bg-black/60 text-[9px] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -179,12 +241,22 @@ export default function Account() {
               <div className="flex-1">
                 <p className="font-semibold text-base">{displayName}</p>
                 {email && <p className="text-sm text-muted-foreground mt-0.5">{email}</p>}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400">Artist</Badge>
+                  {artistName && <span className="text-xs text-amber-300">{artistName}</span>}
+                  {hometown && <span className="text-xs text-muted-foreground">· {hometown}</span>}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1 font-mono opacity-60">{user.externalId ?? user.id}</p>
                 {profileEditing && (
                   <div className="mt-3 space-y-2">
                     <input value={profileName} onChange={(e) => setProfileName(e.target.value)} placeholder="Display name" className="w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm" />
-                    <textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} placeholder="Short artist bio (optional)" className="w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm min-h-20" />
-                    <div className="flex gap-2"><Button size="sm" onClick={() => void saveProfile()} disabled={profileSaving}>{profileSaving ? "Saving…" : "Save profile"}</Button><Button size="sm" variant="ghost" onClick={() => setProfileEditing(false)}>Cancel</Button></div>
+                    <input value={artistName} onChange={(e) => setArtistName(e.target.value)} placeholder="Artist name" maxLength={120} className="w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm" />
+                    <input value={hometown} onChange={(e) => setHometown(e.target.value)} placeholder="Hometown" maxLength={120} className="w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm" />
+                    <div>
+                      <textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value.slice(0, 4000))} placeholder="Short artist bio (optional)" maxLength={4000} className="w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm min-h-20" />
+                      <p className="text-right text-[10px] text-muted-foreground">{profileBio.length}/4000</p>
+                    </div>
+                    <div className="flex gap-2"><Button size="sm" onClick={() => void saveProfile()} disabled={profileSaving}>{profileSaving ? "Saving…" : "Save Profile"}</Button><Button size="sm" variant="ghost" onClick={() => setProfileEditing(false)}>Cancel</Button></div>
                   </div>
                 )}
               </div>

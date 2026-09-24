@@ -1,0 +1,37 @@
+PROMO VIDEO COMPONENT UPDATE: DUAL-ARTIST STAGE & ROLLING PROMPTER FOCUS
+
+Revise the promotional video/motion component to put the Main Stage front and center, highlighting live duet performance and synchronized rolling lyrics:
+
+1. CORE VISUAL FRAME (MAIN STAGE DUET SHOWCASE):
+   - Layout: Split-screen dual artist view (Host on Left, Guest on Right) with live reactive VU meters pulsing beside their video feeds.
+   - Center Display: The high-contrast rolling prompter actively scrolling lyrics across the screen in real-time sync with the backing track (golden glow highlighting the current singing line).
+   - Bottom UI: Stage transport playing smoothly with zero UI clutter, showcasing live interactive mic status for both performers.
+
+2. TIMED SCRIPT ADJUSTMENT:
+
+[0:00 - 0:08] THE HOOK & THE DUET STAGE
+- Visual: Wide cut straight into the Main Stage. Two singers linked up live via WebRTC, headphones on, microphones hot.
+- Center Prompter: Glowing lyrics gliding across the center prompter in real time.
+- On-Screen Text (Bold Neon): "TWO SINGERS. ONE STAGE. ZERO LATENCY."
+- Voiceover: "Drop into the booth. Connect live with any singer, anywhere, with zero-latency monitoring right in your ears."
+
+[0:08 - 0:18] REAL-TIME ROLLING LYRICS & BACKING TRACK
+- Visual: Zoom tight into the rolling prompter as lyrics highlight syllable-by-syllable, backing track waveform moving seamlessly beneath.
+- On-Screen Text: "SYNCHRONIZED ROLLING PROMPTER • LOAD ANY TRACK"
+- Voiceover: "Lyrics flow on time, every time. Pull tracks straight from your Vault or run pure audio-only sessions on your own terms."
+
+[0:18 - 0:25] DUET QUEUE & COLLABORATION
+- Visual: Clean UI cut showing the Host and Guest taking turns queueing tracks into 'Up Next' without audio dropouts.
+- On-Screen Text: "SEAMLESS DUET QUEUE • LIVE MIXDOWN"
+- Voiceover: "Queue duets back-to-back, lock your timing, and capture release-ready takes on the fly."
+
+[0:25 - 0:30] CALL TO ACTION
+- Visual: The two vocalists hit the final bar, stage crowd visualizer erupts, GravelKing Pro logo slams down with the live access badge.
+- On-Screen Text:
+  "STEP ONTO THE MAIN STAGE — FREE ACCESS NOW"
+  "gravelkingpro.it.com"
+- Voiceover: "Claim your spot on the stage. 100% free for early artists right now at gravelkingpro.it.com."
+
+3. ASSET DELIVERY:
+   - Ensure the component uses the actual /main-stage prompter styling (amber/gold active text, dimmed inactive lines, high-contrast dark room background).
+   - Run `PORT=5000 BASE_PATH=/ pnpm run build` to verify exit code 0.

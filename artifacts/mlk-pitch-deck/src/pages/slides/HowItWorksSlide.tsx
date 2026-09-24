@@ -32,7 +32,7 @@ export default function HowItWorksSlide() {
             INPUT
           </p>
           <p className="font-body mt-[1vh] text-[1.6vw] leading-[1.35] [text-wrap:pretty]">
-            Audio enters the MLK v3 DSP Kernel — adaptive mastering
+            Audio enters the MLK V4 (Morris Law Kernel V4) DSP Kernel — adaptive mastering
           </p>
         </div>
         <div className="flex-1 rounded-lg border border-white/10 bg-white/[0.04] px-[1.1vw] pt-[2vh] pb-[2.4vh]">
@@ -89,7 +89,7 @@ export default function HowItWorksSlide() {
       </div>
 
       <div className="absolute bottom-[4.5vh] left-[6vw] right-[6vw] flex items-center justify-between border-t border-white/10 pt-[1.6vh]">
-        <p className="font-body text-[1vw] tracking-[0.3em] text-muted">MORRIS LAW KERNEL V3.5</p>
+        <p className="font-body text-[1vw] tracking-[0.3em] text-muted">Morris Law Kernel V4</p>
         <p className="font-body text-[1vw] tracking-[0.3em] text-muted">04 / 10</p>
       </div>
     </div>

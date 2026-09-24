@@ -45,6 +45,32 @@ export const VERTEX_LOCATION = "us-central1";
 // gemini-2.0-flash is retired on this project and 404s ("Publisher model ...
 // was not found"). gemini-2.5-flash is the model Vertex actually serves here.
 export const VERTEX_MODEL = "gemini-2.5-flash";
+export const VERTEX_PROXY_BASE_URL =
+  process.env.GKA_VERTEX_PROXY_BASE_URL?.trim() || "http://127.0.0.1:8090/v1";
+
+function proxyUrl(pathname: string): string {
+  return `${VERTEX_PROXY_BASE_URL.replace(/\/+$/, "")}/${pathname.replace(/^\/+/, "")}`;
+}
+
+function directVertexUrl(version: "v1" | "v1beta1", pathname: string): string {
+  return `https://aiplatform.googleapis.com/${version}/${pathname.replace(/^\/+/, "")}`;
+}
+
+function shouldUseDirectVertex(): boolean {
+  return process.env.NODE_ENV === "production" && !process.env.GKA_VERTEX_PROXY_BASE_URL?.trim();
+}
+
+/** Regional Vertex v1 requests use the local allowlist proxy in development and direct Vertex in production. */
+export function vertexV1Url(pathname: string): string {
+  return shouldUseDirectVertex() ? directVertexUrl("v1", pathname) : proxyUrl(pathname);
+}
+
+/** Lyria uses the same route boundary, with Vertex's global Interactions API on v1beta1. */
+export function vertexV1Beta1Url(pathname: string): string {
+  if (shouldUseDirectVertex()) return directVertexUrl("v1beta1", pathname);
+  const origin = new URL(VERTEX_PROXY_BASE_URL).origin;
+  return `${origin}/v1beta1/${pathname.replace(/^\/+/, "")}`;
+}
 
 let _cachedToken: { token: string; expiry: number } | null = null;
 
@@ -107,9 +133,20 @@ export async function generateVertexContent(
   generationConfig: GenerationConfig = {},
   timeoutMs = 60_000,
 ): Promise<string> {
+  const result = await generateVertexContentWithTrace(parts, generationConfig, timeoutMs);
+  return result.text;
+}
+
+export async function generateVertexContentWithTrace(
+  parts: VertexPart[],
+  generationConfig: GenerationConfig = {},
+  timeoutMs = 60_000,
+): Promise<{ text: string; traceId: string | null }> {
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
-  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
+  const url = vertexV1Url(
+    `/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`,
+  );
   const { tools, safetySettings, ...vertexGenerationConfig } = generationConfig;
 
   const res = await fetch(url, {
@@ -138,7 +175,10 @@ export async function generateVertexContent(
   } catch {
     throw new Error(`Vertex AI returned non-JSON: ${bodyText.slice(0, 200)}`);
   }
-  return result.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  return {
+    text: result.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
+    traceId: res.headers.get("x-gka-proxy-trace-id"),
+  };
 }
 
 /** Convenience helper for plain text-in / text-out prompts (lyrics, rhymes, etc). */
@@ -147,6 +187,13 @@ export async function generateVertexText(
   generationConfig: GenerationConfig = {},
 ): Promise<string> {
   return generateVertexContent([{ text: prompt }], generationConfig);
+}
+
+export async function generateVertexTextWithTrace(
+  prompt: string,
+  generationConfig: GenerationConfig = {},
+): Promise<{ text: string; traceId: string | null }> {
+  return generateVertexContentWithTrace([{ text: prompt }], generationConfig);
 }
 
 /**
@@ -161,7 +208,9 @@ export async function generateVertexTextStream(
 ): Promise<string> {
   const creds = getGcpCredentials();
   const token = await getVertexAccessToken();
-  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:streamGenerateContent?alt=sse`;
+  const url = `${vertexV1Url(
+    `/projects/${creds.project_id}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:streamGenerateContent`,
+  )}?alt=sse`;
   const { tools, safetySettings, ...vertexGenerationConfig } = generationConfig;
   const response = await fetch(url, {
     method: "POST",

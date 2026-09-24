@@ -1,6 +1,6 @@
 ---
 name: DAW plugin/EQ accuracy + stem-split quality
-description: Audit findings on the web DAW's plugin DSP correctness and the real separation quality of the MLK v3 stem splitter.
+description: Audit findings on the web DAW's plugin DSP correctness and the real separation quality of the MLK V4 (Morris Law Kernel V4) stem splitter.
 ---
 
 # Plugin/EQ DSP accuracy (web DAW)
@@ -25,7 +25,7 @@ The plugin chain (`useDAW.ts` `createPluginNode`) and the EQ-curve visualizer
   gate needs an AudioWorklet (sample-level envelope), which `createPluginNode`
   (synchronous) doesn't currently support.
 
-# MLK v3 stem-split quality (measured)
+# MLK V4 (Morris Law Kernel V4) stem-split quality (measured)
 
 `mlkStemSplit` is **frequency-band splitting + center-cancellation, NOT source
 separation.** Measured on a synthetic true-stereo mix (distinct bass/vox/drum/

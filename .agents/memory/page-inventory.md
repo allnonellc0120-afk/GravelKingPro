@@ -12,7 +12,7 @@ description: All pages, routes, access tiers, and nav structure for GravelKing P
 - `/kernel` — Kernel Dashboard (hard gate: `isPro` = pro or node_auditor tier)
 - `/contact` — Contact (all) — public business contact email + All N One LLC (shown on the page itself)
 - `/songbot` — Songwriter (all, free) — template lyric generator, 8 genres
-- `/beatmaker` — Beat Maker (all, 30s free; Pro: up to 120s) — MLK v3 kernel
+- `/beatmaker` — Beat Maker (all, 30s free; Pro: up to 120s) — MLK V4 (Morris Law Kernel V4) kernel
 - `/download` — Download page (all) — free local version description + download
 
 ## Nav (layout.tsx)
@@ -25,5 +25,5 @@ Mobile: hamburger with all links + Contact in footer
 - `isPro`: pro or node_auditor — Mix Studio, full Beat Maker, Kernel Dashboard
 
 ## API routes (api-server)
-- `POST /api/beatmaker/generate` — ffmpeg lavfi synthesis + MLK v3 kernel → WAV
+- `POST /api/beatmaker/generate` — ffmpeg lavfi synthesis + MLK V4 (Morris Law Kernel V4) kernel → WAV
 - `GET /api/download/package` — returns setup README as text file download

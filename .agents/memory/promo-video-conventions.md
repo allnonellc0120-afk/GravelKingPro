@@ -17,10 +17,34 @@ description: How the promo video artifact maps product/marketing requirements to
   **Why:** the 2026-08 "skipping" masters were browser-captured; re-encoding can't recover frames never captured.
   **How to apply:** render per-beat segments with ffmpeg (fps=30, scale/crop to 4K, drawtext for kinetic headlines sized off min(W,H) so 9:16 doesn't overflow), concat, then mux a separate audio mix (VO adelay per beat + sidechaincompress-ducked music). Escape drawtext apostrophes or avoid them. Chunk long renders (<5 min per shell call) with a per-beat cache; interrupted ffmpeg leaves moov-less truncated files — probe each beat before concat.
 
+- **Main Stage hero extensions use the original stage compositions as still references, not the old promo audio.** Build the additional 30 seconds with the same FFmpeg motion/card pipeline, then append it to the existing 30-second clean promo for a 60-second master.
+  **Why:** the stage UI, duet participants, lyric engine, and queue must remain recognizable while the finished promo keeps the established visual quality and an original hero bed.
+  **How to apply:** preserve the original stage frames as the hero artwork, keep the 30-second base promo unchanged, and QA the boundary at 30 seconds plus the phone/iPad contact sheets.
+
+- **A “use the real stage as a reference” request means generate new artwork guided by the reference, not render the reference frames themselves.** Keep the stage language, but create new singer/location and stage visuals before FFmpeg compositing.
+  **Why:** reference fidelity and a genuinely new clip are separate requirements; reusing screenshots satisfies only the first and fails the second.
+  **How to apply:** use the reference for prompts and visual direction, generate fresh artwork, overlay copy in FFmpeg, and verify the new images appear in the hero contact sheet.
+
+- **When a promo explicitly requires people to be actually moving, a still-image treatment is not acceptable.** Use real moving performance footage for that card and composite it into the FFmpeg hero; still artwork remains appropriate for UI/stage cards.
+  **Why:** zooms and crossfades can make a card feel animated but do not show singing or performance motion.
+  **How to apply:** verify the performance section has changing frames independently, then verify the assembled hero and final master retain the movement.
+
 - **In-page preview of finished promos needs lightweight dual-format files.** Pointing `<video>` at the 4K masters (200MB+) stalls forever on spinners, and the preview/test browser lacks H.264 High-profile decode — plays only WebM (VP8/Vorbis). Serve ~1080p preview copies with BOTH `<source>` mp4 + webm children plus a poster frame; keep 4K masters separate for delivery.
 
 - **Never name a bash array `LINES`** — the terminal-height env var silently clobbers it, so every drawtext beat renders empty (video looks fine but has no headlines). Use a name like `BEATTXT`, and QA at least one extracted frame per format before concat.
 
+- **Readable enterprise audit demos can use static FFmpeg-rendered SVG cards.** Nine 1920×1080 cards at five seconds each provide reliable 45-second timing, large typography, and deterministic frame legibility without browser-capture timing drift.
+  **Why:** the enterprise proof is metric-heavy; static cards keep every number readable for the full dwell while avoiding animation capture failures.
+  **How to apply:** render each card to PNG, encode exactly 150 frames at 30 fps, concat the nine segments, then mux a separate 45-second AAC bed and probe frame count plus contact-sheet readability.
+
+- **Continuous Playwright terminal captures must register the child-process close promise before consuming stdout.**
+  **Why:** the workload can exit between the stdout iterator finishing and a later `close` listener, leaving the browser recording alive indefinitely.
+  **How to apply:** create the `close` promise immediately after spawning the workload, then consume and render its output; shorten pre-roll so the first captured frame already shows the terminal boot.
+
 - **Browser-captured logo exports need a painted pre-roll.** Playwright video recording begins before the navigated page paints, so export pages should paint a dark inline pre-roll before navigating to the animated scene; otherwise frame 0 can be an unintended white flash.
   **Why:** the recorder attaches at browser-context creation, before the scene page's CSS and assets are available.
   **How to apply:** use an inline dark `setContent` pre-roll, wait briefly, then navigate to the export route and QA frame 0 plus a mid-scene frame.
+
+- **Playwright 1.61 video export needs the system FFmpeg bridged into the cache.** With `XDG_CACHE_HOME=/home/runner/workspace/.cache`, create `ms-playwright/ffmpeg-1011/ffmpeg-linux` as a direct executable symlink; a nested `ffmpeg-linux/ffmpeg` directory fails.
+  **Why:** the recorder launches the revision path itself and does not use the system `ffmpeg` from PATH.
+  **How to apply:** ensure the direct symlink before `chromium.launch`, then probe duration and at least one contact sheet after muxing.

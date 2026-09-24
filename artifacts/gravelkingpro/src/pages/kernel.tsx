@@ -236,7 +236,7 @@ function TrackOptimizer({ isNodeAuditor }: { isNodeAuditor: boolean }) {
       {/* Quota bar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="space-y-0.5">
-          <p className="text-sm font-medium">Select tracks to optimize through the MLK V3 kernel</p>
+          <p className="text-sm font-medium">Select tracks to optimize through the MLK V4 (Morris Law Kernel V4) kernel</p>
           <p className="text-xs text-muted-foreground">
             {isNodeAuditor
               ? <span className="text-amber-400 font-medium">Node Auditor — unlimited optimizations</span>
@@ -269,7 +269,7 @@ function TrackOptimizer({ isNodeAuditor }: { isNodeAuditor: boolean }) {
       {optimizing && (
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Running MLK V3 kernel…</span><span>{progress}%</span>
+            <span>Running MLK V4 (Morris Law Kernel V4) kernel…</span><span>{progress}%</span>
           </div>
           <Progress value={progress} className="h-2" />
         </div>
@@ -361,7 +361,7 @@ function TrackOptimizer({ isNodeAuditor }: { isNodeAuditor: boolean }) {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <WaveformBar peaks={r.beforePeaks} color="rgba(251,191,36,0.6)" label="Before — Original" />
-                  <WaveformBar peaks={r.afterPeaks} color="rgba(52,211,153,0.8)" label="After — MLK V3 Optimized" />
+                  <WaveformBar peaks={r.afterPeaks} color="rgba(52,211,153,0.8)" label="After — MLK V4 (Morris Law Kernel V4) Optimized" />
                 </div>
               </CardContent>
             </Card>
@@ -488,7 +488,7 @@ export default function KernelDashboard() {
     <Layout>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-6">
 
-        {/* ── PUBLIC: MLK v3 Before/After Demo ── */}
+        {/* ── PUBLIC: MLK V4 (Morris Law Kernel V4) Before/After Demo ── */}
         <Card className="border-amber-500/25 bg-amber-500/5">
           <CardContent className="p-5">
           </CardContent>
@@ -546,7 +546,7 @@ export default function KernelDashboard() {
                     : <Badge variant="outline" className="border-amber-500/40 text-amber-400 text-[10px]">Pro</Badge>
                   }
                 </div>
-                <p className="text-muted-foreground text-sm">GravelKing Kernel — MLK v3 amplitude carving engine.</p>
+                <p className="text-muted-foreground text-sm">GravelKing Kernel — MLK V4 (Morris Law Kernel V4) amplitude carving engine.</p>
               </div>
               <div className="flex items-center gap-2">
                  {user?.imageUrl
@@ -566,7 +566,7 @@ export default function KernelDashboard() {
                   <Music className="w-3.5 h-3.5" />My Tracks
                   <ToolHelp
                     title="Track Optimizer"
-                    summary="Select saved Vocal Booth tracks and run them through the MLK V3 kernel. See a before/after waveform comparison and download the optimized WAV."
+                    summary="Select saved Vocal Booth tracks and run them through the MLK V4 (Morris Law Kernel V4) kernel. See a before/after waveform comparison and download the optimized WAV."
                     steps={[
                       "Save tracks in Vocal Booth first — they appear here automatically.",
                       "Expand a project and check the tracks you want to optimize.",

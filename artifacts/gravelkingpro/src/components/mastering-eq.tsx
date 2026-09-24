@@ -57,18 +57,15 @@ export function MasteringEqPanel({
 
       {open && (
         <div className="mt-4 space-y-5">
-          <div className="grid grid-cols-5 gap-x-2 gap-y-4 sm:grid-cols-10">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {MASTERING_EQ_BANDS.map((band, index) => {
               const value = bandGains[index] ?? 0;
               return (
                 <label
                   key={band.frequency}
-                  className="flex flex-col items-center gap-2 text-[10px] text-muted-foreground"
+                  className="grid grid-cols-[4rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-[10px] text-muted-foreground"
                 >
-                  <span className="h-4 font-semibold tabular-nums text-amber-200">
-                    {value > 0 ? "+" : ""}
-                    {value.toFixed(1)}
-                  </span>
+                  <span className="font-medium">{band.label} Hz</span>
                   <input
                     type="range"
                     min={-12}
@@ -78,9 +75,13 @@ export function MasteringEqPanel({
                     aria-label={`${band.frequency} Hz EQ gain`}
                     data-testid={`slider-eq-${band.frequency}`}
                     onChange={(event) => onBandGainChange(index, Number(event.target.value))}
-                    className="h-28 w-2 cursor-pointer accent-amber-400 [writing-mode:vertical-lr] [direction:rtl]"
+                    style={{ touchAction: "pan-y" }}
+                    className="h-2 w-full cursor-pointer accent-amber-400"
                   />
-                  <span className="font-medium">{band.label} Hz</span>
+                  <span className="text-right font-semibold tabular-nums text-amber-200">
+                    {value > 0 ? "+" : ""}
+                    {value.toFixed(1)}
+                  </span>
                 </label>
               );
             })}
@@ -107,6 +108,7 @@ export function MasteringEqPanel({
               aria-label="Post-EQ gain"
               data-testid="slider-post-eq-gain"
               onChange={(event) => onPostEqGainChange(Number(event.target.value))}
+              style={{ touchAction: "pan-y" }}
               className="h-2 w-full cursor-pointer accent-amber-400"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground/60">

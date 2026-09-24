@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/mlk-licensing/"
-title = "MLK V3.5 Licensing Platform"
+title = "MLK V4 (Morris Law Kernel V4) Licensing Platform"
 version = "1.0.0"
 id = "artifacts/mlk-licensing"
 router = "path"

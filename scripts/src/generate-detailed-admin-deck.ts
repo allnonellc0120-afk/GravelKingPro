@@ -238,7 +238,7 @@ async function createDetailedAdminDeck() {
       y -= 12;
       subheading("Strengths");
       bullet([
-        "Proprietary MLK V3.5 engine and Clean Room verification protocol.",
+        "Proprietary MLK V4 (Morris Law Kernel V4) engine and Clean Room verification protocol.",
         "First-mover positioning in AI-assisted music chain-of-title.",
         "Live product, not a prototype.",
         "Low burn: solo/lean team, cloud infrastructure costs under control.",
@@ -286,7 +286,7 @@ async function createDetailedAdminDeck() {
       body("Banks lend against cash flow, hard assets, or accounts receivable. A pre-revenue SaaS is difficult to collateralize. However, the technology asset can be appraised and pledged as part of a broader loan package.");
       y -= 12;
       bullet([
-        "Document the MLK V3.5 engine, verification protocol, and codebase ownership.",
+        "Document the MLK V4 (Morris Law Kernel V4) engine, verification protocol, and codebase ownership.",
         "Get an independent IP appraisal from a valuation firm specializing in software/technology.",
         "Prepare a 3-year financial projection showing revenue ramp.",
         "Show the payment infrastructure and live user base as evidence of commercial viability.",

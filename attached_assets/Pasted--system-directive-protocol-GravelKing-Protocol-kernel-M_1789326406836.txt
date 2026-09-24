@@ -1,0 +1,51 @@
+{
+  "system_directive": {
+    "protocol": "GravelKing Protocol",
+    "kernel": "Morris Law Kernel V2",
+    "author": "Kevin Morris",
+    "mode": "EXECUTE_REGRESSION_TESTS_AND_RENDER_VIDEO",
+    "task": "Lock regression tests, run Legal RAG and Support Agent simulations, and physically render the 45-second demo video into an MP4 file on disk."
+  },
+  "execution_steps": [
+    {
+      "step": 1,
+      "name": "Lock Regression Tests",
+      "action": "Execute the regression test suite for artifacts/api-server/data/token_savings_ledger.jsonl and tokenTracker.ts to prevent any drift in gain-share arithmetic (67/33) or cl100k_base BPE token tracking."
+    },
+    {
+      "step": 2,
+      "name": "Simulate Workload 2: Legal RAG & Long-Doc Analysis",
+      "action": "Route a 5-turn contract audit loop (100k+ tokens of legal boilerplate, NDAs, and search chunks) through GKA proxy with client_id: 'enterprise-rag-audit-02'. Append results to the active ledger."
+    },
+    {
+      "step": 3,
+      "name": "Simulate Workload 3: Multi-Agent Customer Escalation",
+      "action": "Route an enterprise CRM support ticket triage loop (accumulated ticket history, telemetry logs, and agent handoffs) through GKA proxy with client_id: 'enterprise-support-triage-03'. Append results to the active ledger."
+    },
+    {
+      "step": 4,
+      "name": "Physically Compile 45-Second MP4 Video",
+      "action": "Do not just provide a JSON spec. Use FFmpeg, Remotion, or a node-canvas rendering script in the workspace to compile the 9-frame video production spec into a physical MP4 file saved at `artifacts/gka_enterprise_code_demo.mp4`. Ensure large high-contrast fonts and a minimum 4.5s dwell time per frame so it is completely readable."
+    }
+  ],
+  "response_requirement": {
+    "format": "JSON_ONLY",
+    "schema": {
+      "regression_tests": "PASSED | FAILED",
+      "workloads_simulated": [
+        {
+          "client_id": "string",
+          "workload_type": "string",
+          "raw_tokens": "number",
+          "tokens_suppressed": "number",
+          "suppression_pct": "string",
+          "dollar_savings": "number",
+          "gka_gain_share": "number"
+        }
+      ],
+      "compiled_video_path": "string",
+      "video_file_size_bytes": "number",
+      "ledger_total_revenue_due": "number"
+    }
+  }
+}

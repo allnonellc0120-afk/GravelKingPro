@@ -14,7 +14,7 @@ import { promisify } from "node:util";
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isAdminAutomationAuthenticated } from "../lib/adminAuth";
+import { isAdminAutomationAuthenticated, requireLabelCatalogOwner } from "../lib/adminAuth";
 import { recordAnalyticsEvent } from "../analytics";
 import { CREDIT_COSTS, spendCredits } from "../lib/credits";
 
@@ -61,6 +61,7 @@ const publicTrackCols = {
   submittedByUserId: tracksTable.submittedByUserId,
   createdAt: tracksTable.createdAt,
   updatedAt: tracksTable.updatedAt,
+  isFeatured: tracksTable.isFeatured,
 };
 
 /**
@@ -88,6 +89,113 @@ async function saveFileToBucket(buffer: Buffer, key: string, contentType: string
   await saveObjectWithFallback(bucketId, key, buffer, { contentType });
 }
 
+type LabelPublishStorage = Pick<
+  ObjectStorageService,
+  "savePrivateObject" | "savePublicObject" | "deleteObject"
+>;
+
+type LabelPublishDependencies = {
+  storage: LabelPublishStorage;
+  buildPreview: (master: Buffer, masterExt: string, id: string) => Promise<Buffer>;
+  insertTrack: (values: typeof tracksTable.$inferInsert) => Promise<unknown>;
+  idFactory: () => string;
+};
+
+async function buildLabelPreview(master: Buffer, masterExt: string, id: string): Promise<Buffer> {
+  const tempInput = join(tmpdir(), `gkp-label-${id}.${masterExt}`);
+  const tempPreview = join(tmpdir(), `gkp-label-${id}-preview.mp3`);
+  try {
+    writeFileSync(tempInput, master);
+    await execFileAsync("ffmpeg", [
+      "-hide_banner", "-loglevel", "error", "-y",
+      "-i", tempInput, "-t", String(MAX_PREVIEW_SECONDS),
+      "-vn", "-codec:a", "libmp3lame", "-b:a", "192k", tempPreview,
+    ], { timeout: 120_000 });
+    return readFileSync(tempPreview);
+  } finally {
+    try { unlinkSync(tempInput); } catch { /* already removed */ }
+    try { unlinkSync(tempPreview); } catch { /* already removed */ }
+  }
+}
+
+const productionLabelPublishDependencies: LabelPublishDependencies = {
+  storage: objectStorageService,
+  buildPreview: buildLabelPreview,
+  insertTrack: async (values) => {
+    const [track] = await db.insert(tracksTable).values(values).returning();
+    return track;
+  },
+  idFactory: randomUUID,
+};
+
+export function createLabelPublishHandler(
+  dependencies: LabelPublishDependencies = productionLabelPublishDependencies,
+) {
+  return async (req: Request, res: Response): Promise<void> => {
+    if (!requireLabelCatalogOwner(req, res)) return;
+    const body = req.body as Record<string, string>;
+    const title = body.title?.trim();
+    const artistName = body.artistName?.trim();
+    const visibility = body.visibility ?? "live";
+    if (visibility !== "draft" && visibility !== "live") {
+      res.status(400).json({ error: "Visibility must be either draft or live." });
+      return;
+    }
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const master = files?.audio_master?.[0];
+    const cover = files?.cover_art?.[0];
+    if (!title || !artistName || !master || !cover) {
+      res.status(400).json({ error: "Title, artist name, audio master, and cover artwork are required." });
+      return;
+    }
+
+    const id = dependencies.idFactory();
+    const masterExt = sanitizeExt(master.originalname);
+    const coverExt = sanitizeExt(cover.originalname);
+    const audioFullKey = `private/tracks/${id}/audio_master.${masterExt}`;
+    const audioPreviewKey = `tracks/${id}/audio_preview.mp3`;
+    const coverArtKey = `tracks/${id}/cover_art.${coverExt}`;
+    const storedObjects: Array<{ key: string; visibility: "private" | "public" }> = [];
+    try {
+      const preview = await dependencies.buildPreview(master.buffer, masterExt, id);
+      await dependencies.storage.savePrivateObject(
+        audioFullKey,
+        master.buffer,
+        master.mimetype || "application/octet-stream",
+      );
+      storedObjects.push({ key: audioFullKey, visibility: "private" });
+      await dependencies.storage.savePublicObject(audioPreviewKey, preview, "audio/mpeg");
+      storedObjects.push({ key: audioPreviewKey, visibility: "public" });
+      await dependencies.storage.savePublicObject(
+        coverArtKey,
+        cover.buffer,
+        cover.mimetype || "image/jpeg",
+      );
+      storedObjects.push({ key: coverArtKey, visibility: "public" });
+      const track = await dependencies.insertTrack({
+        title,
+        artistName,
+        audioFullKey,
+        audioPreviewKey,
+        coverArtKey,
+        // Drafts use the existing moderation-pending state so they remain
+        // private from public catalog queries without requiring a schema change.
+        status: visibility === "draft" ? "pending" : "accepted",
+        price: 9.99,
+        submittedByUserId: req.dbUser!.id,
+      });
+      res.status(200).json({ track });
+    } catch (err) {
+      await Promise.all(storedObjects.map(async ({ key, visibility }) => {
+        try {
+          await dependencies.storage.deleteObject(key, visibility);
+        } catch { /* cleanup is best effort; the DB row is never committed */ }
+      }));
+      res.status(500).json({ error: err instanceof Error ? err.message : "Failed to publish release." });
+    }
+  };
+}
+
 /** Derive gk_session-based userId. Returns null if no session cookie present. */
 async function resolveSessionUser(req: Request): Promise<{ sessionId: string; userId: string } | null> {
   // Clerk-signed-in users FIRST — they never carry a gk_session cookie, so
@@ -113,7 +221,7 @@ router.get("/tracks", async (_req: Request, res: Response) => {
         eq(tracksTable.status, "accepted"),
         eq(tracksTable.takenDown, false),
       ))
-      .orderBy(desc(tracksTable.createdAt));
+    .orderBy(desc(tracksTable.isFeatured), desc(tracksTable.createdAt));
     res.json({ tracks: rows });
   } catch (_err) {
     res.status(500).json({ error: "Failed to list tracks" });
@@ -132,7 +240,7 @@ router.get("/tracks/artist/:artist", async (req: Request, res: Response) => {
         eq(tracksTable.status, "accepted"),
         eq(tracksTable.takenDown, false),
       ))
-      .orderBy(desc(tracksTable.createdAt));
+    .orderBy(desc(tracksTable.isFeatured), desc(tracksTable.createdAt));
     res.json({ tracks: rows });
   } catch (_err) {
     res.status(500).json({ error: "Failed to list tracks" });
@@ -423,6 +531,25 @@ router.post(
       res.status(500).json({ error: "Failed to submit track" });
     }
   }
+);
+
+/**
+ * Owner-only one-step label publisher. The client supplies a master and cover;
+ * the server derives the public preview so a release cannot be published with
+ * mismatched audio files.
+ */
+const labelPublishUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 150 * 1024 * 1024 },
+});
+
+router.post(
+  "/admin/label/publish",
+  labelPublishUpload.fields([
+    { name: "audio_master", maxCount: 1 },
+    { name: "cover_art", maxCount: 1 },
+  ]),
+  createLabelPublishHandler(),
 );
 
 /**
@@ -849,8 +976,7 @@ router.get("/tracks/:id/download", async (req: Request, res: Response) => {
 
 /** GET /api/admin/tracks — admin: list all tracks for moderation */
 router.get("/admin/tracks", async (req: Request, res: Response) => {
-  const { requireAdmin } = await import("../lib/adminAuth");
-  if (!await requireAdmin(req, res)) return;
+  if (!requireLabelCatalogOwner(req, res)) return;
   try {
     const rows = await db
       .select()
@@ -864,8 +990,7 @@ router.get("/admin/tracks", async (req: Request, res: Response) => {
 
 /** GET /api/admin/tracks/pending — admin: list only pending tracks */
 router.get("/admin/tracks/pending", async (req: Request, res: Response) => {
-  const { requireAdmin } = await import("../lib/adminAuth");
-  if (!await requireAdmin(req, res)) return;
+  if (!requireLabelCatalogOwner(req, res)) return;
   try {
     const rows = await db
       .select()
@@ -880,8 +1005,7 @@ router.get("/admin/tracks/pending", async (req: Request, res: Response) => {
 
 /** POST /api/admin/tracks/:id/approve — admin approve */
 router.post("/admin/tracks/:id/approve", async (req: Request, res: Response) => {
-  const { requireAdmin } = await import("../lib/adminAuth");
-  if (!await requireAdmin(req, res)) return;
+  if (!requireLabelCatalogOwner(req, res)) return;
 
   const trackId = req.params.id as string;
   try {
@@ -902,8 +1026,7 @@ router.post("/admin/tracks/:id/approve", async (req: Request, res: Response) => 
 
 /** POST /api/admin/tracks/:id/reject — admin reject */
 router.post("/admin/tracks/:id/reject", async (req: Request, res: Response) => {
-  const { requireAdmin } = await import("../lib/adminAuth");
-  if (!await requireAdmin(req, res)) return;
+  if (!requireLabelCatalogOwner(req, res)) return;
 
   const trackId = req.params.id as string;
   try {
@@ -924,8 +1047,7 @@ router.post("/admin/tracks/:id/reject", async (req: Request, res: Response) => {
 
 /** POST /api/admin/tracks/seed — admin-only: seed label tracks into production DB */
 router.post("/admin/tracks/seed", async (req: Request, res: Response) => {
-  const { requireAdmin } = await import("../lib/adminAuth");
-  if (!await requireAdmin(req, res)) return;
+  if (!requireLabelCatalogOwner(req, res)) return;
 
   const seedData = [
     {

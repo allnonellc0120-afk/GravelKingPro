@@ -12,7 +12,7 @@ const BODY = `Hey Marty,
 Good news — you've been granted a lifetime Node Auditor subscription to GravelKing Pro, on the house. No trial clock, no billing, no expiration. It's yours until you hear otherwise directly from the owner.
 
 Node Auditor is the top tier — everything unlocked:
-- Unlimited AI mastering with the MLK V3.5 kernel (full-length masters, all presets)
+- Unlimited AI mastering with the MLK V4 (Morris Law Kernel V4) kernel (full-length masters, all presets)
 - The full Studio: multitrack DAW, mixing, and effects in your browser
 - Vocal Booth recording with live monitor effects and karaoke mode
 - IP certification on every release — cryptographic proof of ownership embedded in your masters

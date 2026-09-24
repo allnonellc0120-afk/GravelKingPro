@@ -1,0 +1,21 @@
+{
+  "task": "ENFORCE_MAX_THROTTLE_SAL_CODEX_FULL_STACK",
+  "priority": "P0_ZERO_OVERHEAD_MAX_SPEED",
+  "target_modules": [
+    "/lib/jax/salCompressor.ts",
+    "/api/admin/jax/tts/route.ts",
+    "/components/admin/JaxWidget.tsx"
+  ],
+  "implementation_code": {
+    "salCompressor_ts": "export interface SalOpcodePayload {\n  op: 'OK' | 'ERR' | 'STG' | 'AUD' | 'WRN';\n  tgt: string;\n  code?: string | number;\n  msg?: string;\n}\n\nconst OPCODE_MAP: Record<string, string> = {\n  AudioWorkletNode: 'AWN',\n  MasterDSP: 'DSP',\n  MainStage: 'STG',\n  SendGrid: 'EML',\n  ReplicateRVC: 'RVC',\n  JsonStaging: 'STG_BX'\n};\n\nexport function encodeToDenseSal(rawText: string): string {\n  let clean = rawText.replace(/^(hello|hi|hey|jax here|virtual assistant|reporting).*?:/i, '').trim();\n  for (const [verbose, short] of Object.entries(OPCODE_MAP)) {\n    clean = clean.replaceAll(verbose, short);\n  }\n  return clean.replace(/\\s+/g, ' ').slice(0, 30);\n}\n\nexport function formatAuditPayload(payload: Record<string, any>): string {\n  return JSON.stringify(payload).replace(/\\s+/g, '');\n}",
+    "tts_route_patch": "// Inject into POST /api/admin/jax/tts before processing\nimport { encodeToDenseSal } from '@/lib/jax/salCompressor';\n\nexport async function POST(req: Request) {\n  const auth = await verifyOwnerAuth(req);\n  if (!auth) return new Response('Forbidden', { status: 403 });\n\n  const body = await req.json();\n  const denseSal = encodeToDenseSal(body.text || '');\n  \n  // Hard clamp TTS synthesis input to 30 characters maximum\n  const ttsPayload = denseSal.length > 0 ? denseSal : 'SYS:OK';\n  \n  return processRvcAudioPipeline(ttsPayload);\n}",
+    "widget_patch": "// Inject into JaxWidget.tsx state handler\nconst handleIncomingJaxDirective = (rawResponse: string) => {\n  // Render dense text immediately with zero block\n  renderChatBubble(rawResponse);\n  \n  // Strictly verify master switch state from local/admin settings\n  const isVoiceActive = localStorage.getItem('JAX_VOICE_MASTER_SWITCH') === 'true';\n  if (isVoiceActive) {\n    triggerTtsInference(rawResponse);\n  }\n};"
+  },
+  "operational_rules": [
+    "1. Eliminate all natural language filler; restrict telemetry output strictly to dense opcodes.",
+    "2. Clamp all voice synthesis strings to a maximum of 30 characters (slashing inference duration to under 1.5 seconds).",
+    "3. Minify and strip whitespace from all JSON audit and staging payloads before transmission.",
+    "4. Default voice toggle to OFF; execute audio inference strictly when manually engaged."
+  ],
+  "verification": "Confirm TTS synthesis character count is under 30 characters, audit payloads are minified without formatting, and voice toggle remains OFF across reloads."
+}

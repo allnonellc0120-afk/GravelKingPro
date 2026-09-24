@@ -1,11 +1,11 @@
-# One-Page Licensing Terms Template — Morris Law Kernel v3.5 + IP Protection
+# One-Page Licensing Terms Template — Morris Law Kernel V4 + IP Protection
 
 **Licensor:** GravelKing Productions / All One LLC (Kevin Morris)  
 **Licensee:** [Company Name]  
 **Effective Date:** [Date]
 
 ## 1. Grant of License
-Licensor grants Licensee a non-exclusive, non-transferable license to integrate and use the Morris Law Kernel v3.5 + IP Protection System (the “Technology”) in Licensee’s products and services, subject to the terms below.
+Licensor grants Licensee a non-exclusive, non-transferable license to integrate and use the Morris Law Kernel V4 + IP Protection System (the “Technology”) in Licensee’s products and services, subject to the terms below.
 
 ## 2. Scope of Use
 - Licensee may embed the Technology in its DAW, platform, plugin, or service.

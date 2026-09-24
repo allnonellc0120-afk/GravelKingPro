@@ -1,0 +1,52 @@
+{
+  "system_directive": {
+    "protocol": "GravelKing Protocol",
+    "kernel": "Morris Law Kernel V2",
+    "author": "Kevin Morris",
+    "mode": "STRICT_SYSTEM_AUDIT",
+    "mentor_guidance": "Do not build, do not rewrite, and do not mock data. Perform a cold read audit of the existing codebase to verify whether any token counting, token carving delta calculations, or savings ledger tracking are currently active."
+  },
+  "audit_scope": {
+    "target_directories": [
+      "./artifacts/api-server/src",
+      "./artifacts/api-server/data",
+      "./artifacts/gravelkingpro"
+    ],
+    "objectives": [
+      "Check if any tokenizer libraries (tiktoken, gpt-tokenizer, ctransformers, etc.) are installed in package.json.",
+      "Check if raw vs. carved input payloads are actively measured for token count deltas.",
+      "Check if a database, file ledger (JSONL, SQLite), or logging stream records dollar savings or tokens sliced per request.",
+      "Check if any active endpoints or middleware exist for telemetry, usage billing, or client gain-share calculations."
+    ]
+  },
+  "required_audit_commands": [
+    "grep -rnE '(tokenizer|tiktoken|tokens_saved|raw_tokens|carved_tokens|tokensSliced|dollar_savings)' ./artifacts/api-server/ 2>/dev/null",
+    "grep -rnE '(usage|tokenCount|calculateSavings)' ./artifacts/api-server/src/ 2>/dev/null",
+    "cat ./artifacts/api-server/package.json"
+  ],
+  "response_requirement": {
+    "format": "JSON_ONLY",
+    "instructions": "Execute the audit checks against the physical workspace and return ONLY a raw JSON response adhering to the schema below.",
+    "schema": {
+      "status": "AUDIT_COMPLETE",
+      "protocol": "GravelKing Protocol",
+      "kernel": "Morris Law Kernel V2",
+      "token_tracking_state": {
+        "is_tokenizer_installed": false,
+        "tokenizer_package": "string | null",
+        "is_token_delta_calculated": false,
+        "is_savings_ledger_active": false,
+        "active_ledger_location": "string | null",
+        "has_billing_telemetry_endpoints": false
+      },
+      "codebase_findings": [
+        {
+          "file": "string",
+          "matched_pattern": "string",
+          "actual_function": "string"
+        }
+      ],
+      "gap_verdict": "Detailed summary of what exists versus what is missing for real gain-share token tracking."
+    }
+  }
+}

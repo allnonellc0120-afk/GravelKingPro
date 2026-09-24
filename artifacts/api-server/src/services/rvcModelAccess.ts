@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { getAdminRuntimeConfig } from "../lib/adminRuntimeConfig";
 
 /** Stable storage keys for the validated GravelKing Outlaw Baritone weights. */
 export const GRAVELKING_OUTLAW_MODEL_KEY = "models/gravelking_v2.pth";
@@ -50,7 +51,7 @@ function rvcModelStreamSignature(expiresAt: number): string {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error("SESSION_SECRET is required for signed RVC model streaming");
   return createHmac("sha256", secret)
-    .update(`${expiresAt}:${GRAVELKING_RVC_MODEL_KEY}:${GRAVELKING_RVC_INDEX_KEY}`)
+    .update(`${expiresAt}:${getAdminRuntimeConfig().rvc.modelKey}:${getAdminRuntimeConfig().rvc.indexKey}`)
     .digest("base64url");
 }
 

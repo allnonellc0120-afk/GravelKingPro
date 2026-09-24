@@ -1,0 +1,31 @@
+HOTFIX DIRECTIVE (PHASE 2.5): ROUTING REPAIR, TAB RESTORATION & LRC PROMPTER INTEGRATION
+
+Do not advance to Phase 3 until this hotfix compiles with exit code 0.
+
+1. TAB & ROUTING RESTORATION (STRICT):
+   - [Studio]: Re-route directly to `artifacts/gravelkingpro/src/pages/mastering.tsx` (mastering rack, 3 stems, video demux). Fix the 404 error immediately.
+   - [Jax]: Restore the full Jax AI Studio Companion (lyric writer, bar polisher, chat suite, song generator). Evict the lyric timer from this tab.
+   - [Main Stage]: Live stage performance room. Add a top-bar action button: "[ + Sync / Add Song ]" that opens the workshop/timer modal.
+
+2. WIRE EXISTING LRC INTEGRATION TO ROLLING PROMPTER:
+   - Reuse the existing lyric search client already in the repo.
+   - In "[ + Sync / Add Song ]", when a song is selected from your existing search, parse its synced LRC lines:
+     * Regex match: /^\[(\d{2}):(\d{2}(?:\.\d{2,3})?)\](.*)/
+     * Convert mm:ss.xx to seconds: (parseInt(mm) * 60) + parseFloat(ss)
+     * Output clean line array: [{ time: seconds, text: string }]
+   - Feed this parsed array directly into the rolling prompter clock (`audioContext.currentTime`).
+   - Fallback: Keep the manual line-break parser + spacebar tap-to-time engine for unlisted songs.
+
+3. REAL-TIME DIRECT MIC MONITOR (WIRED ONLY):
+   - Add [ 🎧 MONITOR MIC ] button on [Main Stage].
+   - Route `navigator.mediaDevices.getUserMedia` directly to `audioContext.destination` using `latencyHint: 'interactive'` so users hear their own voice with zero delay.
+   - Check audio output: show alert warning if Bluetooth profile is active.
+
+4. HARDWARE GRAPHICS:
+   - Apply brushed dark steel chassis styling, glowing LED toggles, and responsive VU meter bars across active cards.
+
+Run `pnpm run build` and output:
+1. Confirmation that `/mastering` loads on [Studio] with zero 404.
+2. Confirmation that Jax chat is restored on [Jax].
+3. Build receipt confirming exit code 0.
+Wait for approval before advancing to Phase 3.

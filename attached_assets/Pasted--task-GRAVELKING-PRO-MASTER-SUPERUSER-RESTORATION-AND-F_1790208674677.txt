@@ -1,0 +1,220 @@
+{
+  "task": "GRAVELKING_PRO_MASTER_SUPERUSER_RESTORATION_AND_FEATURE_DEPLOYMENT",
+  "priority": "P0_CRITICAL_OVERRIDE",
+  "auth_lock": {
+    "admin_routes": ["/admin/control", "/admin/label"],
+    "enforced_superadmin_email": "allin10120@gmail.com",
+    "unauthorized_status": 403
+  },
+  "execution_rules": {
+    "zero_stubs": true,
+    "no_mocks": true,
+    "physical_verification_required": true,
+    "fail_closed": true
+  },
+  "work_order_items": [
+    {
+      "id": "ITEM_01_JAX_ADMIN_DEV_CONSOLE_AND_RUNNER",
+      "module": "Admin Intelligence & Command Plane",
+      "specs": {
+        "location": "/admin/control",
+        "llm_engine_binding": "Wire JAX directly to the Google Gemini developer API using process.env.GEMINI_API_KEY.",
+        "context_injection": "Inject live backend environment state: database schema definitions, recent server error traces, system load, active presets, and user funnel drop-offs into JAX's system prompt.",
+        "admin_dev_capabilities": [
+          "Interactive Chat Interface: JAX assists directly in tuning mastering presets, updating JAX lyrical parameters, analyzing code, and auditing changes in-browser.",
+          "Command & Operational Runner: Secure execution endpoint allowing superadmin to trigger whitelisted system tasks, curls, db migrations, and diagnostic shell commands straight from the admin UI.",
+          "Live Terminal Output: Real-time standard out/error stream embedded directly below the JAX chat box to view execution logs immediately."
+        ]
+      },
+      "verification_command": "Verify authenticated request to /api/admin/jax/chat returns streaming response with injected system metrics, and test command execution endpoint returns exit status 0."
+    },
+    {
+      "id": "ITEM_02_STORK_WIRE_PROXY",
+      "module": "Infrastructure / SEO",
+      "specs": {
+        "rewrite_routes": ["/news", "/news/*"],
+        "target_destination": "https://www.stork.ai/wire/wa3l9nvf14gbmqa40",
+        "proxy_mode": "SERVER_SIDE_REVERSE_PROXY_HTTP_200",
+        "forbid_redirects": [301, 302],
+        "robots_txt_append": "Sitemap: https://gravelkingpro.com/news/sitemap.xml",
+        "navigation_link": "Add visible 'News' link to main nav and global footer"
+      },
+      "verification_command": "curl -sI https://gravelkingpro.com/news | grep -E 'HTTP/|stork-wire:'"
+    },
+    {
+      "id": "ITEM_03_ZERO_LATENCY_LIVE_DUET_MONITOR",
+      "module": "GravelKing Advantage (GKA) Audio Engine",
+      "specs": {
+        "architecture": "AudioWorkletNode execution running GKA multi-band & sub-harmonic saturation directly on the hardware metal, completely bypassing main-thread JS buffers and network sockets.",
+        "routing": "MediaStreamSource (Mic) -> GKA AudioWorkletNode -> AudioContext.destination",
+        "buffer_size": 128,
+        "max_buffer_size": 256,
+        "latency_hint": "interactive",
+        "stream_constraints": {
+          "echoCancellation": false,
+          "noiseSuppression": false,
+          "autoGainControl": false
+        },
+        "target_roundtrip_latency_ms": "< 10ms"
+      },
+      "verification_command": "Output the AudioContext graph configuration and print the hardware buffer round-trip latency log."
+    },
+    {
+      "id": "ITEM_04_PROFILE_SCHEMA_FIX",
+      "module": "User Profile Service",
+      "specs": {
+        "endpoint": "PATCH /api/users/profile",
+        "error_to_resolve": "first_name is not a valid parameter for this request.",
+        "payload_alignment": "Strip all legacy first_name / last_name fields. Enforce backend schema validation strictly on: artist_name, hometown, bio.",
+        "persistence_target": "Save artist name as 'Gravelking' successfully with HTTP 200"
+      },
+      "verification_command": "curl -X PATCH /api/users/profile -H 'Content-Type: application/json' -d '{\"artist_name\":\"Gravelking\",\"bio\":\"GravelKing Productions\",\"hometown\":\"Bossier City\"}'"
+    },
+    {
+      "id": "ITEM_05_REMIX_LOOKUP_AND_CERT_PERSISTENCE",
+      "module": "Studio / JAX Audio Pipeline",
+      "specs": {
+        "error_to_resolve": "Original track not found. The original track's certificate record is missing.",
+        "database_write": "Ensure every track render/master completion commits track_id, storage_url, and parent IP-certificate record in a single atomic database transaction.",
+        "modal_fix": "Fix 'Remix with MLK V4' modal to query and resolve track metadata and certificate ID cleanly without missing-record exceptions."
+      },
+      "verification_command": "Execute track render, verify certificate row written to DB, and curl remix endpoint verifying HTTP 200 response."
+    },
+    {
+      "id": "ITEM_06_DECOUPLE_CONTEST_FROM_MAIN_STAGE",
+      "module": "Main Stage UI / Contest Pipeline",
+      "specs": {
+        "main_stage_save": "Restore default save flow to write user audio recordings directly and exclusively to the user's private Vault.",
+        "contest_submission": "Make contest entry a distinct, optional checkbox/button or accessible via the standalone contest flyer page.",
+        "storefront_roster": "Ensure /label displays a clean, elegant default roster state when no featured artists are published."
+      },
+      "verification_command": "Simulate Main Stage track save; assert database entry resides strictly in user vault with zero contest association unless explicitly selected."
+    },
+    {
+      "id": "ITEM_07_LIVE_DSP_MASTERING_PRESET_DIALER",
+      "module": "Admin Audio Tuning Plane",
+      "specs": {
+        "location": "/admin/control",
+        "controls": [
+          "Sub-Harmonic Saturation drive and mix sliders",
+          "Multi-Band Dynamics threshold, ratio, attack, and release per band (Low, Mid, High)",
+          "Air / Top-End Exciter curve adjustments",
+          "Stereo field width expansion and low-end mono crossover",
+          "Target LUFS limiter selectors (-14 LUFS streaming, -9 LUFS punch, -7 LUFS street heat)",
+          "Global Preset Manager: Save, rename, and set global defaults across user renders without redeploying code"
+        ]
+      },
+      "verification_command": "Update LUFS limiter and saturation settings via admin API; confirm database persistence and application to next engine render."
+    },
+    {
+      "id": "ITEM_08_JAX_IDENTITY_AND_RVC_VOICE_CONTROLS",
+      "module": "Voice Model Management",
+      "specs": {
+        "location": "/admin/control",
+        "controls": [
+          "Founder Voice Model Selector: Bind/swap active RVC checkpoint (.pth) and index files from bucket",
+          "Pitch shift semitone slider",
+          "Index rate / feature retrieval weight slider (0.0 to 1.0)",
+          "Protect voiceless consonant threshold slider",
+          "JAX Persona / System Prompt Editor: Live editor for lyrical directives, tone, cadence parameters",
+          "Inline audio test sandbox with preview playback inside the admin panel"
+        ]
+      },
+      "verification_command": "Post parameter update to voice config; confirm updated values reflect in subsequent conversion pipeline payload."
+    },
+    {
+      "id": "ITEM_09_LIVE_FUNNEL_ANALYTICS",
+      "module": "Admin Intelligence",
+      "specs": {
+        "location": "/admin/control",
+        "pipeline_stages": [
+          "Landing",
+          "Main Stage",
+          "Recording / Duet",
+          "Render / Master",
+          "Vault Save",
+          "Label Store / Contest Entry"
+        ],
+        "capabilities": [
+          "Real-time drop-off counters per stage",
+          "Active user sessions with device classification (iOS, iPadOS, Desktop)",
+          "Manual 'Instant Refresh' button bypassing browser/server cache",
+          "Pipeline error and exception stage mapper"
+        ]
+      },
+      "verification_command": "Query analytics endpoint with mock session drops; assert accurate conversion counts returned."
+    },
+    {
+      "id": "ITEM_10_CREDIT_LEDGER_AND_ACCOUNT_OVERRIDE",
+      "module": "Admin Superuser Authority",
+      "specs": {
+        "location": "/admin/control",
+        "controls": [
+          "Search user accounts by email, handle, or ID",
+          "Live balance display for MP3 and WAV credits",
+          "Manual credit override tool (add, deduct, set balance)",
+          "Subscription tier toggle (Studio Pass, Owner, VIP bypass)",
+          "Account permission freeze / ban / reset actions"
+        ]
+      },
+      "verification_command": "Execute manual credit grant on a test account; verify updated ledger balance via API query."
+    },
+    {
+      "id": "ITEM_11_MANUAL_CATALOG_UPLOADER",
+      "module": "Label Storefront Administration",
+      "specs": {
+        "location": "/admin/label",
+        "form_fields": [
+          "Track Title (text)",
+          "Artist Name (unrestricted freeform text for any artist name/alias)",
+          "Audio Master file upload (pushes to storage bucket)",
+          "Cover Artwork file upload (pushes to storage bucket)",
+          "Price: hardcoded default to $9.99 (bypass Stripe setup complexity)",
+          "Publish Toggle: live storefront publish vs draft"
+        ],
+        "frontend_render": "Published releases must immediately appear on public /label storefront"
+      },
+      "verification_command": "Create sample track via form payload; verify HTTP 200 and assert release is present in GET /api/catalog and GET /label."
+    },
+    {
+      "id": "ITEM_12_DIRECT_AGENT_API_AND_BULK_OUTREACH",
+      "module": "Admin Automation Gateway",
+      "specs": {
+        "location": "/admin/control",
+        "controls": [
+          "Direct Agent API Console: Input prompt or system patch command and trigger workspace executions via API/webhook",
+          "Bulk Outreach Dispatcher: Text/CSV recipient list input (names, phone numbers, emails)",
+          "Template Builder: Dynamic merge variables ({name}, {link}, {artist_id})",
+          "Queue Dispatcher: Execute message blasts with real-time delivery and error logs"
+        ]
+      },
+      "verification_command": "Trigger test webhook via agent console and dispatch test templated message; assert success status in terminal log."
+    },
+    {
+      "id": "ITEM_13_STRICT_320_AUDIO_PIPELINE_VERIFICATION",
+      "module": "Mastering Engine Export",
+      "specs": {
+        "target": "320 kbps MP3 master export pipeline",
+        "execution": "Run actual subprocess export pipeline on test audio (no stubs)",
+        "ffprobe_assertions": {
+          "codec_name": "mp3",
+          "bit_rate": "320000",
+          "sample_rate": "44100",
+          "channels": 2
+        }
+      },
+      "verification_command": "ffprobe -v quiet -print_format json -show_format -show_streams <exported_file.mp3> && ls -la <exported_file.mp3> && sha256sum <exported_file.mp3>"
+    }
+  ],
+  "submission_requirements": {
+    "format": "JSON",
+    "required_fields": [
+      "status",
+      "completed_items",
+      "code_diffs",
+      "terminal_execution_proofs",
+      "ffprobe_json",
+      "active_admin_routes"
+    ]
+  }
+}

@@ -30,6 +30,7 @@ export const tracksTable = pgTable("tracks", {
   adminOverride: boolean("admin_override").notNull().default(false),
   overrideExpiresAt: timestamp("override_expires_at", { withTimezone: true }),
   takenDown: boolean("taken_down").notNull().default(false),
+  isFeatured: boolean("is_featured").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

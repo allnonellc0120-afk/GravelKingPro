@@ -33,14 +33,16 @@ interface AdminGateProps {
   children: ReactNode;
   title?: string;
   description?: string;
+  ownerOnly?: boolean;
 }
 
 export function AdminGate({
   children,
   title = "Admin Area",
   description = "Enter your admin key to continue.",
+  ownerOnly = false,
 }: AdminGateProps) {
-  const { isLoaded: clerkLoaded } = useAuth();
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const [status, setStatus] = useState<AuthState>("checking");
   const [keyInput, setKeyInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function AdminGate({
     fetch("/api/admin/check", { credentials: "include" })
       .then((r) => setStatus(r.ok ? "unlocked" : "locked"))
       .catch(() => setStatus("locked"));
-  }, [clerkLoaded]);
+  }, [clerkLoaded, isSignedIn]);
 
   const handleLogin = useCallback(async () => {
     const k = keyInput.trim();
@@ -114,9 +116,9 @@ export function AdminGate({
           </div>
           <div>
             <h2 className="text-xl font-bold mb-2">{title}</h2>
-            <p className="text-muted-foreground text-sm">{description}</p>
+            <p className="text-muted-foreground text-sm">{ownerOnly ? "Sign in with the owner account to continue. An admin key alone does not grant access." : description}</p>
           </div>
-          <div className="flex flex-col gap-3">
+          {ownerOnly ? <a className="inline-block underline text-amber-500" href={`/sign-in?redirect_url=${encodeURIComponent(window.location.pathname)}`}>Sign in to the owner account</a> : <div className="flex flex-col gap-3">
             <input
               type="password"
               value={keyInput}
@@ -137,7 +139,7 @@ export function AdminGate({
               ) : null}
               Unlock Dashboard
             </Button>
-          </div>
+          </div>}
         </div>
       </Layout>
     );

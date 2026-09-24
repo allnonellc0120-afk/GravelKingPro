@@ -91,9 +91,9 @@ async function createPitchDeckV2() {
   // SOLUTION
   newPage(white);
   heading("The Solution", dark);
-  subheading("MLK V3.5 + Clean Room Protocol");
+  subheading("MLK V4 (Morris Law Kernel V4) + Clean Room Protocol");
   bodyCopy("GravelKing Pro is a complete browser studio — write, record, mix, master, and certify — in one tab.");
-  bodyCopy("Every creative action is measured against the original baseline by the Morris Law Kernel V3.5 authorship engine. When human contribution crosses the legal threshold, a tamper-proof IP certificate is issued.");
+  bodyCopy("Every creative action is measured against the original baseline by the Morris Law Kernel V4 authorship engine. When human contribution crosses the legal threshold, a tamper-proof IP certificate is issued.");
   bodyCopy("Every mastered WAV also carries a cryptographic nominator embedded in the PCM signal. The matching denominator and HMAC live on our server. Alter the file, and the handshake fails.");
 
   // PRODUCT
@@ -129,7 +129,7 @@ async function createPitchDeckV2() {
   const plans = [
     ["Starter", "Free", "Core tools, limited runs"],
     ["Pro", "$9.99/mo", "Unlimited removal, splitting & preset masters"],
-    ["King", "$24.99/mo", "Studio tools + MLK V3.5 optimizer + 7-day trial"],
+    ["King", "$24.99/mo", "Studio tools + MLK V4 (Morris Law Kernel V4) optimizer + 7-day trial"],
     ["Node Auditor", "$499/mo", "Enterprise optimization, API access, label hub"],
   ];
   for (const [name, price, desc] of plans) {

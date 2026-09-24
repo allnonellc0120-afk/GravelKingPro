@@ -1,4 +1,4 @@
-# 0–30 Day Financial Plan — Bootstrapped (Morris Law Kernel v3.5 + IP System)
+# 0–30 Day Financial Plan — Bootstrapped (Morris Law Kernel V4 + IP System)
 
 ## Overall Strategy
 Focus on **speed to revenue** and **proof of value** with minimal spend. Goal: Generate early revenue or strong signals for licensing/buyout within 30 days.

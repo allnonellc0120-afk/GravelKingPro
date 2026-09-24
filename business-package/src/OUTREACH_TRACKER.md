@@ -1,4 +1,4 @@
-# Outreach Tracker Template — Morris Law Kernel v3.5
+# Outreach Tracker Template — Morris Law Kernel V4
 
 Use this simple tracker to stay organized during your LinkedIn and email outreach.
 

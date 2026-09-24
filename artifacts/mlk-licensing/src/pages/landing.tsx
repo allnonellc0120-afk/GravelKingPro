@@ -25,7 +25,7 @@ export default function Landing() {
               The fastest matrix multiplication kernel in existence.
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-[600px] leading-relaxed">
-              MLK V3.5 achieves 92% of theoretical peak FP64 throughput on multi-core x86-64 architectures with AVX-512. Engineered for high-frequency trading, dense simulations, and proprietary AI training.
+              MLK V4 (Morris Law Kernel V4) achieves 92% of theoretical peak FP64 throughput on multi-core x86-64 architectures with AVX-512. Engineered for high-frequency trading, dense simulations, and proprietary AI training.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/pricing" className="inline-flex h-12 items-center justify-center border border-primary bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">

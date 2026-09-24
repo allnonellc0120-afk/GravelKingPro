@@ -1,0 +1,44 @@
+{
+  "admin_tool_specification": {
+    "routes": ["/admin/label", "/admin/control"],
+    "access_lock": "allin10120@gmail.com",
+    "features_to_implement_and_test": [
+      {
+        "feature": "MANUAL_CATALOG_UPLOADER",
+        "description": "Full release publisher directly to the GravelKing Productions label page.",
+        "controls": [
+          "Track Title input (text)",
+          "Artist Name input (freeform text, unconstrained, any artist name)",
+          "Audio Master file picker (upload audio to storage bucket)",
+          "Cover Artwork file picker (upload release image to storage bucket)",
+          "Price: hardcoded/preset to $9.99 (no Stripe dependency)",
+          "Publish button that immediately commits the record to the database and displays it live on /label"
+        ]
+      },
+      {
+        "feature": "FEATURED_CONTEST_MANAGEMENT",
+        "description": "Admin review panel for contest submissions.",
+        "controls": [
+          "View Main Stage audition submissions",
+          "Durable mastering & IP-certificate eligibility verification status",
+          "Approve / Select artist toggle (enforcing the 10-slot maximum limit, 1 per artist account)",
+          "Private catalog upload and consent-gated outreach review",
+          "Generate expiring private outreach links"
+        ]
+      },
+      {
+        "feature": "STORE_ROSTER_VISIBILITY_CONTROLS",
+        "description": "Control over what shows on the public /label storefront.",
+        "controls": [
+          "Ability to set /label storefront to a clean/blank state when no featured artists are active",
+          "Toggle active/inactive status for any catalog release or artist profile"
+        ]
+      }
+    ],
+    "verification_test_required": {
+      "auth_check": "Deny all emails except allin10120@gmail.com with HTTP 403",
+      "publish_test": "Curl/POST test creating a sample track ($9.99, title, artist, audio, cover) and verifying it returns HTTP 200 and renders on GET /label",
+      "contest_slots_test": "Verify slot cap (10 max) and single-account constraint logic"
+    }
+  }
+}

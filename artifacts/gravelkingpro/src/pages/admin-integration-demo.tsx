@@ -295,7 +295,7 @@ function IntegrationDemoDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-xl"><Zap className="h-5 w-5 text-amber-500" /> Kernel processing benchmark</CardTitle>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Runs the real Morris Law Kernel v3.5 execution path (the same remote-first / local-fallback selection mastering uses) on a bounded generated WAV fixture. Kernel time only — no network or upload.
+                  Runs the real MLK V4 execution path (the same remote-first / local-fallback selection mastering uses) on a bounded generated WAV fixture. Kernel time only — no network or upload.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -342,7 +342,7 @@ function IntegrationDemoDashboard() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <Metric value={fmtMs(e2eBench.result.timings.uploadAndParseMs)} label="Upload + parse" detail="multipart receive" />
-                      <Metric value={fmtMs(e2eBench.result.timings.kernelMs)} label="Kernel" detail="MLK v3.5 processing" />
+                      <Metric value={fmtMs(e2eBench.result.timings.kernelMs)} label="Kernel" detail="MLK V4 processing" />
                       <Metric value={fmtMs(e2eBench.result.timings.networkAndResponseMs)} label="Response + network" detail="stream back" />
                       <Metric value={fmtMs(e2eBench.result.timings.totalMs)} label="Total" detail="wall clock" />
                     </div>
@@ -365,7 +365,7 @@ function IntegrationDemoDashboard() {
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Metric value="1,000 / 1,000" label="Health requests returned 200" detail="Historical: repeated health probes completed cleanly (Aug 4, 2026 load test)." />
-            <Metric value="500 / 500" label="MLK v3 processing returned 200" detail="Historical: audio processing path remained available through the run (Aug 4, 2026 load test)." />
+            <Metric value="500 / 500" label="MLK V4 (Morris Law Kernel V4) processing returned 200" detail="Historical: audio processing path remained available through the run (Aug 4, 2026 load test)." />
             <Metric value="1,000 / 1,000" label="Raw processing returned 200" detail="Historical: baseline API processing completed without failed responses (Aug 4, 2026 load test)." />
             <Metric value="200 / 200" label="Invalid payloads returned 400" detail="Historical: bad input was rejected cleanly rather than crashing (Aug 4, 2026 load test)." />
             <Metric value="200 / 200" label="Missing routes returned 404" detail="Historical: unknown paths returned expected not-found responses (Aug 4, 2026 load test)." />

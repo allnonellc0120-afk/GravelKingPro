@@ -186,7 +186,7 @@ function AnalyticsDashboard() {
     {
       key: "reddit",
       label: "Reddit post (r/WeAreTheMusicMakers)",
-      text: `I built GravelKing Pro — a browser-based creative audio toolkit\n\nHey r/WeAreTheMusicMakers — I've been building GravelKing Pro for the past year and it's finally live.\n\nWhat it does:\n• JAX songwriting companion with IP provenance certificates\n• Vocal Booth recording, clipping, splicing, and layering\n• The Foundry with Morris Law Kernel v3.5 mastering\n• Audio format conversion\n\nFree trial, no install: https://gravelkingpro.com\n\nWould love feedback from producers!`,
+      text: `I built GravelKing Pro — a browser-based creative audio toolkit\n\nHey r/WeAreTheMusicMakers — I've been building GravelKing Pro for the past year and it's finally live.\n\nWhat it does:\n• JAX songwriting companion with IP provenance certificates\n• Vocal Booth recording, clipping, splicing, and layering\n• The Foundry with MLK V4 mastering\n• Audio format conversion\n\nFree trial, no install: https://gravelkingpro.com\n\nWould love feedback from producers!`,
     },
     {
       key: "producthunt",

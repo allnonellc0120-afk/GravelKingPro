@@ -11,7 +11,7 @@ GravelKing Pro is a creator-audio workspace for provenance, production, and rele
 5. Use “Regenerate (Keep Human Lines)” to change untouched AI lines while preserving human lines verbatim.
 6. Send the exact final generator lyrics into Song Generator.
 7. Generate an unmastered take.
-8. Use paid MLK v3.5 mastering as a separate step when the track is ready.
+8. Use paid MLK V4 (Morris Law Kernel V4) mastering as a separate step when the track is ready.
 9. Review the final lyric hash, authorship score, ledger, and certificate label.
 10. Use Vocal Booth, karaoke, download, and certificate paths according to the account tier.
 

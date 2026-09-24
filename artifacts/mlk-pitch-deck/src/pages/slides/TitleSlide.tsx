@@ -37,7 +37,7 @@ export default function TitleSlide() {
           />
         </svg>
         <h1 className="font-display font-bold text-[6.2vw] leading-[1.02] tracking-tight [text-wrap:balance]">
-          Morris Law Kernel v3.5
+          Morris Law Kernel V4
         </h1>
         <p className="font-body mt-[3vh] text-[2.1vw] leading-[1.35] text-text/90 [text-wrap:pretty]">
           The First Adaptive Mastering Engine with{' '}

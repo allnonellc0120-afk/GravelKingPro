@@ -3,6 +3,7 @@ import type { Request } from "express";
 import { randomUUID } from "node:crypto";
 import { db, creditTransactionsTable, type User, usersTable } from "@workspace/db";
 import { storage } from "../storage";
+import { logger } from "./logger";
 
 export const CREDIT_COSTS = {
   song: 20,
@@ -88,6 +89,9 @@ export async function spendCredits(
         .select({ creditsBalance: usersTable.creditsBalance })
         .from(usersTable)
         .where(eq(usersTable.id, userId));
+      logger.info(
+        `[LEDGER] User ${userId} balance unchanged at ${current?.creditsBalance ?? 0} (idempotent ${kind})`,
+      );
       return { ok: true as const, balance: current?.creditsBalance ?? 0 };
     }
 
@@ -101,6 +105,9 @@ export async function spendCredits(
         .select({ creditsBalance: usersTable.creditsBalance })
         .from(usersTable)
         .where(eq(usersTable.id, userId));
+      logger.info(
+        `[LEDGER] User ${userId} balance: ${current?.creditsBalance ?? 0} -> deducted ${amount} -> remaining ${current?.creditsBalance ?? 0} (insufficient ${kind})`,
+      );
       return { ok: false as const, balance: current?.creditsBalance ?? 0 };
     }
 
@@ -110,7 +117,11 @@ export async function spendCredits(
       kind: `spend_${kind}`,
       reference,
     });
-    return { ok: true as const, balance: updated[0].creditsBalance };
+    const remaining = updated[0].creditsBalance;
+    logger.info(
+      `[LEDGER] User ${userId} balance: ${remaining + amount} -> deducted ${amount} -> remaining ${remaining} (${kind})`,
+    );
+    return { ok: true as const, balance: remaining };
   });
 }
 

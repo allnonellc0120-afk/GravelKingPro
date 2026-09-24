@@ -85,9 +85,9 @@ Clean up recordings by removing background noise, hiss, hum, and room artifacts.
 ### 6. GravelKing Kernel (Mix Studio / Full Kernel)
 The flagship Pro-tier experience — a multi-track analysis and signal processing engine.
 
-- **MLK v3 kernel** runs amplitude analysis, parity validation, efficiency scoring, and decay rate calculations
+- **MLK V4 (Morris Law Kernel V4) kernel** runs amplitude analysis, parity validation, efficiency scoring, and decay rate calculations
 - Multi-track Mix Studio with speed & pitch control, layering, and voice effects
-- Beat Maker generates original instrumentals in up to 120 seconds across 7 genres using the MLK v3 engine
+- Beat Maker generates original instrumentals in up to 120 seconds across 7 genres using the MLK V4 (Morris Law Kernel V4) engine
 - Live waveform visualization
 - Kernel metrics dashboard with throughput, stability, efficiency, and parity status
 - Exportable PDF audit reports
@@ -200,7 +200,7 @@ GravelKing Productions is available as a native mobile app (iOS & Android via Ex
 | Backend | Express 5, Node.js 24, TypeScript |
 | Database | PostgreSQL + Drizzle ORM |
 | ML Separation | Demucs htdemucs (GNS — GravelKing Neural Separator) |
-| Mastering Engine | MLK v3 kernel (proprietary signal processing) |
+| Mastering Engine | MLK V4 (Morris Law Kernel V4) kernel (proprietary signal processing) |
 | Payments | Stripe (subscriptions + one-time checkout) |
 | Lyrics | lrclib.net (open database) |
 

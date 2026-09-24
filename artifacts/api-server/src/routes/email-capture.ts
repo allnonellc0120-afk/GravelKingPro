@@ -7,20 +7,95 @@
  *
  * Admin:
  *   GET  /api/admin/email-list      — every captured address, newest first
- *   POST /api/admin/email-blast     — send one email to every captured address via Gmail (BCC batches)
+ *   POST /api/admin/email-blast/preview — stage a deduplicated recipient snapshot
+ *   POST /api/admin/email-blast     — send one email to captured addresses via SendGrid or Gmail
  */
 import { Router, type Request, type Response } from "express";
+import { randomUUID } from "node:crypto";
 import { db, usersTable, emailCaptureTable } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 import { requireAdmin, isAdminAuthenticated } from "../lib/adminAuth";
 import { rateLimit } from "../lib/rateLimiter";
 import { getUsageUser } from "../lib/usage";
 import { sendGmail, getGmailAddress } from "../lib/gmail";
+import { checkSendGrid, sendSendGrid } from "../lib/sendgrid";
+import { ADMIN_AUTOMATION_EMAIL } from "../lib/adminAuth";
 import { storage } from "../storage";
 
 const emailRouter = Router();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "23505";
+}
+
+/**
+ * Attach an anonymous visitor's session to the canonical user for the email.
+ * The session_id column is unique, so clear the anonymous row before moving
+ * the token to an existing account.
+ */
+async function findOrLinkCapturedEmail(
+  req: Request,
+  usageUser: Awaited<ReturnType<typeof getUsageUser>>,
+  normalized: string,
+): Promise<void> {
+  // getUsageUser creates the cookie on the response when this is a first-time
+  // visitor, so req.cookies does not contain it yet. The returned user row does.
+  const sessionId =
+    (req.cookies as Record<string, string> | undefined)?.gk_session ??
+    usageUser.sessionId ??
+    undefined;
+  const [emailOwner] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.email, normalized))
+    .limit(1);
+
+  if (emailOwner && emailOwner.id !== usageUser.id) {
+    if (!sessionId) return;
+    await db.transaction(async (tx) => {
+      await tx
+        .update(usersTable)
+        .set({ sessionId: null })
+        .where(eq(usersTable.id, usageUser.id));
+      await tx
+        .update(usersTable)
+        .set({ sessionId })
+        .where(eq(usersTable.id, emailOwner.id));
+    });
+    return;
+  }
+
+  if (usageUser.email?.trim()) return;
+
+  try {
+    await db
+      .update(usersTable)
+      .set({ email: normalized })
+      .where(eq(usersTable.id, usageUser.id));
+  } catch (err) {
+    // A concurrent request may have claimed the email after the lookup.
+    // Re-resolve and link instead of returning a duplicate-key 500.
+    if (!isUniqueViolation(err)) throw err;
+    const [concurrentOwner] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, normalized))
+      .limit(1);
+    if (!concurrentOwner || !sessionId) throw err;
+    await db.transaction(async (tx) => {
+      await tx
+        .update(usersTable)
+        .set({ sessionId: null })
+        .where(eq(usersTable.id, usageUser.id));
+      await tx
+        .update(usersTable)
+        .set({ sessionId })
+        .where(eq(usersTable.id, concurrentOwner.id));
+    });
+  }
+}
 
 const captureRateLimit = rateLimit({
   windowMs: 10 * 60_000,
@@ -39,9 +114,7 @@ emailRouter.post("/email-capture", captureRateLimit, async (req: Request, res: R
   try {
     // Tie the email to the visitor's user row so the free-tool gate recognises them.
     const usageUser = await getUsageUser(req, res);
-    if (!usageUser.email?.trim()) {
-      await db.update(usersTable).set({ email: normalized }).where(eq(usersTable.id, usageUser.id));
-    }
+    await findOrLinkCapturedEmail(req, usageUser, normalized);
 
     const [existing] = await db
       .select({ id: emailCaptureTable.id })
@@ -127,24 +200,198 @@ emailRouter.get("/admin/email-list", async (req: Request, res: Response) => {
   }
 });
 
+/** GET /api/admin/email-provider — provider readiness for the outreach panel. */
+emailRouter.get("/admin/email-provider", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  const sendgrid = await checkSendGrid();
+  let gmail = false;
+  try {
+    gmail = Boolean(await getGmailAddress());
+  } catch {
+    // Status is best-effort; the send path reports the actionable error.
+  }
+  res.json({ ok: true, sendgrid, gmail });
+});
+
 const BCC_BATCH = 40;
+const SENDGRID_BATCH = 100;
+const OUTREACH_PREVIEW_TTL_MS = 10 * 60_000;
+
+type OutreachProvider = "sendgrid" | "gmail";
+
+type OutreachPreview = {
+  provider: OutreachProvider;
+  emails: string[];
+  createdAt: number;
+};
+
+const outreachPreviews = new Map<string, OutreachPreview>();
+
+function normalizeProvider(provider: unknown): OutreachProvider {
+  return provider === "gmail" ? "gmail" : "sendgrid";
+}
+
+function batchSizeFor(provider: OutreachProvider): number {
+  return provider === "gmail" ? BCC_BATCH : SENDGRID_BATCH;
+}
+
+function batchCountFor(provider: OutreachProvider, recipientCount: number): number {
+  return Math.ceil(recipientCount / batchSizeFor(provider));
+}
+
+async function getCapturedEmailSnapshot(): Promise<string[]> {
+  const rows = await db.select({ email: emailCaptureTable.email }).from(emailCaptureTable);
+  return [...new Set(rows.map((row) => row.email.trim().toLowerCase()))];
+}
+
+function removeExpiredOutreachPreviews(now = Date.now()): void {
+  for (const [id, preview] of outreachPreviews) {
+    if (now - preview.createdAt > OUTREACH_PREVIEW_TTL_MS) outreachPreviews.delete(id);
+  }
+}
+
+function storeOutreachPreview(provider: OutreachProvider, emails: string[]): string {
+  const now = Date.now();
+  removeExpiredOutreachPreviews(now);
+  // Keep the in-memory store bounded if an admin leaves several composer tabs open.
+  while (outreachPreviews.size >= 100) {
+    const oldest = outreachPreviews.keys().next().value;
+    if (!oldest) break;
+    outreachPreviews.delete(oldest);
+  }
+  const id = randomUUID();
+  outreachPreviews.set(id, { provider, emails, createdAt: now });
+  return id;
+}
+
+function getOutreachPreview(id: string): OutreachPreview | null {
+  removeExpiredOutreachPreviews();
+  return outreachPreviews.get(id) ?? null;
+}
+
+/** POST /api/admin/email-blast/preview — stage the exact audience for a send. */
+emailRouter.post("/admin/email-blast/preview", async (req: Request, res: Response) => {
+  if (!await requireAdmin(req, res)) return;
+  const selectedProvider = normalizeProvider((req.body ?? {}).provider);
+  try {
+    const emails = await getCapturedEmailSnapshot();
+    const previewId = storeOutreachPreview(selectedProvider, emails);
+    res.json({
+      ok: true,
+      previewId,
+      provider: selectedProvider,
+      total: emails.length,
+      recipientCount: emails.length,
+      batches: batchCountFor(selectedProvider, emails.length),
+      emails,
+    });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to preview recipients" });
+  }
+});
 
 /**
  * POST /api/admin/email-blast — send one email to every captured address via
- * the owner's Gmail. Recipients are BCC'd in batches so addresses stay private.
+ * SendGrid or the explicitly selected Gmail fallback.
  */
 emailRouter.post("/admin/email-blast", async (req: Request, res: Response) => {
   if (!await requireAdmin(req, res)) return;
-  const { subject, body } = (req.body ?? {}) as { subject?: string; body?: string };
+  const { subject, body, provider, recipients, previewId } = (req.body ?? {}) as {
+    subject?: string;
+    body?: string;
+    provider?: string;
+    recipients?: unknown;
+    previewId?: unknown;
+  };
   if (!subject?.trim() || !body?.trim()) {
     res.status(400).json({ error: "subject and body are required" });
     return;
   }
+  if (recipients !== undefined && (
+    !Array.isArray(recipients)
+    || recipients.some((email): email is string => typeof email !== "string" || !EMAIL_RE.test(email.trim()))
+  )) {
+    res.status(400).json({ error: "recipients must be a list of valid email addresses" });
+    return;
+  }
+  const selectedProvider = normalizeProvider(provider);
+  if (previewId !== undefined && typeof previewId !== "string") {
+    res.status(400).json({ error: "previewId must be a string" });
+    return;
+  }
+  if (previewId !== undefined && recipients !== undefined) {
+    res.status(400).json({ error: "previewId and recipients cannot be used together" });
+    return;
+  }
+  if (recipients === undefined && previewId === undefined) {
+    res.status(400).json({ error: "Preview the recipient list before sending" });
+    return;
+  }
   try {
-    const rows = await db.select({ email: emailCaptureTable.email }).from(emailCaptureTable);
-    const emails = [...new Set(rows.map((r) => r.email))];
+    // Retry requests must be limited to addresses that are still in the
+    // captured audience. The UI supplies only the failedRecipients returned
+    // by an earlier send; this server-side check also prevents arbitrary
+    // addresses from being introduced through the retry payload.
+    let emails: string[];
+    if (previewId !== undefined) {
+      const preview = getOutreachPreview(previewId);
+      if (!preview) {
+        res.status(409).json({ error: "Recipient preview expired or is no longer available. Preview the list again." });
+        return;
+      }
+      if (preview.provider !== selectedProvider) {
+        res.status(409).json({ error: "The selected provider changed. Preview the recipient list again." });
+        return;
+      }
+      outreachPreviews.delete(previewId);
+      emails = preview.emails;
+    } else {
+      const capturedEmails = new Set(await getCapturedEmailSnapshot());
+      emails = recipients === undefined
+        ? [...capturedEmails]
+        : [...new Set(
+          recipients
+            .map((email) => email.trim().toLowerCase())
+            .filter((email) => capturedEmails.has(email)),
+        )];
+    }
     if (emails.length === 0) {
-      res.json({ ok: true, sent: 0, failed: 0, batches: 0, total: 0 });
+      res.json({ ok: true, sent: 0, failed: 0, failedRecipients: [], batches: 0, total: 0 });
+      return;
+    }
+
+    if (selectedProvider === "sendgrid") {
+      const sender = process.env.SENDGRID_FROM_EMAIL?.trim() || ADMIN_AUTOMATION_EMAIL;
+      let sent = 0;
+      let failed = 0;
+      const failedRecipients: string[] = [];
+      let batches = 0;
+      for (let i = 0; i < emails.length; i += SENDGRID_BATCH) {
+        const chunk = emails.slice(i, i + SENDGRID_BATCH);
+        const ok = await sendSendGrid({
+          to: chunk,
+          from: sender,
+          subject: subject.trim(),
+          text: body.trim(),
+        });
+        if (ok) {
+          sent += chunk.length;
+        } else {
+          failed += chunk.length;
+          failedRecipients.push(...chunk);
+        }
+        batches += 1;
+        if (i + SENDGRID_BATCH < emails.length) await new Promise((r) => setTimeout(r, 300));
+      }
+      res.json({
+        ok: failed === 0,
+        provider: selectedProvider,
+        sent,
+        failed,
+        failedRecipients,
+        batches,
+        total: emails.length,
+      });
       return;
     }
 
@@ -158,6 +405,7 @@ emailRouter.post("/admin/email-blast", async (req: Request, res: Response) => {
 
     let sent = 0;
     let failed = 0;
+    const failedRecipients: string[] = [];
     let batches = 0;
     for (let i = 0; i < emails.length; i += BCC_BATCH) {
       const chunk = emails.slice(i, i + BCC_BATCH);
@@ -167,13 +415,26 @@ emailRouter.post("/admin/email-blast", async (req: Request, res: Response) => {
         subject: subject.trim(),
         text: body.trim(),
       });
-      if (ok) sent += chunk.length; else failed += chunk.length;
+      if (ok) {
+        sent += chunk.length;
+      } else {
+        failed += chunk.length;
+        failedRecipients.push(...chunk);
+      }
       batches += 1;
       if (i + BCC_BATCH < emails.length) {
         await new Promise((r) => setTimeout(r, 300));
       }
     }
-    res.json({ ok: failed === 0, sent, failed, batches, total: emails.length });
+    res.json({
+      ok: failed === 0,
+      provider: selectedProvider,
+      sent,
+      failed,
+      failedRecipients,
+      batches,
+      total: emails.length,
+    });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Failed" });
   }

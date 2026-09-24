@@ -1,5 +1,5 @@
 /**
- * Server-side generator for the GravelKing Pro MLK V3.5 Technical Brief PDF.
+ * Server-side generator for the GravelKing Pro MLK V4 Technical Brief PDF.
  *
  * Single source of truth for the brief: `GET /api/v1/download-whitepaper`
  * (alias `/api/whitepaper.pdf`) streams this document, and the /whitepaper
@@ -45,7 +45,7 @@ export function buildWhitepaperPdf(): Buffer {
   doc.text("GravelKing Pro", W / 2, 62, { align: "center" });
   doc.setFontSize(17);
   doc.setTextColor(251, 191, 36);
-  doc.text("MLK V3.5 — Signal-Level Audio Security", W / 2, 77, { align: "center" });
+  doc.text("MLK V4 — Signal-Level Audio Security", W / 2, 77, { align: "center" });
   doc.setFontSize(12.5);
   doc.setTextColor(161, 161, 170);
   doc.text("Technical Brief for Enterprise Partners", W / 2, 89, { align: "center" });
@@ -143,7 +143,7 @@ export function buildWhitepaperPdf(): Buffer {
     "The 2026 AI content landscape has created an urgent trust deficit for digital creators. Generative AI tools now produce audio indistinguishable from human-authored recordings, AI training datasets ingest unlicensed catalog without attribution, and platform-level metadata (ID3 tags, ISRC codes) can be stripped, reassigned, or fraudulently claimed by any actor with basic tooling.",
   );
   body(
-    "GravelKing Pro MLK V3.5 solves this at the signal level — not the metadata level. Rather than relying on external ledgers, blockchain timestamps, or third-party registries that can be circumvented, MLK V3.5 embeds cryptographic proof of ownership directly into the audio bitstream using dual-anchor LSB steganography. This proof travels with the track permanently, survives platform distribution, and is verified server-authoritatively — making chain-of-custody disputes resolvable without court-ordered discovery.",
+    "GravelKing Pro MLK V4 solves this at the signal level — not the metadata level. Rather than relying on external ledgers, blockchain timestamps, or third-party registries that can be circumvented, MLK V4 embeds cryptographic proof of ownership directly into the audio bitstream using dual-anchor LSB steganography. This proof travels with the track permanently, survives platform distribution, and is verified server-authoritatively — making chain-of-custody disputes resolvable without court-ordered discovery.",
   );
   heading("Market Context");
   bullet("$43B+ global creator economy (2026), growing 18% YoY");
@@ -178,7 +178,7 @@ export function buildWhitepaperPdf(): Buffer {
   section("3", "Court-Admissible Forensic Chain-of-Title");
   heading("Dual-Anchor Split-Key Architecture");
   body(
-    "MLK V3.5 uses a nominator/denominator split: the two halves of the cryptographic proof are stored separately, making verification server-authoritative by design.",
+    "MLK V4 uses a nominator/denominator split: the two halves of the cryptographic proof are stored separately, making verification server-authoritative by design.",
   );
   bullet(
     "Anchor A (Nominator) — embedded into the audio's least-significant bits. Encodes SHA-256(contentHash | artistHandle | certId), truncated to 32 hex chars. Survives lossless export (WAV, AIFF, FLAC). Travels with the signal, not the container.",
@@ -211,7 +211,7 @@ export function buildWhitepaperPdf(): Buffer {
   );
   heading("Core Endpoints");
   bullet(
-    "POST /api/v1/ingest (alias: /api/kernel/master) — Submit audio for MLK V3.5 processing + cert embedding. Returns processed stream + X-GK-CertId header.",
+    "POST /api/v1/ingest (alias: /api/kernel/master) — Submit audio for MLK V4 processing + cert embedding. Returns processed stream + X-GK-CertId header.",
   );
   bullet(
     "POST /api/v1/verify (alias: /api/kernel/verify-signal) — Public clean-room verification. No auth required. < 2ms median response for pre-certified tracks.",
@@ -228,7 +228,7 @@ export function buildWhitepaperPdf(): Buffer {
   bullet("Sample rates: 44.1 kHz, 48 kHz, 96 kHz — all supported via ffmpeg normalization");
   heading("Integration Flow for Creator Platforms");
   body(
-    "1. Platform calls POST /api/v1/ingest with creator's audio file + author_assertion: true\n2. MLK V3.5 validates through the 3-tier ingestion filter\n3. If cleared: applies mastering chain, embeds Anchor A watermark, stores Anchor B + cert\n4. Returns processed audio to platform + certId header\n5. Platform stores certId against the creator's content record\n6. Any downstream dispute: call POST /api/v1/verify with the distributed file — warrant status returns in < 2ms",
+    "1. Platform calls POST /api/v1/ingest with creator's audio file + author_assertion: true\n2. MLK V4 validates through the 3-tier ingestion filter\n3. If cleared: applies mastering chain, embeds Anchor A watermark, stores Anchor B + cert\n4. Returns processed audio to platform + certId header\n5. Platform stores certId against the creator's content record\n6. Any downstream dispute: call POST /api/v1/verify with the distributed file — warrant status returns in < 2ms",
   );
   heading("Throughput & SLA");
   bullet("Median verification latency: < 2ms (pre-certified tracks, in-region)");
@@ -239,7 +239,7 @@ export function buildWhitepaperPdf(): Buffer {
   // ── Section 5 ───────────────────────────────────────────────────────────────
   section("5", "Containerized Infrastructure Moat");
   body(
-    "The MLK V3.5 kernel is implemented as a native C-bound DSP pipeline exposed through a Node.js FFI layer. The architecture is designed for zero-trust enterprise cloud deployment and on-premise air-gapped installations.",
+    "The MLK V4 kernel is implemented as a native C-bound DSP pipeline exposed through a Node.js FFI layer. The architecture is designed for zero-trust enterprise cloud deployment and on-premise air-gapped installations.",
   );
   heading("Core Architecture");
   bullet("Docker multi-stage build: Node.js 22 LTS + ffmpeg-headless + native kernel binary");

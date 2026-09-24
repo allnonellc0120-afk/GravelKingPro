@@ -161,6 +161,10 @@ analyticsRouter.post("/analytics/track", async (req: Request, res: Response) => 
 
     const metadata = safeCampaignMetadata(body.metadata) ?? {};
     if (isInternalTraffic(req)) metadata.internal = "1";
+    // Store only a coarse device class; never persist the full user-agent.
+    const ua = String(req.headers["user-agent"] ?? "");
+    metadata.device = /iPad/.test(ua) || (/Macintosh/.test(ua) && /Mobile/.test(ua))
+      ? "iPadOS" : /iPhone|iPod/.test(ua) ? "iOS" : /Android|Mobile/.test(ua) ? "Other mobile" : "Desktop";
 
     await recordAnalyticsEvent({
       type: "pageview",

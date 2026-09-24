@@ -1,6 +1,6 @@
 ---
 name: MorrisLawKernel standalone repo
-description: Where the standalone MLK v3.5 showcase repo lives and the rules its contents must follow
+description: Where the standalone MLK V4 (Morris Law Kernel V4) showcase repo lives and the rules its contents must follow
 ---
 
 # MorrisLawKernel standalone repo

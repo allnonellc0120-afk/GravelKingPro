@@ -35,7 +35,7 @@ const KIT_808 = [
 
 function getCtx() {
   const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-  return new AudioContext({ sampleRate: 44100 });
+  return new AudioContext({ sampleRate: 48000 });
 }
 
 function renderDrum(

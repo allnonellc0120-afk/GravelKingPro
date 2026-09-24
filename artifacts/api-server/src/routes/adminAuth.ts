@@ -6,6 +6,7 @@ import {
   isAdminAuthenticated,
   isDeveloperAuthenticated,
   requireAdmin,
+  requireLabelCatalogOwner,
 } from "../lib/adminAuth";
 import {
   db,
@@ -55,17 +56,11 @@ adminAuthRouter.post("/admin/login", adminLoginRateLimit, (req: Request, res: Re
   res.json({ ok: true });
 });
 
-/** GET /api/admin/check — return 200 if admin session OR developer user is valid. */
+/** GET /api/admin/check — owner-only gate for label/control surfaces. */
 adminAuthRouter.get("/admin/check", async (req: Request, res: Response) => {
-  if (isAdminAuthenticated(req)) {
+  if (requireLabelCatalogOwner(req, res)) {
     res.json({ ok: true });
-    return;
   }
-  if (await isDeveloperAuthenticated(req)) {
-    res.json({ ok: true });
-    return;
-  }
-  res.status(401).json({ ok: false });
 });
 
 /** POST /api/admin/logout — clear the session cookie. */

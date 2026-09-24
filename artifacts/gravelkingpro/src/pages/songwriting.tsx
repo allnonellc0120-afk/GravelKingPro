@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuth, useUser } from "@clerk/react";
 import { jsPDF } from "jspdf";
 import { useAppState } from "@/lib/context";
 import { Layout } from "@/components/layout";
@@ -9,11 +9,13 @@ import { trackEvent } from "@/lib/analytics";
 import { submitGenerationJob } from "@/lib/generation-jobs";
 import { useCredits } from "@/components/credit-wallet";
 import { authorshipLedger as buildAuthorshipLedger, authorshipScore as computeAuthorshipScore, preserveHumanEdits, type AuthorshipLedgerEntry } from "@workspace/authorship";
+import { getJaxRequestHeaders as buildJaxRequestHeaders } from "@/lib/jax-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -96,18 +98,13 @@ const DEFAULT_ARTIST_PROFILE: ArtistProfile = {
   vocabularyHabits: "",
 };
 const JAX_VOICE_STORAGE_KEY = "mlk_jax_selected_voice";
-const DEFAULT_JAX_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
-const LEGACY_DEFAULT_JAX_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
-const CITY_RAIN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+const JAX_BROWSER_VOICE_URI_KEY = "gk:jax:browser-voice-uri:v1";
+const JAX_SPEECH_PITCH_KEY      = "gk:jax:speech-pitch:v1";
+const JAX_SPEECH_RATE_KEY       = "gk:jax:speech-rate:v1";
+const DEFAULT_JAX_VOICE_ID = "gravelking_outlaw_baritone";
 type JaxVoicePreset = readonly [string, string];
 const DEFAULT_JAX_VOICE_PRESETS: JaxVoicePreset[] = [
-  ["admin", "Admin Configured Voice"],
-  [DEFAULT_JAX_VOICE_ID, "Voice: GravelKing (Baritone)"],
-  [CITY_RAIN_VOICE_ID, "Voice: City Rain (Female Lead)"],
-  ["ErXwobaYiN019PkySvjV", "JAX Smooth / Younger Conversational"],
-  ["N2lVS1w4EtoT3dr4eOWO", "JAX Gritty Blues / Rough"],
-  ["TxGEqnHWrfWFTfGW9XjX", "JAX Heavy Low-End / Narrator"],
-  ["pqHfZKP75CvOlQylNhV4", "JAX Classic Vintage"],
+  [DEFAULT_JAX_VOICE_ID, "JAX GravelKing Outlaw Baritone (MLK/RVC)"],
 ] as const;
 
 function mergeJaxVoicePresets(
@@ -450,7 +447,11 @@ function AutoTextarea({
 
 export default function SongwritingStudio() {
   const { tier, isDeveloper } = useAppState();
+  const { getToken } = useAuth();
   const { user } = useUser();
+  const getJaxRequestHeaders = useCallback(async (accept?: string): Promise<Record<string, string>> => {
+    return buildJaxRequestHeaders(getToken, accept);
+  }, [getToken]);
   const [initialJax] = useState(() => {
     const activeSessionId = localStorage.getItem(JAX_SESSION_KEY) || crypto.randomUUID();
     return { sessionId: activeSessionId, snapshot: readLocalJaxSnapshot(activeSessionId) };
@@ -507,10 +508,22 @@ export default function SongwritingStudio() {
   const [speaking, setSpeaking] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(() => {
     const saved = localStorage.getItem(JAX_VOICE_STORAGE_KEY);
-    return !saved || saved === LEGACY_DEFAULT_JAX_VOICE_ID ? DEFAULT_JAX_VOICE_ID : saved;
+    return saved === DEFAULT_JAX_VOICE_ID ? saved : DEFAULT_JAX_VOICE_ID;
   });
   const [jaxVoicePresets, setJaxVoicePresets] = useState<JaxVoicePreset[]>(DEFAULT_JAX_VOICE_PRESETS);
   const [, setVoiceError] = useState("");
+
+  // ── Browser speech synthesis (Read Aloud) ─────────────────────────────────
+  const [browserVoices,           setBrowserVoices]           = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedBrowserVoiceURI, setSelectedBrowserVoiceURI] = useState<string>(
+    () => localStorage.getItem(JAX_BROWSER_VOICE_URI_KEY) ?? "",
+  );
+  const [speechPitch, setSpeechPitch] = useState<number>(
+    () => { const v = parseFloat(localStorage.getItem(JAX_SPEECH_PITCH_KEY) ?? ""); return Number.isFinite(v) ? Math.max(0.5, Math.min(2, v)) : 1; },
+  );
+  const [speechRate, setSpeechRate] = useState<number>(
+    () => { const v = parseFloat(localStorage.getItem(JAX_SPEECH_RATE_KEY) ?? ""); return Number.isFinite(v) ? Math.max(0.5, Math.min(2, v)) : 1; },
+  );
   const recognitionRef = useRef<{ stop: () => void; sessionId: number } | null>(null);
   const speechSessionRef = useRef(0);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -523,6 +536,7 @@ export default function SongwritingStudio() {
   const [profileStatus, setProfileStatus] = useState("");
   const [styleDescriptor, setStyleDescriptor] = useState("");
   const [generatorLyrics, setGeneratorLyrics] = useState("");
+  const [instrumentalOnly, setInstrumentalOnly] = useState(false);
   const [generatorBusy, setGeneratorBusy] = useState(false);
   const [generatorMessage, setGeneratorMessage] = useState("");
   const [generatorProgress, setGeneratorProgress] = useState<number | null>(null);
@@ -647,6 +661,25 @@ export default function SongwritingStudio() {
   useEffect(() => {
     localStorage.setItem(JAX_VOICE_STORAGE_KEY, selectedVoice);
   }, [selectedVoice]);
+
+  // Persist browser voice settings
+  useEffect(() => { localStorage.setItem(JAX_BROWSER_VOICE_URI_KEY, selectedBrowserVoiceURI); }, [selectedBrowserVoiceURI]);
+  useEffect(() => { localStorage.setItem(JAX_SPEECH_PITCH_KEY,      String(speechPitch));      }, [speechPitch]);
+  useEffect(() => { localStorage.setItem(JAX_SPEECH_RATE_KEY,       String(speechRate));       }, [speechRate]);
+
+  // Load available browser voices; re-fire on voiceschanged (Chrome fires it asynchronously)
+  useEffect(() => {
+    const load = () => {
+      const voices = typeof window !== "undefined" ? (window.speechSynthesis?.getVoices() ?? []) : [];
+      if (voices.length) setBrowserVoices(voices);
+    };
+    load();
+    if (typeof window !== "undefined") {
+      window.speechSynthesis?.addEventListener("voiceschanged", load);
+      return () => window.speechSynthesis?.removeEventListener("voiceschanged", load);
+    }
+    return undefined;
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(JAX_SESSION_KEY, sessionId);
@@ -967,7 +1000,7 @@ export default function SongwritingStudio() {
       const prompt = `Regenerate only the requested lyric lines below. Return exactly one replacement line for each requested line, in the same order, with no numbering, commentary, or code fences. Do not return any other lines.\n\nREQUESTED LINES:\n${requestedLines}`;
       const result = await fetch("/api/chat/jax", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getJaxRequestHeaders(),
         credentials: "include",
         body: JSON.stringify({
           message: prompt,
@@ -1053,7 +1086,7 @@ export default function SongwritingStudio() {
     try {
       const result = await fetch("/api/chat/jax", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+        headers: await getJaxRequestHeaders("text/event-stream"),
         credentials: "include",
         body: JSON.stringify({
           message: submittedPrompt,
@@ -1201,7 +1234,7 @@ export default function SongwritingStudio() {
   };
 
   const speakText = async (text: string, force = false) => {
-    if (!force && (speaking || voiceAudioRef.current || ttsAbortRef.current)) {
+    if (!force && speaking) {
       stopSpeaking();
       return;
     }
@@ -1210,72 +1243,28 @@ export default function SongwritingStudio() {
     setSpeaking(true);
     const playbackId = voicePlaybackRef.current + 1;
     voicePlaybackRef.current = playbackId;
-    const controller = new AbortController();
-    ttsAbortRef.current = controller;
-    try {
-      const result = await fetch("/api/jax/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ text, voiceId: selectedVoice }),
-        signal: controller.signal,
-      });
-      if (!result.ok) throw new Error((await result.json() as { error?: string }).error || "Voice playback unavailable.");
-      const objectUrl = URL.createObjectURL(await result.blob());
-      if (voicePlaybackRef.current !== playbackId) {
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-      let audio: HTMLAudioElement;
-      try {
-        audio = new Audio(objectUrl);
-      } catch {
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-      voiceAudioRef.current = audio;
-      voiceObjectUrlRef.current = objectUrl;
-      audio.onended = () => {
-        if (voicePlaybackRef.current !== playbackId) return;
-        voiceAudioRef.current = null;
-        if (voiceObjectUrlRef.current === objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-          voiceObjectUrlRef.current = null;
-        }
-        if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
-        setSpeaking(false);
-      };
-      audio.onerror = () => {
-        if (voicePlaybackRef.current !== playbackId) return;
-        voiceAudioRef.current = null;
-        if (voiceObjectUrlRef.current === objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-          voiceObjectUrlRef.current = null;
-        }
-        if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
-        setVoiceError("The selected voice could not be played.");
-        setSpeaking(false);
-      };
-      try {
-        await audio.play();
-      } catch {
-        // Playback is optional; keep the generated text visible on WebKit/iOS.
-        audio.pause();
-        audio.removeAttribute("src");
-        audio.load();
-        if (voiceObjectUrlRef.current === objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-          voiceObjectUrlRef.current = null;
-        }
-        voiceAudioRef.current = null;
-        setSpeaking(false);
-      }
-    } catch (error) {
-      if (voicePlaybackRef.current !== playbackId || (error instanceof DOMException && error.name === "AbortError")) return;
+    if (!("speechSynthesis" in window)) {
+      setVoiceError("Device speech preview is unavailable in this browser.");
       setSpeaking(false);
-    } finally {
-      if (ttsAbortRef.current === controller) ttsAbortRef.current = null;
+      return;
     }
+    const utterance = new SpeechSynthesisUtterance(text.slice(0, 10_000));
+    // Apply persisted browser voice settings
+    utterance.pitch = speechPitch;
+    utterance.rate  = speechRate;
+    if (selectedBrowserVoiceURI) {
+      const voice = browserVoices.find(v => v.voiceURI === selectedBrowserVoiceURI);
+      if (voice) utterance.voice = voice;
+    }
+    utterance.onend = () => {
+      if (voicePlaybackRef.current === playbackId) setSpeaking(false);
+    };
+    utterance.onerror = () => {
+      if (voicePlaybackRef.current !== playbackId) return;
+      setVoiceError("Device speech preview could not be played.");
+      setSpeaking(false);
+    };
+    window.speechSynthesis.speak(utterance);
   };
 
   const speakResponse = async () => {
@@ -1318,7 +1307,7 @@ export default function SongwritingStudio() {
   const askJax = async (fillPrompt: string): Promise<string> => {
     const result = await fetch("/api/chat/jax", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await getJaxRequestHeaders(),
       credentials: "include",
       body: JSON.stringify({ message: fillPrompt, is_explicit: isExplicit, artistProfile, history: chatMessages.slice(-2).map((m) => ({ role: m.role, content: m.content })) }),
     });
@@ -1331,6 +1320,15 @@ export default function SongwritingStudio() {
     let lyrics = generatorLyrics.trim();
     let style = styleDescriptor.trim();
     const filled: string[] = [];
+    if (instrumentalOnly) {
+      if (!style) {
+        setGeneratorMessage("No style entered — JAX is picking an instrumental direction…");
+        style = await askJax("In one short line, describe a compelling instrumental music style with genre, tempo, mood, and instrumentation. Output the style description only.");
+        setStyleDescriptor(style);
+        filled.push("style");
+      }
+      return { lyrics: "", style, filled };
+    }
     if (!lyrics) {
       setGeneratorMessage(style ? "No lyrics entered — JAX is writing them in your style…" : "No lyrics entered — JAX is writing them…");
       lyrics = await askJax(style
@@ -1358,40 +1356,6 @@ export default function SongwritingStudio() {
       .filter(Boolean),
   });
 
-  const generateSongElevenLabs = async () => {
-    if (generatorBusy) return;
-    setGeneratorBusy(true);
-    setGeneratorMessage("");
-    toast({ title: "Generating your track…", description: "JAX is preparing the audio. We’ll open your Library when it’s ready." });
-    try {
-      const { lyrics, style, filled } = await smartFill();
-      const lyricAudit = await buildRenderAudit(lyrics);
-      trackEvent("song_generate_clicked", { engine: "jax" });
-      setGeneratorMessage("JAX is producing your take… this can take a minute or two.");
-      const result = await fetch("/api/jax/generate-music", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-         body: JSON.stringify({ lyrics, style, title: draft.title, lyricAudit }),
-      });
-      if (!result.ok) {
-        const data = await result.json().catch(() => ({})) as { error?: string; code?: string };
-        if (result.status === 403) throw new Error(data.error || "JAX generation is a Pro/King feature.");
-        throw new Error(data.error || "JAX could not complete this take.");
-      }
-      const data = await result.json() as { trackId?: string; title?: string };
-      setGeneratorMessage(`JAX take ready${filled.length ? ` — JAX supplied the ${filled.join(" and ")}` : ""} — playing now and saved to your library. Open it in the Mastering Tool to polish it.`);
-      toast({ title: "Track ready", description: "Your new track is cued at the top of Library." });
-      trackEvent("song_generated", { engine: "jax", auto_filled: filled.join("+") || "none" });
-      if (data.trackId) navigate(`/library?track=${encodeURIComponent(data.trackId)}`);
-    } catch (error) {
-      setGeneratorMessage(error instanceof Error ? error.message : "JAX could not complete this take.");
-      toast({ title: "Generation failed", description: error instanceof Error ? error.message : "JAX could not complete this take.", variant: "destructive" });
-    } finally {
-      setGeneratorBusy(false);
-    }
-  };
-
   const generateSong = async () => {
     if (generatorBusy) return;
     setGeneratorBusy(true);
@@ -1399,13 +1363,21 @@ export default function SongwritingStudio() {
     toast({ title: "Generating your track…", description: "The MLK engine is rendering your audio. We’ll open your Library when it’s ready." });
     try {
       const { lyrics, style, filled } = await smartFill();
-      const lyricAudit = await buildRenderAudit(lyrics);
+      const lyricAudit = instrumentalOnly ? undefined : await buildRenderAudit(lyrics);
       trackEvent("song_generate_clicked", { engine: "mlk" });
       setGeneratorMessage("Rendering your take… this can take a couple of minutes.");
       const state = await submitGenerationJob({
         kind: "generate",
         dedupeKey: `${await sha256Text(lyrics)}:${await sha256Text(style)}`,
-        body: { text: lyrics, title: draft.title, stylePrompt: style, vocalMode: "lyrics", durationS: 120, isExplicit, lyricAudit },
+         body: {
+           text: lyrics,
+           title: draft.title,
+           stylePrompt: style,
+           vocalMode: instrumentalOnly ? "instrumental" : "lyrics",
+           durationS: 120,
+           isExplicit,
+           lyricAudit,
+         },
         onProgress: (job) => {
           if (job.status === "processing") {
             const pct = typeof job.progress === "number" ? job.progress : 5;
@@ -1421,7 +1393,7 @@ export default function SongwritingStudio() {
       setStage3Hash(bytesToHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(binding))));
       setGeneratorMessage(`Render complete${filled.length ? ` — JAX supplied the ${filled.join(" and ")}` : ""}. The take is in your library, ready to certify when you are.`);
       toast({ title: "Track ready", description: "Your new track is cued at the top of Library." });
-      trackEvent("song_generated", { engine: "mlk", auto_filled: filled.join("+") || "none" });
+       trackEvent("song_generated", { engine: "mlk", mode: instrumentalOnly ? "instrumental" : "lyrics", auto_filled: filled.join("+") || "none" });
       if (data.trackId) navigate(`/library?track=${encodeURIComponent(data.trackId)}`);
     } catch (error) {
       setGeneratorProgress(null);
@@ -1456,12 +1428,84 @@ export default function SongwritingStudio() {
                    </PopoverTrigger>
                    <PopoverContent align="end" className="w-80 border-white/10 bg-[#171820] text-foreground">
                      <p className="font-semibold">JAX voice settings</p>
-                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose how JAX sounds. The setting is remembered on this device.</p>
-                     <label htmlFor="jax-voice-settings" className="mt-4 block text-xs font-medium text-muted-foreground">Voice</label>
-                     <select id="jax-voice-settings" value={selectedVoice} onChange={(event) => { stopSpeaking(); setSelectedVoice(event.target.value); }} className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm text-foreground outline-none focus:border-violet-400">
-                       {jaxVoicePresets.map(([voiceId, label]) => <option key={voiceId} value={voiceId}>{label}</option>)}
-                     </select>
-                     <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-5 text-muted-foreground">
+                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                       Configures your browser's speech synthesis for "Read aloud". Saved on this device.
+                     </p>
+
+                     {/* System voice picker — populated from window.speechSynthesis.getVoices() */}
+                     <label htmlFor="jax-browser-voice" className="mt-4 block text-xs font-medium text-muted-foreground">
+                       System voice
+                     </label>
+                     {browserVoices.length > 0 ? (
+                       <select
+                         id="jax-browser-voice"
+                         value={selectedBrowserVoiceURI}
+                         onChange={(event) => { stopSpeaking(); setSelectedBrowserVoiceURI(event.target.value); }}
+                         className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm text-foreground outline-none focus:border-violet-400"
+                       >
+                         <option value="">— Browser default —</option>
+                         {browserVoices.map((v) => (
+                           <option key={v.voiceURI} value={v.voiceURI}>
+                             {v.name}{v.localService ? "" : " ☁"} ({v.lang})
+                           </option>
+                         ))}
+                       </select>
+                     ) : (
+                       <p className="mt-1.5 text-xs italic text-muted-foreground">
+                         No voices found — browser may not support speech synthesis, or voices are still loading.
+                       </p>
+                     )}
+
+                     {/* Pitch control */}
+                     <div className="mt-4">
+                       <div className="mb-1.5 flex items-center justify-between text-xs">
+                         <label className="font-medium text-muted-foreground">Pitch</label>
+                         <span className="font-mono text-violet-300">{speechPitch.toFixed(2)}×</span>
+                       </div>
+                       <Slider
+                         min={0.5}
+                         max={2}
+                         step={0.05}
+                         value={[speechPitch]}
+                         onValueChange={([v]) => { if (v !== undefined) { stopSpeaking(); setSpeechPitch(v); } }}
+                         aria-label="Speech pitch"
+                       />
+                       <div className="mt-1 flex justify-between text-[9px] text-muted-foreground">
+                         <span>Lower</span><span>Higher</span>
+                       </div>
+                     </div>
+
+                     {/* Rate control */}
+                     <div className="mt-4">
+                       <div className="mb-1.5 flex items-center justify-between text-xs">
+                         <label className="font-medium text-muted-foreground">Speed</label>
+                         <span className="font-mono text-violet-300">{speechRate.toFixed(2)}×</span>
+                       </div>
+                       <Slider
+                         min={0.5}
+                         max={2}
+                         step={0.05}
+                         value={[speechRate]}
+                         onValueChange={([v]) => { if (v !== undefined) { stopSpeaking(); setSpeechRate(v); } }}
+                         aria-label="Speech rate"
+                       />
+                       <div className="mt-1 flex justify-between text-[9px] text-muted-foreground">
+                         <span>Slower</span><span>Faster</span>
+                       </div>
+                     </div>
+
+                     {/* Live preview */}
+                     <button
+                       type="button"
+                       disabled={!response}
+                       onClick={() => void speakResponse()}
+                       className="mt-4 w-full rounded-lg border border-violet-400/30 bg-violet-500/10 py-2 text-xs font-medium text-violet-200 transition-colors hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                     >
+                       {speaking ? "Stop preview" : "Preview with current voice"}
+                     </button>
+
+                     {/* Auto-play status */}
+                     <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-5 text-muted-foreground">
                        <span className="font-medium text-foreground">{autoVoice ? "Auto-play on" : "Auto-play paused"}</span>
                        <br />Use the {autoVoice ? "stop" : "play"} button above to {autoVoice ? "pause" : "hear"} future JAX replies.
                      </div>
@@ -1527,11 +1571,15 @@ export default function SongwritingStudio() {
           <Textarea id="generator-lyrics" value={generatorLyrics} onChange={(event) => setGeneratorLyrics(event.target.value)} className="min-h-36 border-white/10 bg-black/20 leading-7" placeholder="Empty? JAX writes the lyrics for you…" />
           <label className="mb-2 mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="style-descriptor">Style prompt</label>
           <Textarea id="style-descriptor" value={styleDescriptor} onChange={(event) => setStyleDescriptor(event.target.value)} className="min-h-24 border-white/10 bg-black/20" placeholder="Empty? JAX picks a style. Or be exact: sad outlaw grunge, 70 BPM, dark raw acoustic…" />
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+           <label className="mt-5 flex min-h-11 w-fit cursor-pointer items-center gap-2 rounded-lg border border-amber-300/25 bg-amber-300/5 px-3 py-2 text-sm text-amber-100">
+             <Switch checked={instrumentalOnly} onCheckedChange={setInstrumentalOnly} aria-label="Instrumental Only" />
+             <span>Instrumental Only</span>
+             <span className="text-xs text-amber-200/60">no synthetic guide vocals</span>
+           </label>
+           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">The take lands in your library when it finishes rendering.</span>
             <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate with MLK (20 credits)"}</Button>
-                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with JAX (20 credits)"}</Button>
+                <Button onClick={() => void generateSong()} disabled={generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate Take (MLK)"}</Button>
             </div>
           </div>
           {generatorBusy && generatorProgress !== null && (
@@ -1745,7 +1793,6 @@ export default function SongwritingStudio() {
                   <span className="text-xs text-muted-foreground">Arrangement: {draft.blocks.map((block) => block.type).join(" → ")}</span>
                   <div className="flex flex-wrap gap-2">
                     <Button onClick={() => void generateSong()} disabled={!generatorLyrics.trim() || generatorBusy} className="bg-amber-500 text-black hover:bg-amber-400">{generatorBusy ? "Generating take…" : "Generate song (20 credits)"}</Button>
-                    <Button onClick={() => void generateSongElevenLabs()} disabled={generatorBusy} variant="outline" className="border-amber-400/40 text-amber-200 hover:bg-amber-400/10">{generatorBusy ? "Generating take…" : "Generate with ElevenLabs (20 credits)"}</Button>
                   </div>
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">

@@ -22,8 +22,18 @@ build = [ "pnpm", "--filter", "@workspace/gravelkingpro", "run", "build" ]
 publicDir = "artifacts/gravelkingpro/dist/public"
 serve = "static"
 
-# Exact rewrites for every prerendered route — each must serve its own
-# route-specific SEO HTML. These MUST stay ahead of the /* fallback.
+[[services.production.rewrites]]
+from = "/main-stage"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/duet"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/stage/duet/*"
+to = "/index.html"
+
 [[services.production.rewrites]]
 from = "/pricing"
 to = "/pricing.html"
@@ -77,10 +87,6 @@ from = "/label"
 to = "/label.html"
 
 [[services.production.rewrites]]
-from = "/label/*"
-to = "/label.html"
-
-[[services.production.rewrites]]
 from = "/submit"
 to = "/submit.html"
 
@@ -93,7 +99,75 @@ from = "/convert"
 to = "/convert.html"
 
 [[services.production.rewrites]]
-from = "/*"
+from = "/report"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/kernel"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/account"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/library"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/protected-lyrics"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/weekend-special"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/pitch"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/demo"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-in/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-up/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/login"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/demo-login"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/help"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/help/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/promoters"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/admin"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/admin/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/label/*"
 to = "/index.html"
 
 [services.env]

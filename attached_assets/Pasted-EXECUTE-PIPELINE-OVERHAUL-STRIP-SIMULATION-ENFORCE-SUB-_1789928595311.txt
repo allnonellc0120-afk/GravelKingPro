@@ -1,0 +1,49 @@
+EXECUTE PIPELINE OVERHAUL: STRIP SIMULATION, ENFORCE SUB-30S GENERATION, AND INJECT VOCAL GRIT
+
+IDENTITY & SCOPE BINDING:
+- Target: gravelking-pro-agent
+- Admin Identity: Allnonellc0120@gmail.com
+- Standard: Morris Law Kernel / GravelKing Production Protocol
+- Strict Clause: Zero canned mocks, zero simulated progress bars (no fake setInterval counters), zero static placeholders. Every verification must execute live code against the runtime and return verifiable terminal receipts.
+
+1. LATENCY SLA: SUB-30 SECOND TURNAROUND
+- Deconstruct the Vertex-to-Replicate/RVC inference pipeline.
+- Implement concurrent task priming (parallel fetch for backing track, lyrics, and voice container warm-up).
+- Stream model generation or split into concurrent segment rendering to prevent serial blocking.
+- Any generation taking over 30 seconds for an 8-bar section will be treated as an unhandled defect.
+
+2. VOCAL ENGINE CALIBRATION: NATURAL GRIT, ZERO PLASTIC SHINE
+- Eliminate spoken-word TTS cadence: The vocal guide input MUST contain melodic contours, bar-locked pacing, and musical pitch inflections before entering conversion.
+- Set RVC `index_rate` to 0.88 (mandates extraction of rasp, chest texture, and gravel from the voice index).
+- Set `f0_method` to "rmvpe" or "harvest" with pitch-smoothing disabled to keep natural vocal breaks intact.
+- Lower `protect` to 0.15 to preserve raw consonants and throat friction.
+- Mixdown Chain (FFmpeg / MLK Audio Rack):
+  * Apply analog-style saturation in the 1.5kHz–3.5kHz band for bite and 250Hz–450Hz for chest gravel.
+  * Apply a gentle -2.5dB high-shelf rolloff above 10kHz to cut synthetic digital sheen.
+  * Duck the backing track -3dB under the vocal stem to anchor the voice into the mix.
+
+3. HARD VERIFICATION GATES (PASS 5 DISTINCT TESTS FOR EACH CORE DELIVERABLE)
+
+A. LATENCY & CONCURRENCY VERIFICATION (5 TESTS):
+1. Benchmark Test L1: Lyric generation latency from Vertex under 3.5s (print millisecond log).
+2. Benchmark Test L2: Audio conversion response time logged and verified under 22s.
+3. Benchmark Test L3: FFmpeg mixdown, ducking, and normalization completed under 2.5s.
+4. Benchmark Test L4: Total end-to-end round trip strictly under 30.0s on an 8-bar generation.
+5. Benchmark Test L5: Replace fake progress-bar timers with live WebSocket/SSE event-driven updates tied to actual backend execution stages.
+
+B. VOCAL GRIT & ACOUSTIC AUTHENTICITY (5 TESTS):
+1. Harmonic Test V1: Spectral density analysis showing present mid-range harmonic energy between 250Hz and 3.5kHz.
+2. Pitch Contour Test V2: Verification that pitch tracking uses musical scale intervals and vibrato, not a flat TTS reading.
+3. Parameter Lock Test V3: Automated assertion confirming `index_rate >= 0.85` and `protect <= 0.20` in active request bodies.
+4. Glaze Elimination Test V4: High-frequency spectrum check verifying no unnatural auto-tune spikes above 10kHz.
+5. Stem Separation Test V5: Export dry processed vocal stem and verify human breath, rasps, and chest tone are preserved.
+
+C. LIVE DUET STAGE & PWA INTEGRATION (5 TESTS):
+1. UI State Test D1: Load `/duet` and verify the live performer rings animate dynamically to active WebRTC/audio input, not dummy CSS classes.
+2. WebRTC Signal Test D2: Successfully negotiate SDP/ICE handshake between two mock client contexts on port 8080/8090.
+3. Asset Cache Test D3: Send GET request to `/index.html` and verify `Cache-Control: no-store, no-cache, must-revalidate` response header.
+4. Service Worker Test D4: Inspect `sw.js` registration and assert `skipWaiting: true` and `clientsClaim: true` execute on reload.
+5. Audio Sync Test D5: Verify backing track buffer decodes synchronously on both performer channels with clock drift under 15ms.
+
+REQUIRED OUTPUT:
+Output a structured execution summary with terminal logs, exact file diffs for every modified route, and a pass/fail table covering all 15 tests with real metrics.

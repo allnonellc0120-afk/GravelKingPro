@@ -1,0 +1,41 @@
+{
+  "task": "GLOBAL_JAX_ONBOARD_ENGINEERING_WIDGET",
+  "priority": "P1_FINAL_AGENT_HANDOFF",
+  "visibility_lock": {
+    "allowed_email": "allin10120@gmail.com",
+    "behavior": "Strictly mount the widget only when the active session belongs to the owner account. Hide completely from standard users."
+  },
+  "modules": [
+    {
+      "name": "Omnipresent Draggable JAX Widget",
+      "specs": {
+        "ui_behavior": "Render a floating JAX icon above the main application layout wrapper. The widget must be freely draggable across the viewport so the owner can slide it out of the way of active work.",
+        "activation": "Tap/click to expand into the active engineering copilot overlay without navigating away from the current tool (Main Stage, Studio, Vault, Label).",
+        "voice_synthesis": "JAX must respond to queries using the backend RVC text-to-speech pipeline, speaking through the active founder voice checkpoint."
+      }
+    },
+    {
+      "name": "Multimodal Input & Code Monkey Brain",
+      "specs": {
+        "speech_to_text": "Integrate a microphone toggle within the widget allowing the owner to speak plain-language directives or bug descriptions directly to JAX.",
+        "llm_binding": "Wire the widget's input to the updated Gemini API (models/gemini-3.6-flash). Instruct the system prompt that JAX is a senior 'code monkey' and platform engineer."
+      }
+    },
+    {
+      "name": "Context-Aware Page & Code Scanner",
+      "specs": {
+        "error_interception": "On command, JAX automatically scrapes the active DOM structure, window.location.pathname, and intercepts window.console.error logs to identify exact frontend failures.",
+        "logical_code_scan": "If the owner flags a bug but no explicit console error is thrown, the 'Scan Code' function must bundle the raw page source/component state and active backend route logic, feeding it to Gemini to hunt for silent logical errors."
+      }
+    },
+    {
+      "name": "Air-Gapped JSON Staging Box (Double Confirm Protocol)",
+      "specs": {
+        "execution_restriction": "JAX is strictly forbidden from directly executing code patches, database migrations, or shell commands from the floating widget.",
+        "payload_routing": "When JAX formulates a fix (frontend patch, backend route update, DSP parameter change), it must format the fix strictly as a JSON payload.",
+        "staging_destination": "JAX must automatically transmit the JSON patch to the dedicated 'JSON Staging Box' located in /admin/control. JAX will verbally confirm the fix has been sent to the staging box for audit and manual execution."
+      }
+    }
+  ],
+  "verification_command": "Log in as owner. Drag the widget across the screen. Tap to activate, speak a command to 'scan the page' for a simulated error, and verify JAX replies verbally while routing the proposed JSON fix exclusively to the /admin/control staging box without executing it."
+}

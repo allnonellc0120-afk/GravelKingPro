@@ -1,4 +1,4 @@
-# Data Room Structure — Morris Law Kernel v3.5 + IP Protection
+# Data Room Structure — Morris Law Kernel V4 + IP Protection
 
 ## Recommended Folder Structure (Google Drive / Notion / Dropbox)
 

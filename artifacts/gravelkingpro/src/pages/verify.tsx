@@ -218,7 +218,7 @@ export default function VerifyPage() {
             Clean Room Audio Verification
           </h1>
           <p className="text-muted-foreground text-base max-w-lg mx-auto">
-            Upload a <strong>.wav</strong> master to verify its MLK V3.5 dual-anchor cryptographic certificate.
+            Upload a <strong>.wav</strong> master to verify its MLK V4 dual-anchor cryptographic certificate.
             No account required — this is the public-facing B2B trust surface.
           </p>
         </motion.div>

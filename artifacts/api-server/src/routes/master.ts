@@ -9,14 +9,21 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID, createHash, createHmac, timingSafeEqual } from "crypto";
 import { rateLimit } from "../lib/rateLimiter";
+import { getAdminRuntimeConfig, getAudioPresets } from "../lib/adminRuntimeConfig";
 import { isAdminAuthenticated } from "../lib/adminAuth";
 import { concurrencyLimit } from "../lib/concurrencyLimit";
-import { probeFileDuration, sanitizeExt, normalizeToWav, MAX_AUDIO_DURATION_S } from "../lib/audioGuards";
+import {
+  probeFileDuration,
+  sanitizeExt,
+  normalizeToWav,
+  MAX_AUDIO_DURATION_S,
+  AUDIO_PROCESS_TIMEOUT_MS,
+} from "../lib/audioGuards";
 import { hasStudio } from "../lib/entitlement";
 import { getUsageUser, incrementUsage, FREE_LIMITS } from "../lib/usage";
 import { checkExportQuota, consumeExport, exportLimitPayload } from "../lib/exportQuota";
 import type { User } from "@workspace/db";
-import { embedLsbPayload, extractLsbPayload } from "../kernel-v3";
+import { assertCanonicalPcm24Wav, embedLsbPayload, extractLsbPayload } from "../kernel-v3";
 import { readFile, writeFile } from "fs/promises";
 import { db, ipCertStubsTable } from "@workspace/db";
 import { masterJobsTable } from "@workspace/db/schema";
@@ -34,10 +41,21 @@ import {
   spendCredits,
 } from "../lib/credits";
 
+const MLK_WORKER_TIMEOUT_MS = 45_000;
+
 /** Optional denoise stage folded into mastering (applied before the preset). */
 const DENOISE_FILTER = "afftdn=nf=-25,anlmdn=s=7";
 
 const execFileAsync = promisify(execFile);
+
+function processFailureDetail(err: unknown): string {
+  const processError = err as { stderr?: unknown; message?: unknown };
+  const stderr = typeof processError.stderr === "string"
+    ? processError.stderr.trim().replace(/\s+/g, " ")
+    : "";
+  const message = typeof processError.message === "string" ? processError.message.trim() : "";
+  return (stderr || message || String(err)).slice(0, 1800);
+}
 const upload = multer({
   storage: multer.diskStorage({
     destination: "/tmp",
@@ -46,6 +64,21 @@ const upload = multer({
     },
   }),
   limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB matches the audio route; 200 MB was unnecessarily large
+});
+
+// The MP3 button used to POST the already-rendered WAV back to the API. A
+// full-length 24-bit WAV can be much larger than the original MP3 and exceed
+// the normal mastering-ingest limit even though the WAV download itself works.
+// New clients send the durable master job id instead; keep this larger upload
+// parser for older clients and direct API callers.
+const masteredResultUpload = multer({
+  storage: multer.diskStorage({
+    destination: "/tmp",
+    filename: (_req, file, cb) => {
+      cb(null, `gk_master_result_${randomUUID()}.${sanitizeExt(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: 300 * 1024 * 1024 },
 });
 
 const masterRouter = Router();
@@ -188,7 +221,7 @@ export const KERNEL_PRESET_MAP: Record<
   MasterPreset,
   { kernel: string; lufs: number; ceiling: number }
 > = {
-  baseline:   { kernel: "natural_body",   lufs: -14, ceiling: -0.8 },
+  baseline:   { kernel: "natural_body",   lufs: -14, ceiling: -1.0 },
   spacious:   { kernel: "spatial_edge",   lufs: -14, ceiling: -0.8 },
   normal:     { kernel: "natural_body",   lufs: -16, ceiling: -1.0 },
   broadcast:  { kernel: "gravelking_max", lufs: -23, ceiling: -2.0 },
@@ -289,13 +322,10 @@ masterRouter.post(
   "/kernel/export-result-mp3",
   partnerAwareRateLimit,
   masterConcurrency,
-  upload.single("audio"),
+  masteredResultUpload.single("audio"),
   async (req: Request, res: Response) => {
-    if (!req.file) {
-      res.status(400).json({ error: "No mastered audio file received." });
-      return;
-    }
-    const sourcePath = req.file.path;
+    let sourcePath: string | null = req.file?.path ?? null;
+    let ownsSourcePath = sourcePath !== null;
     const outputPath = `/tmp/gk_master_export_${randomUUID()}.mp3`;
     try {
       const creditUser = await resolveCreditUser(req);
@@ -304,9 +334,46 @@ masterRouter.post(
         return;
       }
 
+      // Prefer the private object-storage copy created by the mastering
+      // request. This is replica-safe for autoscale deployments and avoids
+      // sending a potentially hundreds-of-megabytes WAV through the browser.
+      const masterJobId = typeof req.body?.masterJobId === "string"
+        ? req.body.masterJobId.trim()
+        : "";
+      if (!sourcePath && masterJobId) {
+        const [job] = await db.select({
+          userId: masterJobsTable.userId,
+          status: masterJobsTable.status,
+          outputObjectKey: masterJobsTable.outputObjectKey,
+        }).from(masterJobsTable)
+          .where(eq(masterJobsTable.id, masterJobId))
+          .limit(1);
+
+        if (!job || job.userId !== creditUser.id) {
+          res.status(404).json({ error: "Mastered audio was not found for this account." });
+          return;
+        }
+        if (job.status !== "completed" || !job.outputObjectKey) {
+          res.status(409).json({ error: "Mastered audio is not ready yet." });
+          return;
+        }
+
+        const sourceFile = await masterJobStorage.getObjectEntityFile(`/objects/${job.outputObjectKey}`);
+        const [sourceBuffer] = await sourceFile.download();
+        sourcePath = `/tmp/gk_master_export_source_${randomUUID()}.wav`;
+        await writeFile(sourcePath, sourceBuffer);
+        ownsSourcePath = true;
+      }
+
+      if (!sourcePath) {
+        res.status(400).json({ error: "No mastered audio file or master job was received." });
+        return;
+      }
+
       await execFileAsync("ffmpeg", [
+        "-nostdin", "-hide_banner", "-loglevel", "error",
         "-y", "-i", sourcePath,
-        "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100",
+        "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100", "-ac", "2",
         outputPath,
       ], { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 });
 
@@ -340,7 +407,7 @@ masterRouter.post(
       if (!res.headersSent) res.status(500).json({ error: "Could not create the MP3 download." });
     } finally {
       await Promise.all([
-        unlink(sourcePath).catch(() => {}),
+        ownsSourcePath && sourcePath ? unlink(sourcePath).catch(() => {}) : Promise.resolve(),
         unlink(outputPath).catch(() => {}),
       ]);
     }
@@ -348,7 +415,7 @@ masterRouter.post(
 );
 
 masterRouter.post(
-  ["/kernel/master", "/v1/ingest", "/export-wav", "/export-mp3"],
+  ["/master", "/kernel/master", "/v1/ingest", "/export-wav", "/export-mp3"],
   requirePartnerApiKey,
   partnerAwareRateLimit,
   masterConcurrency,
@@ -382,8 +449,22 @@ masterRouter.post(
     const asStr = (v: unknown): string | undefined =>
       typeof v === "string" ? v : undefined;
 
-    const presetName    = asStr(req.body.preset) || "baseline";
-    if (!VALID_PRESETS.has(presetName)) {
+    let audioPresets: Awaited<ReturnType<typeof getAudioPresets>>;
+    try {
+      audioPresets = await getAudioPresets();
+    } catch (err) {
+      res.status(503).json({ success: false, error: `Audio preset storage unavailable: ${String(err)}` });
+      return;
+    }
+    // Existing clients always submit "baseline", even for their untouched
+    // default selection; map that selection to the owner's global default.
+    // Explicit non-baseline selections still win.
+    const submittedPreset = asStr(req.body.preset);
+    const presetName = (!submittedPreset || submittedPreset === "baseline")
+      ? audioPresets.defaultName || getAdminRuntimeConfig().mastering.defaultPreset || "baseline"
+      : submittedPreset;
+    const customPreset = audioPresets.presets.find(p => p.name === presetName);
+    if (!customPreset && !VALID_PRESETS.has(presetName)) {
       res.status(400).json({ success: false, error: `Unknown preset "${presetName}".` });
       return;
     }
@@ -484,6 +565,12 @@ masterRouter.post(
       (asStr(req.body.certProvenance) || "").trim() === "vocal_recording"
         ? "vocal_recording"
         : "external_upload";
+    // Main Stage contest entries must be traceable to this explicit client
+    // surface. Unknown/legacy callers remain ordinary mastering-tool jobs.
+    const sourceContext =
+      (asStr(req.body.sourceContext) || "").trim() === "main_stage"
+        ? "main_stage"
+        : "mastering_tool";
 
     // Pro+ tiers get full-length masters. WAV uses the tier-aware quota (Pro:
     // 10/7d; King: 40/30d); MP3 is unlimited. Free users get one full
@@ -598,6 +685,10 @@ masterRouter.post(
         autoThreshold,
         certify: certifyRequested,
         format: mp3Requested ? "mp3" : "wav",
+        sourceContext,
+        certProvenance,
+        certCategory,
+        artist: artistHandle,
       },
       clientJobId: suppliedClientJobId,
       idempotencyKey: suppliedIdempotencyKey,
@@ -621,7 +712,25 @@ masterRouter.post(
       // Normalize any format (m4a, mp4, mov, ogg, webm…) → WAV before the
       // preset chain. ffmpeg auto-detects the container so the user can drop
       // anything from their photo library and have it just work.
-      normalizedPath = await normalizeToWav(uploadedPath);
+      try {
+        normalizedPath = await normalizeToWav(uploadedPath);
+      } catch (err) {
+        const error = err instanceof Error
+          ? err.message
+          : "Could not decode audio from this file. Try a different format (MP3 or WAV work best).";
+        await updateMasterJob(jobId, {
+          status: "failed",
+          stage: "decode_failed",
+          error,
+          completedAt: new Date(),
+        }).catch(() => {});
+        res.status(422).json({
+          success: false,
+          code: "AUDIO_DECODE_FAILED",
+          error,
+        });
+        return;
+      }
       filePath = normalizedPath;
       await updateMasterJob(jobId, { progress: 15, stage: "validated" });
 
@@ -649,23 +758,27 @@ masterRouter.post(
       if (isSample || denoise) {
         prePassPath = `/tmp/gk_master_pre_${randomUUID()}.wav`;
         await execFileAsync("ffmpeg", [
-          "-y", "-i", filePath,
+          "-nostdin", "-y", "-i", filePath,
           ...(isSample ? ["-t", "30"] : []),
           ...(denoise ? ["-af", DENOISE_FILTER] : []),
-          "-ac", "2", "-acodec", "pcm_s16le", "-ar", "44100", prePassPath,
-        ], { maxBuffer: 50 * 1024 * 1024, timeout: 60_000 });
+          "-ac", "2", "-acodec", "pcm_f32le", "-ar", "48000", prePassPath,
+        ], {
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: AUDIO_PROCESS_TIMEOUT_MS,
+          killSignal: "SIGKILL",
+        });
         kernelInputPath = prePassPath;
       }
 
       // Pre-kernel bytes for cert content-hash binding (read before cleanup).
       const preKernelBytes = await readFile(kernelInputPath);
 
-      // ── Morris Law Kernel v3.5 (Python + Numba) — the ONLY DSP path ─────
+      // ── MLK V4 (Morris Law Kernel V4) — the ONLY DSP path ────────────────
       // All DSP — EQ, saturation, adaptive sidechain compression, limiting,
       // loudness staging — runs exclusively in the local Python MLK worker.
       // There is no cloud / remote fallback by design. If the kernel fails,
       // the request fails loudly with a 500.
-      const kp = KERNEL_PRESET_MAP[presetName as MasterPreset];
+      const kp = KERNEL_PRESET_MAP[(customPreset?.basePreset ?? presetName) as MasterPreset];
       let pyStats: {
         numba?: boolean; scFreqUsed?: number;
         detectedRmsDb?: number; appliedThresholdDb?: number;
@@ -694,7 +807,12 @@ masterRouter.post(
             "--auto-offset", String(autoThresholdOffset),
             "--target-lufs", String(kp.lufs),
             "--ceiling-db", String(kp.ceiling),
-          ], { maxBuffer: 10 * 1024 * 1024, timeout: 300_000 });
+            ...(customPreset ? ["--dsp-preset-json", JSON.stringify(customPreset)] : []),
+          ], {
+            maxBuffer: 10 * 1024 * 1024,
+            timeout: MLK_WORKER_TIMEOUT_MS,
+            killSignal: "SIGKILL",
+          });
           pyStats = JSON.parse(stdout.trim().split("\n").pop() ?? "{}");
         }
       } catch (err: any) {
@@ -703,13 +821,28 @@ masterRouter.post(
           error: String(err?.message ?? "The Morris Law Kernel failed.").slice(0, 4000),
           completedAt: new Date(),
         }).catch(() => {});
+        const stderr = err?.stderr?.slice?.(-1600) ?? "";
+        const errorText = String(err?.message ?? err);
+        const timedOut =
+          err?.code === "ETIMEDOUT" ||
+          err?.code === 124 ||
+          err?.killed === true ||
+          /execution limit|timed out|timeout/i.test(`${errorText}\n${stderr}`);
         req.log.error(
-          { stderr: err?.stderr?.slice?.(-800) ?? String(err?.message ?? err) },
-          "Morris Law Kernel failed (remote and local)",
+          {
+            stderr,
+            error: errorText,
+            timedOut,
+            timeoutMs: MLK_WORKER_TIMEOUT_MS,
+          },
+          "Morris Law Kernel worker failed",
         );
-        res.status(500).json({
+        const failureMessage = timedOut
+          ? "MLK V4 took longer than 45 seconds to process this file. Try a shorter audio or video file."
+          : `The Morris Law Kernel failed: ${processFailureDetail(err)}`;
+        res.status(timedOut ? 504 : 500).json({
           success: false,
-          error: "The Morris Law Kernel failed to process this file. Try a different file or contact support.",
+          error: failureMessage,
         });
         return;
       } finally {
@@ -794,7 +927,7 @@ masterRouter.post(
 
       // The mastered WAV on disk IS the kernel output — no second carve stage.
       const carvedBuffer = Buffer.from(await readFile(outPath));
-      const parity = "MLK_V3.5_PYTHON";
+      const parity = "MLK_V4_PYTHON";
 
       // Certification is opt-in. Plain masters ship the carved audio untouched —
       // no hash, no watermark, no DB record — so karaoke tracks, covers, and
@@ -889,6 +1022,7 @@ masterRouter.post(
           JSON.stringify({ v: 2, id: certId, n: nominator, a: artistHandle })
         );
         outBuffer = embedLsbPayload(carvedBuffer, nominatorPayload);
+        assertCanonicalPcm24Wav(outBuffer);
         certHash = fullHash;
       }
 
@@ -927,7 +1061,7 @@ masterRouter.post(
         res.setHeader("X-GK-Mode",              "master");
         res.setHeader("X-GK-Preset",            presetName);
         res.setHeader("X-GK-Denoise",           denoise ? "true" : "false");
-        res.setHeader("X-GK-Kernel",            "MLK_v3.5");
+        res.setHeader("X-GK-Kernel",            "MLK V4 (Morris Law Kernel V4)");
         res.setHeader("X-GK-Intensity",         String(intensity));
         res.setHeader("X-GK-Sidechain",         sidechainFilter);
         res.setHeader("X-GK-SidechainFreq",     String(sidechainFreq));
@@ -978,10 +1112,10 @@ masterRouter.post(
         try {
           await writeFile(`/tmp/gk_master_mp3_${mp3Id}.wav`, outBuffer);
           await execFileAsync("ffmpeg", [
-            "-y", "-i", `/tmp/gk_master_mp3_${mp3Id}.wav`,
-            "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100",
+            "-nostdin", "-y", "-i", `/tmp/gk_master_mp3_${mp3Id}.wav`,
+            "-acodec", "libmp3lame", "-b:a", "320k", "-ar", "44100", "-ac", "2",
             mp3OutPath,
-          ], { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 });
+          ], { maxBuffer: 50 * 1024 * 1024, timeout: MLK_WORKER_TIMEOUT_MS, killSignal: "SIGKILL" });
           const mp3Buffer = Buffer.from(await readFile(mp3OutPath));
           res.setHeader("Content-Type", "audio/mpeg");
           res.setHeader("Content-Disposition", `attachment; filename="${filename.replace(/\.wav$/, ".mp3")}"`);
@@ -1012,7 +1146,20 @@ masterRouter.post(
         await grantCredits(creditUser.id, walletCost, "failed_master_refund", `refund:${walletReference}`);
       }
       void logToolError("Mastering Tool", "MASTERING", err);
-      res.status(500).json({ success: false, error: err.message ?? "Mastering failed." });
+      const errorText = String(err?.message ?? "Mastering failed.");
+      const timedOut =
+        err?.code === "ETIMEDOUT" ||
+        err?.code === 124 ||
+        err?.killed === true ||
+        err?.name === "AudioProcessTimeoutError" ||
+        /execution limit|timed out|timeout/i.test(errorText);
+      res.status(timedOut ? 504 : 500).json({
+        success: false,
+        code: timedOut ? "AUDIO_PROCESSING_TIMEOUT" : "MASTERING_FAILED",
+        error: timedOut
+          ? "Audio processing exceeded the 45-second execution limit."
+          : errorText,
+      });
     } finally {
       await Promise.all([
         unlink(uploadedPath).catch(() => {}),
@@ -1109,7 +1256,7 @@ masterRouter.post(
         certId,
         artist:      stub.artist,
         certifiedAt: stub.certifiedAt,
-        kernel:      "MLK_v3.5",
+        kernel:      "MLK V4 (Morris Law Kernel V4)",
         note:        "GravelKing server verified. Nominator (track) + denominator (server) handshake valid.",
       });
     } catch (err: any) {

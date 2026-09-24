@@ -1,0 +1,34 @@
+MANDATORY ITEM-BY-ITEM VERIFICATION PROTOCOL (ZERO MOCK / 100% AUDIT)
+
+Every single item below must be executed against real production code and system binaries. No mocked endpoints, no simulated returns, and no fabricated receipts. Provide the exact file paths modified and the literal stdout receipts for every single item.
+
+1. ENVIRONMENT & INFRASTRUCTURE (CRITICAL BLOCKERS)
+- [ ] System FFmpeg Verified: Run and print the raw output of `which ffmpeg` and `ffmpeg -version`.
+- [ ] Dependency Restoration: Run `pnpm install` and print the raw summary showing all package trees restored cleanly.
+- [ ] Timeout & Error Hardening: Provide the exact file path and code snippet showing the hard 45-second subprocess execution timeout on all server-side FFmpeg and Python worker calls.
+
+2. DEVELOPER & ADMIN ACCOUNT PERMISSIONS
+- [ ] Root Admin Bypass: Print the database record showing `allnonellc0120@gmail.com` with `is_developer: true` and role set to root admin/developer.
+- [ ] Zero Credit Gating: Provide the exact file path and middleware code proving all credit deductions and rate limits are completely bypassed for this account.
+- [ ] Credit Balance: Update and print the wallet ledger showing `credits_balance: 1000000`.
+
+3. MASTERING ENGINE & UI (MLK V4)
+- [ ] Global Copy Audit: Run `grep -rn "MLK v3" client/src/` to prove ZERO occurrences remain. All labels must read "MLK V4 (Morris Law Kernel V4)".
+- [ ] Container & Transcode Pipeline: Verify server transcode handles container extraction cleanly through MLK V4 without unhandled exceptions.
+- [ ] Cache Bust & Route Parity: Verify `gravelkingpro.com/mastering` client bundle is rebuilt and matches the primary production build.
+
+4. JAX WORKFLOW & STUDIO PARTNER INTENT ROUTING
+- [ ] Dual-Mode Intent Classifier: 
+  - Provide the file path and implementation where prompts are classified.
+  - Prove conversational dialogue is returned for artist/music knowledge (e.g., "Tell me about Sam Barber") without spitting unprompted lyrics.
+  - Prove lyrics are only drafted when explicit keywords ("write", "lyrics", "rhyme", "verse", "chorus") are present.
+- [ ] Song Generation Pipeline: Execute a real test call to the song generation route and print stdout confirming it creates a complete take without throwing `spawn ffmpeg ENOENT`.
+
+5. VOCAL BOOTH & 3D LIVE DUET STAGE
+- [ ] Visual Duet Stage Prominence: Provide the modified code in `client/src/pages/vocal-booth.tsx` proving the 3D Stage is the immediate default view rather than hidden behind a small toggle button.
+- [ ] Clear Navigation Labels: Itemize the updated plain-English labels across monitoring presets, room links, and backing track loaders.
+
+6. VERIFICATION PROOFS & BUILD RECEIPT
+- [ ] Clean Production Build Output: Run `pnpm run build` and print the complete terminal output showing exit code 0.
+- [ ] Local Test Curl Receipt: Submit a real generated test audio/video file through `/api/master` and print the HTTP 200 response headers showing `X-GK-Kernel: MLK V4 (Morris Law Kernel V4)`.
+- [ ] Non-Zero File Output: Run `ls -la` and `file` on the generated output WAV to prove it contains valid 24-bit PCM audio data.

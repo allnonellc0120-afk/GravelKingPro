@@ -1,18 +1,18 @@
 ---
-name: MLK v3 applies to every audio process
-description: MLK v3 is always-on across all audio routes; rules for remote routing and buffered carving
+name: MLK V4 (Morris Law Kernel V4) applies to every audio process
+description: MLK V4 (Morris Law Kernel V4) is always-on across all audio routes; rules for remote routing and buffered carving
 ---
 
-MLK v3 (the multi-band Morris Law Kernel) runs on EVERY audio process, not just
+MLK V4 (Morris Law Kernel V4) (the multi-band Morris Law Kernel) runs on EVERY audio process, not just
 voice/stem separation: mastering, DAW/studio mix export, and standard processing
 all carve their output through it. The shared exported helper is
 `applyMLKv3(wavBuf, multiplier=0.75) -> { buf, parity }` in `kernel-v3.ts`
 (alongside `parseWav`/`buildWavHeader`/`mlk_v3`); the separator imports it. Every
 audio response should carry an `X-GK-Kernel: MLK_v3` marker.
 
-**Remote standard kernel is the canonical MLK v3 processor.**
+**Remote standard kernel is the canonical MLK V4 (Morris Law Kernel V4) processor.**
 The standard-mode remote path (`REMOTE_KERNEL_URL` `/process-audio`) already
-applies MLK v3 server-side and returns `X-GK-Parity`. The local `mlk_v3` path is
+applies MLK V4 (Morris Law Kernel V4) server-side and returns `X-GK-Parity`. The local `mlk_v3` path is
 the FALLBACK only.
 **Why:** re-running `applyMLKv3` on a remote result would double-process (degrade
 audio + add latency) for no benefit.
@@ -47,7 +47,7 @@ JS kernel; the heap blow-up was the real cause of the "all separators hang in
 prod" bug, even though the separators themselves were innocent collateral.
 **How to apply:** route output carving goes through
 `applyMLKv3Fast(input: string|Buffer, multiplier)` (kernel-v3.ts), which does the
-3-band MLK v3 carve entirely in ffmpeg (asplit=3 → per-band lowpass/highpass +
+3-band MLK V4 (Morris Law Kernel V4) carve entirely in ffmpeg (asplit=3 → per-band lowpass/highpass +
 volume → amix → dynaudnorm), streaming on disk with near-zero heap and returns
 `{ buf, parity: "MLK_V3_VALIDATED" }`. The JS `gravelking_opt` now takes
 `buildSlices` (default true for the bounded `/kernel/process` demo); `mlk_v3`

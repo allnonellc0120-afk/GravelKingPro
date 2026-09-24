@@ -1,4 +1,4 @@
-# Morris Law Kernel v3.5
+# Morris Law Kernel V4
 
 **Court-grade IP protection + production audio DSP — the technical moat for [GravelKing Pro](https://gravelkingpro.com).**
 

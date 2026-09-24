@@ -1,4 +1,4 @@
-# Morris Law Kernel V3.5 — Cloud Run mastering service
+# Morris Law Kernel V4 — Cloud Run mastering service
 # Build:  gcloud builds submit --tag gcr.io/PROJECT_ID/mlk-api -f Dockerfile.mlk-api .
 # Deploy: gcloud run deploy mlk-api --image gcr.io/PROJECT_ID/mlk-api \
 #           --region us-west2 --set-env-vars MLK_API_KEY=<shared-secret> \

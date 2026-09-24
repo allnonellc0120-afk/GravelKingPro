@@ -6,7 +6,7 @@
  * dispatch, download + mix + Python MLK master) continues in the background:
  *
  *   stage=demucs  succeeded → store stem URLs, dispatch RVC (webhook)
- *   stage=rvc     succeeded → mix + Python MLK V3.5 master → vault → completed
+ *   stage=rvc     succeeded → mix + Python MLK V4 master → vault → completed
  *   any           failed/canceled → mark job failed, refund credits
  *
  * The per-job HMAC token in the query string prevents forged stage advances.
@@ -14,6 +14,7 @@
 import { Router, type Request, type Response } from "express";
 import {
   failPipelineJob,
+  fallbackRvcToBase,
   handleDemucsWebhook,
   handleRvcWebhook,
   pipelineWebhookToken,
@@ -58,6 +59,10 @@ replicateWebhookRouter.post(
             typeof payload.error === "string"
               ? payload.error
               : JSON.stringify(payload.error ?? "unknown error");
+          if (stage === "rvc") {
+            await fallbackRvcToBase(jobId, `Replicate rvc ${status}: ${detail}`);
+            return;
+          }
           await failPipelineJob(jobId, `Replicate ${stage} ${status}: ${detail}`);
           return;
         }
@@ -71,6 +76,14 @@ replicateWebhookRouter.post(
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         req.log.error({ err, jobId, stage }, "[pipeline] webhook stage failed");
+        if (stage === "rvc") {
+          try {
+            await fallbackRvcToBase(jobId, message);
+            return;
+          } catch (fallbackErr) {
+            req.log.error({ err: fallbackErr, jobId }, "[pipeline] base-generation fallback failed");
+          }
+        }
         await failPipelineJob(jobId, message).catch(() => {});
       }
     })();

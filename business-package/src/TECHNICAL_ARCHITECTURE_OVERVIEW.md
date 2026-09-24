@@ -1,19 +1,19 @@
 # Technical Architecture Overview
 
-A concise technical summary of the Morris Law Kernel v3.5 + IP Protection System as implemented today. Suitable for sharing with technical evaluators at potential licensees and partners.
+A concise technical summary of the Morris Law Kernel V4 + IP Protection System as implemented today. Suitable for sharing with technical evaluators at potential licensees and partners.
 
 ## System Layers
 
 | Layer | Implementation | Status |
 |-------|----------------|--------|
-| DSP / Mastering | Morris Law Kernel v3.5 (Python + Numba JIT) | Production-ready |
+| DSP / Mastering | Morris Law Kernel V4 (Python + Numba JIT) | Production-ready |
 | Watermarking | Robust hybrid embedding (spread-spectrum + echo hiding), TypeScript | Production-ready |
 | Provenance | Split-key cryptographic record: content hash + perceptual hash + digital signature | Production-ready |
 | Verification | FastAPI service + live public verification endpoint | Live |
 | Frontend | Streamlit application (mastering, stem isolation, lyric pre-flight, verification) | Live |
 | Anchoring | Blockchain / trusted timestamping module | Optional — roadmap |
 
-## Mastering Engine (Morris Law Kernel v3.5)
+## Mastering Engine (Morris Law Kernel V4)
 
 - **Numba JIT compiled** core loops with parallel execution — the hot path runs as native machine code, not interpreted Python.
 - **Stereo-linked adaptive compression** with program-dependent ratio; neutral at zero intensity (verified transparent, correlation > 0.9999).

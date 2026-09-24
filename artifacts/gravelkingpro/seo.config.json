@@ -1,5 +1,5 @@
 {
-  "siteUrl": "https://gravelkingpro.com",
+  "siteUrl": "https://gravelkingpro.it.com",
   "siteName": "GravelKing Pro",
   "locale": "en_US",
   "twitterCard": "summary_large_image",
@@ -8,12 +8,12 @@
   "ogImageWidth": 1280,
   "ogImageHeight": 720,
   "defaultTitle": "AI Audio Mastering & IP Certification | GravelKing Pro",
-  "defaultDescription": "Master tracks online with the MLK V3.5 kernel, record studio-quality vocals, and protect every release with embedded IP certification. Free previews — no account needed.",
+  "defaultDescription": "Master tracks online with MLK V4 (Morris Law Kernel V4), record studio-quality vocals, and protect every release with embedded IP certification. Free previews — no account needed.",
   "routes": [
     {
       "path": "/",
       "title": "AI Audio Mastering & IP Certification | GravelKing Pro",
-      "description": "Master tracks online with the MLK V3.5 kernel, record studio-quality vocals, and protect every release with embedded IP certification. Free previews — no account needed.",
+      "description": "Master tracks online with MLK V4 (Morris Law Kernel V4), record studio-quality vocals, and protect every release with embedded IP certification. Free previews — no account needed.",
       "ogType": "website"
     },
     {
@@ -24,14 +24,14 @@
     },
     {
       "path": "/mastering",
-      "title": "Online Audio Mastering — MLK V3.5 Kernel | GravelKing Pro",
-      "description": "Upload a track and get a polished, release-ready master powered by the MLK V3.5 kernel. Free 30-second preview, full masters with embedded IP certification.",
+      "title": "Online Audio Mastering — MLK V4 | GravelKing Pro",
+      "description": "Upload a track and get a polished, release-ready master powered by MLK V4 (Morris Law Kernel V4). Free 30-second preview, full masters with embedded IP certification.",
       "ogType": "website"
     },
     {
       "path": "/songwriting",
       "title": "Songwriting Studio with Copyright Proof | GravelKing Pro",
-      "description": "Write lyrics with AI-assisted authorship scoring and a cryptographic certificate of human authorship. Generate and master your song in-house with MLK v3.5, protected in your vault.",
+      "description": "Write lyrics with AI-assisted authorship scoring and a cryptographic certificate of human authorship. Generate and master your song in-house with MLK V4, protected in your vault.",
       "ogType": "website"
     },
     {
@@ -49,13 +49,13 @@
     {
       "path": "/verify",
       "title": "Verify an Audio Certificate — Public Cert Check | GravelKing Pro",
-      "description": "Check any .wav master for its MLK V3.5 dual-anchor cryptographic certificate. Free public verification — no account required.",
+      "description": "Check any .wav master for its MLK V4 dual-anchor cryptographic certificate. Free public verification — no account required.",
       "ogType": "website"
     },
     {
       "path": "/whitepaper",
-      "title": "MLK V3.5 Technical Whitepaper | GravelKing Pro",
-      "description": "The engineering behind GravelKing Pro: LSB dual-anchor steganography, HMAC chain-of-custody, and the MLK V3.5 mastering kernel.",
+      "title": "MLK V4 Technical Whitepaper | GravelKing Pro",
+      "description": "The engineering behind GravelKing Pro: LSB dual-anchor steganography, HMAC chain-of-custody, and the MLK V4 mastering kernel.",
       "ogType": "website"
     },
     {
@@ -73,7 +73,7 @@
     {
       "path": "/contact",
       "title": "Contact GravelKing Pro — All N One LLC",
-      "description": "Questions about plans, licensing, or the MLK V3.5 kernel? Contact the GravelKing Pro team at All N One LLC directly.",
+      "description": "Questions about plans, licensing, or the MLK V4 kernel? Contact the GravelKing Pro team at All N One LLC directly.",
       "ogType": "website"
     },
     {
@@ -91,13 +91,37 @@
     {
       "path": "/optimizer",
       "title": "Audio Quality Optimizer — Free Online Tool | GravelKing Pro",
-      "description": "Analyze and optimize your audio quality free with the MLK V3.5 kernel. Upload a track and get instant signal-level recommendations.",
+      "description": "Analyze and optimize your audio quality free with MLK V4. Upload a track and get instant signal-level recommendations.",
       "ogType": "website"
     },
     {
       "path": "/convert",
       "title": "Audio File Converter — Free Online | GravelKing Pro",
       "description": "Convert audio files free in your browser. WAV, MP3, FLAC and more — fast, private, and mastered-quality output.",
+      "ogType": "website"
+    },
+    {
+      "path": "/pitch",
+      "title": "GravelKing Pro — Audio Mastering & IP Protection",
+      "description": "See how GravelKing Pro helps creators master releases, record vocals, and protect music rights with MLK V4.",
+      "ogType": "website"
+    },
+    {
+      "path": "/weekend-special",
+      "title": "GravelKing Pro Weekend Special",
+      "description": "Explore the current GravelKing Pro creator offer for mastering, vocal recording, and music IP protection.",
+      "ogType": "website"
+    },
+    {
+      "path": "/help",
+      "title": "GravelKing Pro Help Center",
+      "description": "Get answers about mastering, uploads, exports, vocal recording, and music IP certification in GravelKing Pro.",
+      "ogType": "website"
+    },
+    {
+      "path": "/promoters",
+      "title": "GravelKing Pro Promoter Program",
+      "description": "Share GravelKing Pro with music creators and learn about the creator referral program.",
       "ogType": "website"
     }
   ]

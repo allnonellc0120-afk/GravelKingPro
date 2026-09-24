@@ -6,7 +6,7 @@
 GravelKing Pro is a complete music-production studio that runs in your browser. Write a song with AI, split any track into stems, sing over a backing in the Vocal Booth, mix in a full live DAW, master to release loudness, and convert any file — all from one tab, with nothing to download.
 
 ## What it is
-Most creators juggle a $400/year DAW, a separate mastering service, a stem-splitter subscription, and a converter — and then still need somewhere to release. GravelKing Pro folds all of that into a single web app powered by our in-house Morris Law Kernel (MLK v3.5) audio engine. Your audio is processed on our own infrastructure and never handed to a third party.
+Most creators juggle a $400/year DAW, a separate mastering service, a stem-splitter subscription, and a converter — and then still need somewhere to release. GravelKing Pro folds all of that into a single web app powered by our in-house Morris Law Kernel (MLK V4 (Morris Law Kernel V4)) audio engine. Your audio is processed on our own infrastructure and never handed to a third party.
 
 ## Who it's for
 - Independent artists and rappers who record at home and want pro results without pro overhead.
@@ -26,7 +26,7 @@ Load a backing track (or split one of your own songs into instrumental + a guide
 Drop in any audio or video file and split it into a separate instrumental and vocal by cancelling the center-panned vocal. It's instant and runs on our servers, not a third party. Center-cancel separation is approximate — expect some bleed — and it works best on true stereo mixes.
 
 ### Mastering — release-ready loudness
-Upload a finished mix, pick a preset that matches the genre, and apply a full mastering chain — EQ, compression, and loudness with optional denoise. Preview, then download. Processed with MLK v3 and never uploaded to a third party.
+Upload a finished mix, pick a preset that matches the genre, and apply a full mastering chain — EQ, compression, and loudness with optional denoise. Preview, then download. Processed with MLK V4 (Morris Law Kernel V4) and never uploaded to a third party.
 
 ### Songwriting Studio — your AI co-writer
 Enter a theme, mood, or lyric seed, pick a genre, and Gemini writes the complete song. Free users get the AI draft (no IP rights). Pro users edit line-by-line, certify their human–AI authorship, and send the finished song straight to Suno.
@@ -35,7 +35,7 @@ Enter a theme, mood, or lyric seed, pick a genre, and Gemini writes the complete
 Convert any audio or video to MP3, WAV, FLAC, M4A, or OGG — audio is auto-extracted from video (MP4, MOV, even screen recordings). Free for everyone and processed without third-party upload.
 
 ### Hardware Optimizer — benchmark your rig
-Detects your CPU topology and runs a DGEMM benchmark to gauge audio-processing throughput, presented alongside the MLK V3.5 optimization sequence. (Node Auditor.)
+Detects your CPU topology and runs a DGEMM benchmark to gauge audio-processing throughput, presented alongside the MLK V4 (Morris Law Kernel V4) optimization sequence. (Node Auditor.)
 
 ### GK Productions Label & Library
 Browse the GK Productions roster and artist pages, explore the public Library, and submit your own tracks — a built-in home for releasing and discovering music.
