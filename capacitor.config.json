@@ -1,0 +1,14 @@
+{
+  "appId": "com.allnone.gravelking.daw",
+  "appName": "GravelKing DAW",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": []
+  },
+  "android": {
+    "allowMixedContent": true,
+    "androidInsecureFileOperations": true
+  }
+}

@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;700;900&family=Cormorant+Garamond:ital,wght@1,300;1,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Cormorant Garamond", serif;
+}
+
+:root {
+  --bg: #0A0B0E;
+  --ink: #F0F0F0;
+  --accent: #00FFC2;
+  --sovereign: #FFD700; /* Gold */
+  --muted: #88888F;
+  --line: #1A1C23;
+  --surface: #0F1115;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dot-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.brutalist-card {
+  background-color: var(--surface);
+  border: 1px solid #333;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.editorial-header {
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+}
+
+.grid-cols-16 {
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+}

@@ -1,0 +1,6 @@
+{
+  "name": "GravelKing",
+  "description": "Sovereign Core Controller running Morris Law Kernel V2 Active with Node Auditor V2 support",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
